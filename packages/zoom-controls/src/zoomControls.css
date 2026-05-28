@@ -1,0 +1,38 @@
+/* Positioning + corner-pinning is now owned by the shared
+   `.sobree-floating-corner` container that `getFloatingCorner` mints
+   inside the host — we just lay out our own buttons here. */
+.sobree-zoom-controls {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.1);
+  opacity: 0.5;
+  transition: opacity 180ms ease;
+}
+
+.sobree-zoom-controls:hover,
+.sobree-zoom-controls:focus-within {
+  opacity: 1;
+}
+
+.sobree-zoom-controls button {
+  all: unset;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #1a1a1a;
+}
+
+.sobree-zoom-controls button:hover {
+  background: #f0f0f3;
+}
+
+.sobree-zoom-controls button:active {
+  background: #e2e2e6;
+}

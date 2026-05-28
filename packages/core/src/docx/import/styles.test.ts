@@ -1,0 +1,101 @@
+import { describe, expect, it } from "vitest";
+import { parseStylesXml } from "./styles";
+import { resolveStyleCascade } from "../../doc/styles";
+
+const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+/**
+ * Regression coverage for the Normal-style cascade. Bug history:
+ *
+ *   `ensureWordBaseline` previously injected `fontFamily: "Calibri"` +
+ *   `fontSizePt: 11` onto Normal whenever Normal's own `runDefaults`
+ *   didn't specify them — even when `<w:docDefaults>` already provided
+ *   them via the cascade. The injection silently overrode the docx
+ *   author's choice. The Hungarian user-contract.docx declares Times
+ *   New Roman in `<w:docDefaults><w:rPrDefault>`; Word/LibreOffice
+ *   render the whole body as Times; Sobree wrongly rendered it as
+ *   Calibri. The fix: only inject Calibri/11pt when the *cascade*
+ *   (including DocDefaults via `basedOn`) provides no font/size.
+ *
+ *   Adding this test as a hard lock — any future change to
+ *   `ensureWordBaseline` that re-introduces the override will fail
+ *   here and pop the diff at PR time, not at the user's eyeballs.
+ */
+describe("parseStylesXml + ensureWordBaseline", () => {
+  it("honours <w:docDefaults> rFonts via the Normal-style cascade", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="${NS_W}">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>
+      </w:rPr>
+    </w:rPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+</w:styles>`;
+    const styles = parseStylesXml(xml);
+    expect(styles).not.toBeNull();
+    const resolved = resolveStyleCascade(styles!, "Normal");
+    expect(resolved.runDefaults.fontFamily).toBe("Times New Roman");
+    // Size is unspecified everywhere — last-resort baseline (11pt) wins.
+    expect(resolved.runDefaults.fontSizePt).toBe(11);
+  });
+
+  it("falls back to Calibri 11pt when neither Normal nor docDefaults sets a font", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="${NS_W}">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+  </w:style>
+</w:styles>`;
+    const styles = parseStylesXml(xml);
+    const resolved = resolveStyleCascade(styles!, "Normal");
+    expect(resolved.runDefaults.fontFamily).toBe("Calibri");
+    expect(resolved.runDefaults.fontSizePt).toBe(11);
+  });
+
+  it("reads <w:shd> into paragraph-level shading on a style", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="${NS_W}">
+  <w:style w:type="paragraph" w:styleId="Highlight">
+    <w:name w:val="Highlight"/>
+    <w:pPr>
+      <w:shd w:val="clear" w:fill="FFEB9C" w:color="auto"/>
+    </w:pPr>
+  </w:style>
+</w:styles>`;
+    const styles = parseStylesXml(xml);
+    const resolved = resolveStyleCascade(styles!, "Highlight");
+    expect(resolved.paragraphDefaults.shading).toEqual({
+      pattern: "clear",
+      fill: "#FFEB9C",
+    });
+  });
+
+  it("respects an explicit Normal rFonts even when docDefaults differs", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="${NS_W}">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Times New Roman"/>
+      </w:rPr>
+    </w:rPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:rPr>
+      <w:rFonts w:ascii="Cambria"/>
+      <w:sz w:val="22"/>
+    </w:rPr>
+  </w:style>
+</w:styles>`;
+    const styles = parseStylesXml(xml);
+    const resolved = resolveStyleCascade(styles!, "Normal");
+    expect(resolved.runDefaults.fontFamily).toBe("Cambria");
+    expect(resolved.runDefaults.fontSizePt).toBe(11);
+  });
+});

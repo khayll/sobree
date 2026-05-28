@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sobree · dev playground</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <header class="bar">
+      <strong>Sobree dev playground</strong>
+      <span class="hint">For verifying editor changes during development. Not the user-facing demo (that lives at <a href="https://sobree.dev/try" target="_blank" rel="noopener">sobree.dev/try</a>).</span>
+    </header>
+    <div class="layout">
+      <main id="editor" class="editor"></main>
+      <aside class="panel">
+        <section class="modes">
+          <h2>Editor mode</h2>
+          <label class="switch">
+            <input type="checkbox" id="mode-edit" checked />
+            <span>Editable</span>
+            <em class="switch__hint">(off = read-only)</em>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="mode-track-changes" />
+            <span>Track changes</span>
+          </label>
+          <label class="switch switch--input" id="author-row" hidden>
+            <span class="switch__label">Author</span>
+            <input type="text" id="tc-author" placeholder="Anonymous" maxlength="60" />
+          </label>
+        </section>
+        <section>
+          <h2>Seed</h2>
+          <button data-action="seed-simple">Simple paragraph</button>
+          <button data-action="seed-rich">Rich (headings + lists)</button>
+          <button data-action="seed-multipage">Multi-page A4</button>
+          <button data-action="seed-a5">A5 (2 pages)</button>
+          <button data-action="clear">Clear</button>
+        </section>
+        <section>
+          <h2>DOCX</h2>
+          <input type="file" id="file-input" accept=".docx" />
+          <button data-action="export-docx">Download .docx</button>
+        </section>
+        <section>
+          <h2>Live state</h2>
+          <div class="meta">
+            <span>blocks: <code id="meta-blocks">0</code></span>
+            <span>pages: <code id="meta-pages">0</code></span>
+            <span>rev: <code id="meta-rev">0</code></span>
+          </div>
+          <pre id="doc-pre"></pre>
+        </section>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

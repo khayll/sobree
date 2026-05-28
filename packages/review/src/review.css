@@ -1,0 +1,251 @@
+/* @sobree/review — post-it comment cards + per-author mark colour.
+ *
+ * Colours read `--sobree-*` design tokens from @sobree/core/tokens.css
+ * (with hard-coded fallbacks), so the whole surface is themeable by
+ * overriding tokens rather than these rules.
+ */
+
+/* The per-paper sidebar slot — core creates it empty; this plugin
+   fills it. `position: relative` anchors the absolutely-positioned
+   cards; the plugin sets each card's `top` to align with its anchor. */
+.paper-comments {
+  position: relative;
+}
+
+/* Post-it card — one comment thread. White, lightly shadowed, pinned
+   at a computed `top`. Sits in the sidebar to the right of the page. */
+.sobree-review-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated, #ffffff);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(20, 19, 15, 0.06));
+  overflow: hidden;
+}
+
+/* One comment inside the thread. Replies sit below, hairline-divided
+   and slightly inset. */
+.sobree-review-comment {
+  padding: 6px 9px;
+}
+.sobree-review-comment.is-reply {
+  border-top: 1px solid var(--border, #dedbd0);
+  margin-left: 10px;
+}
+.sobree-review-comment__header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.sobree-review-comment__author {
+  font-weight: 600;
+  /* colour set inline per author by the plugin */
+}
+.sobree-review-comment__date {
+  font-size: 0.8em;
+  color: var(--fg-subtle, #7c7764);
+}
+.sobree-review-comment__status {
+  margin-left: auto;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--sobree-comment-resolved, #16a34a);
+}
+.sobree-review-comment__body {
+  white-space: pre-wrap;
+  color: var(--fg, #26241f);
+}
+
+/* Resolved comments — muted, struck body. */
+.sobree-review-comment.is-resolved .sobree-review-comment__body {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+/* Resolve / reopen toggle in the card header. */
+.sobree-review-comment__action {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm, 2px);
+  background: transparent;
+  color: var(--fg-subtle, #7c7764);
+  cursor: pointer;
+}
+.sobree-review-comment__action:hover {
+  background: var(--bg-hover, #eceae3);
+  color: var(--sobree-comment-resolved, #16a34a);
+}
+/* When a status badge is present it already took `margin-left: auto`;
+   keep the action button snug after it. */
+.sobree-review-comment__status + .sobree-review-comment__action {
+  margin-left: 4px;
+}
+
+/* Accept / reject popover — floats above a hovered revision mark.
+   `position: fixed` + appended to <body> so it stays UI-sized
+   regardless of document zoom and is never clipped by the viewport. */
+.sobree-review-actions {
+  position: fixed;
+  z-index: 9999;
+  display: none;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-elevated, #ffffff);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  box-shadow: var(--shadow-md, 0 4px 8px -2px rgba(20, 19, 15, 0.12));
+}
+.sobree-review-actions.is-visible {
+  display: flex;
+}
+.sobree-review-actions__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm, 2px);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg-muted, #5a5649);
+}
+.sobree-review-actions__btn.is-accept:hover {
+  background: color-mix(in srgb, var(--sobree-comment-resolved, #16a34a) 16%, transparent);
+  color: var(--sobree-comment-resolved, #16a34a);
+}
+.sobree-review-actions__btn.is-reject:hover {
+  background: color-mix(in srgb, #b3261e 16%, transparent);
+  color: #b3261e;
+}
+
+/* ---------- review dock (top-level accept-all / next-prev) ---------- */
+
+.sobree-review-dock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  /* Match the buttons-visible outer height (24px btn + 12px padding + 2px border, border-box) so the empty state doesn't collapse. */
+  min-height: 38px;
+  background: var(--sobree-bg, #fff);
+  border: 1px solid var(--sobree-border, #dedbd0);
+  border-radius: 8px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 6px 18px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+  color: var(--sobree-fg, #26241f);
+  /* Slightly dim when idle so we don't draw the eye away from
+     content, but stay readable. */
+  opacity: 0.82;
+  transition: opacity 180ms ease;
+}
+.sobree-review-dock:hover,
+.sobree-review-dock:focus-within {
+  opacity: 1;
+}
+
+.sobree-review-dock__summary {
+  /* Author-tinted left edge so the dock mirrors the per-author colour
+     of the cursor revision. */
+  padding-left: 8px;
+  border-left: 3px solid var(--sobree-review-dock-accent, currentColor);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Empty state — dock is still visible (so the user has a stable
+   surface and clear feedback that there's nothing to act on) but
+   the action buttons + dividers are hidden, and the message is
+   de-emphasized. */
+.sobree-review-dock.is-empty .sobree-review-dock__divider,
+.sobree-review-dock.is-empty .sobree-review-dock__btn {
+  display: none;
+}
+.sobree-review-dock.is-empty .sobree-review-dock__summary {
+  color: var(--sobree-fg-muted, #5a5649);
+  font-weight: 400;
+  font-style: italic;
+  /* Accent is removed by JS in the empty state; fall back to a faint
+     border so the text doesn't sit oddly against a colored stripe. */
+  border-left-color: transparent;
+  padding-left: 4px;
+}
+.sobree-review-dock.is-empty {
+  /* A bit more muted overall in the empty state — it's a status hint
+     more than a UI surface. */
+  opacity: 0.55;
+}
+.sobree-review-dock.is-empty:hover {
+  opacity: 0.85;
+}
+
+.sobree-review-dock__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--sobree-border, #dedbd0);
+}
+
+.sobree-review-dock__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--sobree-fg-muted, #5a5649);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.sobree-review-dock__btn:hover {
+  background: var(--sobree-bg-hover, #eceae3);
+  color: var(--sobree-fg, #26241f);
+}
+.sobree-review-dock__btn.is-accept:hover {
+  background: color-mix(in srgb, var(--sobree-comment-resolved, #16a34a) 16%, transparent);
+  color: var(--sobree-comment-resolved, #16a34a);
+}
+.sobree-review-dock__btn.is-reject:hover {
+  background: color-mix(in srgb, #b3261e 16%, transparent);
+  color: #b3261e;
+}
+.sobree-review-dock__btn-label {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- flash pulse on navigation ----------
+   The dock's prev/next adds `.is-flashing` to the target mark for
+   ~700ms after scroll-into-view. The pulse is a halo: a coloured
+   outline that fades from saturated → transparent. We don't change
+   the mark's own colour — that would be confusing with author tints. */
+@keyframes sobree-review-flash {
+  0% {
+    outline: 3px solid color-mix(in srgb, currentColor 60%, transparent);
+    outline-offset: 2px;
+    background-color: color-mix(in srgb, currentColor 18%, transparent);
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: 2px;
+    background-color: transparent;
+  }
+}
+.sobree-editor .is-flashing {
+  border-radius: 3px;
+  animation: sobree-review-flash 700ms ease-out;
+}

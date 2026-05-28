@@ -1,0 +1,17 @@
+/* Bring @sobree/core tokens in, then map them onto the Starlight
+   accent / colour roles so the docs site reads as Sobree-branded
+   without rewriting every Starlight component class. */
+
+@import "@sobree/core/tokens.css";
+
+:root {
+  /* Accent → Sobree amber. Starlight uses --sl-color-accent-* across
+     buttons, links, heading marks, code highlights. */
+  --sl-color-accent: var(--sobree-500);
+  --sl-color-accent-low: var(--sobree-50);
+  --sl-color-accent-high: var(--sobree-600);
+
+  /* Text + surface — keep Starlight's default scale but nudge the
+     warmer end toward the Sobree neutral palette. */
+  --sl-color-text-accent: var(--sobree-500);
+}

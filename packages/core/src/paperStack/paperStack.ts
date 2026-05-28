@@ -1,0 +1,1046 @@
+import "./paperStack.css";
+import {
+  type PageSetup,
+  resolvedDimensions,
+  substituteVariables,
+  zoneTemplateFor,
+} from "./pageSetup";
+import { paginateBlocks } from "./paginationAdapter";
+import { Paper } from "./paper";
+import { renderBlocks } from "../editor/view/docRenderer/block";
+import { restoreSelection, saveSelection } from "../util/selection";
+import type {
+  AnchoredFrame,
+  Block,
+  NamedStyle,
+  NumberingDefinition,
+  SectionProperties,
+} from "../doc/types";
+
+/**
+ * Sourced from `SobreeDocument`: the rich AST + the dependencies
+ * `renderBlocks` needs (numbering, named styles, embedded media bytes).
+ * When set, every page renders headers/footers from this AST and
+ * ignores the `PageSetup.header.default` / `footer.default` string
+ * templates. Cleared (set back to `null`) when the doc has no
+ * header/footer parts — falls back to the legacy text path.
+ */
+export interface RichZonesSource {
+  headerFooterBodies: Record<string, Block[]>;
+  numbering: readonly NumberingDefinition[];
+  styles: readonly NamedStyle[];
+  rawParts: Record<string, Uint8Array>;
+}
+
+const MM_TO_PX = 96 / 25.4;
+
+/** Cap on iterative repagination retries. Each iteration shrinks the
+ *  budget by the observed overflow, so convergence is exponential —
+ *  3 is plenty for any realistic doc and prevents accidental infinite
+ *  loops on pathological content. */
+const MAX_REPAGINATE_RETRIES = 3;
+
+/** "Is this page actually overflowing enough to warrant a re-pack?"
+ *  Set to ~one body line — sub-line overflows are visually
+ *  imperceptible and re-paginating to fix them tends to shift page
+ *  breaks by a full line elsewhere, drifting AWAY from Word/LibreOffice
+ *  break points rather than toward them. We only iterate when the
+ *  overflow exceeds a typical line height. (~28px ≈ 21pt at 12pt
+ *  body — covers the common case where split-slippage adds a line.) */
+const OVERFLOW_TOLERANCE_PX = 28;
+
+/**
+ * Stack of Paper elements. The stack's root is the single contentEditable
+ * region; each paper's header/footer is contentEditable=false. Blocks of
+ * editor content are physically distributed across the papers'
+ * `.paper-content` elements. Editing naturally crosses page boundaries
+ * because the whole stack is one editable region.
+ *
+ * Call `repaginate()` after content changes or after page setup changes.
+ */
+export class PaperStack {
+  readonly root: HTMLElement;
+  private papers: Paper[] = [];
+  private setup: PageSetup;
+  /**
+   * Layout-side zoom tier currently applied to an ancestor (via the Viewport's
+   * CSS `zoom`). Measurements from offsetHeight/offsetTop come back in zoomed
+   * pixels, so the page budget must scale the same way.
+   */
+  private renderTier = 1;
+  /** Optional observer fired after every successful repagination. */
+  private paginateListeners: Set<(pageCount: number) => void> = new Set();
+  /**
+   * Per-section property overrides. When set, each Paper applies the
+   * section's settings (currently just `vAlign`) based on the
+   * `data-section-index` stamped on its first block. Sobree provides
+   * this from the live document; absent → all pages use `setup`.
+   */
+  private sections: SectionProperties[] | null = null;
+  /**
+   * Optional rich-AST source for header/footer rendering. When present,
+   * each paper's header/footer is rendered from the matching part body
+   * (resolved through `sections[i].headerRefs` / `footerRefs`) instead
+   * of from the `PageSetup` string template. Set via `setRichZones`.
+   */
+  private richZones: RichZonesSource | null = null;
+  /**
+   * Document's floating-layer frames (the new architecture replacing
+   * the lifter + framePictures hacks). When set, each paper is painted
+   * with the subset of frames whose anchor resolves to that page;
+   * paper.setAnchoredFrames does the per-page filtering and DOM swap.
+   * `null` → no floating layer at all (skeleton state during Phase B).
+   */
+  private anchoredFrames: AnchoredFrame[] | null = null;
+  /** Reused blob-URL cache across renders so the same image isn't re-uploaded. */
+  private readonly anchorPictureUrlCache = new Map<string, string>();
+
+  constructor(container: HTMLElement, setup: PageSetup) {
+    this.setup = setup;
+    this.root = document.createElement("div");
+    this.root.className = "paper-stack";
+    container.appendChild(this.root);
+    this.ensurePaperCount(1);
+    this.renderAllZones();
+  }
+
+  /**
+   * Provide the document's sections for per-page property application.
+   * Re-applied immediately so a setSections call without a content
+   * change still updates papers (e.g. user edits a section's vAlign in
+   * the future Page Setup section selector).
+   */
+  setSections(sections: readonly SectionProperties[]): void {
+    this.sections = sections.slice();
+    this.applyPerSectionSettings();
+  }
+
+  /**
+   * Install or clear the rich AST source for header/footer rendering.
+   * Re-renders zones immediately so the swap is visible without waiting
+   * for the next paginate. Pass `null` to revert to the legacy text-
+   * template path (no rich body available).
+   */
+  setRichZones(source: RichZonesSource | null): void {
+    this.richZones = source;
+    this.renderAllZones();
+  }
+
+  /**
+   * Install or clear the document's floating-layer frames. Each frame's
+   * `anchor.paragraphIndex` (when set) decides which page receives it
+   * after the next repaginate; frames without a paragraph index land
+   * on the first page of their section. Pass `null` to clear.
+   *
+   * Call after `setRichZones`/`updateBodyBlocks` so the next render
+   * picks up the new floating content alongside body flow.
+   */
+  setAnchoredFrames(frames: readonly AnchoredFrame[] | null): void {
+    this.anchoredFrames = frames ? frames.slice() : null;
+    this.paintAnchorLayers();
+  }
+
+  getSetup(): PageSetup {
+    return this.setup;
+  }
+
+  getPageCount(): number {
+    return this.papers.length;
+  }
+
+  onPaginate(cb: (pageCount: number) => void): () => void {
+    this.paginateListeners.add(cb);
+    return () => this.paginateListeners.delete(cb);
+  }
+
+  /** First paper's content — initial render target for a new editor. */
+  get primaryContent(): HTMLElement {
+    const p = this.papers[0];
+    if (!p) throw new Error("PaperStack has no papers");
+    return p.content;
+  }
+
+  /** First paper card — for viewport fit-to-page calculations. */
+  get firstPaper(): HTMLElement {
+    const p = this.papers[0];
+    if (!p) throw new Error("PaperStack has no papers");
+    return p.root;
+  }
+
+  /** First paper's row wrapper (paper + comments sidebar) — for fit-to-width. */
+  get firstPaperRow(): HTMLElement {
+    const p = this.papers[0];
+    if (!p) throw new Error("PaperStack has no papers");
+    return p.outer;
+  }
+
+  /** All content hosts in document order — for serialization. */
+  get contentHosts(): HTMLElement[] {
+    return this.papers.map((p) => p.content);
+  }
+
+  updateSetup(setup: PageSetup): void {
+    this.setup = setup;
+    for (const p of this.papers) p.applySetup(setup);
+    this.repaginate();
+  }
+
+  /**
+   * Called by the Viewport when the layout-zoom tier changes. In Chromium,
+   * CSS `zoom` doesn't change `offsetHeight`/`offsetTop`, so measurements
+   * stay logical and the page budget is unaffected. We still re-paginate
+   * defensively — tier changes re-render text at a new resolution, which
+   * can nudge line wrapping at sub-pixel boundaries.
+   */
+  setRenderTier(tier: number): void {
+    if (tier === this.renderTier) return;
+    this.renderTier = tier;
+    this.repaginate();
+  }
+
+  /**
+   * Redistribute blocks across papers so no paper overflows. Creates or
+   * removes papers as needed.
+   *
+   * Delegates to the pure paginator in `src/pagination/` via the DOM
+   * adapter. Before paginating, blocks are **consolidated** into the first
+   * paper's content so their `offsetTop` values share one coordinate system,
+   * and consecutive `<p>` fragments sharing a `data-pag-pid` (previous-split
+   * siblings of the same logical paragraph) are **merged** back into a
+   * single paragraph — so each repagination starts from the clean logical
+   * flow instead of accumulating inter-fragment margins.
+   */
+  repaginate(): void {
+    const initialBlocks = this.collectAllBlocks();
+
+    if (initialBlocks.length === 0) {
+      this.ensurePaperCount(1);
+      this.renderAllZones();
+      this.emitPaginate();
+      return;
+    }
+
+    const saved = saveSelection();
+    const baselineBudgetPx = this.pageContentHeightPx();
+    // Iterative paginate with per-page budget. The paginator gets a
+    // `pageHeights[]` array — entry `i` is page `i`'s budget after
+    // subtracting whatever space its footnote zone occupies. Pages
+    // without footnotes use the full baseline budget. Each iteration:
+    //
+    //   1. paginate body with current `pageHeights`
+    //   2. distribute footnotes — populates per-page zones based on
+    //      where the refs landed
+    //   3. rebuild `pageHeights` from observed footnote zone heights
+    //   4. if any page's body now overflows its new (smaller) budget,
+    //      retry with the updated array
+    //
+    // Bounded by `MAX_REPAGINATE_RETRIES`; each iteration is exponential
+    // so 3 is plenty for any realistic doc.
+    let pageHeights: number[] = [];
+    for (let attempt = 0; attempt <= MAX_REPAGINATE_RETRIES; attempt++) {
+      this.runPaginationOnce(baselineBudgetPx, pageHeights);
+      this.distributeFootnotes();
+      const newHeights = this.computePageHeights(baselineBudgetPx);
+      const stable = arraysEqual(newHeights, pageHeights);
+      pageHeights = newHeights;
+      // Stable + no overflow → done. Stable + overflow shouldn't
+      // happen (the shrunken budget already reserved footnote space),
+      // but guard with the existing overflow check anyway.
+      const overflowPx = this.maxPaperOverflowPx();
+      if (stable && overflowPx <= OVERFLOW_TOLERANCE_PX) break;
+    }
+
+    // Post-pagination: absorb under-filled middle papers. After the
+    // distribution loop converges, each paper has its blocks laid
+    // out in their final layout, so offsetHeight is reliable —
+    // measurements during pagination see absolute-positioned
+    // section-frame decorations as 0-height (they're out of flow at
+    // measurement time), so the in-paginate `collapseUnderfilledPages`
+    // pass under-estimates page contents and only catches truly tiny
+    // widows. This second pass uses the true rendered heights.
+    // Disabled — this post-distribute absorption was a session hack
+    // that fused tiny widow pages into the previous one to match a
+    // page-count target. With anchored content now living in its own
+    // layer (not consuming body-flow space), the paginator's primary
+    // pass produces correctly-sized pages on its own. Leaving the
+    // absorber on caused page 2 of complex-multipage to overflow by
+    // 696px (182% fill) — pulling section-heading + bullet content
+    // out of page 3 onto an already-full page 2.
+    void baselineBudgetPx;
+
+    restoreSelection(saved);
+    this.renderAllZones();
+    this.applyPerSectionSettings();
+    this.emitPaginate();
+  }
+
+  /**
+   * Per-page footnote pinning. After body pagination completes, scan
+   * each paper for footnote references (`<sup class="sobree-footnote-ref">`)
+   * and populate that paper's `.paper-footnotes` zone with the cited
+   * bodies — matching Word's "footnote bodies render at the bottom of
+   * the page where they're referenced" behaviour.
+   *
+   * Footnote bodies are sourced from two places:
+   *   1. The doc-end `<aside class="sobree-footnotes">` the renderer
+   *      initially appends to paper[0].content. We harvest the `<li>`s
+   *      out of it before the aside itself gets re-paginated as a block.
+   *   2. Any footnote zones already populated from a previous repaginate
+   *      pass — those bodies stay in scope across iterations.
+   *
+   * Caveat: body budget is NOT reduced for footnote-zone height. On
+   * pages with many footnotes, the footnote zone may extend past the
+   * page bottom into the footer area. True budget-reservation is its
+   * own paginator feature.
+   */
+  private distributeFootnotes(): void {
+    // 1. Harvest existing footnote bodies (from any source) into a
+    //    Map<id, HTMLElement>. Bodies are cloned on each insertion so
+    //    a footnote referenced from multiple pages renders multiple
+    //    times without DOM ownership conflicts.
+    const bodies = new Map<number, HTMLElement>();
+    for (const p of this.papers) {
+      for (const li of Array.from(p.footnotes.querySelectorAll("li[id^='sobree-footnote-']"))) {
+        const id = footnoteIdFromAttr(li.id);
+        if (id !== null) bodies.set(id, li as HTMLElement);
+      }
+      p.footnotes.replaceChildren();
+      p.footnotes.classList.add("is-empty");
+    }
+    // Also harvest from any doc-end `<aside>` left over from the
+    // renderer. The paginator treats it as a regular block, so it may
+    // have landed on any page — scan them all.
+    for (const p of this.papers) {
+      for (const aside of Array.from(p.content.querySelectorAll("aside.sobree-footnotes"))) {
+        for (const li of Array.from(aside.querySelectorAll("li[id^='sobree-footnote-']"))) {
+          const id = footnoteIdFromAttr(li.id);
+          if (id !== null) bodies.set(id, li as HTMLElement);
+        }
+        aside.remove();
+      }
+    }
+    if (bodies.size === 0) return;
+
+    // 2. For each paper, collect referenced ids in document order then
+    //    populate the footnote zone.
+    for (const paper of this.papers) {
+      const refs = paper.content.querySelectorAll("[id^='sobree-footnote-ref-']");
+      if (refs.length === 0) continue;
+      const seen = new Set<number>();
+      const list = document.createElement("ol");
+      list.className = "sobree-footnotes__list";
+      for (const ref of Array.from(refs)) {
+        const id = footnoteIdFromAttr(
+          (ref as HTMLElement).id.replace("sobree-footnote-ref-", "sobree-footnote-"),
+        );
+        if (id === null || seen.has(id)) continue;
+        seen.add(id);
+        const source = bodies.get(id);
+        if (!source) continue;
+        const clone = source.cloneNode(true) as HTMLElement;
+        // Per-paper id keeps the anchor link working when the same
+        // footnote pins to multiple pages: only the first occurrence
+        // owns the canonical id.
+        if (paper.footnotes.querySelector(`#${clone.id}`)) clone.removeAttribute("id");
+        list.appendChild(clone);
+      }
+      if (list.children.length > 0) {
+        paper.footnotes.appendChild(list);
+        paper.footnotes.classList.remove("is-empty");
+      }
+    }
+  }
+
+  /**
+   * One round of consolidate → merge → paginate → distribute.
+   * Re-entrant: each call re-collects blocks from every paper, so the
+   * iterative loop in `repaginate` can call this multiple times with
+   * shrinking budgets to absorb post-split slippage.
+   */
+  private runPaginationOnce(budgetPx: number, pageHeights: readonly number[] = []): void {
+    const blocks = this.collectAllBlocks();
+    const firstContent = this.papers[0]!.content;
+    for (const block of blocks) {
+      if (block.parentElement !== firstContent) firstContent.appendChild(block);
+    }
+    mergeConsecutiveFragments(firstContent);
+    const consolidatedBlocks = Array.from(firstContent.children).filter(
+      (c): c is HTMLElement => c instanceof HTMLElement,
+    );
+
+    const rawPages = paginateBlocks(
+      consolidatedBlocks,
+      budgetPx,
+      pageHeights.length > 0 ? pageHeights : undefined,
+    );
+    // Trailing-empty absorption: if the last page contains only
+    // visually-empty blocks (empty paragraphs, no images, no tables),
+    // sweep them onto the previous page. Matches Word's / LibreOffice's
+    // behaviour for trailing whitespace — they keep blank tail
+    // paragraphs anchored to the prior page rather than spawning a
+    // dedicated page. Without this, jellap.docx ends with a 3rd page
+    // containing two empty paragraphs.
+    const emptyCollapsed = collapseTrailingEmptyPages(rawPages);
+    // `collapseUnderfilledPages` (post-process widow absorption) was
+    // removed: at this point in the loop the blocks are still all
+    // stacked inside `firstContent` (per the `firstContent.appendChild`
+    // dance above) and `measureBlocksHeight` reads in-stack
+    // `offsetHeight`, which for tables and inline-frame wrappers is
+    // 5-10× smaller than the same content's height once distributed
+    // to its own paper. Traced live on complex-multipage: page 3's
+    // 268px Databases table measured 36px at collapse time → wrongly
+    // classified as a 15%-widow → absorbed back onto page 2 → page 2
+    // overflows 268px into the footer band.
+    //
+    // The paginator already produces correct page assignments
+    // (verified: with the absorber bypassed, page 2 lands at 98%
+    // fill, 0 overflow). Widow handling is a paginator-internals
+    // concern that belongs in the Knuth-Plass penalty function
+    // (Phase 2, task #164), not a post-process pass.
+    const pages = emptyCollapsed;
+    const pageCount = Math.max(1, pages.length);
+    this.ensurePaperCount(pageCount);
+
+    // `distributePages` may insert NEW per-page list clones at
+    // specific positions in `pageBlocks` (between H1 and the existing
+    // P/H1 siblings that came from `renderBlocks`). Those existing
+    // siblings are already children of `firstContent` from the pre-
+    // pagination consolidation pass. If we only re-parent blocks that
+    // currently live in a different paper, the new clones get
+    // `appendChild`-ed at the END of `target.content` and the existing
+    // siblings keep their old position — yielding all H1/P first, then
+    // all UL clones at the bottom (observed on google-modern.docx: 4
+    // section headings cluster above 4 bullet lists). Always call
+    // `appendChild` per block in `pageBlocks` order: same-parent calls
+    // MOVE the node to the end of the parent's child list, so iterating
+    // pageBlocks lays them down in exactly the order the paginator
+    // intended. Out-of-flow (`position: absolute|fixed`) elements skip
+    // the move — re-parenting under a transformed paper could disturb
+    // their resolved positioning ancestor (jellap.docx's anchored
+    // textbox frames depend on staying under their original paragraph).
+    for (let i = 0; i < pageCount; i++) {
+      const target = this.papers[i];
+      const pageBlocks = pages[i];
+      if (!target || !pageBlocks) continue;
+      for (const block of pageBlocks) {
+        const pos = getComputedStyle(block).position;
+        if (pos === "absolute" || pos === "fixed") {
+          if (block.parentElement !== target.content) {
+            target.content.appendChild(block);
+          }
+          continue;
+        }
+        target.content.appendChild(block);
+      }
+    }
+  }
+
+  /**
+   * Build a `pageHeights[]` array from observed footnote-zone heights.
+   * Entry `i` = `baselineBudgetPx - footnoteZoneHeight(i)`. Pages
+   * without footnotes get the full baseline. Returned array trims
+   * trailing entries equal to the baseline, so consumers can detect
+   * "no per-page overrides needed" via `length === 0`.
+   */
+  private computePageHeights(baselineBudgetPx: number): number[] {
+    const heights: number[] = [];
+    for (let i = 0; i < this.papers.length; i++) {
+      const paper = this.papers[i]!;
+      // Only footnotes share the page with body content; comments
+      // live in a sidebar outside the paper card.
+      const fnH = paper.footnotes.classList.contains("is-empty")
+        ? 0
+        : paper.footnotes.offsetHeight;
+      heights.push(baselineBudgetPx - fnH);
+    }
+    // Trim trailing baseline entries so two arrays that only differ by
+    // unrelated tail entries compare equal — keeps `arraysEqual` honest.
+    while (heights.length > 0 && heights[heights.length - 1] === baselineBudgetPx) {
+      heights.pop();
+    }
+    return heights;
+  }
+
+  /**
+   * Largest content overflow across all papers, in CSS px. Zero means
+   * every paper fits within its content area. Used by the iterative
+   * `repaginate` to detect post-split slippage that needs another
+   * pagination pass with a tighter budget.
+   */
+  private maxPaperOverflowPx(): number {
+    const budget = this.pageContentHeightPx();
+    let max = 0;
+    for (const paper of this.papers) {
+      const blocks = Array.from(paper.content.children);
+      const last = blocks[blocks.length - 1] as HTMLElement | undefined;
+      if (!last) continue;
+      const used = last.offsetTop + last.offsetHeight;
+      // Footnote zone (when non-empty) sits absolutely positioned just
+      // above the footer area, stealing visual space from the body
+      // budget. Comments now live in a sidebar OUTSIDE the paper, so
+      // they don't compete with body — only footnotes need budget
+      // reservation here.
+      const footnoteH = paper.footnotes.classList.contains("is-empty")
+        ? 0
+        : paper.footnotes.offsetHeight;
+      const effectiveBudget = budget - footnoteH;
+      const overflow = used - effectiveBudget;
+      if (overflow > max) max = overflow;
+    }
+    return max;
+  }
+
+  /**
+   * For every Paper, look at its first content block's `data-section-index`
+   * and apply that section's overrides. Falls back silently when no
+   * sections were provided or a paper is empty.
+   */
+  private applyPerSectionSettings(): void {
+    if (!this.sections) return;
+    for (const paper of this.papers) {
+      const first = paper.content.firstElementChild as HTMLElement | null;
+      const raw = first?.dataset.sectionIndex;
+      const idx = raw === undefined ? 0 : Number(raw);
+      const section = this.sections[idx] ?? this.sections[0];
+      if (section) paper.applySectionOverride(section);
+    }
+  }
+
+  private emitPaginate(): void {
+    const count = this.getPageCount();
+    for (const cb of this.paginateListeners) {
+      try {
+        cb(count);
+      } catch (err) {
+        console.error("[sobree] paginate listener threw:", err);
+      }
+    }
+  }
+
+  destroy(): void {
+    this.paginateListeners.clear();
+    for (const p of this.papers) p.destroy();
+    this.papers = [];
+    this.root.remove();
+  }
+
+  private pageContentHeightPx(): number {
+    // Prefer the EFFECTIVE content area height — what the first paper's
+    // `.paper-content` element actually reports after CSS layout. The
+    // `Paper.applyZoneOverflowPadding` may have bumped the paper's
+    // padding-top above `setup.margins.top` to make room for a
+    // taller-than-margin rich header (jellap.docx pushes body down by
+    // ~50mm because its header has logo + lifted contact-info textbox).
+    // If we ignored this and used the raw margin-derived budget, the
+    // paginator would think the page is ~200px taller than visible,
+    // overpack page 1, and the user would silently lose content past
+    // the bottom edge (Word's "Rendelkezik-e" and "Igényelnek-e"
+    // questions vanished without trace).
+    const firstPaper = this.papers[0];
+    if (firstPaper) {
+      const contentHeightPx = firstPaper.content.offsetHeight;
+      if (contentHeightPx > 0) return contentHeightPx;
+    }
+    const { heightMM } = resolvedDimensions(this.setup);
+    const { top, bottom } = this.setup.margins;
+    // CSS `zoom` on an ancestor changes `getBoundingClientRect` but NOT
+    // `offsetHeight`/`offsetTop` (in Chromium). Since the adapter measures
+    // blocks via `offsetHeight`, measurements stay in logical space at any
+    // render tier — so the budget stays logical too.
+    return (heightMM - top - bottom) * MM_TO_PX;
+  }
+
+  private collectAllBlocks(): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    for (const p of this.papers) {
+      for (const child of Array.from(p.content.children)) {
+        if (child instanceof HTMLElement) out.push(child);
+      }
+    }
+    return out;
+  }
+
+  private ensurePaperCount(n: number): void {
+    while (this.papers.length < n) {
+      this.papers.push(new Paper(this.root, this.setup));
+    }
+    while (this.papers.length > n) {
+      const p = this.papers.pop();
+      p?.destroy();
+    }
+  }
+
+  private renderAllZones(): void {
+    const pages = this.papers.length;
+    this.papers.forEach((paper, i) => {
+      const pageNum = i + 1;
+      const sectionIdx = this.sectionIndexForPage(i);
+      const isFirstOfSection = this.isFirstPaperOfSection(i, sectionIdx);
+      const headerBlocks = this.pickRichZone("header", sectionIdx, isFirstOfSection);
+      const footerBlocks = this.pickRichZone("footer", sectionIdx, isFirstOfSection);
+
+      if (this.richZones && headerBlocks !== null) {
+        paper.setHeaderBlocks({
+          blocks: headerBlocks,
+          numbering: this.richZones.numbering,
+          styles: this.richZones.styles,
+          rawParts: this.richZones.rawParts,
+          pageNumber: pageNum,
+          totalPages: pages,
+        });
+      } else {
+        const hTpl = zoneTemplateFor(this.setup.header, pageNum, pages);
+        paper.setHeaderText(substituteVariables(hTpl, { page: pageNum, pages }));
+      }
+
+      if (this.richZones && footerBlocks !== null) {
+        paper.setFooterBlocks({
+          blocks: footerBlocks,
+          numbering: this.richZones.numbering,
+          styles: this.richZones.styles,
+          rawParts: this.richZones.rawParts,
+          pageNumber: pageNum,
+          totalPages: pages,
+        });
+      } else {
+        const fTpl = zoneTemplateFor(this.setup.footer, pageNum, pages);
+        paper.setFooterText(substituteVariables(fTpl, { page: pageNum, pages }));
+      }
+    });
+    // Repaint floating layer alongside zones so a setRichZones (or
+    // setSections) call that triggers renderAllZones also refreshes
+    // anchor placement.
+    this.paintAnchorLayers();
+  }
+
+  /**
+   * Filter the document's `anchoredFrames` per paper and ask each Paper
+   * to swap its anchor-layer DOM accordingly. A frame's destination
+   * page is determined by its anchor:
+   *   - `paragraphIndex` set → page that ended up containing that
+   *     body block (looked up by `data-block-index` stamped on
+   *     rendered children).
+   *   - paragraphIndex absent → first paper of the frame's section.
+   *
+   * Cheap and idempotent; safe to call after any layout change.
+   */
+  private paintAnchorLayers(): void {
+    const frames = this.anchoredFrames;
+    if (!this.richZones || frames === null) {
+      // No floating layer wanted — clear every paper's overlay.
+      for (const p of this.papers) {
+        p.setAnchoredFrames([], {
+          rawParts: {},
+          pictureUrlCache: this.anchorPictureUrlCache,
+        });
+      }
+      return;
+    }
+    const richZones = this.richZones;
+    const ctx = {
+      rawParts: richZones.rawParts,
+      pictureUrlCache: this.anchorPictureUrlCache,
+      // Inject the full block renderer so anchored textbox bodies
+      // render with the same paragraph/list/table pipeline as body
+      // content — anchorLayer stays decoupled from block.ts.
+      renderBody: (blocks: Block[], host: HTMLElement) => {
+        renderBlocks(blocks, host, richZones.numbering, richZones.styles, richZones.rawParts);
+      },
+    };
+    // Build per-page assignment. A paragraph-anchored frame lives on
+    // the page whose .paper-content contains an element stamped with
+    // `data-block-index="N"` where N === paragraphIndex. Anything
+    // else falls onto the first page of its section (currently always
+    // section 0 — multi-section frame routing is a follow-up).
+    const perPage: AnchoredFrame[][] = this.papers.map(() => []);
+    const paragraphPage = this.buildParagraphPageIndex();
+    for (const frame of frames) {
+      let page = 0;
+      if (frame.anchor.paragraphIndex !== undefined) {
+        const found = paragraphPage.get(frame.anchor.paragraphIndex);
+        if (found !== undefined) page = found;
+      }
+      const bucket = perPage[page];
+      if (bucket) bucket.push(frame);
+    }
+    for (let i = 0; i < this.papers.length; i++) {
+      this.papers[i]!.setAnchoredFrames(perPage[i] ?? [], ctx);
+    }
+  }
+
+  /**
+   * Walk every paper's content children once and record, for each
+   * `data-block-index="N"` element, the paper index that holds it.
+   * The renderer stamps that attribute when emitting body paragraphs;
+   * this is the only piece of mutual knowledge between body flow and
+   * the floating layer needed for paragraph anchoring.
+   */
+  private buildParagraphPageIndex(): Map<number, number> {
+    const out = new Map<number, number>();
+    for (let i = 0; i < this.papers.length; i++) {
+      const stamped = this.papers[i]!.content.querySelectorAll<HTMLElement>("[data-block-index]");
+      for (const el of Array.from(stamped)) {
+        const n = Number(el.dataset.blockIndex);
+        if (Number.isFinite(n) && !out.has(n)) out.set(n, i);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Section index a paper belongs to. Read off the first content
+   * block's `data-section-index` (stamped by `renderBlocks`). Empty
+   * papers and the no-sections case fall back to 0.
+   */
+  private sectionIndexForPage(paperIdx: number): number {
+    const paper = this.papers[paperIdx];
+    if (!paper) return 0;
+    const first = paper.content.firstElementChild as HTMLElement | null;
+    const raw = first?.dataset.sectionIndex;
+    if (raw === undefined) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /**
+   * True when this paper is the first page of its section. Used to
+   * select the `first`-typed header/footer ref when the section has
+   * `titlePage = true`.
+   */
+  private isFirstPaperOfSection(paperIdx: number, sectionIdx: number): boolean {
+    if (paperIdx === 0) return true;
+    return this.sectionIndexForPage(paperIdx - 1) !== sectionIdx;
+  }
+
+  /**
+   * Resolve which header/footer Block[] applies to a paper. Walks the
+   * section's refs by type and looks up the corresponding part body in
+   * `richZones.headerFooterBodies`. Returns `null` when no rich body
+   * applies (no refs, or `richZones` not set).
+   */
+  private pickRichZone(
+    kind: "header" | "footer",
+    sectionIdx: number,
+    isFirstOfSection: boolean,
+  ): readonly Block[] | null {
+    if (!this.richZones || !this.sections) return null;
+    // OOXML §17.10.3: when a section omits headerReference / footerReference,
+    // the corresponding zone is inherited from the prior section. Walk back
+    // until we find a section that declares refs; bail at section 0. This
+    // is how multi-section forms (jellap.docx) keep a single header part
+    // across continuous section breaks even though only section 0 names it.
+    let lookupIdx = sectionIdx;
+    let section: SectionProperties | undefined;
+    while (lookupIdx >= 0) {
+      const candidate = this.sections[lookupIdx];
+      if (candidate) {
+        const refs = kind === "header" ? candidate.headerRefs : candidate.footerRefs;
+        if (refs.length > 0) {
+          section = candidate;
+          break;
+        }
+      }
+      lookupIdx -= 1;
+    }
+    if (!section) return null;
+    const refs = kind === "header" ? section.headerRefs : section.footerRefs;
+    if (refs.length === 0) return null;
+    // Type preference: titlePage + first-of-section → `first`,
+    // otherwise → `default`. Even-page support is a future addition.
+    const preferred = isFirstOfSection && section.titlePage === true
+      ? refs.find((r) => r.type === "first") ?? refs.find((r) => r.type === "default")
+      : refs.find((r) => r.type === "default") ?? refs[0];
+    if (!preferred) return null;
+    return this.richZones.headerFooterBodies[preferred.partId] ?? null;
+  }
+}
+
+/**
+ * Walk `container`'s direct children and merge adjacent fragments back
+ * into their logical parents:
+ *
+ *   - `<p>` siblings sharing a `data-pag-pid` rejoin into one paragraph.
+ *   - `<ol>` / `<ul>` siblings sharing a `data-pag-lid` rejoin into one
+ *     list — the head's `start` attribute is preserved, the tail's is
+ *     dropped, and the tail's `<li>` children move into the head.
+ *   - INSIDE every merged list, sibling `<li>` fragments sharing a
+ *     `data-pag-pid` rejoin too — the post-paragraph-split repair
+ *     applied to LIs since they're now treated like paragraphs by
+ *     the paginator.
+ *
+ * Continuation markers (`data-pag-continuation`, `sobree-li-continuation`
+ * class) are stripped on merge so the rejoined LI starts fresh. Without
+ * this, every repagination pass would accumulate stale fragments and
+ * marker-suppression flags.
+ */
+function mergeConsecutiveFragments(container: HTMLElement): void {
+  // Pass 1: merge top-level <p> and <ol>/<ul>.
+  let child = container.firstElementChild as HTMLElement | null;
+  while (child) {
+    const next = child.nextElementSibling as HTMLElement | null;
+    if (next && canMergeFragments(child, next)) {
+      mergeInto(child, next);
+      next.remove();
+      // `child` may merge with further siblings too — stay put.
+      continue;
+    }
+    child = next;
+  }
+  // Pass 2: walk into each list and merge its LI children. This
+  // happens AFTER pass 1 so all LIs are back inside one OL / UL
+  // before we try to merge them.
+  for (const list of Array.from(container.children)) {
+    if (list.tagName !== "OL" && list.tagName !== "UL") continue;
+    mergeListItemFragments(list as HTMLElement);
+  }
+  // Pass 3: merge TBODY contents of joined tables. After pass 1
+  // joined adjacent `<table>` fragments sharing `data-pag-tid`, their
+  // TBODY's now-sibling rows are already in correct order — but the
+  // head TABLE may have ended up with two TBODY children (head's own
+  // + the moved-in tail TBODY). Collapse those into one.
+  for (const table of Array.from(container.children)) {
+    if (table.tagName !== "TABLE") continue;
+    mergeTableBodyFragments(table as HTMLElement);
+  }
+}
+
+function canMergeFragments(a: HTMLElement, b: HTMLElement): boolean {
+  if (a.tagName !== b.tagName) return false;
+  if (a.tagName === "P") {
+    return !!a.dataset.pagPid && a.dataset.pagPid === b.dataset.pagPid;
+  }
+  if (a.tagName === "OL" || a.tagName === "UL") {
+    return !!a.dataset.pagLid && a.dataset.pagLid === b.dataset.pagLid;
+  }
+  if (a.tagName === "TABLE") {
+    return !!a.dataset.pagTid && a.dataset.pagTid === b.dataset.pagTid;
+  }
+  return false;
+}
+
+/**
+ * Collapse multiple TBODY children of one `<table>` into a single
+ * TBODY (head's own + every following TBODY's TRs append into the
+ * head's TBODY). Side-effect of merging two table fragments via
+ * `mergeInto` — it dumps the tail's entire child list (one TBODY)
+ * into the head, leaving the head with two consecutive TBODY's. The
+ * browser tolerates that but it confuses the next pagination pass:
+ * `tableRowBoxes` only walks the FIRST TBODY's TRs.
+ */
+function mergeTableBodyFragments(table: HTMLElement): void {
+  const tbodies = Array.from(table.children).filter(
+    (c): c is HTMLElement => c.tagName === "TBODY",
+  );
+  if (tbodies.length <= 1) return;
+  const head = tbodies[0]!;
+  for (let i = 1; i < tbodies.length; i++) {
+    const tail = tbodies[i]!;
+    while (tail.firstChild) head.appendChild(tail.firstChild);
+    tail.remove();
+  }
+}
+
+/**
+ * Merge sibling `<li>` fragments inside a list. Two adjacent LIs sharing
+ * a `data-pag-pid` collapse into one; the tail's children move into the
+ * head, the tail is removed.
+ */
+function mergeListItemFragments(list: HTMLElement): void {
+  let child = list.firstElementChild as HTMLElement | null;
+  while (child) {
+    const next = child.nextElementSibling as HTMLElement | null;
+    if (
+      next &&
+      child.tagName === "LI" &&
+      next.tagName === "LI" &&
+      child.dataset.pagPid &&
+      child.dataset.pagPid === next.dataset.pagPid
+    ) {
+      mergeInto(child, next);
+      next.remove();
+      continue;
+    }
+    child = next;
+  }
+}
+
+/**
+ * Move all of `tail`'s children into `head` (preserving order) and
+ * strip continuation markers from `head` so the merged element looks
+ * like a fresh paragraph / LI to the next pagination pass.
+ */
+function mergeInto(head: HTMLElement, tail: HTMLElement): void {
+  while (tail.firstChild) head.appendChild(tail.firstChild);
+  // Continuation flags belong to the tail, not the merged whole.
+  delete head.dataset.pagContinuation;
+  head.classList.remove("sobree-li-continuation");
+}
+
+/** Parse "sobree-footnote-7" → 7; returns null for anything else. */
+function footnoteIdFromAttr(attr: string): number | null {
+  const m = /^sobree-footnote-(\d+)$/.exec(attr);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Walk the paginator's output back-to-front, collapsing trailing pages
+ * whose blocks are all visually empty into the previous page.
+ *
+ * "Visually empty" = an empty paragraph: a `<p>` (or list-item `<li>`)
+ * with no text content and no embedded image / table / break. We keep
+ * the empty blocks (round-trip fidelity demands every paragraph mark
+ * stays in the AST) — we just stop reserving a fresh page for them.
+ *
+ * Stops collapsing the moment a page contains any non-empty block, so
+ * a real "last page with just a signature line" still gets its own
+ * page. Idempotent; safe to call on a single-page result.
+ */
+/**
+ * Walk paginator output forward, absorbing pages whose total content
+ * height is ≤ 15% of `budgetPx` (the page-content budget) into the
+ * previous page. These tiny tail-pages are paginator widows — usually
+ * a 1-line overflow or an LRPB-induced sub-section that didn't have
+ * room. Both Word and LO tolerate a bit of bottom-margin spill in
+ * exchange for not spending an entire fresh page on the runt.
+ *
+ * Safety: only absorbs pages whose content height is smaller than the
+ * previous page's slack PLUS the widow tolerance (~20% of budget).
+ * If absorbing would visibly push content far past the page bottom,
+ * we leave the runt page alone — better an underfilled page than
+ * unreadable overflow.
+ *
+ * Run AFTER `collapseTrailingEmptyPages` so trailing whitespace is
+ * already merged and we're working on the real content layout.
+ */
+export function collapseUnderfilledPages(
+  pages: readonly HTMLElement[][],
+  budgetPx: number,
+): HTMLElement[][] {
+  if (budgetPx <= 0) return pages.map((p) => p.slice());
+
+  /** Two thresholds, picked by how underfilled the target page is.
+   *  TIGHT: typical widow — a 1-3 line tail-page. Absorb only when
+   *  it fits within a modest overflow.
+   *  AGGRESSIVE: a substantially-underfilled page (≤ 40% fill) is
+   *  almost always a paginator/LRPB mistake. Worth absorbing even
+   *  if the resulting overflow is noticeable, because the alternative
+   *  is an obviously-half-empty page that breaks the eye more than
+   *  a bit of bottom-margin spill.
+   *  Pages above the aggressive threshold are left alone. */
+  // Only the "tight" widow rule. We considered an "aggressive" pass
+  // for ≤40%-fill pages, but at the moment this function runs the
+  // candidate blocks are all stacked together in `firstContent` and
+  // any absolute-positioned decoration (section-frame banner, anchored
+  // shape, lifted textbox) contributes 0 to its block's flow
+  // offsetHeight — so a 700-px text-page that carries a 400-px
+  // backgroundframe looks like 300 px to `measureBlocksHeight` and
+  // accidentally qualifies as a widow. Constrain to tight so the
+  // misclassification can't cascade.
+  const WIDOW_FRACTION = 0.15;
+  const OVERFLOW_FRACTION = 0.2;
+  const widowThresholdPx = budgetPx * WIDOW_FRACTION;
+  const overflowPx = budgetPx * OVERFLOW_FRACTION;
+
+  const out: HTMLElement[][] = pages.map((p) => p.slice());
+  for (let i = 0; i + 1 < out.length; i++) {
+    const cur = out[i]!;
+    const next = out[i + 1]!;
+    // Don't absorb when the NEXT page's first block carries the
+    // OOXML `<w:pageBreakBefore/>` directive — merging would override
+    // the author's explicit page-boundary intent and stuff the
+    // heading mid-page. Per `data-page-break-before` stamped by the
+    // renderer from `Paragraph.properties.pageBreakBefore`.
+    const nextStartsWithForcedBreak =
+      next.length > 0 && next[0]!.hasAttribute("data-page-break-before");
+    if (nextStartsWithForcedBreak) continue;
+    const curH = measureBlocksHeight(cur);
+    const nextH = measureBlocksHeight(next);
+    // Refuse outright if cur is already over budget — absorbing more
+    // would just compound the overflow.
+    if (curH > budgetPx) continue;
+    if (nextH > 0 && nextH <= widowThresholdPx
+        && curH + nextH <= budgetPx + overflowPx) {
+      cur.push(...next);
+      out.splice(i + 1, 1);
+      // Don't decrement i — we want to advance past the absorbed-into
+      // page so we never cascade-absorb several widows into one host
+      // page (that would compound overflow).
+    }
+  }
+  return out;
+}
+
+/** Sum offsetHeight of a page's blocks. Detached blocks (not yet in
+ *  the DOM) report 0 — that's fine; they don't contribute to layout. */
+function measureBlocksHeight(blocks: readonly HTMLElement[]): number {
+  let total = 0;
+  for (const b of blocks) total += b.offsetHeight;
+  return total;
+}
+
+export function collapseTrailingEmptyPages(
+  pages: readonly HTMLElement[][],
+): HTMLElement[][] {
+  const out: HTMLElement[][] = pages.map((page) => page.slice());
+  // Walk from the last page back. While the last page is fully empty
+  // and we have a previous page to absorb into, merge it down.
+  while (out.length >= 2) {
+    const last = out[out.length - 1];
+    if (!last || !last.every(isVisuallyEmptyBlock)) break;
+    const prev = out[out.length - 2]!;
+    prev.push(...last);
+    out.pop();
+  }
+  // Now collapse MIDDLE pages whose ONLY blocks are visually empty —
+  // these are pages created by stale page-break hints landing AFTER
+  // empty placeholder paragraphs. LO collapses them; Sobree should
+  // too. complex-multipage.docx has 2 such pages (intentional
+  // `<w:br type="page"/>` followed by empty paragraphs); without
+  // this collapse pass we'd render 18 pages instead of LO's 16.
+  for (let i = out.length - 2; i >= 0; i--) {
+    const page = out[i]!;
+    if (page.length === 0) continue;
+    if (!page.every(isVisuallyEmptyBlock)) continue;
+    // All blocks visually empty. Push them onto the next page's
+    // start so document order is preserved, then drop this page.
+    const next = out[i + 1];
+    if (!next) continue;
+    next.unshift(...page);
+    out.splice(i, 1);
+  }
+  return out;
+}
+
+function isVisuallyEmptyBlock(el: HTMLElement): boolean {
+  const tag = el.tagName;
+  // Only collapse paragraph / list-item blocks. Tables, drawings,
+  // section breaks etc. always justify a page even when "empty".
+  if (tag !== "P" && tag !== "LI" && tag !== "H1" && tag !== "H2" &&
+      tag !== "H3" && tag !== "H4" && tag !== "H5" && tag !== "H6") {
+    return false;
+  }
+  // Any text content (after trim) means non-empty.
+  if ((el.textContent ?? "").trim().length > 0) return false;
+  // Embedded images / tables / SVG / drawings keep it non-empty. We
+  // include both raw graphic tags AND Sobree's drawing wrappers
+  // (section-frame banners, anchored shapes) so a paragraph that's
+  // textually empty but carries a poster-sized background drawing
+  // — like the project pages of complex-multipage.docx where each
+  // "Project:" page is a textbox-only layout — never gets absorbed.
+  if (el.querySelector(
+    "img, svg, table, canvas, iframe, video, [class*='sobree-section-frame'], [data-sobree-drawing]",
+  ) !== null) {
+    return false;
+  }
+  return true;
+}
+
+function arraysEqual(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}

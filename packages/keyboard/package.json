@@ -1,0 +1,50 @@
+{
+  "name": "@sobree/keyboard",
+  "version": "0.1.0",
+  "publishConfig": { "access": "public" },
+  "description": "Default keyboard shortcuts plugin for @sobree/core — undo/redo, text formatting, section breaks. Mount via the `keyboard()` factory in `createSobree({ plugins: [...] })`.",
+  "keywords": [
+    "sobree",
+    "wysiwyg",
+    "editor",
+    "keyboard",
+    "shortcuts",
+    "hotkeys"
+  ],
+  "license": "MIT",
+  "author": "sobree.dev",
+  "homepage": "https://docs.sobree.dev/api/keyboard/",
+  "bugs": {
+    "url": "https://github.com/khayll/sobree/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khayll/sobree.git",
+    "directory": "packages/keyboard"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@sobree/core": "workspace:*"
+  }
+}

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same PR cancels the in-flight run for it; main pushes
+# never cancel each other (they live on the `main` branch ref).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build-and-test:
+    name: build · test · typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # version is read from `packageManager` in the root package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # Render fidelity gate. Renders every corpus docx through
+      # LibreOffice (reference) and Sobree (oracle snapshot), computes
+      # the drift score, and fails the build if any score regressed
+      # beyond tolerance vs the committed baseline. To update
+      # baselines intentionally: run `pnpm corpus:baseline` locally,
+      # commit the resulting `*.baseline.json` / `baseline/score.json`
+      # changes alongside the rendering change, justify in the commit
+      # message. See tests/corpus/README.md.
+      - name: Install LibreOffice
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice
+
+      - name: Corpus render-fidelity check
+        run: pnpm corpus:check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upload docs build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-dist
+          path: apps/docs/dist
+          if-no-files-found: error
+          retention-days: 7

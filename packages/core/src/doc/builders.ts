@@ -1,0 +1,196 @@
+import type {
+  Block,
+  HeaderFooterRef,
+  InlineRun,
+  NamedStyle,
+  PageMargins,
+  PageSize,
+  Paragraph,
+  ParagraphProperties,
+  RunProperties,
+  SectionProperties,
+  SobreeDocument,
+  Table,
+  TextRun,
+} from "./types";
+
+/**
+ * Constructors for AST nodes. Two reasons these exist as separate helpers
+ * instead of object literals at every call site:
+ *   1. Defaults — letter-paper, no margins set, etc. — without sprinkling
+ *      magic numbers into editor code.
+ *   2. Future schema migration — when a new required field is added, all
+ *      construction goes through here and the migration is one diff.
+ */
+
+const A4_WIDTH_TWIPS = 11906; // 210 mm
+const A4_HEIGHT_TWIPS = 16838; // 297 mm
+const ONE_INCH_TWIPS = 1440;
+
+/** A new, blank document with an A4 portrait section and the standard styles. */
+export function emptyDocument(): SobreeDocument {
+  return {
+    body: [paragraph()],
+    sections: [defaultSection()],
+    headerFooterBodies: {},
+    styles: defaultStyles(),
+    numbering: [],
+    rawParts: {},
+    fonts: [],
+  };
+}
+
+export function defaultSection(): SectionProperties {
+  return {
+    pageSize: defaultPageSize(),
+    pageMargins: defaultMargins(),
+    headerRefs: [],
+    footerRefs: [],
+  };
+}
+
+export function defaultPageSize(): PageSize {
+  return { wTwips: A4_WIDTH_TWIPS, hTwips: A4_HEIGHT_TWIPS, orientation: "portrait" };
+}
+
+export function defaultMargins(): PageMargins {
+  return {
+    topTwips: ONE_INCH_TWIPS,
+    rightTwips: ONE_INCH_TWIPS,
+    bottomTwips: ONE_INCH_TWIPS,
+    leftTwips: ONE_INCH_TWIPS,
+    headerTwips: 720,
+    footerTwips: 720,
+    gutterTwips: 0,
+  };
+}
+
+/** A paragraph with no runs and no properties beyond the defaults. */
+export function paragraph(
+  runs: InlineRun[] = [],
+  properties: ParagraphProperties = {},
+): Paragraph {
+  return { kind: "paragraph", properties, runs };
+}
+
+/** Heading paragraph (`Heading{level}` style, level clamped to 1..6). */
+export function heading(
+  level: number,
+  runs: InlineRun[] = [],
+  extra: ParagraphProperties = {},
+): Paragraph {
+  const lv = Math.max(1, Math.min(6, level));
+  return paragraph(runs, { ...extra, styleId: `Heading${lv}` });
+}
+
+/** Plain text run with optional formatting. */
+export function text(value: string, properties: RunProperties = {}): TextRun {
+  return { kind: "text", text: value, properties };
+}
+
+/** Convenience: emphasised (bold + italic) text run. */
+export function emphasis(value: string, properties: RunProperties = {}): TextRun {
+  return { kind: "text", text: value, properties: { ...properties, italic: true } };
+}
+
+export function strong(value: string, properties: RunProperties = {}): TextRun {
+  return { kind: "text", text: value, properties: { ...properties, bold: true } };
+}
+
+export function softBreak(): InlineRun {
+  return { kind: "break", type: "line" };
+}
+
+export function pageBreak(): InlineRun {
+  return { kind: "break", type: "page" };
+}
+
+/** Default Word styles every doc declares so headings render correctly.
+ *
+ *  Carries WORD-HARDCODED-DEFAULT typography — i.e. what Word uses
+ *  when a docx has bare/empty styles.xml entries. That means single
+ *  line spacing (1.0×) and zero space-before / space-after on Normal.
+ *  Headings keep their bold + size on `runDefaults` but DON'T add
+ *  spacing-before/after either — the original docx tells the renderer
+ *  via per-paragraph `spacing` properties when something needs to
+ *  breathe.
+ *
+ *  This is the load-bearing constraint: a docx round-trip must not
+ *  silently add (or remove) vertical rhythm the original didn't ask
+ *  for. Embedders that want a different baseline (e.g. markdown output
+ *  with 8pt-after for visible paragraph separation) override the
+ *  Normal style on the document they construct — see `parseMarkdown`.
+ *
+ *  Heading scale steps down from a prominent H1 at 24pt to body-sized
+ *  H6 at 11pt. */
+export function defaultStyles(): NamedStyle[] {
+  const headingSizes = [24, 20, 16, 14, 12, 11] as const;
+  const out: NamedStyle[] = [
+    {
+      id: "Normal",
+      type: "paragraph",
+      displayName: "Normal",
+      runDefaults: {
+        fontFamily: "Helvetica",
+        fontSizePt: 11,
+      },
+      // Word hardcoded default — single line, zero before/after.
+      paragraphDefaults: {
+        spacing: { line: 240, lineRule: "auto" },
+      },
+    },
+  ];
+  for (let i = 1; i <= 6; i++) {
+    const size = headingSizes[i - 1] ?? 11;
+    out.push({
+      id: `Heading${i}`,
+      type: "paragraph",
+      displayName: `heading ${i}`,
+      basedOn: "Normal",
+      nextStyleId: "Normal",
+      runDefaults: {
+        bold: true,
+        fontFamily: "Helvetica",
+        fontSizePt: size,
+      },
+      // No paragraph-level spacing — inherits from Normal (single
+      // line). Documents authored in tools that want breathing
+      // room around headings ship explicit `spacing.beforeTwips`
+      // / `afterTwips` per heading paragraph.
+    });
+  }
+  out.push({
+    id: "Quote",
+    type: "paragraph",
+    displayName: "Quote",
+    basedOn: "Normal",
+    runDefaults: { italic: true },
+    // Quote indent only — no spacing change vs Normal.
+    paragraphDefaults: {
+      indent: { leftTwips: 567, rightTwips: 567 },
+    },
+  });
+  return out;
+}
+
+/** Push a block onto the document body. Mutates `doc` and returns it. */
+export function appendBlock(doc: SobreeDocument, block: Block): SobreeDocument {
+  doc.body.push(block);
+  return doc;
+}
+
+/** Allocate a new header/footer reference id. Pure helper. */
+export function makeHeaderFooterRef(
+  type: "default" | "first" | "even",
+  partId: string,
+): HeaderFooterRef {
+  return { type, partId };
+}
+
+export function isParagraph(block: Block): block is Paragraph {
+  return block.kind === "paragraph";
+}
+
+export function isTable(block: Block): block is Table {
+  return block.kind === "table";
+}

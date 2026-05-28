@@ -1,0 +1,190 @@
+{
+  "blocks": [
+    {
+      "attrs": {
+        "data-block-index": "0",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Default font here. Times New Roman here. Back to Calibri. Co…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "1",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Whole paragraph in Georgia, with some bold and italic mixed …",
+    },
+  ],
+  "fixture": "corpus/generated/font/06-mixed-fonts",
+  "importWarnings": [],
+  "numberingDefs": 1,
+  "styles": [
+    {
+      "basedOn": "Normal",
+      "id": "Title",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontSizePt": 28,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading1",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 240,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 16,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading2",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 200,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 13,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading3",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 12,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading4",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "italic": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading5",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading6",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Strong",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "bold": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "ListParagraph",
+      "paragraphDefaults": undefined,
+      "runDefaults": undefined,
+    },
+    {
+      "basedOn": "Normal",
+      "id": "FootnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "EndnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": undefined,
+      "id": "Normal",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontFamily": "Calibri",
+        "fontSizePt": 11,
+      },
+    },
+  ],
+}

@@ -1,0 +1,338 @@
+import { appendInlineRuns } from "./inline";
+import { renderTable } from "./table";
+import { applyParagraphProps } from "./properties";
+import { createListContainer, paragraphListInfo } from "./lists";
+import { renderInlineFrameBlock } from "./inlineFrame";
+import { renderParagraph } from "./paragraph";
+import { twipsToMm } from "./units";
+import type {
+  Block,
+  NamedStyle,
+  NumberingDefinition,
+  Paragraph,
+  ParagraphProperties,
+  SectionProperties,
+} from "../../../doc/types";
+
+/**
+ * Render a `Block[]` stream into `host`, grouping consecutive paragraphs
+ * that share a `numId` into a single `<ul>`/`<ol>` so the browser renders
+ * proper list markers.
+ *
+ * `numbering` maps `numId` → definition so we can decide ordered vs
+ * bulleted. Unknown numIds fall back to `<ul>`.
+ *
+ * `rawParts` is threaded to image rendering so `<img src>` can be
+ * populated from embedded bytes via a blob URL.
+ */
+export function renderBlocks(
+  blocks: readonly Block[],
+  host: HTMLElement,
+  numbering: readonly NumberingDefinition[],
+  styles: readonly NamedStyle[] = [],
+  rawParts: Record<string, Uint8Array> = {},
+  blockIds?: readonly string[],
+  sections: readonly SectionProperties[] = [],
+): void {
+  let currentList: { el: HTMLElement; numId: number } | null = null;
+  /**
+   * Section index for the block currently being rendered. Starts at 0
+   * (the first section), bumps every time we step over a `SectionBreak`.
+   * Stamped onto each rendered element as `data-section-index` so the
+   * paper stack can apply per-section settings (vAlign, etc.) page-by-page
+   * without re-walking the AST.
+   */
+  let sectionIndex = 0;
+  /**
+   * If the current section has `columns.count > 1` we wrap its blocks
+   * in a `<div class="sobree-section-cols">` so CSS `column-count` can
+   * flow content across the columns. `appendTarget` becomes that
+   * wrapper; on a section change we close it (revert to `host`) and
+   * re-evaluate for the new section.
+   */
+  let appendTarget: HTMLElement = openColumnContainerIfNeeded(host, sections[0]);
+
+  // Word's `<w:lastRenderedPageBreak/>` hints almost always land on
+  // an EMPTY paragraph that the source author kept as a "end of
+  // section" marker. Honoring the break literally creates a page
+  // boundary BEFORE the empty paragraph — wasting the previous page
+  // and putting the empty paragraph alone at the top of the next.
+  // We DEFER the break: when a paragraph carrying `pageBreakBefore`
+  // is empty, suppress its attribute and stash the break to be
+  // applied to the next NON-EMPTY block. This produces the same
+  // visual page boundary (break still happens before real content)
+  // but the previous page packs whatever could fit, killing the
+  // 11-of-26 wasteful-pages problem on complex-multipage.docx.
+  let pendingPageBreak = false;
+  const isVisuallyEmptyBlock = (b: Block): boolean => {
+    if (b.kind === "section_break") return false;
+    if (b.kind === "table") return false;
+    if (b.kind !== "paragraph") return false;
+    for (const r of b.runs) {
+      if (r.kind === "text" && r.text.trim().length > 0) return false;
+      if (r.kind === "drawing") return false;
+      if (r.kind === "tab") return false;
+      if (r.kind === "field") return false;
+      if (r.kind === "hyperlink") return false;
+      if (r.kind === "footnoteRef") return false;
+    }
+    return true;
+  };
+
+  const flushList = () => {
+    currentList = null;
+  };
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (!block) continue;
+    const id = blockIds?.[i];
+
+    // Page-break deferral: if this block carries pageBreakBefore but
+    // is visually empty, suppress its break and remember it. Apply
+    // the pending break to the next non-empty block instead. See the
+    // pendingPageBreak comment above for why.
+    if (block.kind === "paragraph" && block.properties.pageBreakBefore) {
+      if (isVisuallyEmptyBlock(block)) {
+        pendingPageBreak = true;
+        // strip the break from this block so the renderer doesn't
+        // apply it. Use a shallow clone of properties so we don't
+        // mutate the source AST.
+        block.properties = { ...block.properties, pageBreakBefore: false };
+      }
+    }
+    if (pendingPageBreak && !isVisuallyEmptyBlock(block)) {
+      if (block.kind === "paragraph") {
+        block.properties = { ...block.properties, pageBreakBefore: true };
+      }
+      pendingPageBreak = false;
+    }
+
+    const listInfo = paragraphListInfo(block, numbering);
+    if (listInfo) {
+      if (!currentList || currentList.numId !== listInfo.numId) {
+        const listEl = createListContainer(listInfo, sectionIndex);
+        appendTarget.appendChild(listEl);
+        currentList = { el: listEl, numId: listInfo.numId };
+      }
+      const li = document.createElement("li");
+      if (id) li.dataset.blockId = id;
+      li.dataset.sectionIndex = String(sectionIndex);
+      li.dataset.blockIndex = String(i);
+      applyParagraphProps(li, (block as Paragraph).properties, styles);
+      stampBlockRevision(li, (block as Paragraph).properties);
+      appendInlineRuns(li, (block as Paragraph).runs, rawParts);
+      currentList.el.appendChild(li);
+      continue;
+    }
+    flushList();
+
+    // SectionBreak rendering needs the upcoming section's `type` to
+    // decide whether it's a forced page break ("nextPage" / default)
+    // or a flow-through ("continuous"). Pulled here so renderBlock
+    // stays section-array-agnostic.
+    const nextSectionForBreak =
+      block.kind === "section_break"
+        ? sections[block.toSectionIndex]
+        : undefined;
+    const rendered = renderBlock(
+      block,
+      numbering,
+      styles,
+      rawParts,
+      nextSectionForBreak,
+    );
+    if (rendered) {
+      if (id) rendered.dataset.blockId = id;
+      rendered.dataset.sectionIndex = String(sectionIndex);
+      rendered.dataset.blockIndex = String(i);
+      if (block.kind === "paragraph") {
+        stampBlockRevision(rendered, block.properties);
+      }
+      // Section breaks always go to `host`, never into the current
+      // column container. If a `<w:sectPr>` ends a 2-column section,
+      // the break is the boundary AFTER the section — putting it
+      // inside the column container makes it a balanced-flow item
+      // that throws off Word's intended pairing (e.g. jellap.docx's
+      // ANYA section gets 4|4 instead of 3|3 because the section
+      // break counts as the 8th item).
+      if (block.kind === "section_break") {
+        host.appendChild(rendered);
+      } else {
+        appendTarget.appendChild(rendered);
+      }
+    }
+    if (block.kind === "section_break") {
+      // Before closing the previous column container, evict any trailing
+      // empty paragraphs from inside it back to `host`. Word's column
+      // balancer doesn't count trailing empties when distributing
+      // content — jellap.docx's ANYA section has a single trailing
+      // empty paragraph that, if left in the column flow, makes CSS
+      // columns split 4|3 instead of 3|3 and mis-pairs the form
+      // labels (Foglalkozása ends up on the LEFT row 4 instead of on
+      // RIGHT row 1 next to Neve). Moving trailing empties out lets
+      // CSS balance the remaining 6 items as 3|3, matching Word.
+      evictTrailingEmptyParagraphs(appendTarget, host);
+      // Collapse the visual height of the empty paragraph that
+      // immediately precedes this section break in `host`. Word stores
+      // sectPrs INSIDE a paragraph's pPr; that paragraph is often an
+      // empty placeholder whose only job is to carry the sectPr. Word
+      // treats it as part of the section boundary and renders ~no
+      // visible whitespace — but our render shows it at full
+      // double-spaced 9pt = ~28px, creating an unsightly gap right
+      // before each section change (jellap.docx's ANYA / APA headers
+      // gain ~28px of post-heading whitespace from this).
+      collapseSectionTrailerEmpty(host);
+      // Section index ticks AFTER rendering the break itself — the break
+      // belongs to the section it ends, not to the next one.
+      sectionIndex += 1;
+      // Close any open column container and re-evaluate for the new section.
+      appendTarget = openColumnContainerIfNeeded(host, sections[sectionIndex]);
+    }
+  }
+  // After the walk, evict trailing empties from whatever the final
+  // appendTarget was (if it's a column container).
+  evictTrailingEmptyParagraphs(appendTarget, host);
+}
+
+/**
+ * Visually collapse the empty paragraph immediately preceding the
+ * just-appended section_break. The paragraph stays in the DOM (and the
+ * AST) so round-trip and caret behaviour stay intact; CSS just zeros
+ * its height. Pulls back from the last element (which is the section
+ * break itself) by one position and checks if it's a visually-empty
+ * paragraph (no text, no images).
+ */
+function collapseSectionTrailerEmpty(host: HTMLElement): void {
+  // The section_break was the LAST child appended. Step back one.
+  const sectBreak = host.lastElementChild;
+  if (!sectBreak || !sectBreak.classList.contains("sobree-section-break")) return;
+  const trailer = sectBreak.previousElementSibling as HTMLElement | null;
+  if (!trailer) return;
+  if (trailer.tagName !== "P" && trailer.tagName !== "LI") return;
+  if ((trailer.textContent ?? "").trim().length > 0) return;
+  if (trailer.querySelector("img, svg, table")) return;
+  trailer.classList.add("sobree-section-trailer-empty");
+}
+
+/**
+ * If `container` is a column-flow container, move any trailing
+ * visually-empty paragraphs out of it and append them to `host`. Keeps
+ * Word's column balancing semantics: empties between content count,
+ * trailing empties do not.
+ */
+function evictTrailingEmptyParagraphs(
+  container: HTMLElement,
+  host: HTMLElement,
+): void {
+  if (!container.classList.contains("sobree-section-cols")) return;
+  while (container.lastElementChild) {
+    const last = container.lastElementChild as HTMLElement;
+    if (!isVisuallyEmptyParagraph(last)) break;
+    container.removeChild(last);
+    host.appendChild(last);
+  }
+}
+
+function isVisuallyEmptyParagraph(el: HTMLElement): boolean {
+  if (el.tagName !== "P" && el.tagName !== "LI") return false;
+  if ((el.textContent ?? "").trim().length > 0) return false;
+  if (el.querySelector("img, svg, table") !== null) return false;
+  return true;
+}
+
+/**
+ * If `section.columns.count > 1`, append a column container to `host`
+ * and return it as the new append target. Otherwise return `host` —
+ * single-column sections write directly to it.
+ */
+function openColumnContainerIfNeeded(
+  host: HTMLElement,
+  section: SectionProperties | undefined,
+): HTMLElement {
+  const cols = section?.columns;
+  if (!cols || cols.count <= 1) return host;
+  const wrapper = document.createElement("div");
+  wrapper.className = "sobree-section-cols";
+  wrapper.style.columnCount = String(cols.count);
+  if (cols.spaceTwips !== undefined) {
+    wrapper.style.columnGap = `${twipsToMm(cols.spaceTwips)}mm`;
+  }
+  host.appendChild(wrapper);
+  return wrapper;
+}
+
+function renderBlock(
+  block: Block,
+  numbering: readonly NumberingDefinition[],
+  styles: readonly NamedStyle[],
+  rawParts: Record<string, Uint8Array>,
+  nextSection?: SectionProperties,
+): HTMLElement | null {
+  if (block.kind === "paragraph") return renderParagraph(block, styles, rawParts);
+  if (block.kind === "table") return renderTable(block, numbering, styles, rawParts);
+  if (block.kind === "section_break") return renderSectionBreak(nextSection);
+  if (block.kind === "inline_frame") {
+    return renderInlineFrameBlock(block, numbering, styles, rawParts, renderBlocks);
+  }
+  return null;
+}
+
+/**
+ * Render a `SectionBreak` as a visible rule. Whether it carries
+ * `data-page-break` depends on the upcoming section's `type`:
+ *
+ *   - "continuous" — render the rule but DO NOT mark it as a page
+ *     break. The paginator flows past it; the section change still
+ *     takes effect for vAlign, columns, etc. on the new section's
+ *     blocks.
+ *   - "nextPage" / "evenPage" / "oddPage" / undefined — forced page
+ *     break. (We don't yet distinguish even / odd from nextPage.)
+ *
+ * The rule is `contentEditable=false` so caret traffic skips it.
+ */
+function renderSectionBreak(nextSection?: SectionProperties): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "sobree-section-break";
+  const isContinuous = nextSection?.type === "continuous";
+  if (!isContinuous) {
+    el.setAttribute("data-page-break", "");
+  } else {
+    el.classList.add("sobree-section-break--continuous");
+  }
+  // Set both the IDL property AND the HTML attribute — the IDL drives
+  // caret behaviour, the attribute is what querying code (and jsdom in
+  // tests) reads; jsdom doesn't reflect the IDL property to the attribute.
+  el.contentEditable = "false";
+  el.setAttribute("contenteditable", "false");
+  el.setAttribute("role", "separator");
+  el.setAttribute("aria-orientation", "horizontal");
+  const label = isContinuous ? "Section break — continuous" : "Section break — next page";
+  el.setAttribute("aria-label", label);
+  const display = isContinuous ? "Section break · continuous" : "Section break · next page";
+  el.innerHTML = `<span class="sobree-section-break__label" aria-hidden="true">${display}</span>`;
+  return el;
+}
+
+/**
+ * Stamp `data-block-revision="ins"|"del"` and `data-block-revision-author`
+ * on a paragraph element whose properties carry a tracked-change marker
+ * on the paragraph mark itself. The review plugin uses these to colour
+ * the trailing paragraph-mark glyph (the "¶" the user types Enter to
+ * produce). Core renders no visual itself — neutral by default; the
+ * plugin layers the author colour.
+ */
+function stampBlockRevision(
+  el: HTMLElement,
+  props: ParagraphProperties,
+): void {
+  const rev = props.revision;
+  if (!rev) return;
+  el.dataset.blockRevision = rev.type;
+  if (rev.author !== undefined) {
+    el.dataset.blockRevisionAuthor = rev.author;
+  }
+  if (rev.date !== undefined) {
+    el.dataset.blockRevisionDate = rev.date;
+  }
+}

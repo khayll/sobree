@@ -1,0 +1,32 @@
+{
+  "fixture": "07-table-simple",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Table below:",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 52.43,
+          "height": 10,
+          "fontName": "g_d20_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph after table.",
+          "x": 72.1,
+          "y": 693.44,
+          "width": 85.66,
+          "height": 10,
+          "fontName": "g_d20_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

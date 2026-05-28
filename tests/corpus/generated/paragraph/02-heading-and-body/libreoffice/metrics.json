@@ -1,0 +1,41 @@
+{
+  "fixture": "02-heading-and-body",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Section title",
+          "x": 72.1,
+          "y": 743.39,
+          "width": 82.62,
+          "height": 16,
+          "fontName": "g_d16_f1",
+          "fontSize": 16
+        },
+        {
+          "text": "First body paragraph after the heading. Should have the heading's after-spacing as a gap above it.",
+          "x": 72.1,
+          "y": 724.54,
+          "width": 388.28,
+          "height": 10,
+          "fontName": "g_d16_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Second body paragraph. Should sit at body line-height with body after-spacing between it and the first.",
+          "x": 72.1,
+          "y": 712.99,
+          "width": 411.49,
+          "height": 10,
+          "fontName": "g_d16_f2",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

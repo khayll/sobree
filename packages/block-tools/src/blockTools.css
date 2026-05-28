@@ -1,0 +1,625 @@
+/* ============================================================
+   Block tools — per-block indicator + floating toolbar.
+
+   Uses Sobree design-system tokens (colors_and_type.css). Styles
+   stay quiet and ink-on-paper-ish; amber is the accent only on
+   focus / active states.
+   ============================================================ */
+
+.sobree-block-indicator {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  /* Centre the chip on the paper's left edge — half its width hangs
+     into the gutter, half sits over the paper. */
+  margin-left: -12px;
+  border-radius: var(--radius-md, 4px);
+  background: var(--primary, #c96f22);
+  border: 1px solid var(--primary, #c96f22);
+  color: var(--fg-on-primary, #fff);
+  cursor: pointer;
+  user-select: none;
+  box-shadow: var(--shadow-xs, 0 1px 0 rgba(20, 19, 15, 0.04));
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition:
+    opacity var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    transform var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    color var(--dur-fast, 120ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    background-color var(--dur-fast, 120ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    border-color var(--dur-fast, 120ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+  z-index: 4;
+}
+
+.sobree-block-indicator.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.sobree-block-indicator:hover {
+  color: var(--fg-on-primary, #fff);
+  background: var(--primary-strong, #b25d18);
+  border-color: var(--primary-strong, #b25d18);
+}
+
+/* Toolbar open for this block — invert to a paper-on-amber chip so the
+   "currently selected" state reads distinctly from the default fill. */
+.sobree-block-indicator.is-active {
+  color: var(--primary, #c96f22);
+  background: var(--bg-elevated, #fff);
+  border-color: var(--primary, #c96f22);
+}
+
+.sobree-block-indicator:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus, 0 0 0 3px rgba(201, 111, 34, 0.25));
+}
+
+.sobree-block-indicator svg {
+  display: block;
+}
+
+/* Read mode — host turned Sobree into a read-only surface. The indicator
+   has already been disabled from JS, but this hard-hides it in case
+   anything sneaks through, and removes the caret/selection affordances
+   on the page itself. */
+.paper-stack.is-read-mode .sobree-block-indicator {
+  display: none;
+}
+
+.paper-stack.is-read-mode .paper .content {
+  caret-color: transparent;
+}
+
+/* ============================================================
+   Floating block toolbar — opens above the active block.
+   Positioned at viewport coordinates (fixed) so it floats
+   above any zoomed / transformed stack content.
+   ============================================================ */
+.sobree-block-toolbar {
+  position: fixed;
+  display: none;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: var(--space-1, 4px);
+  column-gap: var(--space-2, 8px);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  min-height: 40px;
+  background: var(--bg-elevated, #fff);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  box-shadow: var(--shadow-md, 0 4px 8px -2px rgba(20, 19, 15, 0.08));
+  font-family: var(--font-sans, -apple-system, "Segoe UI", sans-serif);
+  font-size: 13px;
+  color: var(--fg, #26241f);
+  user-select: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+    transform var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+  z-index: 40;
+}
+
+.sobree-block-toolbar.is-open {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Dividers shouldn't wrap onto their own line — drop them when they
+   end up as the first item in a wrapped row. Purely cosmetic. */
+.sobree-block-toolbar .tb-divider {
+  flex: 0 0 auto;
+}
+
+.sobree-block-toolbar.is-stuck {
+  box-shadow: var(--shadow-lg, 0 12px 24px -8px rgba(20, 19, 15, 0.12));
+}
+
+.sobree-block-toolbar :focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus, 0 0 0 3px rgba(201, 111, 34, 0.25));
+}
+
+.sobree-block-toolbar .tb-placeholder {
+  color: var(--fg-subtle, #7c7764);
+  font-size: 12px;
+  padding: 0 var(--space-2, 8px);
+}
+
+.sobree-block-toolbar .tb-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+}
+
+.sobree-block-toolbar .tb-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border, #dedbd0);
+  margin: var(--space-1, 4px) var(--space-1, 4px);
+}
+
+/* Icon buttons (B/I/U/S/sup/sub/clear/…) — exclude the labelled
+   "Change block" pill which has its own pill styles. */
+.sobree-block-toolbar button[data-action]:not(.tb-change-btn),
+.sobree-block-toolbar button.tb-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 4px);
+  color: var(--fg-muted, #5a5649);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition:
+    background-color var(--dur-fast, 120ms) var(--ease-standard),
+    color var(--dur-fast, 120ms) var(--ease-standard),
+    border-color var(--dur-fast, 120ms) var(--ease-standard);
+}
+
+.sobree-block-toolbar button[data-action]:not(.tb-change-btn):hover,
+.sobree-block-toolbar button.tb-action:hover {
+  background: var(--bg-hover, #eceae3);
+  color: var(--fg-strong, #14130f);
+}
+
+.sobree-block-toolbar button[data-action]:not(.tb-change-btn):active,
+.sobree-block-toolbar button.tb-action:active {
+  background: var(--primary-soft, #fdf6ee);
+}
+
+.sobree-block-toolbar button[data-action]:not(.tb-change-btn).is-active,
+.sobree-block-toolbar button.tb-action.is-active {
+  color: var(--primary, #c96f22);
+  background: var(--primary-soft, #fdf6ee);
+  border-color: var(--sobree-100, #f9e6d0);
+}
+
+/* Track-changes pill: when there are unresolved revisions in the doc
+   (regardless of whether the mode is on or off), surface a small red
+   numeric badge over the button's top-right corner. The exact count
+   lives in `data-unresolved-count` and is read via attr() so the CSS
+   is fully data-driven — JS doesn't have to manipulate a separate
+   element. The screen-reader / hover text spells out the count in
+   the button's title and aria-label. */
+.sobree-block-toolbar button[data-action="toggle-track-changes"] {
+  /* Establish positioning context for the ::after badge. */
+  position: relative;
+}
+.sobree-block-toolbar
+  button[data-action="toggle-track-changes"][data-unresolved-count]::after {
+  content: attr(data-unresolved-count);
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #b3261e;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+  /* Keep the badge readable on the toolbar's light background even at
+     small sizes. */
+  box-shadow: 0 0 0 1.5px var(--bg, #fbfaf7);
+}
+
+/* Author input next to the track-changes pill. Only visible when the
+   pill is on (toggled by JS). Tight presentation — matches the
+   toolbar's text-button height so it doesn't break the row. */
+.sobree-block-toolbar input.tb-author-input {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-sm, 2px);
+  background: var(--bg, #fff);
+  min-width: 110px;
+  max-width: 160px;
+  height: 28px;
+  box-sizing: border-box;
+}
+.sobree-block-toolbar input.tb-author-input:focus {
+  outline: 2px solid var(--primary-soft, #fdf6ee);
+  border-color: var(--primary, #c96f22);
+}
+
+/* Selects (font family, size) */
+.sobree-block-toolbar select {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 22px 4px 8px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-sm, 2px);
+  background: var(--bg-subtle, #f6f4ef);
+  color: var(--fg, #26241f);
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237c7764' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  outline: none;
+  cursor: pointer;
+}
+
+.sobree-block-toolbar select[data-role="font-family"] {
+  width: 110px;
+}
+.sobree-block-toolbar select[data-role="font-size"] {
+  width: 62px;
+}
+
+/* Colour swatches — the native <input type=color> nested in a label with
+   the icon to its left. */
+.sobree-block-toolbar .tb-colour {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 4px);
+  color: var(--fg-muted, #5a5649);
+  cursor: pointer;
+}
+
+.sobree-block-toolbar .tb-colour:hover {
+  background: var(--bg-hover, #eceae3);
+  color: var(--fg-strong, #14130f);
+}
+
+.sobree-block-toolbar .tb-colour input[type="color"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-xs, 2px);
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Cell / Table mode pill inside the table toolbar */
+.sobree-block-toolbar .tb-pill {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  background: var(--bg-subtle, #f6f4ef);
+}
+
+.sobree-block-toolbar .tb-pill button {
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm, 2px);
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg-muted, #5a5649);
+  cursor: pointer;
+  transition: color var(--dur-fast, 120ms) var(--ease-standard),
+    background-color var(--dur-fast, 120ms) var(--ease-standard);
+}
+
+.sobree-block-toolbar .tb-pill button:hover:not([disabled]) {
+  color: var(--fg-strong, #14130f);
+}
+
+.sobree-block-toolbar .tb-pill button.is-active {
+  background: var(--bg-elevated, #fff);
+  color: var(--fg-strong, #14130f);
+  box-shadow: var(--shadow-xs, 0 1px 0 rgba(20, 19, 15, 0.04));
+}
+
+.sobree-block-toolbar .tb-pill button[disabled] {
+  color: var(--fg-disabled, #a29c88);
+  cursor: not-allowed;
+}
+
+/* Wider buttons for table ops (labelled with text) */
+.sobree-block-toolbar .tb-group[data-group^="row-ops"] button,
+.sobree-block-toolbar .tb-group[data-group^="col-ops"] button,
+.sobree-block-toolbar .tb-group[data-group^="cell-merge"] button,
+.sobree-block-toolbar .tb-group[data-group^="table-ops"] button {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.sobree-block-toolbar .tb-group[data-group="image"] input[type="text"] {
+  width: 140px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-sm, 2px);
+  background: var(--bg-elevated, #fff);
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg, #26241f);
+  outline: none;
+}
+
+/* "Change block" trigger — labelled pill that opens the popover */
+.sobree-block-toolbar .tb-change-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  width: auto;
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  height: 28px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg-muted, #5a5649);
+  background: var(--bg-subtle, #f6f4ef);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast, 120ms) var(--ease-standard),
+    color var(--dur-fast, 120ms) var(--ease-standard),
+    border-color var(--dur-fast, 120ms) var(--ease-standard);
+}
+
+.sobree-block-toolbar .tb-change-btn:hover {
+  background: var(--bg-hover, #eceae3);
+  color: var(--fg-strong, #14130f);
+  border-color: var(--border-strong, #c4bfaf);
+}
+
+/* ============================================================
+   Change-block-type popover — attached to <body>, positioned
+   just below the toolbar's trigger button.
+   ============================================================ */
+.sobree-change-popover {
+  position: fixed;
+  min-width: 200px;
+  padding: var(--space-1, 4px);
+  background: var(--bg-elevated, #fff);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  box-shadow: var(--shadow-lg, 0 12px 24px -8px rgba(20, 19, 15, 0.12));
+  z-index: 50;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--dur-base, 180ms) var(--ease-standard),
+    transform var(--dur-base, 180ms) var(--ease-standard);
+  pointer-events: none;
+}
+
+.sobree-change-popover.is-open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sobree-change-popover .popover-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1, 4px);
+}
+
+.sobree-change-popover .popover-divider {
+  height: 1px;
+  margin: var(--space-1, 4px) 0;
+  background: var(--border, #dedbd0);
+}
+
+.sobree-change-popover .popover-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #7c7764);
+  padding: 4px 8px 2px;
+}
+
+.sobree-change-popover button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg, #26241f);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 2px);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sobree-change-popover button:hover {
+  background: var(--bg-hover, #eceae3);
+  color: var(--fg-strong, #14130f);
+}
+
+/* Current block kind — flagged so the user sees what they're starting from
+   before picking a target. A small filled disc on the left, plus a slightly
+   stronger label colour. */
+.sobree-change-popover button.is-current {
+  font-weight: 600;
+  color: var(--fg-strong, #14130f);
+  position: relative;
+  padding-right: 28px;
+}
+.sobree-change-popover button.is-current::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--accent, #c96f22);
+}
+
+.sobree-change-popover button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus, 0 0 0 3px rgba(201, 111, 34, 0.25));
+}
+
+/* === Page-setup popover ============================================
+   Reuses the .sobree-change-popover positioning + chrome (border,
+   shadow, background, animation). Adds form layout for the Page Setup
+   form fields. */
+
+.sobree-page-setup-popover {
+  width: 320px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sobree-page-setup-popover .ps-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-subtle, #7c7764);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border, #dedbd0);
+}
+
+.sobree-page-setup-popover .ps-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sobree-page-setup-popover .ps-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sobree-page-setup-popover .ps-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fg-muted, #5a5649);
+}
+
+.sobree-page-setup-popover select,
+.sobree-page-setup-popover input[type="number"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg, #26241f);
+  background: var(--bg-elevated, #ffffff);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-sm, 2px);
+  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sobree-page-setup-popover select:focus-visible,
+.sobree-page-setup-popover input[type="number"]:focus-visible {
+  outline: none;
+  border-color: var(--primary, #c96f22);
+  box-shadow: var(--ring-focus, 0 0 0 3px rgba(201, 111, 34, 0.25));
+}
+
+.sobree-page-setup-popover .ps-margin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sobree-page-setup-popover .ps-margin {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sobree-page-setup-popover .ps-margin span {
+  font-size: 10px;
+  text-transform: capitalize;
+  color: var(--fg-subtle, #7c7764);
+}
+
+/* === Page & section setup popover — group headers + section group === */
+
+.sobree-page-setup-popover .ps-section-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary, #c96f22);
+  padding: 6px 0 2px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border, #dedbd0);
+}
+
+.sobree-page-setup-popover .ps-section-header:first-of-type {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Checkbox rows render horizontally: [checkbox] [label]. */
+.sobree-page-setup-popover .ps-row.ps-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.sobree-page-setup-popover .ps-row.ps-checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--primary, #c96f22);
+  cursor: pointer;
+}
+
+.sobree-page-setup-popover .ps-row.ps-checkbox span {
+  font-size: 12px;
+  color: var(--fg, #26241f);
+  line-height: 1.3;
+}
+
+.sobree-page-setup-popover .ps-insert-break {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary, #c96f22);
+  background: var(--primary-soft, #fdf6ee);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 2px);
+  cursor: pointer;
+  text-align: center;
+  transition: background-color var(--dur-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--dur-fast, 120ms) var(--ease-standard, ease);
+}
+
+.sobree-page-setup-popover .ps-insert-break:hover {
+  background: var(--bg-hover, #eceae3);
+  border-color: var(--primary, #c96f22);
+}
+
+.sobree-page-setup-popover .ps-insert-break:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus, 0 0 0 3px rgba(201, 111, 34, 0.25));
+}

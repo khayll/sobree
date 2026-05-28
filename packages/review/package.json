@@ -1,0 +1,50 @@
+{
+  "name": "@sobree/review",
+  "version": "0.1.0",
+  "publishConfig": { "access": "public" },
+  "description": "Tracked-changes & comments review surface for @sobree/core — post-it comment threads, per-author colours, accept/reject/resolve actions.",
+  "keywords": [
+    "sobree",
+    "wysiwyg",
+    "editor",
+    "track-changes",
+    "comments",
+    "review"
+  ],
+  "license": "MIT",
+  "author": "sobree.dev",
+  "homepage": "https://docs.sobree.dev/api/review/",
+  "bugs": {
+    "url": "https://github.com/khayll/sobree/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khayll/sobree.git",
+    "directory": "packages/review"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@sobree/core": "workspace:*"
+  }
+}

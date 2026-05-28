@@ -1,0 +1,23 @@
+{
+  "name": "@sobree/docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Documentation site for @sobree/* packages. Deploys to docs.sobree.dev.",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.34.0",
+    "@sobree/core": "workspace:*",
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

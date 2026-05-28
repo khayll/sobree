@@ -1,0 +1,32 @@
+{
+  "fixture": "06-mixed-fonts",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Default font here. Times New Roman here. Back to Calibri. Courier New monospace.",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 371.85,
+          "height": 10,
+          "fontName": "g_d2_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Whole paragraph in Georgia, with some bold and italic mixed in. Bold Georgia. Italic Georgia.",
+          "x": 72.1,
+          "y": 747.14,
+          "width": 424.68,
+          "height": 10,
+          "fontName": "g_d2_f4",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

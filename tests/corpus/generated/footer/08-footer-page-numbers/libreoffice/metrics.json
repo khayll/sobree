@@ -1,0 +1,757 @@
+{
+  "fixture": "08-footer-page-numbers",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Paragraph 1. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 749.44,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 2. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 737.89,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 726.34,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 3. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 714.79,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 703.24,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 4. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 691.69,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 680.14,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 5. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 668.59,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 657.04,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 6. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 645.49,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 633.94,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 7. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 622.39,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 610.84,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 8. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 599.29,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 587.74,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 9. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 576.19,
+          "width": 424.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 564.64,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 10. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 553.09,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 541.54,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 11. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 529.99,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 518.44,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 12. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 506.89,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 495.34,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 13. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 483.79,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 472.24,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 14. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 460.69,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 449.14,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 15. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 437.59,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 426.04,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 16. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 414.49,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 402.94,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 17. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 391.39,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 379.84,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 18. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 368.29,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 356.74,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 19. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 345.19,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 333.64,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 20. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 322.09,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 310.54,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 21. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 298.99,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 287.44,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 22. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 275.89,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 264.34,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 23. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 252.79,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 241.24,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 24. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 229.69,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 218.14,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 25. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 206.59,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 195.04,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 26. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 183.49,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 171.94,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 27. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 160.39,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 148.84,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 28. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 137.29,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 125.74,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 29. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 114.19,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 102.64,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 30. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 91.09,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 79.54,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Page 1 of 2",
+          "x": 275.15,
+          "y": 38.04,
+          "width": 45.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "lines": [
+        {
+          "text": "Paragraph 31. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 749.44,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 32. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 737.89,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 726.34,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 33. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 714.79,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 703.24,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 34. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 691.69,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 680.14,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 35. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 668.59,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 657.04,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 36. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 645.49,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 633.94,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 37. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 622.39,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 610.84,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 38. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 599.29,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 587.74,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 39. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 576.19,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 564.64,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph 40. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 553.09,
+          "width": 429.52,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 541.54,
+          "width": 121.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Page 2 of 2",
+          "x": 275.15,
+          "y": 38.04,
+          "width": 45.2,
+          "height": 10,
+          "fontName": "g_d4_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

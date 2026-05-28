@@ -1,0 +1,185 @@
+{
+  "fixture": "12-mixed-flow",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Mixed Flow",
+          "x": 72.1,
+          "y": 743.39,
+          "width": 80.85,
+          "height": 16,
+          "fontName": "g_d10_f1",
+          "fontSize": 16
+        },
+        {
+          "text": "Body paragraph following the heading. The next block should be a numbered list starting at 1.",
+          "x": 72.1,
+          "y": 724.54,
+          "width": 376.58,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "1. First numbered item.",
+          "x": 90.1,
+          "y": 712.99,
+          "width": 101.48,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "2. Second numbered item.",
+          "x": 90.1,
+          "y": 701.44,
+          "width": 112.59,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "3. Third numbered item.",
+          "x": 90.1,
+          "y": 689.89,
+          "width": 105.39,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Body paragraph after the first numbered list. Next: a bulleted list — its <ul> must NOT be merged with the",
+          "x": 72.1,
+          "y": 678.34,
+          "width": 429.1,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "previous <ol>.",
+          "x": 72.1,
+          "y": 666.79,
+          "width": 58.41,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "• Bullet one.",
+          "x": 90.1,
+          "y": 655.24,
+          "width": 61.82,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "• Bullet two.",
+          "x": 90.1,
+          "y": 643.69,
+          "width": 62.37,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "• Bullet three.",
+          "x": 90.1,
+          "y": 632.14,
+          "width": 67.35,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Body paragraph between bulleted list and table.",
+          "x": 72.1,
+          "y": 620.59,
+          "width": 190.59,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Key Value",
+          "x": 77.75,
+          "y": 608.54,
+          "width": 174.97,
+          "height": 10,
+          "fontName": "g_d10_f3",
+          "fontSize": 10
+        },
+        {
+          "text": "alpha 1",
+          "x": 77.75,
+          "y": 596.49,
+          "width": 155,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "beta 2",
+          "x": 77.75,
+          "y": 584.44,
+          "width": 155,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Body paragraph after the table. The next block is a SECOND numbered list — a new numId, so it should restart",
+          "x": 72.1,
+          "y": 572.39,
+          "width": 447.83,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "at 1, not continue from 3.",
+          "x": 72.1,
+          "y": 560.84,
+          "width": 101.29,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "1. Restarted at 1 (new numId).",
+          "x": 90.1,
+          "y": 549.29,
+          "width": 129.8,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "2. Second item of the second list.",
+          "x": 90.1,
+          "y": 537.74,
+          "width": 140.64,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Final trailing body paragraph.",
+          "x": 72.1,
+          "y": 526.19,
+          "width": 119.31,
+          "height": 10,
+          "fontName": "g_d10_f2",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

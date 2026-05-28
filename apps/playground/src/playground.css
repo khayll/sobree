@@ -1,0 +1,181 @@
+/* Dev playground — minimal, branded, two-column. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  background: var(--bg, #fbfaf7);
+  color: var(--fg, #26241f);
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border, #dedbd0);
+  background: var(--bg-elevated, #fff);
+  font-size: 13px;
+}
+.bar strong {
+  color: var(--primary, #c96f22);
+  letter-spacing: 0.01em;
+}
+.bar .hint {
+  color: var(--fg-muted, #5a5649);
+  font-size: 12px;
+}
+.bar a {
+  color: var(--primary, #c96f22);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  height: calc(100% - 41px);
+  min-height: 0;
+}
+
+.editor {
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-subtle, #f6f4ef);
+}
+
+.panel {
+  border-left: 1px solid var(--border, #dedbd0);
+  background: var(--bg-elevated, #fff);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-size: 13px;
+}
+
+.panel h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted, #5a5649);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.panel section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel button {
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  background: var(--bg, #fbfaf7);
+  color: var(--fg, #26241f);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+.panel button:hover {
+  background: var(--bg-hover, #eceae3);
+}
+
+.panel input[type="file"] {
+  font: inherit;
+  font-size: 12px;
+}
+
+/* Mode switches — sit above the seed buttons. Simple checkbox-based
+   toggles styled to read as "on/off" rather than a tick-mark. */
+.panel section.modes {
+  gap: 8px;
+}
+.panel .switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  background: var(--bg, #fbfaf7);
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  transition: background var(--dur-fast, 120ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
+}
+.panel .switch:hover {
+  background: var(--bg-hover, #eceae3);
+}
+.panel .switch input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary, #c96f22);
+}
+.panel .switch:has(input:checked) {
+  background: var(--primary-soft, #fdf6ee);
+  border-color: var(--sobree-100, #f9e6d0);
+}
+.panel .switch span {
+  flex: 1;
+}
+.panel .switch__hint {
+  color: var(--fg-muted, #5a5649);
+  font-style: normal;
+  font-size: 11px;
+}
+.panel .switch--input {
+  cursor: default;
+}
+.panel .switch--input .switch__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted, #5a5649);
+  flex: 0 0 auto;
+}
+.panel .switch--input input[type="text"] {
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-sm, 2px);
+  background: var(--bg, #fff);
+  min-width: 0;
+}
+.panel .switch--input input[type="text"]:focus {
+  outline: 2px solid var(--primary-soft, #fdf6ee);
+  border-color: var(--primary, #c96f22);
+}
+
+.meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--fg-muted, #5a5649);
+}
+.meta code {
+  font-family: Menlo, Consolas, monospace;
+  color: var(--fg, #26241f);
+}
+
+#doc-pre {
+  margin: 0;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--fg-muted, #5a5649);
+  background: var(--bg-subtle, #f6f4ef);
+  border: 1px solid var(--border, #dedbd0);
+  border-radius: var(--radius-md, 4px);
+  padding: 8px;
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

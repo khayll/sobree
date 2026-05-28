@@ -1,0 +1,198 @@
+{
+  "blocks": [
+    {
+      "attrs": {
+        "data-block-index": "0",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5750000000000002;",
+      "tag": "P",
+      "text": "Paragraph one with explicit 1.5× line spacing. Lorem ipsum d…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "1",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5750000000000002;",
+      "tag": "P",
+      "text": "Paragraph two — should render with the same line-height as p…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "2",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5750000000000002;",
+      "tag": "P",
+      "text": "Paragraph three — same.",
+    },
+  ],
+  "fixture": "corpus/generated/paragraph/03-bodytext-line-360",
+  "importWarnings": [],
+  "numberingDefs": 1,
+  "styles": [
+    {
+      "basedOn": "Normal",
+      "id": "Title",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontSizePt": 28,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading1",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 240,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 16,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading2",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 200,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 13,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading3",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 12,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading4",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "italic": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading5",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading6",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Strong",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "bold": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "ListParagraph",
+      "paragraphDefaults": undefined,
+      "runDefaults": undefined,
+    },
+    {
+      "basedOn": "Normal",
+      "id": "FootnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "EndnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": undefined,
+      "id": "Normal",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontFamily": "Calibri",
+        "fontSizePt": 11,
+      },
+    },
+  ],
+}

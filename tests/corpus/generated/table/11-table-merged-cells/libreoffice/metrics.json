@@ -1,0 +1,77 @@
+{
+  "fixture": "11-table-merged-cells",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Quarterly status report — exercises merged cells and colour-coded backgrounds.",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 322.9,
+          "height": 10,
+          "fontName": "g_d22_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Team Project Owner Status",
+          "x": 116.4,
+          "y": 748.94,
+          "width": 363.03,
+          "height": 10,
+          "fontName": "g_d22_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Engineering Auth refactor Alice On track",
+          "x": 77.75,
+          "y": 728.44,
+          "width": 405.67,
+          "height": 10,
+          "fontName": "g_d22_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Pipeline migration Bob At risk",
+          "x": 190.25,
+          "y": 716.39,
+          "width": 289.57,
+          "height": 10,
+          "fontName": "g_d22_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Design Onboarding redesign Carol Blocked",
+          "x": 77.75,
+          "y": 704.34,
+          "width": 404.98,
+          "height": 10,
+          "fontName": "g_d22_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Note: figures revised against the previous quarter; see Schedule C for methodology.",
+          "x": 129.65,
+          "y": 692.29,
+          "width": 335.15,
+          "height": 10,
+          "fontName": "g_d22_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph after the table.",
+          "x": 72.1,
+          "y": 680.24,
+          "width": 100.39,
+          "height": 10,
+          "fontName": "g_d22_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

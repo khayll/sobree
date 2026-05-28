@@ -1,0 +1,1032 @@
+{
+  "fixture": "13-pagination-edge-cases",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Filler paragraph 1. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 749.44,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 2. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 737.89,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 726.34,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 3. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 714.79,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 703.24,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 4. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 691.69,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 680.14,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 5. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 668.59,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 657.04,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 6. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 645.49,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 633.94,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 7. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 622.39,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 610.84,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 8. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 599.29,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 587.74,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 9. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 576.19,
+          "width": 448.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 564.64,
+          "width": 231.11,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 10. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 553.09,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 541.54,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 11. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 529.99,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 518.44,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 12. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 506.89,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 495.34,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 13. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 483.79,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 472.24,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 14. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 460.69,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 449.14,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 15. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 437.59,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 426.04,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 16. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 414.49,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 402.94,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 17. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 391.39,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 379.84,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 18. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 368.29,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 356.74,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "A heading near the page boundary",
+          "x": 72.1,
+          "y": 330.34,
+          "width": 200.07,
+          "height": 13,
+          "fontName": "g_d12_f2",
+          "fontSize": 13
+        },
+        {
+          "text": "This paragraph must travel together with the heading above. If you see the heading at the bottom of one page",
+          "x": 72.1,
+          "y": 312.19,
+          "width": 435.6,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "and this paragraph at the top of the next, keep-with-next is broken.",
+          "x": 72.1,
+          "y": 300.64,
+          "width": 266.09,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 19. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 289.09,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 277.54,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 20. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 265.99,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 254.44,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 21. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 242.89,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 231.34,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Filler paragraph 22. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 219.79,
+          "width": 442.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+          "x": 72.1,
+          "y": 208.24,
+          "width": 241.36,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "lines": [
+        {
+          "text": "This paragraph starts on a fresh page (pageBreakBefore).",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 228.53,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Splittable paragraph. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt",
+          "x": 72.1,
+          "y": 749.44,
+          "width": 446.98,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod",
+          "x": 72.1,
+          "y": 737.89,
+          "width": 421.43,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed",
+          "x": 72.1,
+          "y": 726.34,
+          "width": 446.4,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur",
+          "x": 72.1,
+          "y": 714.79,
+          "width": 418.14,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 72.1,
+          "y": 703.24,
+          "width": 447.28,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum",
+          "x": 72.1,
+          "y": 691.69,
+          "width": 435.31,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 680.14,
+          "width": 439.21,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 72.1,
+          "y": 668.59,
+          "width": 436.71,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 657.04,
+          "width": 430.06,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 72.1,
+          "y": 645.49,
+          "width": 441.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do",
+          "x": 72.1,
+          "y": 633.94,
+          "width": 428.12,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing",
+          "x": 72.1,
+          "y": 622.39,
+          "width": 449.21,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 72.1,
+          "y": 610.84,
+          "width": 403.72,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum",
+          "x": 72.1,
+          "y": 599.29,
+          "width": 435.31,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 587.74,
+          "width": 439.21,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 72.1,
+          "y": 576.19,
+          "width": 436.71,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 564.64,
+          "width": 430.06,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 72.1,
+          "y": 553.09,
+          "width": 441.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do",
+          "x": 72.1,
+          "y": 541.54,
+          "width": 428.12,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing",
+          "x": 72.1,
+          "y": 529.99,
+          "width": 449.21,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 72.1,
+          "y": 518.44,
+          "width": 403.72,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum",
+          "x": 72.1,
+          "y": 506.89,
+          "width": 435.31,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 495.34,
+          "width": 439.21,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 72.1,
+          "y": 483.79,
+          "width": 436.71,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut",
+          "x": 72.1,
+          "y": 472.24,
+          "width": 430.06,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 72.1,
+          "y": 460.69,
+          "width": 441.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do",
+          "x": 72.1,
+          "y": 449.14,
+          "width": 428.12,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing",
+          "x": 72.1,
+          "y": 437.59,
+          "width": 449.21,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 426.04,
+          "width": 287.72,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "1. Short item one.",
+          "x": 90.1,
+          "y": 414.49,
+          "width": 79.31,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "2. Short item two.",
+          "x": 90.1,
+          "y": 402.94,
+          "width": 79.86,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "3. Oversized item three — Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod",
+          "x": 90.1,
+          "y": 391.39,
+          "width": 403.64,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing",
+          "x": 108.1,
+          "y": 379.84,
+          "width": 412.84,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 108.1,
+          "y": 368.29,
+          "width": 403.72,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem",
+          "x": 108.1,
+          "y": 356.74,
+          "width": 408.38,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 108.1,
+          "y": 345.19,
+          "width": 407.58,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 108.1,
+          "y": 333.64,
+          "width": 376.8,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit,",
+          "x": 108.1,
+          "y": 322.09,
+          "width": 399.79,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 108.1,
+          "y": 310.54,
+          "width": 385.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem",
+          "x": 108.1,
+          "y": 298.99,
+          "width": 408.38,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 108.1,
+          "y": 287.44,
+          "width": 407.58,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 108.1,
+          "y": 275.89,
+          "width": 376.8,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit,",
+          "x": 108.1,
+          "y": 264.34,
+          "width": 399.79,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 108.1,
+          "y": 252.79,
+          "width": 385.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem",
+          "x": 108.1,
+          "y": 241.24,
+          "width": 408.38,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 108.1,
+          "y": 229.69,
+          "width": 407.58,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 108.1,
+          "y": 218.14,
+          "width": 376.8,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit,",
+          "x": 108.1,
+          "y": 206.59,
+          "width": 399.79,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 108.1,
+          "y": 195.04,
+          "width": 385.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem",
+          "x": 108.1,
+          "y": 183.49,
+          "width": 408.38,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 108.1,
+          "y": 171.94,
+          "width": 407.58,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 108.1,
+          "y": 160.39,
+          "width": 376.8,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit,",
+          "x": 108.1,
+          "y": 148.84,
+          "width": 399.79,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 108.1,
+          "y": 137.29,
+          "width": 385.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem",
+          "x": 108.1,
+          "y": 125.74,
+          "width": 408.38,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 108.1,
+          "y": 114.19,
+          "width": 407.58,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 108.1,
+          "y": 102.64,
+          "width": 376.8,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit,",
+          "x": 108.1,
+          "y": 91.09,
+          "width": 399.79,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet,",
+          "x": 108.1,
+          "y": 79.54,
+          "width": 385.99,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        }
+      ]
+    },
+    {
+      "page": 3,
+      "lines": [
+        {
+          "text": "consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem",
+          "x": 108.1,
+          "y": 760.99,
+          "width": 408.38,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore",
+          "x": 108.1,
+          "y": 749.44,
+          "width": 407.58,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "magna aliqua. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
+          "x": 108.1,
+          "y": 737.89,
+          "width": 376.8,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "incididunt ut labore et dolore magna aliqua.",
+          "x": 108.1,
+          "y": 726.34,
+          "width": 174.51,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "4. Short item four.",
+          "x": 90.1,
+          "y": 714.79,
+          "width": 81.55,
+          "height": 10,
+          "fontName": "g_d12_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

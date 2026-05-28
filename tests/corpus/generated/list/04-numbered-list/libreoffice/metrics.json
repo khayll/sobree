@@ -1,0 +1,86 @@
+{
+  "fixture": "04-numbered-list",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Intro paragraph before the list.",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 121.74,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "1. First item.",
+          "x": 90.1,
+          "y": 749.44,
+          "width": 59.05,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "2. Second item.",
+          "x": 90.1,
+          "y": 737.89,
+          "width": 70.16,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "3. Third item — a longer one with enough text to wrap, demonstrating that wrapped lines align with the",
+          "x": 90.1,
+          "y": 726.34,
+          "width": 422.58,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "body text and not the marker.",
+          "x": 108.1,
+          "y": 714.79,
+          "width": 117.63,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "4. Fourth item.",
+          "x": 90.1,
+          "y": 703.24,
+          "width": 67.37,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "5. Fifth item.",
+          "x": 90.1,
+          "y": 691.69,
+          "width": 60.16,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Trailing paragraph after the list.",
+          "x": 72.1,
+          "y": 680.14,
+          "width": 127.27,
+          "height": 10,
+          "fontName": "g_d6_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

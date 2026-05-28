@@ -1,0 +1,71 @@
+{
+  "name": "@sobree/mcp",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "MCP server for Sobree — exposes a Y.Doc-backed editor's mutations as Model Context Protocol tools so LLMs can read and edit a Sobree document.",
+  "keywords": [
+    "sobree",
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "claude",
+    "anthropic",
+    "yjs",
+    "wysiwyg",
+    "editor"
+  ],
+  "license": "MIT",
+  "author": "sobree.dev",
+  "homepage": "https://docs.sobree.dev/api/mcp/",
+  "bugs": {
+    "url": "https://github.com/khayll/sobree/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khayll/sobree.git",
+    "directory": "packages/mcp"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "sobree-mcp": "./dist/bin/sobree-mcp.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "yjs": "^13.6.0"
+  },
+  "peerDependenciesMeta": {
+    "y-websocket": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@sobree/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "y-websocket": "^3.0.0"
+  }
+}

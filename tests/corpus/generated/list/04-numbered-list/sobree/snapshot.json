@@ -1,0 +1,242 @@
+{
+  "blocks": [
+    {
+      "attrs": {
+        "data-block-index": "0",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Intro paragraph before the list.",
+    },
+    {
+      "children": [
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "1",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "First item.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "2",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Second item.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "3",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Third item — a longer one with enough text to wrap, demonstr…",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "4",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Fourth item.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "5",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Fifth item.",
+        },
+      ],
+      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "tag": "OL",
+      "text": "First item.Second item.Third item — a longer one with enough…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "6",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Trailing paragraph after the list.",
+    },
+  ],
+  "fixture": "corpus/generated/list/04-numbered-list",
+  "importWarnings": [],
+  "numberingDefs": 2,
+  "styles": [
+    {
+      "basedOn": "Normal",
+      "id": "Title",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontSizePt": 28,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading1",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 240,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 16,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading2",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 200,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 13,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading3",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 12,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading4",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "italic": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading5",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading6",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Strong",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "bold": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "ListParagraph",
+      "paragraphDefaults": undefined,
+      "runDefaults": undefined,
+    },
+    {
+      "basedOn": "Normal",
+      "id": "FootnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "EndnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": undefined,
+      "id": "Normal",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontFamily": "Calibri",
+        "fontSizePt": 11,
+      },
+    },
+  ],
+}

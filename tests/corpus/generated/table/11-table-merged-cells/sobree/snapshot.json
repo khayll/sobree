@@ -1,0 +1,481 @@
+{
+  "blocks": [
+    {
+      "attrs": {
+        "data-block-index": "0",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Quarterly status report — exercises merged cells and colour-…",
+    },
+    {
+      "attrs": {
+        "class": "sobree-table-bordered",
+        "data-block-index": "1",
+      },
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "Team",
+                    },
+                  ],
+                  "style": "background-color: rgb(31, 78, 121);",
+                  "tag": "TH",
+                  "text": "Team",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "Project",
+                    },
+                  ],
+                  "style": "background-color: rgb(31, 78, 121);",
+                  "tag": "TH",
+                  "text": "Project",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "Owner",
+                    },
+                  ],
+                  "style": "background-color: rgb(31, 78, 121);",
+                  "tag": "TH",
+                  "text": "Owner",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "Status",
+                    },
+                  ],
+                  "style": "background-color: rgb(31, 78, 121);",
+                  "tag": "TH",
+                  "text": "Status",
+                },
+              ],
+              "tag": "TR",
+              "text": "TeamProjectOwnerStatus",
+            },
+          ],
+          "tag": "THEAD",
+          "text": "TeamProjectOwnerStatus",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "attrs": {
+                    "rowspan": "2",
+                  },
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Engineering",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Engineering",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Auth refactor",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Auth refactor",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Alice",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Alice",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "On track",
+                    },
+                  ],
+                  "style": "background-color: rgb(198, 239, 206);",
+                  "tag": "TD",
+                  "text": "On track",
+                },
+              ],
+              "tag": "TR",
+              "text": "EngineeringAuth refactorAliceOn track",
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Pipeline migration",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Pipeline migration",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Bob",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Bob",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "At risk",
+                    },
+                  ],
+                  "style": "background-color: rgb(255, 235, 156);",
+                  "tag": "TD",
+                  "text": "At risk",
+                },
+              ],
+              "tag": "TR",
+              "text": "Pipeline migrationBobAt risk",
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Design",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Design",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Onboarding redesign",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Onboarding redesign",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: left;",
+                      "tag": "P",
+                      "text": "Carol",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "Carol",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "Blocked",
+                    },
+                  ],
+                  "style": "background-color: rgb(255, 199, 206);",
+                  "tag": "TD",
+                  "text": "Blocked",
+                },
+              ],
+              "tag": "TR",
+              "text": "DesignOnboarding redesignCarolBlocked",
+            },
+            {
+              "children": [
+                {
+                  "attrs": {
+                    "colspan": "4",
+                  },
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; text-align: center;",
+                      "tag": "P",
+                      "text": "Note: figures revised against the previous quarter; see Sche…",
+                    },
+                  ],
+                  "style": "background-color: rgb(242, 242, 242);",
+                  "tag": "TD",
+                  "text": "Note: figures revised against the previous quarter; see Sche…",
+                },
+              ],
+              "tag": "TR",
+              "text": "Note: figures revised against the previous quarter; see Sche…",
+            },
+          ],
+          "tag": "TBODY",
+          "text": "EngineeringAuth refactorAliceOn trackPipeline migrationBobAt…",
+        },
+      ],
+      "style": "border-collapse: collapse; --table-cell-border: 1px solid #888; border-top: 1px solid rgb(136, 136, 136); border-right: 1px solid rgb(136, 136, 136); border-bottom: 1px solid rgb(136, 136, 136); border-left: 1px solid rgb(136, 136, 136);",
+      "tag": "TABLE",
+      "text": "TeamProjectOwnerStatusEngineeringAuth refactorAliceOn trackP…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "2",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Paragraph after the table.",
+    },
+  ],
+  "fixture": "corpus/generated/table/11-table-merged-cells",
+  "importWarnings": [],
+  "numberingDefs": 1,
+  "styles": [
+    {
+      "basedOn": "Normal",
+      "id": "Title",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontSizePt": 28,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading1",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 240,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 16,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading2",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 200,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 13,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading3",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 12,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading4",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "italic": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading5",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading6",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Strong",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "bold": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "ListParagraph",
+      "paragraphDefaults": undefined,
+      "runDefaults": undefined,
+    },
+    {
+      "basedOn": "Normal",
+      "id": "FootnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "EndnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": undefined,
+      "id": "Normal",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontFamily": "Calibri",
+        "fontSizePt": 11,
+      },
+    },
+  ],
+}

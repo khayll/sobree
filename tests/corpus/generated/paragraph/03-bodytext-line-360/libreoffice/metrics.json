@@ -1,0 +1,59 @@
+{
+  "fixture": "03-bodytext-line-360",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Paragraph one with explicit 1.5× line spacing. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 437.36,
+          "height": 10,
+          "fontName": "g_d18_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "x": 72.1,
+          "y": 743.69,
+          "width": 241.66,
+          "height": 10,
+          "fontName": "g_d18_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph two — should render with the same line-height as paragraph one. Wrapped lines breathe; consecutive",
+          "x": 72.1,
+          "y": 726.39,
+          "width": 448.85,
+          "height": 10,
+          "fontName": "g_d18_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "paragraphs still have normal after-spacing.",
+          "x": 72.1,
+          "y": 709.09,
+          "width": 170.57,
+          "height": 10,
+          "fontName": "g_d18_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Paragraph three — same.",
+          "x": 72.1,
+          "y": 691.79,
+          "width": 100.96,
+          "height": 10,
+          "fontName": "g_d18_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,235 @@
+/**
+ * Paragraph-property → CSS derivation.
+ *
+ * `applyParagraphProps` is the single place that turns a paragraph's
+ * resolved `ParagraphProperties` (after the style cascade) into inline
+ * CSS on its rendered element: font, colour, alignment, line-height,
+ * spacing, indent, borders, shading, page-break / keep-next hints,
+ * and tab geometry.
+ *
+ * CSS owns layout / interaction; the document owns typography. Every
+ * value applied here comes from the AST + the document's style chain —
+ * there are no CSS-only typography fallbacks.
+ */
+
+import { withFallbacks } from "./fontFallback";
+import { twipsToMm } from "./units";
+import { resolveStyleCascade } from "../../../doc/styles";
+import type { NamedStyle, ParagraphProperties } from "../../../doc/types";
+
+export function applyParagraphProps(
+  el: HTMLElement,
+  props: ParagraphProperties,
+  styles: readonly NamedStyle[] = [],
+): void {
+  // Resolve the style cascade for both run + paragraph defaults, then
+  // overlay the paragraph's own properties so explicit settings win on
+  // conflict.
+  // Bare paragraphs without an explicit `styleId` inherit from
+  // "Normal" — same behaviour as Word's pStyle-default. The cascade
+  // walks `Normal → docDefaults` (when present) under the hood; a
+  // missing "Normal" style returns empty defaults safely.
+  const effectiveStyleId = props.styleId ?? "Normal";
+  const { runDefaults: cascadeRunDefaults, paragraphDefaults } = styles.length > 0
+    ? resolveStyleCascade(styles, effectiveStyleId)
+    : { runDefaults: {}, paragraphDefaults: {} };
+  const effective: ParagraphProperties = mergeParagraphProperties(paragraphDefaults, props);
+  // Overlay the paragraph's OWN `runDefaults` on top of the style
+  // cascade. `pPr/rPr` carries the paragraph-mark font (e.g. an
+  // 8pt Arial in jellap.docx's header contact lines, or 9pt Times
+  // for form-field empties); without overlaying here the cascade
+  // wins and we render those paragraphs at the style's default font
+  // (often 12pt Calibri from DocDefaults), throwing every line-height
+  // calculation off.
+  const runDefaults = { ...cascadeRunDefaults, ...(props.runDefaults ?? {}) };
+
+  if (runDefaults.fontFamily) el.style.fontFamily = withFallbacks(runDefaults.fontFamily);
+  if (runDefaults.fontSizePt !== undefined) {
+    el.style.fontSize = `${runDefaults.fontSizePt}pt`;
+  }
+  // Apply the rest of the run cascade to the block element so per-run
+  // children inherit Word's style-defined colour / weight / italic /
+  // underline. Without this, e.g. Heading1's `color: "#2E74B5"`
+  // (declared in styles.xml) is parsed into the AST but never makes
+  // it onto the rendered `<h1>` — headings render in the default
+  // text colour instead of Word's blue.
+  if (runDefaults.color) el.style.color = runDefaults.color;
+  if (runDefaults.bold) el.style.fontWeight = "bold";
+  if (runDefaults.italic) el.style.fontStyle = "italic";
+  // `underline` is an enum (single / double / dotted / …) or
+  // undefined. Map all non-"none" values to a plain underline — the
+  // exact style is decorative and most aren't representable as a
+  // single CSS rule anyway. Per-run runs can still set richer
+  // styles via their own inline declarations.
+  if (runDefaults.underline && runDefaults.underline !== "none") {
+    el.style.textDecoration = "underline";
+  }
+  if (runDefaults.strike) {
+    el.style.textDecoration = el.style.textDecoration
+      ? `${el.style.textDecoration} line-through`
+      : "line-through";
+  }
+  // Caps from cascade — descendant text nodes inherit
+  // `text-transform: uppercase` so a run that doesn't set its own
+  // caps still uppercases when its paragraph style does.
+  // healthcare-with-photo's `PersonalName` style extends `Title`,
+  // which carries `<w:caps/>`; without this the name renders mixed
+  // case despite the cascade resolving caps=true.
+  if (runDefaults.caps) el.style.textTransform = "uppercase";
+
+  if (props.styleId && !/^Heading[1-6]$/.test(props.styleId)) {
+    el.classList.add(`style-${props.styleId.toLowerCase()}`);
+  }
+  if (effective.alignment) {
+    el.style.textAlign =
+      effective.alignment === "both" ? "justify" : effective.alignment;
+  }
+  if (effective.spacing?.line && effective.spacing.lineRule === "auto") {
+    // OOXML's `auto` lineRule means "1 = single line spacing as Word
+    // defines it, where single ALREADY includes the font's natural
+    // leading". Word's "1.5 lines" is therefore 1.5 × (font-size +
+    // natural leading), NOT 1.5 × font-size. CSS's unitless
+    // `line-height` is just (multiplier × font-size), so to match Word
+    // we multiply by the font's natural leading.
+    //
+    // Each font has a different built-in leading (declared in its
+    // OS/2 + hhea tables and respected by the rasteriser). The values
+    // below were measured against LibreOffice's PDF output by the
+    // `pnpm fixtures:compare` drift tool — same docx, same font, same
+    // line-rule; we ratio LibreOffice's Δy to the font size and back
+    // out the leading.
+    //
+    // `line=240` (single) keeps the `normal` shortcut so the browser
+    // uses its own native leading for the font; only multi-line rules
+    // need the explicit `line-height: N` declaration to scale.
+    if (effective.spacing.line === 240) {
+      el.style.lineHeight = "normal";
+    } else {
+      const naturalLeading = naturalLeadingFor(runDefaults.fontFamily);
+      el.style.lineHeight = String((effective.spacing.line / 240) * naturalLeading);
+    }
+  }
+  // Spacing applies to LI just as it does to a free paragraph —
+  // Word's per-paragraph `<w:spacing w:after>` is the gap BETWEEN
+  // consecutive bullets, not just a wrapper concern. Dropping it on
+  // LIs (the pre-fix behaviour) collapsed every list to zero inter-
+  // bullet gap, packing ~3pt per bullet too tight and cascading into
+  // a 2-page short-fall on complex-multipage.docx vs LO.
+  if (effective.spacing?.beforeTwips !== undefined) {
+    el.style.marginTop = `${twipsToMm(effective.spacing.beforeTwips)}mm`;
+  }
+  if (effective.spacing?.afterTwips !== undefined) {
+    el.style.marginBottom = `${twipsToMm(effective.spacing.afterTwips)}mm`;
+  }
+  const isLi = el.tagName === "LI";
+  if (effective.indent?.leftTwips !== undefined && !isLi) {
+    // OOXML's `<w:ind w:left>` on a numbered paragraph is the SAME
+    // value as the numbering definition's `lvl/pPr/ind/@w:left`. The
+    // numbering def already drives the UL's `padding-left`; if we
+    // also stamped it as `margin-left` on the LI, the indent would
+    // double (text starts at 2 × leftTwips). LIs ignore the paragraph
+    // indent here — the UL's padding-left wins. Non-LI paragraphs
+    // still get their own indent.
+    el.style.marginLeft = `${twipsToMm(effective.indent.leftTwips)}mm`;
+  }
+  if (effective.indent?.rightTwips !== undefined) {
+    el.style.marginRight = `${twipsToMm(effective.indent.rightTwips)}mm`;
+  }
+  // Paragraph borders (`<w:pBdr>`). Word's sz is eighths-of-a-point;
+  // convert to CSS px (1pt = 96/72 px). All four sides supported so
+  // page-header dividers (top/bottom) and decorative box paragraphs
+  // (all four sides) render correctly.
+  if (effective.borders) {
+    for (const side of ["top", "bottom", "left", "right"] as const) {
+      const b = effective.borders[side];
+      if (!b || b.style === "none") continue;
+      const px = Math.max(1, Math.round((b.sizeEighthsOfPt / 8) * (96 / 72)));
+      el.style[`border${side[0]!.toUpperCase() + side.slice(1)}` as "borderTop"] =
+        `${px}px ${mapBorderStyle(b.style)} ${mapBorderColor(b.color)}`;
+    }
+  }
+  // <w:shd w:fill="…"/> on the paragraph — paragraph background colour.
+  if (effective.shading?.fill && effective.shading.fill !== "#auto") {
+    el.style.backgroundColor = effective.shading.fill;
+  }
+  if (effective.pageBreakBefore) {
+    el.setAttribute("data-page-break-before", "");
+  }
+  // `keepNext`: the paragraph must travel together with whatever
+  // follows on the same page. Stamped here as a data-attribute so the
+  // paginator's `buildItems` reads it (mirrors how `pageBreakBefore`
+  // becomes `data-page-break-before`).
+  if (effective.keepNext) {
+    el.setAttribute("data-keep-next", "");
+  }
+  // Custom tab stops (`<w:pPr><w:tabs>`) → CSS `tab-size` so `\t`
+  // characters in run text honour Word's stop geometry. We use the
+  // smallest stop's position as the tab width — a strict approximation:
+  // only correct when all stops are evenly spaced and tabs always land
+  // on the first stop. Fine for the common case (header label/value
+  // column, form fields like "Cím: \t 1012 Budapest"); mixed-position
+  // layouts will drift. CSS `tab-size: <length>` is honoured by
+  // browsers when `white-space` preserves whitespace (we set
+  // `pre-wrap` on paragraphs globally).
+  if (effective.tabStops && effective.tabStops.length > 0) {
+    const minTwips = Math.min(...effective.tabStops.map((s) => s.positionTwips));
+    if (minTwips > 0) {
+      el.style.setProperty("tab-size", `${twipsToMm(minTwips)}mm`);
+      // Browsers also need the prefixed -moz- variant in older versions.
+      el.style.setProperty("-moz-tab-size", `${twipsToMm(minTwips)}mm`);
+    }
+  }
+}
+
+/**
+ * Merge `over` into `base` for paragraph properties — `over`'s explicit
+ * values win, but its sub-objects (spacing, indent, borders) shallow-
+ * merge with `base`'s so partial overrides don't wipe sibling fields.
+ *
+ * Example: a paragraph that sets only `spacing.afterTwips: 240` should
+ * NOT lose the `spacing.line: 276` from its style cascade.
+ */
+function mergeParagraphProperties(
+  base: ParagraphProperties,
+  over: ParagraphProperties,
+): ParagraphProperties {
+  return {
+    ...base,
+    ...over,
+    spacing: { ...base.spacing, ...over.spacing },
+    indent: { ...base.indent, ...over.indent },
+    borders: { ...base.borders, ...over.borders },
+  };
+}
+
+/**
+ * Per-font natural-leading lookup (single-line height ÷ design size).
+ *
+ * Measured against LibreOffice via `pnpm fixtures:compare`. Each font's
+ * OS/2 + hhea tables declare a different built-in leading, and Word's
+ * `lineRule="auto"` multiplies that, not the design size. Without this
+ * adjustment, `line=360` (1.5×) on Calibri 11pt renders ~10% denser in
+ * Sobree than in Word.
+ *
+ * Default 1.15 is the Latin-serif baseline (Times / Bookman / Georgia).
+ * Add more entries as drift reports show divergence on real docs.
+ */
+function naturalLeadingFor(fontFamily: string | undefined): number {
+  if (!fontFamily) return 1.15;
+  const key = fontFamily.toLowerCase();
+  if (key.startsWith("calibri")) return 1.05;
+  return 1.15;
+}
+
+function mapBorderStyle(s: string): string {
+  if (s === "single" || s === "thick") return "solid";
+  if (s === "double") return "double";
+  if (s === "dashed") return "dashed";
+  if (s === "dotted") return "dotted";
+  return "solid";
+}
+
+function mapBorderColor(c: string): string {
+  if (!c || c === "auto") return "currentColor";
+  return c.startsWith("#") ? c : `#${c}`;
+}

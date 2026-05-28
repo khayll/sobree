@@ -1,0 +1,36 @@
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+*.log
+.env
+.env.local
+.env.*.local
+
+.vite
+.vitest
+.astro
+
+# Local dev-collab persistence (created by `pnpm dev:collab`).
+.dev-collab-data
+
+.claude
+devdocs
+
+# inkode
+.ik.yaml
+.ik
+
+# MS Office lock files (created when a .docx / .xlsx is open in Word/Excel)
+~$*
+
+# Real-world corpus + reference renders — real documents kept out of
+# version control. The synthetic `generated/` corpus IS committed.
+tests/corpus/real-world/

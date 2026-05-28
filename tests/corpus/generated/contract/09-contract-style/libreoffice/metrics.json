@@ -1,0 +1,239 @@
+{
+  "fixture": "09-contract-style",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Service Agreement",
+          "x": 225.3,
+          "y": 743.39,
+          "width": 144.83,
+          "height": 16,
+          "fontName": "g_d0_f1",
+          "fontSize": 16
+        },
+        {
+          "text": "This Service Agreement (the “Agreement”) is entered into between:",
+          "x": 72.1,
+          "y": 712.99,
+          "width": 271.8,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Provider: Acme Consulting Ltd.",
+          "x": 72.1,
+          "y": 701.44,
+          "width": 128.76,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Address: 1 Example Street, London, EC1A 1AA",
+          "x": 72.1,
+          "y": 689.89,
+          "width": 194.81,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Registered no.: 12345678",
+          "x": 72.1,
+          "y": 678.34,
+          "width": 102.95,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "and:",
+          "x": 72.1,
+          "y": 666.79,
+          "width": 17.17,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Client name John Doe",
+          "x": 77.75,
+          "y": 654.74,
+          "width": 248.02,
+          "height": 10,
+          "fontName": "g_d0_f3",
+          "fontSize": 10
+        },
+        {
+          "text": "Address 42 High Street, London",
+          "x": 77.75,
+          "y": 642.69,
+          "width": 304.36,
+          "height": 10,
+          "fontName": "g_d0_f3",
+          "fontSize": 10
+        },
+        {
+          "text": "Contact john.doe@example.com",
+          "x": 77.75,
+          "y": 630.64,
+          "width": 307.42,
+          "height": 10,
+          "fontName": "g_d0_f3",
+          "fontSize": 10
+        },
+        {
+          "text": "The Parties agree to the following terms (collectively, the “Terms”):",
+          "x": 72.1,
+          "y": 607.04,
+          "width": 272.93,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "1. Scope. Provider shall deliver consulting services as described in Schedule A, subject to revision by",
+          "x": 90.1,
+          "y": 595.49,
+          "width": 414.21,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "mutual written agreement.",
+          "x": 108.1,
+          "y": 583.94,
+          "width": 105.1,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "2. Term. This Agreement shall commence on the date of signature and continue for an initial term of",
+          "x": 90.1,
+          "y": 572.39,
+          "width": 412.21,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "twelve (12) months, automatically renewing for successive twelve-month terms unless either Party",
+          "x": 108.1,
+          "y": 560.84,
+          "width": 394.46,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "gives at least thirty (30) days' written notice of non-renewal.",
+          "x": 108.1,
+          "y": 549.29,
+          "width": 240.92,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "3. Fees and Invoicing. The Client shall pay the Provider the fees set out in Schedule B. Invoices are",
+          "x": 90.1,
+          "y": 537.74,
+          "width": 409.56,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "payable within thirty (30) days of issue. Late payment shall accrue interest at the rate of 8% above the",
+          "x": 108.1,
+          "y": 526.19,
+          "width": 407.5,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Bank of England base rate per annum.",
+          "x": 108.1,
+          "y": 514.64,
+          "width": 152.89,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "4. Confidentiality. Each Party shall keep confidential all information of the other Party marked as",
+          "x": 90.1,
+          "y": 503.09,
+          "width": 401.41,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "confidential or which a reasonable person would understand to be confidential.",
+          "x": 108.1,
+          "y": 491.54,
+          "width": 315.44,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "5. Governing Law. This Agreement shall be governed by and construed in accordance with the laws of",
+          "x": 90.1,
+          "y": 479.99,
+          "width": 422.56,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "England and Wales.",
+          "x": 108.1,
+          "y": 468.44,
+          "width": 80.15,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Signed for and on behalf of the Parties:",
+          "x": 72.1,
+          "y": 445.34,
+          "width": 156.75,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "…………………………………… ……………………………………",
+          "x": 72.1,
+          "y": 422.24,
+          "width": 335,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Provider Client",
+          "x": 72.1,
+          "y": 410.69,
+          "width": 218.82,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,354 @@
+{
+  "blocks": [
+    {
+      "attrs": {
+        "data-block-index": "0",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Table below:",
+    },
+    {
+      "attrs": {
+        "class": "sobree-table-bordered",
+        "data-block-index": "1",
+      },
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Header A",
+                    },
+                  ],
+                  "style": "background-color: rgb(238, 238, 238);",
+                  "tag": "TH",
+                  "text": "Header A",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Header B",
+                    },
+                  ],
+                  "style": "background-color: rgb(238, 238, 238);",
+                  "tag": "TH",
+                  "text": "Header B",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Header C",
+                    },
+                  ],
+                  "style": "background-color: rgb(238, 238, 238);",
+                  "tag": "TH",
+                  "text": "Header C",
+                },
+              ],
+              "tag": "TR",
+              "text": "Header AHeader BHeader C",
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Cell 1A",
+                    },
+                  ],
+                  "tag": "TH",
+                  "text": "Cell 1A",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Cell 1B",
+                    },
+                  ],
+                  "tag": "TH",
+                  "text": "Cell 1B",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Cell 1C",
+                    },
+                  ],
+                  "tag": "TH",
+                  "text": "Cell 1C",
+                },
+              ],
+              "tag": "TR",
+              "text": "Cell 1ACell 1BCell 1C",
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Cell 2A",
+                    },
+                  ],
+                  "tag": "TH",
+                  "text": "Cell 2A",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Cell 2B",
+                    },
+                  ],
+                  "tag": "TH",
+                  "text": "Cell 2B",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Cell 2C",
+                    },
+                  ],
+                  "tag": "TH",
+                  "text": "Cell 2C",
+                },
+              ],
+              "tag": "TR",
+              "text": "Cell 2ACell 2BCell 2C",
+            },
+          ],
+          "tag": "THEAD",
+          "text": "Header AHeader BHeader CCell 1ACell 1BCell 1CCell 2ACell 2BC…",
+        },
+      ],
+      "style": "border-collapse: collapse; --table-cell-border: 1px solid #888; border-top: 1px solid rgb(136, 136, 136); border-right: 1px solid rgb(136, 136, 136); border-bottom: 1px solid rgb(136, 136, 136); border-left: 1px solid rgb(136, 136, 136);",
+      "tag": "TABLE",
+      "text": "Header AHeader BHeader CCell 1ACell 1BCell 1CCell 2ACell 2BC…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "2",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Paragraph after table.",
+    },
+  ],
+  "fixture": "corpus/generated/table/07-table-simple",
+  "importWarnings": [],
+  "numberingDefs": 1,
+  "styles": [
+    {
+      "basedOn": "Normal",
+      "id": "Title",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontSizePt": 28,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading1",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 240,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 16,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading2",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 200,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 13,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading3",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 12,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading4",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "italic": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading5",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading6",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Strong",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "bold": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "ListParagraph",
+      "paragraphDefaults": undefined,
+      "runDefaults": undefined,
+    },
+    {
+      "basedOn": "Normal",
+      "id": "FootnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "EndnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": undefined,
+      "id": "Normal",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontFamily": "Calibri",
+        "fontSizePt": 11,
+      },
+    },
+  ],
+}

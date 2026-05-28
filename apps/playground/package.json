@@ -1,0 +1,23 @@
+{
+  "name": "@sobree/playground",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bare-bones Vite app for verifying editor changes during development. Not published, not deployed.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sobree/block-tools": "workspace:*",
+    "@sobree/collab-providers": "workspace:*",
+    "@sobree/core": "workspace:*",
+    "@sobree/keyboard": "workspace:*",
+    "@sobree/review": "workspace:*",
+    "@sobree/zoom-controls": "workspace:*",
+    "y-indexeddb": "^9.0.12",
+    "yjs": "^13.6.30"
+  }
+}

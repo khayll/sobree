@@ -1,0 +1,326 @@
+/* The stack is the single contentEditable region; papers inside are visually
+   separated by a gap. Each paper sits inside a `.paper-row` along with its
+   right-side comments sidebar — the row's flex layout puts comments beside
+   (not inside) the paper. */
+.paper-stack {
+  display: flex;
+  flex-direction: column;
+  padding: 48px;
+  gap: 28px;
+  outline: none;
+}
+
+/* Row container — paper card + comments sidebar laid out side-by-side.
+   `align-items: flex-start` keeps the sidebar pinned to the top of the
+   paper rather than centring vertically. */
+.paper-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.paper {
+  position: relative;
+  background: #fff;
+  /* 1px outer border + drop shadow — defines the page edge so
+     pages are visually distinguishable from the page-stack background,
+     even when the shadow is faint at high zoom-out levels. */
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 18px 60px rgba(0, 0, 0, 0.12);
+  padding-top: var(--margin-top, 25mm);
+  padding-right: var(--margin-right, 20mm);
+  padding-bottom: var(--margin-bottom, 25mm);
+  padding-left: var(--margin-left, 20mm);
+  overflow: hidden;
+  flex: none;
+}
+
+.paper-header,
+.paper-footer {
+  position: absolute;
+  left: var(--margin-left, 20mm);
+  right: var(--margin-right, 20mm);
+  font-size: 10pt;
+  color: #555;
+  white-space: pre-wrap;
+}
+
+/* Header / footer zones grow with their content. We reserve the top
+   (resp. bottom) margin as min-height so a typical "single line of
+   page number" header still anchors at the bottom of the top margin —
+   matching the legacy behaviour — but a tall rich header (the jellap
+   case: logo + multi-line contact text + heading) is allowed to spill
+   downward into the body area. Word renders this the same way: when
+   the header content exceeds the headerTwips/topTwips reservation it
+   visually overlaps body content (it's the author's job to set a
+   larger top margin). */
+.paper-header {
+  top: 0;
+  min-height: var(--margin-top, 25mm);
+  /* Word positions header text `headerTwips` from the page top.
+     Without this, header content hugs the top edge whereas footer
+     text naturally sits offset from the bottom — visibly
+     asymmetric. Default 12.7mm = Word's factory headerTwips (720). */
+  padding-top: var(--header-offset-mm, 12.7mm);
+  padding-bottom: 4mm;
+  border-bottom: 1px dashed transparent;
+}
+
+.paper-footer {
+  bottom: 0;
+  min-height: var(--margin-bottom, 25mm);
+  /* Footer text sits naturally at the bottom of the zone with just a
+     small top-pad of breathing room from the body. Word's
+     `<w:pgMar w:footer>` distance is already represented by the
+     zone's bottom-positioned anchor + min-height; adding a
+     padding-bottom on top would push the footer text UP off the
+     bottom-margin baseline by the same amount, mis-aligning vs the
+     LO reference. */
+  padding-top: 4mm;
+  text-align: center;
+  border-top: 1px dashed transparent;
+}
+
+/* Floating-object layer — sits over the content rectangle as a sibling
+   of .paper-content. Pointer events pass through to body content by
+   default; the selection layer (when wired up) re-enables them per
+   frame. Hidden via `is-empty` when the page has no anchored frames. */
+.paper-anchors {
+  position: absolute;
+  top: var(--margin-top, 25mm);
+  right: var(--margin-right, 20mm);
+  bottom: var(--margin-bottom, 25mm);
+  left: var(--margin-left, 20mm);
+  pointer-events: none;
+  isolation: isolate;
+  z-index: 1;
+}
+
+.paper-anchors.is-empty {
+  display: none;
+}
+
+/* Individual anchored frame — absolute-positioned child of .paper-anchors.
+   The renderer sets `left/top/width/height` per frame in mm. Default
+   overflow:hidden so textbox content clips on overflow (Word behaviour). */
+.paper-anchor {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Paragraphs and lists inside header/footer zones — strip the default
+   browser margins so the rich content stacks tightly. Without this,
+   every <p> contributes a vertical body-paragraph margin and the
+   header bloats. */
+.paper-header > p,
+.paper-footer > p,
+.paper-header > ul,
+.paper-header > ol,
+.paper-footer > ul,
+.paper-footer > ol {
+  margin: 0;
+}
+
+/* Per-page footnote zone — sits just above the footer, inside the
+   side margins. Populated by `PaperStack.distributeFootnotes` after
+   pagination places footnote-reference superscripts on each page.
+   Hidden when empty so pages without references look like before.
+   The zone is absolutely positioned for layout simplicity — note
+   this does NOT subtract from the body budget, so pages with many
+   footnotes may visually overlap body text (a paginator-budget fix
+   for footnote-area reservation is a follow-up). */
+.paper-footnotes {
+  position: absolute;
+  left: var(--margin-left, 20mm);
+  right: var(--margin-right, 20mm);
+  bottom: var(--margin-bottom, 25mm);
+  font-size: 0.85em;
+  padding-top: 0.5em;
+  border-top: 1pt solid currentColor;
+  background: rgba(255, 255, 255, 0.96);
+  z-index: 1;
+  max-height: 40%;
+  overflow: hidden;
+}
+.paper-footnotes.is-empty {
+  display: none;
+}
+
+/* Per-page comments sidebar — sits to the RIGHT of the paper card,
+   sibling of `.paper` inside `.paper-row`. Width matches typical
+   word-processor sidebars (~70mm). Comments live OUTSIDE the paper so
+   they don't compete with body content for vertical space; long
+   comment threads scroll vertically within the sidebar. */
+.paper-comments {
+  flex: 0 0 70mm;
+  max-width: 70mm;
+  font-size: 0.85em;
+  padding: 0 0.5em;
+  /* Match paper height visually so long threads scroll inside the
+     sidebar rather than overflowing the row. */
+  align-self: stretch;
+  overflow-y: auto;
+}
+.paper-comments.is-empty {
+  display: none;
+}
+.paper-footnotes .sobree-footnotes__list {
+  margin: 0;
+  padding-left: 1.5em;
+}
+.paper-footnotes .sobree-footnotes__item {
+  margin: 0.25em 0;
+}
+
+/* Print view — empty headers / footers stay genuinely empty. The block
+   indicator in the gutter is still the discoverable affordance for
+   entering zone-edit; no placeholder text is needed. */
+
+.paper-content {
+  position: relative;
+  /* Fill the page's content area so vertical-alignment has something
+     to redistribute. `box-sizing: border-box` is set globally — height
+     therefore covers the full content box of `.paper` minus its
+     vertical padding (= page margins). */
+  height: 100%;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  /* Default to top-aligned. The Paper class swaps `justify-content`
+     based on the section's vAlign. */
+  justify-content: flex-start;
+}
+
+/* Table-cell paragraph line-height tightening.
+ *
+ * Word's "single" line spacing (the implicit default for paragraphs
+ * without an explicit `<w:spacing w:line>`) packs lines tighter than
+ * the browser's `normal` (~1.15-1.2). For dense table-cell content —
+ * resume bullets, multi-row job listings, 2-column contact info —
+ * the cumulative ~10-15% drift moves whole pages. Observed on
+ * pentest-engineer.docx: 30+ bullets in cells pushed the doc to 4
+ * pages where Word/LibreOffice render 3.
+ *
+ * The CSS-level fix targets cell descendants ONLY when the renderer
+ * didn't write an inline `line-height` — paragraphs that DO carry
+ * their own `spacing.line` (with explicit multiplier) override via
+ * the inline style and are unaffected. Body-level paragraphs (outside
+ * tables) keep the browser's `normal` so previously-baselined fixtures
+ * (jellap, contract, …) stay visually identical.
+ *
+ * 1.15 matches Word's typical single-spacing for Latin fonts; the
+ * tightening comes from the browser's `normal` being closer to 1.2
+ * for many sans-serif fallbacks. The CSS attribute selector restricts
+ * the override to elements WITHOUT inline line-height (modern browsers
+ * honour cascade precedence, so the selector's specificity isn't the
+ * point — it's a safety belt against clobbering explicit values that
+ * happen to declare line-height in the inline style block).
+ */
+.paper-content td p:not([style*="line-height"]),
+.paper-content td li:not([style*="line-height"]),
+.paper-content th p:not([style*="line-height"]),
+.paper-content th li:not([style*="line-height"]) {
+  line-height: 1;
+}
+
+/* Table-cell paragraph margin tightening.
+ *
+ * The browser's default `<p>` margin is ~1em above and below — for
+ * a 14pt body that's ~15 px PER PARAGRAPH. Inside a multi-paragraph
+ * table cell (the "Designing : UML / Domain Knowledge : Retail …"
+ * structured tables in resumes, 18+ rows each with multiple wrapped
+ * paragraphs) this accumulates to hundreds of wasted vertical pixels
+ * vs Word / LibreOffice, which apply Word's "no spacing-after" as
+ * literal zero. Each forced page boundary that follows is content
+ * we COULD have packed in.
+ *
+ * The renderer writes an explicit `margin-bottom` on any paragraph
+ * whose source carries `<w:spacing w:after>`. The `:not([style*=…])`
+ * guard restricts this override to cells without that explicit
+ * value, so paragraphs that DO declare after-spacing keep theirs.
+ * Body-level paragraphs (outside tables) are unaffected — they
+ * still get the browser default and previously-baselined fixtures
+ * stay visually identical.
+ *
+ * Observed impact on complex-multipage.docx: page 3's 18-row
+ * Designing/Domain-Knowledge/Tools table dropped from 846 px to
+ * ~530 px tall, leaving room for the Operating Systems +
+ * Technical Proficiency sub-sections to land on the SAME page —
+ * matching LibreOffice's 16-page rendering without any visible
+ * overflow.
+ */
+.paper-content td p:not([style*="margin"]),
+.paper-content th p:not([style*="margin"]) {
+  margin: 0;
+}
+
+/* Custom bullet glyphs (Wingdings ❖, ◆, ★ etc.). When the list's
+ * numbering definition specifies a `lvlText` that doesn't map to a
+ * CSS list-style-type keyword, the renderer stamps the literal glyph
+ * as `--sobree-bullet-glyph` on the UL/OL and sets
+ * `list-style-type: none`. This rule restores a marker via the CSS
+ * ::marker pseudo-element using the custom glyph. The trailing space
+ * after the glyph gives breathing room before the LI text. */
+.paper-content ul.sobree-list-custom-bullet > li::marker,
+.paper-content ol.sobree-list-custom-bullet > li::marker {
+  content: var(--sobree-bullet-glyph) "  ";
+}
+
+/* OOXML list indent — Word's `<w:ind w:left="X" w:hanging="Y"/>`
+ * gives the wrap column X and a hanging pull-back Y for the first
+ * line. Reading complex-multipage Skills Profile bullets in Word
+ * shows the WRAP line aligned with where text starts AFTER the
+ * marker — i.e. the second line lines up with the first line of
+ * actual text, not Y past it.
+ *
+ * Implementation: the UL's `padding-left` (set by the renderer to
+ * the marker column) defines the column for both first-line and
+ * wrap. The marker is drawn with `list-style-position: outside`,
+ * so it hangs LEFT of the text into the UL's padding zone. No
+ * per-LI `padding-left` or `text-indent` is added — that was the
+ * source of the wrap-deeper-than-first-line indent bug.
+ *
+ * The `--sobree-list-hanging-mm` custom property is kept on the UL
+ * for downstream consumers (positionMap etc.) but no longer drives
+ * any CSS layout. */
+
+/* Two-column header rows ("YOUR NAME [tab/gap] GitHub: link...")
+ * use flex layout so the right portion lands at the end of the line.
+ * Word renders these via tab stops that align the after-tab text to
+ * the right margin; browsers can't honour the tab stop's exact
+ * position when the gap is a collapsed-whitespace run. Flex with
+ * `justify-content: space-between` achieves the same visual without
+ * depending on the tab-glyph width. */
+.paper-content .sobree-tab-spread {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1em;
+  /* The flex container collapses pre-wrap whitespace handling on its
+   * own children — restore it so any trailing spaces inside the
+   * before/after spans still render. */
+  white-space: nowrap;
+}
+.paper-content .sobree-tab-spread .sobree-tab-spread__before,
+.paper-content .sobree-tab-spread .sobree-tab-spread__after {
+  white-space: pre-wrap;
+  min-width: 0;
+}
+
+/* Table cell borders driven by the per-table `--table-cell-border`
+ * custom property set by `applyTableBorders` in the renderer when
+ * `<w:tblBorders>` (or `tblStyle=TableGrid`) was declared. Defaults
+ * to no border when the property is unset — so plain tables stay
+ * borderless. */
+.paper-content table.sobree-table-bordered td,
+.paper-content table.sobree-table-bordered th {
+  border: var(--table-cell-border, none);
+  /* Word's default cell padding ≈ 0.08" / 2mm — without a hint the
+   * cells touch their borders. Honour explicit per-cell margins later
+   * via `tcMar`; this is the global default fallback. */
+  padding: 0 4px;
+}
+
+

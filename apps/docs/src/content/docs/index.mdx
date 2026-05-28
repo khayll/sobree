@@ -1,0 +1,159 @@
+---
+title: Sobree
+description: Embeddable, print-view-first WYSIWYG editor for .docx — framework-free, plugin-architected, wire-ready.
+template: splash
+hero:
+  tagline: Embeddable, print-view-first WYSIWYG editor for `.docx`. Framework-free core, plugin architecture, native OOXML round-trip.
+  actions:
+    - text: Quick start
+      link: /quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: Try the editor
+      link: https://sobree.dev/try
+      icon: external
+    - text: View on GitHub
+      link: https://github.com/khayll/sobree
+      icon: external
+      variant: minimal
+---
+
+## What's in the box
+
+<div class="sobree-feature-grid not-content">
+  <article class="sobree-feature">
+    <span class="sobree-feature__icon" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 4h11l5 5v19a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+        <path d="M18 4v5h5" />
+        <path d="M10 14h12M10 18h12M10 22h8" />
+      </svg>
+    </span>
+    <h3>Native OOXML AST</h3>
+    <p>Every node maps 1:1 to a <code>&lt;w:…&gt;</code> element. Round-trip is mechanical, not lossy. No abstraction layer between you and the spec.</p>
+  </article>
+
+  <article class="sobree-feature">
+    <span class="sobree-feature__icon" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="11" height="11" rx="1.5" />
+        <rect x="17" y="4" width="11" height="11" rx="1.5" />
+        <rect x="4" y="17" width="11" height="11" rx="1.5" />
+        <path d="M20 17v4h-3v3a3 3 0 0 0 3 3h8a1 1 0 0 0 1-1v-8h-3a3 3 0 0 1-3-3v-1Z" />
+      </svg>
+    </span>
+    <h3>Plugin architecture</h3>
+    <p>Keyboard, sections, marks, block toolbar, zoom dock — all plugins. Disable any, replace any, write your own with the same plugin contract.</p>
+  </article>
+
+  <article class="sobree-feature">
+    <span class="sobree-feature__icon" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="3" width="17" height="22" rx="1.5" />
+        <rect x="6" y="6" width="17" height="22" rx="1.5" fill="var(--bg-elevated, #fff)" />
+        <path d="M10 12h9M10 16h9M10 20h6" />
+      </svg>
+    </span>
+    <h3>Pure paginator</h3>
+    <p>TeX-style break selection, widow / orphan handling, keep-with-next, forced breaks, multi-section. No DOM, no I/O — just box / glue / penalty math.</p>
+  </article>
+
+  <article class="sobree-feature">
+    <span class="sobree-feature__icon" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="16" cy="16" r="3.5" />
+        <circle cx="6" cy="7" r="2.5" />
+        <circle cx="26" cy="7" r="2.5" />
+        <circle cx="6" cy="25" r="2.5" />
+        <circle cx="26" cy="25" r="2.5" />
+        <path d="m8 9 5.5 5M24 9l-5.5 5M8 23l5.5-5M24 23l-5.5-5" />
+      </svg>
+    </span>
+    <h3>Y.Doc backed</h3>
+    <p>Solo, local-persisted, peer-to-peer with an LLM, or fully collaborative — the editor code is identical across all four. The Y.Doc + the right provider is the wire.</p>
+  </article>
+</div>
+
+<style>{`
+  .sobree-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .sobree-feature {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border, var(--sl-color-gray-5));
+    border-radius: var(--radius-md, 6px);
+    background: var(--bg-elevated, var(--sl-color-bg-nav));
+    box-shadow: var(--shadow-xs, none);
+    transition: transform var(--dur-base, 180ms) var(--ease-standard, ease),
+                box-shadow var(--dur-base, 180ms) var(--ease-standard, ease),
+                border-color var(--dur-base, 180ms) var(--ease-standard, ease);
+  }
+  .sobree-feature:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.08));
+    border-color: var(--primary, var(--sl-color-accent));
+  }
+  .sobree-feature__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-md, 6px);
+    background: var(--primary-soft, var(--sl-color-accent-low));
+    color: var(--primary, var(--sl-color-accent));
+  }
+  .sobree-feature__icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  .sobree-feature h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--fg-strong, var(--sl-color-white));
+  }
+  .sobree-feature p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--fg-muted, var(--sl-color-gray-2));
+    line-height: 1.5;
+  }
+`}</style>
+
+## Hello world
+
+```ts
+import { createSobree } from "@sobree/core";
+import { keyboard } from "@sobree/keyboard";
+import { blockTools } from "@sobree/block-tools";
+import "@sobree/core/tokens.css";
+
+const editor = createSobree("#editor", {
+  content: "# Hello\n\nStart typing.",
+  plugins: [keyboard(), blockTools()],
+});
+
+editor.on("change", ({ doc }) => console.log(doc.body.length, "blocks"));
+```
+
+`createSobree()` mounts the viewport and the paginated paper stack;
+the toolbar, keyboard shortcuts, and zoom dock arrive as opt-in
+plugins you install separately. See the [Quick start](/quick-start/)
+for the full options.
+
+## Where to go from here
+
+- **[Quick start](/quick-start/)** — install + working snippets for solo, code-peer, and multi-user setups.
+- **[`createSobree()` API](/api/create-sobree/)** — the blessed entry point, every option, every method on the handle.
+- **[Architecture](/concepts/architecture/)** — the layering, the deployment tiers, why each layer exists.
+- **[Plugin model](/concepts/plugins/)** — events, command bus, the `SobreePlugin` contract.
+- **[HeadlessSobree](/api/headless/)** — the no-DOM peer for LLM agents, automation, and server-side pipelines.
+- **[`@sobree/mcp`](/api/mcp/)** — Model Context Protocol server that lets Claude (or any MCP client) read and edit a doc.
+
+→ Live editor at **[sobree.dev/try](https://sobree.dev/try)**.

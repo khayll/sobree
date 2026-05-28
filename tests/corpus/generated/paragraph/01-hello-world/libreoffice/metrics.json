@@ -1,0 +1,23 @@
+{
+  "fixture": "01-hello-world",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "Hello, world.",
+          "x": 72.1,
+          "y": 760.99,
+          "width": 52.97,
+          "height": 10,
+          "fontName": "g_d14_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

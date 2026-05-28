@@ -1,0 +1,60 @@
+{
+  "name": "@sobree/collab-server",
+  "version": "0.1.0",
+  "publishConfig": { "access": "public" },
+  "description": "Node-only Y-protocol relay + persister for Sobree. WebSocket fan-out, filesystem snapshots, pluggable auth.",
+  "keywords": [
+    "sobree",
+    "yjs",
+    "collaboration",
+    "crdt",
+    "y-websocket",
+    "relay",
+    "websocket",
+    "node"
+  ],
+  "license": "MIT",
+  "author": "sobree.dev",
+  "homepage": "https://docs.sobree.dev/api/collab-server/",
+  "bugs": {
+    "url": "https://github.com/khayll/sobree/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khayll/sobree.git",
+    "directory": "packages/collab-server"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "yjs": "^13.6.0"
+  },
+  "dependencies": {
+    "lib0": "^0.2.99",
+    "ws": "^8.18.0",
+    "y-protocols": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
+  }
+}

@@ -1,0 +1,443 @@
+{
+  "blocks": [
+    {
+      "attrs": {
+        "data-block-index": "0",
+        "data-keep-next": "",
+      },
+      "style": "font-family: "Calibri Light", Carlito, "Helvetica Neue", "Helvetica Light", Helvetica, Arial, sans-serif; font-size: 16pt; color: rgb(46, 116, 181); line-height: normal; margin-top: 4mm; margin-bottom: 0mm;",
+      "tag": "H1",
+      "text": "Mixed Flow",
+    },
+    {
+      "attrs": {
+        "data-block-index": "1",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Body paragraph following the heading. The next block should …",
+    },
+    {
+      "children": [
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "2",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "First numbered item.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "3",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Second numbered item.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "4",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Third numbered item.",
+        },
+      ],
+      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "tag": "OL",
+      "text": "First numbered item.Second numbered item.Third numbered item…",
+    },
+    {
+      "attrs": {
+        "data-block-index": "5",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Body paragraph after the first numbered list. Next: a bullet…",
+    },
+    {
+      "children": [
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "6",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Bullet one.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "7",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Bullet two.",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "8",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Bullet three.",
+        },
+      ],
+      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm; list-style-type: disc;",
+      "tag": "UL",
+      "text": "Bullet one.Bullet two.Bullet three.",
+    },
+    {
+      "attrs": {
+        "data-block-index": "9",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Body paragraph between bulleted list and table.",
+    },
+    {
+      "attrs": {
+        "class": "sobree-table-bordered",
+        "data-block-index": "10",
+      },
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Key",
+                    },
+                  ],
+                  "style": "background-color: rgb(221, 235, 247);",
+                  "tag": "TH",
+                  "text": "Key",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "Value",
+                    },
+                  ],
+                  "style": "background-color: rgb(221, 235, 247);",
+                  "tag": "TH",
+                  "text": "Value",
+                },
+              ],
+              "tag": "TR",
+              "text": "KeyValue",
+            },
+          ],
+          "tag": "THEAD",
+          "text": "KeyValue",
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "alpha",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "alpha",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "1",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "1",
+                },
+              ],
+              "tag": "TR",
+              "text": "alpha1",
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "beta",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "beta",
+                },
+                {
+                  "children": [
+                    {
+                      "attrs": {
+                        "data-block-index": "0",
+                      },
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "tag": "P",
+                      "text": "2",
+                    },
+                  ],
+                  "tag": "TD",
+                  "text": "2",
+                },
+              ],
+              "tag": "TR",
+              "text": "beta2",
+            },
+          ],
+          "tag": "TBODY",
+          "text": "alpha1beta2",
+        },
+      ],
+      "style": "border-collapse: collapse; --table-cell-border: 1px solid #888; border-top: 1px solid rgb(136, 136, 136); border-right: 1px solid rgb(136, 136, 136); border-bottom: 1px solid rgb(136, 136, 136); border-left: 1px solid rgb(136, 136, 136);",
+      "tag": "TABLE",
+      "text": "KeyValuealpha1beta2",
+    },
+    {
+      "attrs": {
+        "data-block-index": "11",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Body paragraph after the table. The next block is a SECOND n…",
+    },
+    {
+      "children": [
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "12",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Restarted at 1 (new numId).",
+        },
+        {
+          "attrs": {
+            "class": "style-listparagraph",
+            "data-block-index": "13",
+          },
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "tag": "LI",
+          "text": "Second item of the second list.",
+        },
+      ],
+      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "tag": "OL",
+      "text": "Restarted at 1 (new numId).Second item of the second list.",
+    },
+    {
+      "attrs": {
+        "data-block-index": "14",
+      },
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "tag": "P",
+      "text": "Final trailing body paragraph.",
+    },
+  ],
+  "fixture": "corpus/generated/mixed/12-mixed-flow",
+  "importWarnings": [],
+  "numberingDefs": 4,
+  "styles": [
+    {
+      "basedOn": "Normal",
+      "id": "Title",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontSizePt": 28,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading1",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 240,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 16,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading2",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 200,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 13,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading3",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+        "fontSizePt": 12,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading4",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+        "italic": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading5",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#2E74B5",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Heading6",
+      "paragraphDefaults": {
+        "keepNext": true,
+        "spacing": {
+          "afterTwips": 0,
+          "beforeTwips": 160,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "color": "#1F4D78",
+        "fontFamily": "Calibri Light",
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "Strong",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "bold": true,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "ListParagraph",
+      "paragraphDefaults": undefined,
+      "runDefaults": undefined,
+    },
+    {
+      "basedOn": "Normal",
+      "id": "FootnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": "Normal",
+      "id": "EndnoteText",
+      "paragraphDefaults": {
+        "spacing": {
+          "afterTwips": 0,
+          "line": 240,
+          "lineRule": "auto",
+        },
+      },
+      "runDefaults": {
+        "fontSizePt": 10,
+      },
+    },
+    {
+      "basedOn": undefined,
+      "id": "Normal",
+      "paragraphDefaults": undefined,
+      "runDefaults": {
+        "fontFamily": "Calibri",
+        "fontSizePt": 11,
+      },
+    },
+  ],
+}

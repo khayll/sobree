@@ -1,0 +1,34 @@
+/**
+ * Header / footer zone-edit visuals.
+ *
+ * Entered from the gutter block indicator: clicking it on a header or
+ * footer flips the zone into contentEditable=true, which the rules
+ * below paint with a dotted primary outline + soft amber background.
+ * The rest of the page dims so focus stays on the zone.
+ */
+
+.paper-stack .paper-content,
+.paper-stack .paper-header,
+.paper-stack .paper-footer {
+  transition: opacity 200ms ease;
+}
+
+.paper-stack.is-zone-editing .paper-content,
+.paper-stack.is-zone-editing .paper-header,
+.paper-stack.is-zone-editing .paper-footer {
+  opacity: 0.2;
+}
+
+.paper-stack.is-zone-editing .paper-header[contenteditable="true"],
+.paper-stack.is-zone-editing .paper-footer[contenteditable="true"] {
+  opacity: 1;
+}
+
+.paper-header[contenteditable="true"],
+.paper-footer[contenteditable="true"] {
+  outline: 2px dotted var(--primary, #c96f22);
+  outline-offset: 4px;
+  background: var(--primary-soft, #fdf6ee);
+  color: var(--fg-strong, #14130f);
+  border-radius: 2px;
+}

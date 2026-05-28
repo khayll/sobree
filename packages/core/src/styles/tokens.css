@@ -1,0 +1,144 @@
+/* Carlito — Google's open-source, metric-compatible clone of Calibri.
+ * MUST be the first rule in this file: CSS `@import` only fires when
+ * it precedes every other declaration. Most Sobree-rendered docs are
+ * authored in Word with Calibri as the body font; without Calibri or
+ * Carlito on the host, browsers fall back to Helvetica/Arial whose
+ * ellipsis (…) glyph is roughly 2× wider than Calibri's. A 60-char
+ * dot-leader bullet ("……………") that fits one line in Word then
+ * overflows or wraps in Sobree.
+ *
+ * We pull Carlito from Google Fonts so any embedder that imports
+ * `@sobree/core/tokens.css` gets Word-fidelity ellipsis (and accurate
+ * line metrics) without bundling the ~200 KB font in the package
+ * itself. Google Fonts serves subset WOFF2 files (~50 KB per weight)
+ * with permissive caching. `font-display: swap` means text reads
+ * immediately while Carlito loads — no flash of invisible text.
+ *
+ * If the host is offline / the CDN is blocked, the cascade falls
+ * through to Helvetica → Arial (wider ellipsis but still readable).
+ * For deployments that need fully-bundled fonts, override this @import
+ * with a local woff2 in the embedder's own CSS.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+
+/* @sobree/core — design tokens (the single source of truth for the brand).
+ *
+ * Consume from CSS:
+ *
+ *   @import "@sobree/core/tokens.css";
+ *
+ * Or from JS / TS:
+ *
+ *   import "@sobree/core/tokens.css";
+ *
+ * Add new tokens here, not in component CSS — keeps the brand coherent
+ * and makes theming a single edit.
+ */
+
+:root {
+  /* Primary — Sobree Amber. */
+  --sobree-50:  #fdf6ee;
+  --sobree-100: #f9e6d0;
+  --sobree-500: #c96f22;
+  --sobree-600: #b2591a;
+
+  /* Neutrals — warm ink, not gray. */
+  --ink-0:   #ffffff;
+  --ink-25:  #fbfaf7;
+  --ink-50:  #f6f4ef;
+  --ink-100: #eceae3;
+  --ink-200: #dedbd0;
+  --ink-300: #c4bfaf;
+  --ink-400: #a29c88;
+  --ink-500: #7c7764;
+  --ink-600: #5a5649;
+  --ink-700: #3d3a31;
+  --ink-800: #26241f;
+  --ink-900: #14130f;
+
+  /* Semantic tokens — what components reference. */
+  --bg:            var(--ink-25);
+  --bg-elevated:   var(--ink-0);
+  --bg-subtle:     var(--ink-50);
+  --bg-hover:      var(--ink-100);
+  --fg:            var(--ink-800);
+  --fg-strong:     var(--ink-900);
+  --fg-muted:      var(--ink-600);
+  --fg-subtle:     var(--ink-500);
+  --fg-on-primary: var(--ink-0);
+  --border:        var(--ink-200);
+  --border-strong: var(--ink-300);
+  --primary:       var(--sobree-500);
+  --primary-hover: var(--sobree-600);
+  --primary-soft:  var(--sobree-50);
+
+  /* Radii. */
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+
+  /* Shadows — warm-ink tinted, never gray. */
+  --shadow-xs: 0 1px 0 rgba(20, 19, 15, 0.04);
+  --shadow-sm: 0 1px 2px rgba(20, 19, 15, 0.06), 0 1px 1px rgba(20, 19, 15, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(20, 19, 15, 0.08), 0 2px 4px -2px rgba(20, 19, 15, 0.05);
+  --shadow-lg: 0 12px 24px -8px rgba(20, 19, 15, 0.12), 0 4px 8px -4px rgba(20, 19, 15, 0.06);
+
+  /* Focus ring — amber glow. */
+  --ring-focus: 0 0 0 3px rgba(201, 111, 34, 0.25);
+
+  /* Motion. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast:   120ms;
+  --dur-base:   180ms;
+  --dur-slow:   280ms;
+
+  /* Spacing — 4px base. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Back-compat aliases for older component CSS. */
+  --sobree-primary: var(--sobree-500);
+  --sobree-primary-soft: var(--primary-soft);
+  --sobree-border: var(--border);
+
+  /* === Tracked changes & comments ===
+   *
+   * The renderer emits semantic `<ins>` / `<del>` / comment markup in
+   * core (visibility is document fidelity, not an opt-in feature).
+   * These tokens make the *styling* themeable — override them in a
+   * consumer stylesheet instead of fighting component CSS specificity.
+   */
+
+  /* Per-author palette — 8 slots. `colorForAuthor()` hashes an author
+   * name to a slot index; the renderer references the matching token.
+   * Chosen for similar luminance (no author looks "louder") and to
+   * avoid pure red (clashes with deletion strikethrough) / pure yellow
+   * (clashes with the comment-range highlight). */
+  --sobree-author-0: #1f77b4; /* muted blue   */
+  --sobree-author-1: #2ca02c; /* green        */
+  --sobree-author-2: #9467bd; /* purple       */
+  --sobree-author-3: #8c564b; /* brown        */
+  --sobree-author-4: #e377c2; /* pink         */
+  --sobree-author-5: #17becf; /* teal         */
+  --sobree-author-6: #bcbd22; /* olive        */
+  --sobree-author-7: #ff7f0e; /* orange       */
+
+  /* Revision (tracked-change) styling. The author colour drives the
+   * text + decoration; `--sobree-revision-tint` is the background
+   * mix-strength applied via `color-mix`. */
+  --sobree-revision-ins-fallback: #0a7d2a; /* used when no author colour */
+  --sobree-revision-del-fallback: #b3261e;
+  --sobree-revision-tint: 8%;
+
+  /* Comment styling. */
+  --sobree-comment-range-bg:     rgba(255, 217, 0, 0.25);
+  --sobree-comment-range-border: rgba(180, 130, 0, 0.5);
+  --sobree-comment-accent:       #f59e0b; /* card rule when author colour absent */
+  --sobree-comment-resolved:     #16a34a; /* resolved-thread green */
+}
+

@@ -1,0 +1,59 @@
+{
+  "fixture": "05-bulleted-list-mixed",
+  "pdfSizePt": {
+    "width": 595.303937007874,
+    "height": 841.889763779528
+  },
+  "pages": [
+    {
+      "page": 1,
+      "lines": [
+        {
+          "text": "• Top-level bullet A",
+          "x": 90.1,
+          "y": 760.99,
+          "width": 91.77,
+          "height": 10,
+          "fontName": "g_d8_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "◦ Nested under A",
+          "x": 126.1,
+          "y": 749.44,
+          "width": 80.68,
+          "height": 10,
+          "fontName": "g_d8_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "◦ Also nested under A",
+          "x": 126.1,
+          "y": 737.89,
+          "width": 99.86,
+          "height": 10,
+          "fontName": "g_d8_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "• Top-level bullet B",
+          "x": 90.1,
+          "y": 726.34,
+          "width": 91.21,
+          "height": 10,
+          "fontName": "g_d8_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "• Top-level bullet C",
+          "x": 90.1,
+          "y": 714.79,
+          "width": 91.21,
+          "height": 10,
+          "fontName": "g_d8_f1",
+          "fontSize": 10
+        }
+      ]
+    }
+  ]
+}

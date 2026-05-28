@@ -1,0 +1,16 @@
+.sobree-editor img.is-selected {
+  outline: 2px solid var(--sobree-primary, #d4521f);
+  outline-offset: 2px;
+}
+
+.sobree-image-resize-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: var(--sobree-primary, #d4521f);
+  border: 2px solid #fff;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  z-index: 1000;
+  user-select: none;
+}

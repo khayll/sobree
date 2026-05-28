@@ -1,0 +1,29 @@
+{
+  "name": "@sobree/fixtures-gen",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates focused .docx fixtures for testing Sobree's import + rendering against Word.",
+  "scripts": {
+    "gen": "tsx src/index.ts",
+    "extract": "tsx src/extract.ts",
+    "compare": "tsx src/compare.ts",
+    "images": "tsx src/images.ts",
+    "corpus": "tsx src/corpus.ts",
+    "corpus:render": "tsx src/corpus.ts render",
+    "corpus:diff": "tsx src/corpus.ts diff",
+    "corpus:check": "tsx src/corpus.ts check",
+    "corpus:baseline": "tsx src/corpus.ts baseline",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.100",
+    "docx": "^9.0.3",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

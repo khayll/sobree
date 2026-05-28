@@ -1,0 +1,355 @@
+/* Editor-local styles. Scoped to .sobree-editor so the editor can be
+   embedded into any page without its styles leaking.
+
+   ARCHITECTURE: this file owns LAYOUT and INTERACTION only. It contains
+   ZERO typography opinions — no font-family, no font-size, no
+   line-height, no paragraph margins, no heading sizing, no
+   blockquote / code chrome.
+
+   Typography lives in the document AST. Every block carries its
+   resolved style (Normal, Heading1, …) and the renderer reads
+   `paragraphDefaults` + `runDefaults` off the cascade
+   (`packages/core/src/doc/styles.ts:resolveStyleCascade`) and applies
+   them as inline styles on the rendered element. `defaultStyles()` in
+   `packages/core/src/doc/builders.ts` carries the baseline for every
+   newly-created doc (Helvetica 11pt, line 1.15, 8pt after on Normal;
+   bigger before/after on Heading1–6). Embedders / converters can
+   replace these wholesale per document.
+
+   What survives in CSS:
+   - Position + outline + selection / caret behaviour
+   - List indentation (the `padding-left` that lets bullet/number
+     markers actually appear inside the type area)
+   - Section-break visual marker (a UI affordance, not document
+     content — survives the AST as a `section_break` block)
+   - Table border-collapse positioning (table chrome is structural;
+     border colours stay rendered from the AST when present)
+*/
+
+.sobree-editor {
+  position: relative;
+  outline: none;
+}
+
+.sobree-editor > :first-child {
+  margin-top: 0;
+}
+
+/* ---------- user-agent reset ----------
+   Browsers ship with opinionated defaults for block elements
+   (`p { margin: 1em 0 }`, headings with various before/after, list
+   items with vertical margins). Those defaults bleed visible space
+   into every paragraph the AST didn't ask for. Reset them all so
+   typography flows ONLY from `paragraphDefaults` / paragraph
+   `properties.spacing` in the AST.
+
+   This is NOT typography — it's a defensive zero so the AST has
+   exclusive ownership. */
+
+.sobree-editor p,
+.sobree-editor h1,
+.sobree-editor h2,
+.sobree-editor h3,
+.sobree-editor h4,
+.sobree-editor h5,
+.sobree-editor h6,
+.sobree-editor ul,
+.sobree-editor ol,
+.sobree-editor li,
+.sobree-editor blockquote,
+.sobree-editor pre {
+  margin: 0;
+  padding: 0;
+}
+
+/* Lists need positive padding-left so bullet / number markers fall
+   inside the type area instead of bleeding past the page margin. The
+   value is purely structural — paragraph indents from the AST stack on
+   top via `marginLeft`. (Overrides the reset above.) */
+.sobree-editor ul,
+.sobree-editor ol {
+  padding-left: 1.5em;
+}
+
+/* Continuation `<li>` — a fragment of a paragraph that started inside
+   a list item on the previous page. Hide its marker (matches Word:
+   the number appears only on the head fragment) but keep the indent
+   so the body text aligns with the rest of the list. The OL counter
+   still increments past this LI, so the NEXT LI shows the right
+   number via its `start` attribute. */
+.sobree-editor li.sobree-li-continuation {
+  list-style-type: none;
+}
+.sobree-editor li.sobree-li-continuation::marker {
+  content: "";
+}
+
+/* Non-final fragment of a multi-page paragraph or list item — its
+   visually-last line is a *middle* line of the source paragraph, so
+   force it to justify (matches Word, which justifies intermediate
+   fragments' last lines and only left-aligns the actual-last line of
+   the source). Cosmetic; doesn't change line-break decisions. */
+.sobree-editor .sobree-fragment-continued {
+  text-align-last: justify;
+}
+
+/* Footnotes — references and end-of-doc list. The references render
+   inline in body text as a small clickable superscript; the bodies
+   render as a `<ol>` at document end, separated by a top border that
+   stands in for Word's footnote separator line. True per-page pinning
+   of footnote bodies is a paginator feature deferred until a fixture
+   demands it. */
+.sobree-editor .sobree-footnote-ref a {
+  color: inherit;
+  text-decoration: none;
+}
+.sobree-editor .sobree-footnote-ref a:hover {
+  text-decoration: underline;
+}
+.sobree-editor .sobree-footnotes {
+  margin-top: 2em;
+  padding-top: 0.5em;
+  border-top: 1pt solid currentColor;
+  font-size: 0.85em;
+}
+.sobree-editor .sobree-footnotes__list {
+  padding-left: 1.5em;
+}
+.sobree-editor .sobree-footnotes__item {
+  margin: 0.25em 0;
+}
+
+/* Tracked changes — neutral semantic marks. Core ships only the
+   underline / strikethrough so changes are VISIBLE with no plugin;
+   `@sobree/review` layers per-author colour + background tint on top
+   by reading `data-revision-author`. Keeping this in core is document
+   fidelity — a deletion that looks like normal text reads wrong. */
+.sobree-editor ins.sobree-revision-ins {
+  text-decoration: underline;
+}
+.sobree-editor del.sobree-revision-del {
+  text-decoration: line-through;
+}
+
+/* Format-change revision — a dashed underline so format-tracked runs
+   are visible without the review plugin (same fidelity rule as inline
+   ins/del). The plugin overrides the colour per author via
+   `--sobree-format-revision-color`. The glyph itself is neutral; the
+   semantics are "this run's formatting was changed in tracked mode". */
+.sobree-editor .sobree-revision-format {
+  text-decoration: underline dashed
+    var(--sobree-format-revision-color, currentColor);
+  text-underline-offset: 3px;
+}
+
+/* Tracked paragraph mark — the trailing `¶` glyph at the end of a
+   paragraph whose break was added (ins) or deleted (del) via track
+   changes. Core ships only a neutral coloured pilcrow so the marker is
+   VISIBLE without the review plugin (same fidelity rule as inline
+   marks); `@sobree/review` overrides with the author colour. The glyph
+   is rendered with a CSS `::after` so the AST keeps its clean shape —
+   no extra DOM nodes, no caret interference. */
+.sobree-editor [data-block-revision="ins"]::after,
+.sobree-editor [data-block-revision="del"]::after {
+  content: " ¶";
+  color: var(--sobree-block-revision-color, currentColor);
+  opacity: 0.65;
+  font-weight: 600;
+  /* Don't break the paragraph layout — purely an annotation. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sobree-editor [data-block-revision="del"]::after {
+  text-decoration: line-through;
+}
+
+/* Commented range — faint neutral highlight so the annotated span is
+   visible without the review plugin. The plugin reads
+   `data-comment-ids` off these marks to place comment cards. */
+.sobree-editor .sobree-comment-range {
+  background: var(--sobree-comment-range-bg, rgba(255, 217, 0, 0.25));
+  border-bottom: 1px dotted var(--sobree-comment-range-border, rgba(180, 130, 0, 0.5));
+}
+/* Comment reference balloon — small clickable glyph at the
+   `<w:commentReference>` position. Sits inline with text. */
+.sobree-editor .sobree-comment-ref {
+  display: inline;
+  font-size: 0.85em;
+  margin: 0 0.1em;
+}
+.sobree-editor .sobree-comment-ref a {
+  color: inherit;
+  text-decoration: none;
+}
+.sobree-editor .sobree-comment-ref a:hover {
+  filter: brightness(0.7);
+}
+
+/* Headings inherit the browser's outsized font-size defaults
+   (`h1 { font-size: 2em }` etc.) which would override AST-applied
+   inline `font-size`. Reset to inherit the parent's size — the AST's
+   `runDefaults.fontSizePt` from the Heading style is then applied as
+   inline `font-size`, which wins. */
+.sobree-editor h1,
+.sobree-editor h2,
+.sobree-editor h3,
+.sobree-editor h4,
+.sobree-editor h5,
+.sobree-editor h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* ---------- tables ----------
+   Border-collapse is structural; per-cell borders / colours come from
+   the AST when present. The `transition` is for hover affordances on
+   the table-edit toolbar. */
+
+.sobree-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  position: relative;
+}
+
+.sobree-editor th,
+.sobree-editor td {
+  /* No default cell border — Word doesn't render borders unless the
+     docx declares them (`<w:tblBorders>` or `<w:tcBorders>`). What
+     looks like a border in Word's view is the "table gridline"
+     editor affordance, which doesn't print / export. Sobree's own
+     gridline equivalent is a future view-mode toggle, not a
+     default border. */
+  border: none;
+  /* Word's default cell padding: 0pt vertical, 0.08 inch horizontal.
+     A nominally-sized cell adds nothing to the page budget beyond
+     its content. Without matching this, a multi-row form table
+     bloats by ~16px per row over Word and pushes content off the
+     page (a 5-row table costs ~80px more in Sobree, enough to
+     evict a numbered list item from page 1). */
+  padding: 0 0.08in;
+  vertical-align: top;
+  transition: border-color 120ms ease;
+}
+
+/* ---------- section break marker ----------
+   The renderer emits a `section_break` block as a thin rule with a
+   small label. `data-page-break` is stamped by the renderer and
+   consumed by the paginator as a forced break. The element is
+   `contenteditable=false` so the caret skips it; the gutter indicator
+   picks it up like any other block kind. This is editor chrome, NOT
+   document typography. */
+
+.sobree-editor .sobree-section-break {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--fg-subtle, #7c7764);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* Continuous section breaks aren't page breaks — they're just
+   structural markers that change properties (column count, header
+   refs, …) for the following paragraphs. Showing a horizontal rule for
+   every one of them clutters dense forms like jellap.docx (6 of them
+   in a single doc). Collapse the rule visually but keep the element in
+   flow with zero height — `display: none` would zero out
+   `offsetHeight/Top` and confuse the paginator's gap math (it'd treat
+   the next block's full `offsetTop` as a one-block gap and waste
+   ~340px of every page). Visibility:hidden + zero metrics keeps the
+   block in the offset chain while staying invisible. nextPage /
+   evenPage breaks still render their rule since they represent real
+   page divisions. */
+.sobree-editor .sobree-section-break--continuous {
+  visibility: hidden;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  overflow: hidden;
+  font-size: 0;
+  line-height: 0;
+}
+
+.sobree-editor .sobree-section-break::before,
+.sobree-editor .sobree-section-break::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed var(--border, #dedbd0);
+}
+
+.sobree-editor .sobree-section-break__label {
+  flex: none;
+  padding: 0 6px;
+  background: var(--bg-elevated, #fff);
+}
+
+/* Lifted text-box paragraphs use Word's default textbox line height
+   (~1.15× single spacing). The bare `line-height: normal` browsers
+   apply yields ~1.0-1.2× which renders too tight compared to Word's
+   visual (gimnázium / e-mail continuation lines need breathing room
+   for the contact-info textbox to read like the Word original). Only
+   applies when the paragraph doesn't carry its own `line-height` from
+   `<w:spacing w:line>` — those still override via inline style. */
+.sobree-editor .sobree-textbox-frame p {
+  line-height: 1.2;
+}
+
+/* Preserve in-document whitespace on body + header/footer paragraphs.
+   Word lets authors type runs of spaces (or use `<w:tab/>`) to position
+   content — e.g. jellap.docx's header uses "Cím: \t 1012 Budapest"
+   and form fields use "............ ............" signature lines.
+   Without `pre-wrap`, browsers collapse runs of whitespace AND drop
+   `\t` characters' tab-stop behaviour, so the form collapses.
+   `pre-wrap` keeps wrapping (long lines still break) while preserving
+   every space and honouring `tab-size`. */
+.sobree-editor .paper-content p,
+.sobree-editor .paper-content li,
+.sobree-editor .paper-header p,
+.sobree-editor .paper-header li,
+.sobree-editor .paper-footer p,
+.sobree-editor .paper-footer li,
+.sobree-editor .sobree-textbox-frame p {
+  white-space: pre-wrap;
+}
+
+/* Empty paragraphs that exist only to carry a `<w:sectPr>` (the
+   section-end marker paragraph in OOXML). The renderer tags these as
+   `sobree-section-trailer-empty` when it detects the paragraph
+   precedes a section_break and is visually empty. Word draws ~no
+   whitespace for them since it treats the paragraph as part of the
+   section boundary; rendering at full double-spaced 9pt would inject
+   an unsightly ~28px gap before every section change. Collapsing
+   height to 0 while keeping the element in the DOM preserves AST
+   round-trip and caret position. */
+.sobree-editor .sobree-section-trailer-empty {
+  height: 0;
+  line-height: 0;
+  font-size: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Placeholder frame for an empty shape lifted from a `<wp:anchor>`
+   without text-box content or image — e.g. jellap.docx's photo box.
+   Word/LibreOffice draw a thin grey outline for these as a visual
+   cue that "this slot is intentionally empty". The text-box-frame
+   used for content-bearing lifts keeps no border (the contained text
+   is the visual). */
+.sobree-editor .sobree-textbox-frame--placeholder {
+  border: 1px solid var(--border, #c8c4b8);
+}
+
+/* When the source shape carried an explicit solidFill colour, the
+ * inline `background` style on the frame paints the band. Drop the
+ * placeholder outline (the colour IS the visual) and push the frame
+ * behind body text — banner / sidebar rectangles in source docs are
+ * almost always behindDoc anchors that body text should overlay. */
+.sobree-editor .sobree-textbox-frame--placeholder.sobree-textbox-frame--filled {
+  border: none;
+  z-index: -1;
+}
