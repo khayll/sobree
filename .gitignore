@@ -24,9 +24,10 @@ coverage
 .claude
 devdocs
 
-# inkode
-.ik.yaml
-.ik
+# inkode — `.ik.yaml` config IS committed (the `ik` CI workflow needs
+# it); the `.ik/` directory is generated output (brief.html) and stays
+# ignored.
+.ik/
 
 # MS Office lock files (created when a .docx / .xlsx is open in Word/Excel)
 ~$*

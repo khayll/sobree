@@ -1,0 +1,6 @@
+project:
+  slug: khayll-sobree
+api:
+  endpoint: https://api.inkode.co
+output:
+  brief_path: .ik/brief.html
