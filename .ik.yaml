@@ -1,5 +1,5 @@
 project:
-  slug: sobree
+  slug: khayll-sobree
 api:
   endpoint: https://api.inkode.co
 output:
