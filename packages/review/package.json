@@ -1,7 +1,16 @@
 {
   "name": "@sobree/review",
   "version": "0.1.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "description": "Tracked-changes & comments review surface for @sobree/core — post-it comment threads, per-author colours, accept/reject/resolve actions.",
   "keywords": [
     "sobree",

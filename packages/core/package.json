@@ -2,7 +2,17 @@
   "name": "@sobree/core",
   "version": "0.1.0",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./tokens.css": {
+        "default": "./dist/tokens.css"
+      },
+      "./package.json": "./package.json"
+    }
   },
   "description": "Embeddable, print-view-first WYSIWYG editor for .docx — framework-free core, plugin architecture, native OOXML round-trip.",
   "keywords": [

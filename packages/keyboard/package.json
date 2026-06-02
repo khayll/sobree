@@ -1,7 +1,16 @@
 {
   "name": "@sobree/keyboard",
   "version": "0.1.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "description": "Default keyboard shortcuts plugin for @sobree/core — undo/redo, text formatting, section breaks. Mount via the `keyboard()` factory in `createSobree({ plugins: [...] })`.",
   "keywords": [
     "sobree",

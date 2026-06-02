@@ -1,7 +1,16 @@
 {
   "name": "@sobree/collab-server",
   "version": "0.1.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "description": "Node-only Y-protocol relay + persister for Sobree. WebSocket fan-out, filesystem snapshots, pluggable auth.",
   "keywords": [
     "sobree",

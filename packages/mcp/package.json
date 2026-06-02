@@ -2,7 +2,14 @@
   "name": "@sobree/mcp",
   "version": "0.1.0",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
   },
   "description": "MCP server for Sobree — exposes a Y.Doc-backed editor's mutations as Model Context Protocol tools so LLMs can read and edit a Sobree document.",
   "keywords": [

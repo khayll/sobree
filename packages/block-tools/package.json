@@ -1,7 +1,16 @@
 {
   "name": "@sobree/block-tools",
   "version": "0.1.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  },
   "description": "Floating toolbar + gutter indicator + zone editor for @sobree/core. Mount via the `blockTools()` factory in `createSobree({ plugins: [...] })`.",
   "keywords": [
     "sobree",
