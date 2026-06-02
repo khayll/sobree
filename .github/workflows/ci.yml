@@ -115,16 +115,24 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      # Node 24 (not 22): OIDC trusted publishing needs npm >= 11.5.1,
+      # which ships with Node 24 — Node 22 bundles npm 10.x and the
+      # publish falls back to (absent) auth → ENEEDAUTH.
       # No `registry-url` / token here on purpose: setup-node's registry
       # wiring writes `_authToken=${NODE_AUTH_TOKEN}` into .npmrc, which
       # shadows the OIDC flow and breaks trusted publishing.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Surfaced in the log so an OIDC auth failure can be checked against
+      # the npm >= 11.5.1 requirement at a glance.
+      - name: Tool versions
+        run: node -v && npm -v && pnpm -v
 
       # Pending changesets → opens/updates the "Version Packages" PR
       # (bumps versions + writes CHANGELOGs). None pending → runs
