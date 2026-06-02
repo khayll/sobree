@@ -1,7 +1,8 @@
 import type { Range as ApiRange, BlockRef } from "../doc/api";
 import { sliceRuns } from "../doc/runs";
 import type { InlineRun, RunProperties } from "../doc/types";
-import type { Editor, WrapTag } from "../editor";
+import type { Editor } from "../editor";
+import type { WrapTag } from "../editor/types";
 
 /**
  * Mark toggle helpers — shared by the floating toolbar's mark buttons
