@@ -51,6 +51,13 @@ jobs:
     # from the UI/API — this skips the job unless the ref is main, so a
     # release can never run (or publish) from a feature branch.
     if: github.ref == 'refs/heads/main'
+    # GitHub-enforced second layer: the `npm` environment has a
+    # deployment branch policy of `main` only, so GitHub itself refuses
+    # to run this job from any other ref — independent of the `if` guard
+    # and the workflow file. (Holds no secrets: publishing is OIDC.)
+    # The npmjs.com trusted-publisher config must name this environment
+    # (`npm`) to match.
+    environment: npm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
