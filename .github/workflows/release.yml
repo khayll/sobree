@@ -45,6 +45,12 @@ permissions:
 jobs:
   release:
     name: version / publish
+    # Hard guard: a release only ever runs from `main`, no matter how the
+    # workflow was triggered. The `push` trigger above is already
+    # main-only, but `workflow_dispatch` can be fired against any branch
+    # from the UI/API — this skips the job unless the ref is main, so a
+    # release can never run (or publish) from a feature branch.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
