@@ -1,3 +1,22 @@
+# CI pipeline — two parallel gates, then a gated release.
+#
+#   build-test ─┐
+#               ├─→ release   (only if both pass, only on main)
+#   corpus    ──┘
+#
+# `build-test` and `corpus` run in parallel on every push + PR. `release`
+# runs only after BOTH succeed, and only on `main` (never on PRs).
+#
+# ─── Release: Changesets + OIDC trusted publishing ───────────────────
+# No long-lived NPM_TOKEN — a short-lived token is minted at publish time
+# via `id-token: write`. One-time setup on npmjs.com (each of the 8
+# publishable @sobree/* packages → Trusted Publisher → GitHub Actions):
+#     organization/user : khayll
+#     repository        : sobree
+#     workflow filename : ci.yml      ← note: this file
+#     environment       : npm
+# Requires pnpm >= 10 (from `packageManager`), Node >= 22.14 / npm >= 11.5.1.
+
 name: CI
 
 on:
@@ -6,21 +25,24 @@ on:
   pull_request:
   workflow_dispatch:
 
-# A second push to the same PR cancels the in-flight run for it; main pushes
-# never cancel each other (they live on the `main` branch ref).
+# PR/branch runs cancel on a new push; main never cancels (so a release
+# in flight is never interrupted).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+
 jobs:
-  build-and-test:
+  build-test:
     name: build · test · typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        # version is read from `packageManager` in the root package.json
+        # pnpm version is read from `packageManager` in the root package.json
 
       - uses: actions/setup-node@v4
         with:
@@ -36,20 +58,6 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # Render fidelity gate. Renders every corpus docx through
-      # LibreOffice (reference) and Sobree (oracle snapshot), computes
-      # the drift score, and fails the build if any score regressed
-      # beyond tolerance vs the committed baseline. To update
-      # baselines intentionally: run `pnpm corpus:baseline` locally,
-      # commit the resulting `*.baseline.json` / `baseline/score.json`
-      # changes alongside the rendering change, justify in the commit
-      # message. See tests/corpus/README.md.
-      - name: Install LibreOffice
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice
-
-      - name: Corpus render-fidelity check
-        run: pnpm corpus:check
-
       - name: Build
         run: pnpm build
 
@@ -60,3 +68,72 @@ jobs:
           path: apps/docs/dist
           if-no-files-found: error
           retention-days: 7
+
+  corpus:
+    name: corpus render-fidelity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Renders every corpus docx through LibreOffice (reference) and
+      # Sobree (oracle snapshot), computes the drift score, and fails if
+      # any score regressed beyond tolerance vs the committed baseline.
+      # Update baselines intentionally with `pnpm corpus:baseline` and
+      # commit the resulting `baseline/score.json` changes. See
+      # tests/corpus/README.md.
+      - name: Install LibreOffice
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice
+
+      - name: Corpus render-fidelity check
+        run: pnpm corpus:check
+
+  release:
+    name: version / publish
+    # Gate: only after BOTH parallel checks pass.
+    needs: [build-test, corpus]
+    # Main-only, never on PRs. The `npm` environment (a deployment branch
+    # policy of `main` only) is the platform-enforced second layer.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: npm
+    permissions:
+      contents: write # Changesets version commit + tags, opens the Version PR
+      pull-requests: write # the auto-maintained "Version Packages" PR
+      id-token: write # OIDC — the short-lived npm publish token
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      # No `registry-url` / token here on purpose: setup-node's registry
+      # wiring writes `_authToken=${NODE_AUTH_TOKEN}` into .npmrc, which
+      # shadows the OIDC flow and breaks trusted publishing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Pending changesets → opens/updates the "Version Packages" PR
+      # (bumps versions + writes CHANGELOGs). None pending → runs
+      # `release` (build packages + `changeset publish`, which uses pnpm
+      # so `publishConfig.exports` applies). Auth is OIDC — no NPM_TOKEN.
+      - name: Create Release PR or publish
+        uses: changesets/action@v1
+        with:
+          version: pnpm version-packages
+          publish: pnpm release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
