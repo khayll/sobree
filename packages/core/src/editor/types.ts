@@ -16,9 +16,11 @@ import type { BlobStore } from "../blob";
 import type {
   Range as ApiRange,
   BlockRef,
+  EditResult,
   InlinePosition,
   Selection,
 } from "../doc/api";
+import type { RunPropertiesPatch } from "../doc/runs";
 import type {
   Block,
   ParagraphAlignment,
@@ -147,6 +149,36 @@ export type ParagraphPropertiesPatch = {
 };
 
 export type WrapTag = "sup" | "sub" | "strong" | "em" | "u" | "s" | "mark";
+
+/** The slice of selection state plugins read (see {@link EditorLike}). */
+export interface EditorSelectionLike {
+  currentRange(): ApiRange | null;
+  currentCaret(): InlinePosition | null;
+}
+
+/**
+ * The minimal `Editor` contract that framework-free plugins depend on
+ * (mark toggles, etc.). Plugins type against this instead of the
+ * concrete `Editor` class so they don't import `editor/index.ts` — that
+ * kept a (type-only) import cycle alive and coupled plugins to the
+ * whole editor module. The `Editor` class structurally satisfies it.
+ */
+export interface EditorLike {
+  getDocument(): SobreeDocument;
+  getBlocks(): BlockInfo[];
+  getBlockById(id: string): BlockInfo | null;
+  applyRunProperties(
+    range: ApiRange,
+    patch: RunPropertiesPatch,
+    opts?: { expect?: Record<string, number> },
+  ): EditResult<void>;
+  wrapRange(
+    range: ApiRange,
+    tag: WrapTag,
+    opts?: { expect?: Record<string, number> },
+  ): EditResult<void>;
+  readonly selection: EditorSelectionLike;
+}
 
 export type EditorEvent =
   | "change"

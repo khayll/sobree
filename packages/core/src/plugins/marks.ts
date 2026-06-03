@@ -1,8 +1,7 @@
 import type { Range as ApiRange, BlockRef } from "../doc/api";
 import { sliceRuns } from "../doc/runs";
 import type { InlineRun, RunProperties } from "../doc/types";
-import type { Editor } from "../editor";
-import type { WrapTag } from "../editor/types";
+import type { EditorLike, WrapTag } from "../editor/types";
 
 /**
  * Mark toggle helpers — shared by the floating toolbar's mark buttons
@@ -65,7 +64,7 @@ export const MARK_COMMAND_DEFS: readonly MarkCommandDef[] = [
  * toggle since highlight is a colour, not a boolean.
  */
 export function toggleMark(
-  editor: Editor,
+  editor: EditorLike,
   range: ApiRange,
   tag: WrapTag,
 ): void {
@@ -87,7 +86,7 @@ export function toggleMark(
  * value. Walks hyperlink children. Multi-block ranges always read as
  * inactive so a click sets the mark before clearing it.
  */
-export function isMarkActive(editor: Editor, range: ApiRange, tag: string): boolean {
+export function isMarkActive(editor: EditorLike, range: ApiRange, tag: string): boolean {
   const prop = MARK_PROP[tag];
   const onValue = MARK_ON[tag];
   if (!prop) return false;
@@ -130,7 +129,7 @@ function everyTextRunHas(
  * otherwise the full extent of the block at the caret. Matches the
  * "press Ctrl+B with caret only → bold the whole paragraph" UX.
  */
-export function rangeAtSelection(editor: Editor): ApiRange | null {
+export function rangeAtSelection(editor: EditorLike): ApiRange | null {
   const sel = editor.selection.currentRange();
   if (sel) return sel;
   const caret = editor.selection.currentCaret();
