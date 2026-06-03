@@ -38,8 +38,11 @@ export const twipsToPt = (t: number): number => (t / TWIPS_PER_INCH) * PT_PER_IN
 export const ptToTwips = (pt: number): number => Math.round((pt / PT_PER_INCH) * TWIPS_PER_INCH);
 
 /**
- * `w:line` for line spacing in "auto" mode: 240 twips = single-spacing.
- * So `line-height: 1.5` → `240 * 1.5 = 360`.
+ * `w:line` value (in "auto" line-rule mode) for single line spacing.
+ * Word treats 240 as 1.0×, so `line-height: 1.5` → `240 * 1.5 = 360`.
  */
-export const lineHeightToOoxml = (lineHeight: number): number => Math.round(240 * lineHeight);
-export const ooxmlLineHeightToCss = (line: number): number => line / 240;
+export const SINGLE_SPACING_LINE = 240;
+
+export const lineHeightToOoxml = (lineHeight: number): number =>
+  Math.round(SINGLE_SPACING_LINE * lineHeight);
+export const ooxmlLineHeightToCss = (line: number): number => line / SINGLE_SPACING_LINE;

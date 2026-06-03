@@ -26,6 +26,9 @@ import type {
 const A4_WIDTH_TWIPS = 11906; // 210 mm
 const A4_HEIGHT_TWIPS = 16838; // 297 mm
 const ONE_INCH_TWIPS = 1440;
+const HALF_INCH_TWIPS = ONE_INCH_TWIPS / 2; // 720 — Word's default header/footer offset
+const SINGLE_SPACING_LINE = 240; // `w:line` for 1.0× line spacing (auto rule)
+const DEFAULT_FONT_SIZE_PT = 11; // Normal style's default run size
 
 /** A new, blank document with an A4 portrait section and the standard styles. */
 export function emptyDocument(): SobreeDocument {
@@ -59,8 +62,8 @@ export function defaultMargins(): PageMargins {
     rightTwips: ONE_INCH_TWIPS,
     bottomTwips: ONE_INCH_TWIPS,
     leftTwips: ONE_INCH_TWIPS,
-    headerTwips: 720,
-    footerTwips: 720,
+    headerTwips: HALF_INCH_TWIPS,
+    footerTwips: HALF_INCH_TWIPS,
     gutterTwips: 0,
   };
 }
@@ -132,16 +135,16 @@ export function defaultStyles(): NamedStyle[] {
       displayName: "Normal",
       runDefaults: {
         fontFamily: "Helvetica",
-        fontSizePt: 11,
+        fontSizePt: DEFAULT_FONT_SIZE_PT,
       },
       // Word hardcoded default — single line, zero before/after.
       paragraphDefaults: {
-        spacing: { line: 240, lineRule: "auto" },
+        spacing: { line: SINGLE_SPACING_LINE, lineRule: "auto" },
       },
     },
   ];
   for (let i = 1; i <= 6; i++) {
-    const size = headingSizes[i - 1] ?? 11;
+    const size = headingSizes[i - 1] ?? DEFAULT_FONT_SIZE_PT;
     out.push({
       id: `Heading${i}`,
       type: "paragraph",
