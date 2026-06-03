@@ -24,16 +24,12 @@ import type { InlineRun, RevisionMark } from "../doc/types";
  *
  * Non-text runs and runs with no `revision` pass through untouched.
  */
-export function decideRevisionRun(
-  run: InlineRun,
-  decision: "accept" | "reject",
-): InlineRun[] {
+export function decideRevisionRun(run: InlineRun, decision: "accept" | "reject"): InlineRun[] {
   if (run.kind !== "text") return [run];
   const rev = run.properties.revision;
   if (!rev) return [run];
   const keepText =
-    (decision === "accept" && rev.type === "ins") ||
-    (decision === "reject" && rev.type === "del");
+    (decision === "accept" && rev.type === "ins") || (decision === "reject" && rev.type === "del");
   if (!keepText) return [];
   const { revision: _dropped, ...rest } = run.properties;
   return [{ ...run, properties: rest }];
@@ -51,8 +47,7 @@ export function decideRevisionRun(
 export function stampInsertRevision(run: InlineRun, author: string | undefined): InlineRun {
   if (run.kind !== "text") return run;
   if (run.properties.revision) return run;
-  const revision: RevisionMark =
-    author === undefined ? { type: "ins" } : { type: "ins", author };
+  const revision: RevisionMark = author === undefined ? { type: "ins" } : { type: "ins", author };
   return { ...run, properties: { ...run.properties, revision } };
 }
 
@@ -108,8 +103,7 @@ export function stampDeleteRevision(run: InlineRun, author: string | undefined):
   if (run.kind !== "text") return [run];
   const rev = run.properties.revision;
   if (!rev) {
-    const revision: RevisionMark =
-      author === undefined ? { type: "del" } : { type: "del", author };
+    const revision: RevisionMark = author === undefined ? { type: "del" } : { type: "del", author };
     return [{ ...run, properties: { ...run.properties, revision } }];
   }
   if (rev.type === "ins" && rev.author === author) {

@@ -21,12 +21,7 @@ import type {
   Selection,
 } from "../doc/api";
 import type { RunPropertiesPatch } from "../doc/runs";
-import type {
-  Block,
-  ParagraphAlignment,
-  ParagraphProperties,
-  SobreeDocument,
-} from "../doc/types";
+import type { Block, ParagraphAlignment, ParagraphProperties, SobreeDocument } from "../doc/types";
 
 export type ApiRangeType = ApiRange;
 
@@ -180,11 +175,7 @@ export interface EditorLike {
   readonly selection: EditorSelectionLike;
 }
 
-export type EditorEvent =
-  | "change"
-  | "selection"
-  | "keydown"
-  | "track-changes-change";
+export type EditorEvent = "change" | "selection" | "keydown" | "track-changes-change";
 export type EditorEventPayload = {
   change: ChangePayload;
   selection: SelectionPayload;

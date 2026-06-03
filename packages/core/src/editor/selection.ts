@@ -1,9 +1,4 @@
-import type {
-  Range as ApiRange,
-  BlockRef,
-  InlinePosition,
-  Selection,
-} from "../doc/api";
+import type { Range as ApiRange, BlockRef, InlinePosition, Selection } from "../doc/api";
 import type { BlockRegistry } from "./internal/blockRegistry";
 import { applySelectionToDom, selectionFromDom } from "./internal/positionMap";
 
