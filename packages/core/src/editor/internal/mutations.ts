@@ -15,7 +15,7 @@ import type {
   SectionProperties,
   SobreeDocument,
 } from "../../doc/types";
-import type { ParagraphPropertiesPatch, WrapTag } from "../index";
+import type { ParagraphPropertiesPatch, WrapTag } from "../types";
 import type { RunPropertiesPatch } from "../../doc/runs";
 
 /**
