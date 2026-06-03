@@ -24,10 +24,7 @@ export function appendInlineRuns(
   }
 }
 
-function renderRun(
-  run: InlineRun,
-  rawParts: Record<string, Uint8Array>,
-): Node | null {
+function renderRun(run: InlineRun, rawParts: Record<string, Uint8Array>): Node | null {
   switch (run.kind) {
     case "text":
       return renderTextRun(run);
@@ -79,9 +76,7 @@ function renderRun(
  * `href="#sobree-footnote-N"` points at the matching `<li>` in the
  * footnotes container that the renderer appends at the end of the body.
  */
-function renderFootnoteRef(
-  run: import("../../../doc/types").FootnoteRefRun,
-): HTMLElement {
+function renderFootnoteRef(run: import("../../../doc/types").FootnoteRefRun): HTMLElement {
   const sup = document.createElement("sup");
   sup.className = "sobree-footnote-ref";
   const link = document.createElement("a");
@@ -98,9 +93,7 @@ function renderFootnoteRef(
  * speech-bubble icon; we use the U+1F4AC character ("💬") as a
  * lightweight stand-in that needs no SVG.
  */
-function renderCommentRef(
-  run: import("../../../doc/types").CommentRefRun,
-): HTMLElement {
+function renderCommentRef(run: import("../../../doc/types").CommentRefRun): HTMLElement {
   const span = document.createElement("span");
   span.className = "sobree-comment-ref";
   const link = document.createElement("a");
@@ -275,7 +268,17 @@ function bytesToBase64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += chunk) {
     str += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  return typeof btoa === "function" ? btoa(str) : Buffer.from(str, "binary").toString("base64");
+  if (typeof btoa === "function") return btoa(str);
+  // Node fallback (no global `btoa`): reach `Buffer` via `globalThis`
+  // with a structural cast, so a browser-only consumer's `.d.ts` build
+  // doesn't need `@types/node`. Same runtime behaviour as `Buffer.from`.
+  const nodeBuffer = (
+    globalThis as {
+      Buffer?: { from(s: string, enc: string): { toString(enc: string): string } };
+    }
+  ).Buffer;
+  if (!nodeBuffer) throw new Error("bytesToBase64: no `btoa` or `Buffer` available.");
+  return nodeBuffer.from(str, "binary").toString("base64");
 }
 
 function mimeFromPath(path: string): string {
