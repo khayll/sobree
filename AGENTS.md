@@ -43,14 +43,16 @@ module is permanent.
 | `@sobree/core`           | Editor (DOM), **HeadlessSobree** (no-DOM peer for LLMs / automation / MCP), AST, **Y.Doc backing** (Yjs), paginator, DOCX I/O, history (undo/redo via Y.UndoManager), fonts (fontTable + ODTTF), `attachSections` plugin, **presence** module, tokens |
 | `@sobree/block-tools`    | Floating toolbar UI — opt-in plugin, mount via `blockTools()` factory in `plugins: []`                              |
 | `@sobree/keyboard`       | Default Cmd / Ctrl shortcuts → command bus — opt-in plugin, mount via `keyboard()` factory                          |
+| `@sobree/review`         | Tracked-changes & comments review surface — comment threads, per-author colours, accept/reject/resolve. Opt-in plugin, mount via `review()` factory |
 | `@sobree/zoom-controls`  | Floating zoom dock (4 buttons) — opt-in plugin, mount via `zoomControls()` factory                                  |
 | `@sobree/collab-providers` | Yjs provider helpers — `y-websocket` / `y-indexeddb` / `y-webrtc` factories normalized to a `CollabHandle` shape, plus an in-memory `loopback()` for tests. Pairs with the `attachPresence` / `attachPresenceOverlay` surface in `@sobree/core`.        |
 | `@sobree/collab-server`    | Node-only y-protocol relay + persister. Hosts many rooms in one process; speaks pure y-protocol (no Editor instantiation). Filesystem + in-memory persistence backends ship; bring your own for S3 / Postgres / etc. Read-only peers (drops their sync-update msgs) and a session message (type 2: `{isEmpty, isWritable, peerCount}`) for empty-room leader-election. |
 | `@sobree/mcp`              | MCP (Model Context Protocol) server. Exposes `HeadlessSobree` mutations as tools an LLM (Claude Desktop, etc.) can call. Two modes: local (own ephemeral Y.Doc) or collab (attach to a `@sobree/collab-server` room and edit alongside humans). Ships a `sobree-mcp` CLI for stdio transport. |
 | `@sobree/docs`           | Starlight site at `docs.sobree.dev` (`apps/docs/`)                                                                  |
 | `@sobree/playground`     | Bare Vite app for verifying editor changes during dev (`apps/playground/`, not published)                           |
+| `@sobree/fixtures-gen`   | Internal tooling (`tools/fixtures-gen/`, not published) — owns the `fixtures:*` and `corpus:*` scripts (fixture generation + render-fidelity corpus runner) |
 
-Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime deps are `fflate` (DOCX ZIP) and `yjs` (the CRDT document store). Three stock plugin packages (`block-tools`, `keyboard`, `zoom-controls`) are pure opt-in siblings that peer-dep `@sobree/core`. Embedders install only the plugins they want and pass the factories to `createSobree({ plugins: [...] })`. Sibling plugin packages must not import each other. For wire-driven scenarios (LLM agents, multi-user collab), there is no separate RPC plugin — the Y.Doc is the wire: attach a Y provider (`@sobree/collab-providers`) and edits propagate via Y-protocol.
+Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime deps are `fflate` (DOCX ZIP) and `yjs` (the CRDT document store). Four stock plugin packages (`block-tools`, `keyboard`, `zoom-controls`, `review`) are pure opt-in siblings that peer-dep `@sobree/core`. Embedders install only the plugins they want and pass the factories to `createSobree({ plugins: [...] })`. Sibling plugin packages must not import each other. For wire-driven scenarios (LLM agents, multi-user collab), there is no separate RPC plugin — the Y.Doc is the wire: attach a Y provider (`@sobree/collab-providers`) and edits propagate via Y-protocol.
 
 `mark.toggle.*` and `history.undo` / `history.redo` commands are registered by the Editor itself, not by the keyboard plugin — disabling keyboard never wipes the bus.
 
@@ -96,7 +98,7 @@ Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime 
 - `concepts/plugins.md` defaults table
 - `api/create-sobree.md` — only if it changes the public surface
 
-### Sibling-package plugin (block-tools, keyboard, zoom-controls, future ones)
+### Sibling-package plugin (block-tools, keyboard, zoom-controls, review, future ones)
 
 - Dedicated `api/<plugin>.md` page (mandatory install snippet + factory usage + direct construction)
 - `concepts/architecture.md` diagram branch
@@ -177,7 +179,7 @@ Paragraph blocks store content as `Y.Text` (char-level CRDT); other blocks as JS
 
 ### Focused test loop (inner-loop, every commit)
 
-`pnpm test` runs the full 649-test suite across 7 packages (~30s). For
+`pnpm test` runs the full 813-test suite across 8 packages (~30s). For
 the fix-validate-fix loop during dev, that's overkill — most edits
 touch one area and a handful of tests in the same package will
 catch any regression. Use the narrowest scope that still covers
@@ -185,8 +187,8 @@ your change:
 
 ```sh
 pnpm test:related                 # auto-pick scope from `git diff`
-pnpm test:core                    # only @sobree/core (~5s, 547 tests)
-pnpm test:oracle                  # only fixtures.oracle (~1s, 19 fixtures)
+pnpm test:core                    # only @sobree/core (~5s, 711 tests)
+pnpm test:oracle                  # only fixtures.oracle (~1s, 12 tests)
 pnpm -F @sobree/core test -- import   # only `import.test.ts` files
 ```
 
