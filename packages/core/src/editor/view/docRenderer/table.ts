@@ -1,11 +1,27 @@
-import { renderBlocks } from "./block";
 import type {
+  Block,
   NamedStyle,
   NumberingDefinition,
   Table,
   TableCell,
   TableRow,
 } from "../../../doc/types";
+
+/**
+ * Renderer for a table cell's block content, injected by the caller
+ * (`block.ts`) instead of imported — so `table.ts` never imports
+ * `block.ts`, breaking the block ↔ table render cycle. The recursion is
+ * genuine (a cell holds blocks; a block may be a nested table), but the
+ * *import* cycle isn't: the sole caller already owns `renderBlocks` and
+ * hands it in.
+ */
+export type RenderCellBlocks = (
+  blocks: readonly Block[],
+  host: HTMLElement,
+  numbering: readonly NumberingDefinition[],
+  styles: readonly NamedStyle[],
+  rawParts: Record<string, Uint8Array>,
+) => void;
 
 /**
  * Render a Table to a `<table>` element. `vMerge: "restart"` cells
@@ -22,6 +38,7 @@ import type {
  */
 export function renderTable(
   table: Table,
+  renderCellBlocks: RenderCellBlocks,
   numbering: readonly NumberingDefinition[] = [],
   styles: readonly NamedStyle[] = [],
   rawParts: Record<string, Uint8Array> = {},
@@ -42,14 +59,18 @@ export function renderTable(
   if (headRows.length > 0) {
     const thead = document.createElement("thead");
     for (const { r, i } of headRows) {
-      thead.appendChild(renderRow(r, i, "th", rowSpans, numbering, styles, rawParts));
+      thead.appendChild(
+        renderRow(r, i, "th", rowSpans, numbering, styles, rawParts, renderCellBlocks),
+      );
     }
     t.appendChild(thead);
   }
   if (bodyRows.length > 0) {
     const tbody = document.createElement("tbody");
     for (const { r, i } of bodyRows) {
-      tbody.appendChild(renderRow(r, i, "td", rowSpans, numbering, styles, rawParts));
+      tbody.appendChild(
+        renderRow(r, i, "td", rowSpans, numbering, styles, rawParts, renderCellBlocks),
+      );
     }
     t.appendChild(tbody);
   }
@@ -64,6 +85,7 @@ function renderRow(
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
+  renderCellBlocks: RenderCellBlocks,
 ): HTMLElement {
   const tr = document.createElement("tr");
   let col = 0;
@@ -73,7 +95,7 @@ function renderRow(
       col += gridSpan;
       continue; // occluded by the restart cell above
     }
-    const el = renderCell(cell, defaultCell, numbering, styles, rawParts);
+    const el = renderCell(cell, defaultCell, numbering, styles, rawParts, renderCellBlocks);
     if (gridSpan > 1) el.setAttribute("colspan", String(gridSpan));
     const rs = rowSpans.get(`${rowIndex}:${col}`);
     if (rs && rs > 1) el.setAttribute("rowspan", String(rs));
@@ -89,6 +111,7 @@ function renderCell(
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
+  renderCellBlocks: RenderCellBlocks,
 ): HTMLElement {
   const el = document.createElement(defaultTag);
 
@@ -110,7 +133,7 @@ function renderCell(
   // alignment, font from style). Without this, per-paragraph properties
   // are silently dropped inside table cells.
   if (cell.content.length > 0) {
-    renderBlocks(cell.content, el, numbering, styles, rawParts);
+    renderCellBlocks(cell.content, el, numbering, styles, rawParts);
     // Match LibreOffice's "compress paragraph after-spacing inside
     // table cells" rendering opinion. Word literally applies
     // `<w:spacing w:after>` in cells; LO ignores it for the implicit

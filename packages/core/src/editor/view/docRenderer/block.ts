@@ -270,7 +270,7 @@ function renderBlock(
   nextSection?: SectionProperties,
 ): HTMLElement | null {
   if (block.kind === "paragraph") return renderParagraph(block, styles, rawParts);
-  if (block.kind === "table") return renderTable(block, numbering, styles, rawParts);
+  if (block.kind === "table") return renderTable(block, renderBlocks, numbering, styles, rawParts);
   if (block.kind === "section_break") return renderSectionBreak(nextSection);
   if (block.kind === "inline_frame") {
     return renderInlineFrameBlock(block, numbering, styles, rawParts, renderBlocks);
