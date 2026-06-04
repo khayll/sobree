@@ -15,18 +15,14 @@ import {
 import { emptyDocument } from "../doc/builders";
 import {
   type RunPropertiesPatch,
-  applyRunPropertiesToRuns,
   mergeAdjacentTextRuns,
   runLength,
   runsLength,
-  splitRunsAt,
 } from "../doc/runs";
 import type {
   Block,
-  DrawingRun,
   InlineRun,
   Paragraph,
-  ParagraphProperties,
   RevisionMark,
   SobreeDocument,
   Table,
@@ -41,17 +37,12 @@ import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
 import { EditorCommands } from "./commands";
 import type { EditorContext } from "./context";
 import { BlockRegistry } from "./internal/blockRegistry";
-import {
-  type Mutation,
-  allocateMediaPath,
-  mimeToExtension,
-  pxToEmu,
-  wrapTagToPatch,
-} from "./internal/mutations";
+import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import * as blocks from "./ops/blocks";
 import * as comments from "./ops/comments";
 import * as parts from "./ops/parts";
+import * as runs from "./ops/runs";
 import * as query from "./query";
 import { EditorSelection } from "./selection";
 import { EditorTable } from "./table";
@@ -62,21 +53,7 @@ import { attachImageResize } from "./view/imageResize";
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
 export { EditorCommands } from "./commands";
 export { EditorSelection } from "./selection";
-import {
-  caretRangeFromPoint,
-  closestBlockElement,
-  currentDomRangeInsideHosts,
-  hasImageInDataTransfer,
-  readImageDimensions,
-  unwrap,
-} from "./dom";
-import {
-  decideFormatRun,
-  decideRevisionRun,
-  snapshotFormatRevision,
-  stampDeleteRevision,
-  stampInsertRevision,
-} from "./revisionRuns";
+import { decideFormatRun, decideRevisionRun } from "./revisionRuns";
 
 // === exported types ===
 
@@ -523,10 +500,10 @@ export class Editor {
     this.pasteListener = (e) => this.onPaste(e);
     host.addEventListener("paste", this.pasteListener);
 
-    this.dragOverListener = (e) => this.onDragOver(e);
+    this.dragOverListener = (e) => runs.onDragOver(this.ctx, e);
     host.addEventListener("dragover", this.dragOverListener);
 
-    this.dropListener = (e) => this.onDrop(e);
+    this.dropListener = (e) => void runs.onDrop(this.ctx, e);
     host.addEventListener("drop", this.dropListener);
 
     this.detachImageResize = attachImageResize(host);
@@ -822,17 +799,7 @@ export class Editor {
     patch: RunPropertiesPatch,
     opts: { expect?: Record<string, number> } = {},
   ): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRange(range, opts.expect);
-    if (lockCheck) return lockCheck;
-    if (this.trackChanges.enabled) {
-      const author = this.trackChanges.author;
-      return this.mutateRunsInRange(range, (runs) => {
-        const snapshotted = runs.map((r) => snapshotFormatRevision(r, author));
-        return applyRunPropertiesToRuns(snapshotted, patch);
-      });
-    }
-    return this.mutateRunsInRange(range, (runs) => applyRunPropertiesToRuns(runs, patch));
+    return runs.applyRunProperties(this.ctx, range, patch, opts);
   }
 
   /** Wrap the runs in `range` with semantic formatting. */
@@ -841,140 +808,38 @@ export class Editor {
     tag: WrapTag,
     opts: { expect?: Record<string, number> } = {},
   ): EditResult<void> {
-    return this.applyRunProperties(range, wrapTagToPatch(tag), opts);
+    return runs.wrapRange(this.ctx, range, tag, opts);
   }
 
   /**
-   * Insert a run at `at`. Splits the run list at the offset.
-   *
-   * In track-changes mode (see `setTrackChanges`), the run is stamped
-   * with `revision: { type: "ins", author }` before insertion (unless
-   * it already carries a `revision` — caller-provided revisions are
-   * never overwritten).
+   * Insert a run at `at`. In track-changes mode the run is stamped
+   * `revision: ins` unless it already carries one.
    */
   insertRun(at: InlinePosition, run: InlineRun): EditResult<BlockRef> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([at.block]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(at.block.id);
-    const block = this.doc.body[index];
-    if (!block || block.kind !== "paragraph") {
-      return fail({ code: "invalid-position", details: "target is not a paragraph" });
-    }
-    const stamped = this.trackChanges.enabled
-      ? stampInsertRevision(run, this.trackChanges.author)
-      : run;
-    const { before, after } = splitRunsAt(block.runs, at.offset);
-    const merged = mergeAdjacentTextRuns([...before, stamped, ...after]);
-    const next = this.doc.body.slice();
-    next[index] = { ...block, runs: merged };
-    return this.commit({ body: next }, [{ type: "bump", index }]);
+    return runs.insertRun(this.ctx, at, run);
   }
 
   /**
-   * Split a paragraph at `at`. The runs before the offset stay on the
-   * original block; the runs after move into a fresh paragraph that's
-   * inserted immediately after. The new block inherits the original
-   * paragraph's properties (alignment, style, indent, …) so the visual
-   * shape of the split is what the user expects from pressing Enter.
-   *
-   * In track-changes mode (see `setTrackChanges`), the new paragraph's
-   * `properties.revision` is stamped `{ type: "ins", author }` — the
-   * "this paragraph break is a tracked insert" marker. The original
-   * paragraph is left clean; only the *new* paragraph carries the mark,
-   * mirroring how Word stores `<w:rPr><w:ins/></w:rPr>` inside `<w:pPr>`.
-   *
-   * `at.offset` is clamped to `[0, block-length]`. A split at offset 0
-   * inserts an empty paragraph *before* the cursor; a split at the
-   * block's full length inserts an empty paragraph *after*.
-   *
-   * Returns the ref of the *new* (second) block — callers typically
-   * place the caret at its offset 0.
+   * Split a paragraph at `at`; runs after the offset move into a new
+   * paragraph inserted after, inheriting the original's properties.
+   * Returns the new (second) block's ref. In track-changes mode the new
+   * paragraph is stamped `revision: ins`.
    */
   splitBlock(at: InlinePosition): EditResult<BlockRef> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([at.block]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(at.block.id);
-    const block = this.doc.body[index];
-    if (!block || block.kind !== "paragraph") {
-      return fail({ code: "invalid-position", details: "target is not a paragraph" });
-    }
-    const { before, after } = splitRunsAt(block.runs, at.offset);
-    const firstHalf: Paragraph = { ...block, runs: mergeAdjacentTextRuns(before) };
-    // Build the new paragraph's properties. Inherit everything from the
-    // source; in tracked mode, stamp `revision: ins` on top.
-    const newProps: ParagraphProperties = this.trackChanges.enabled
-      ? {
-          ...block.properties,
-          revision:
-            this.trackChanges.author === undefined
-              ? { type: "ins" }
-              : { type: "ins", author: this.trackChanges.author },
-        }
-      : { ...block.properties };
-    const secondHalf: Paragraph = {
-      kind: "paragraph",
-      properties: newProps,
-      runs: mergeAdjacentTextRuns(after),
-    };
-    const next = this.doc.body.slice();
-    next.splice(index, 1, firstHalf, secondHalf);
-    const result = this.commit({ body: next }, [
-      { type: "bump", index },
-      { type: "insert", index: index + 1 },
-    ]);
-    if (!result.ok) return result;
-    // `affected` is `[bumped first half, inserted second half]` in
-    // mutation order. Surfacing the new block's ref as `value` lets
-    // callers (notably `handleTrackedInput`'s caret placement) consume
-    // it without a follow-up `getBlock(index + 1)` round-trip.
-    const newRef = result.affected[1] ?? result.affected[0]!;
-    return { ok: true, value: newRef, affected: result.affected };
+    return runs.splitBlock(this.ctx, at);
   }
 
   /**
-   * Insert an image at `at`. The bytes are stored in `doc.rawParts` under
-   * a fresh `word/media/imageN.{ext}` path; a `DrawingRun` referencing
-   * that path is inserted at the position.
-   *
-   * When a `blobStore` is configured (Phase 3.2+), the bytes also
-   * migrate in the background: hashed, uploaded to the store, and a
-   * `partRefs[partPath] = hash` entry written to the Y.Doc. Once the
-   * migration lands, the Y.Doc's inline `parts[partPath]` is cleared —
-   * so the bytes ride the side-channel, not the Y update stream.
-   * The local renderer keeps reading `doc.rawParts[partPath]`
-   * throughout (the value is stable from the moment `insertImage`
-   * returns).
+   * Insert an image at `at`. Bytes are stored in `doc.rawParts` and a
+   * `DrawingRun` is inserted; with a `blobStore` configured the bytes
+   * migrate to the store in the background.
    */
   insertImage(
     at: InlinePosition,
     bytes: Uint8Array,
     opts: { mime: string; widthPx?: number; heightPx?: number; altText?: string },
   ): EditResult<BlockRef> {
-    this.ensureCurrent();
-    const ext = mimeToExtension(opts.mime);
-    const partPath = allocateMediaPath(this.doc, ext);
-    this.doc.rawParts[partPath] = bytes;
-    // Mark for migration BEFORE the insertRun→commit→mirror chain
-    // runs, so the mirror's skip-set catches this path on its first
-    // pass and doesn't write inline bytes to Y.Doc.
-    if (this.blobStore && this.blobCache) {
-      this.pendingPartRefMigrations.add(partPath);
-      // Fire-and-forget background migration. Errors are logged inside.
-      void parts.migratePartToBlobStore(this.ctx, partPath, bytes);
-    }
-    const widthPx = opts.widthPx ?? 200;
-    const heightPx = opts.heightPx ?? 150;
-    const drawing: DrawingRun = {
-      kind: "drawing",
-      partPath,
-      widthEmu: pxToEmu(widthPx),
-      heightEmu: pxToEmu(heightPx),
-      placement: "inline",
-    };
-    if (opts.altText) drawing.altText = opts.altText;
-    return this.insertRun(at, drawing);
+    return runs.insertImage(this.ctx, at, bytes, opts);
   }
 
   /**
@@ -999,118 +864,7 @@ export class Editor {
    * last blocks merge into one.
    */
   deleteRange(range: ApiRange, opts: { expect?: Record<string, number> } = {}): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRange(range, opts.expect);
-    if (lockCheck) return lockCheck;
-    if (range.from.block.id !== range.to.block.id) {
-      return this.trackChanges.enabled
-        ? this.deleteRangeAcrossBlocksTracked(range)
-        : this.deleteRangeAcrossBlocksPlain(range);
-    }
-    if (this.trackChanges.enabled) {
-      const author = this.trackChanges.author;
-      return this.mutateRunsInRange(range, (runs) =>
-        runs.flatMap((r) => stampDeleteRevision(r, author)),
-      );
-    }
-    return this.mutateRunsInRange(range, () => []);
-  }
-
-  /**
-   * Tracked cross-paragraph delete. Walks each paragraph in the range:
-   * stamps `del` on the affected runs (first-block tail / intermediate
-   * full / last-block head), and on every paragraph *after the first*
-   * stamps the paragraph-mark `del` so `acceptAllRevisions` later
-   * merges them all into the first block. Single commit.
-   */
-  private deleteRangeAcrossBlocksTracked(range: ApiRange): EditResult<void> {
-    const fromIdx = this.registry.indexOf(range.from.block.id);
-    const toIdx = this.registry.indexOf(range.to.block.id);
-    if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
-      return fail({ code: "range-out-of-order", details: "range endpoints" });
-    }
-    const author = this.trackChanges.author;
-    const nextBody = this.doc.body.slice();
-    const bumps: Mutation[] = [];
-
-    for (let i = fromIdx; i <= toIdx; i++) {
-      const block = nextBody[i];
-      if (!block || block.kind !== "paragraph") continue;
-
-      // Apply the del-stamp to the right slice of this block's runs.
-      let newRuns: InlineRun[];
-      if (i === fromIdx) {
-        const split = splitRunsAt(block.runs, range.from.offset);
-        const tailStamped = split.after.flatMap((r) => stampDeleteRevision(r, author));
-        newRuns = mergeAdjacentTextRuns([...split.before, ...tailStamped]);
-      } else if (i === toIdx) {
-        const split = splitRunsAt(block.runs, range.to.offset);
-        const headStamped = split.before.flatMap((r) => stampDeleteRevision(r, author));
-        newRuns = mergeAdjacentTextRuns([...headStamped, ...split.after]);
-      } else {
-        newRuns = mergeAdjacentTextRuns(block.runs.flatMap((r) => stampDeleteRevision(r, author)));
-      }
-
-      let nextBlock: Paragraph = { ...block, runs: newRuns };
-
-      // Stamp paragraph-mark del on every block AFTER the first — the
-      // break between i-1 and i is part of the deletion. Skip if a
-      // revision is already present: we don't overwrite peer markers,
-      // and own-ins-cancel + del-on-top-of-del don't make sense in
-      // a bulk path.
-      if (i > fromIdx && !block.properties.revision) {
-        const revision: RevisionMark =
-          author === undefined ? { type: "del" } : { type: "del", author };
-        nextBlock = {
-          ...nextBlock,
-          properties: { ...nextBlock.properties, revision },
-        };
-      }
-
-      nextBody[i] = nextBlock;
-      bumps.push({ type: "bump", index: i });
-    }
-
-    return this.commit({ body: nextBody }, bumps);
-  }
-
-  /**
-   * Non-tracked cross-paragraph delete. Keeps the head of the first
-   * block + the tail of the last block, splices them into the first
-   * block as one paragraph, and removes everything in between.
-   */
-  private deleteRangeAcrossBlocksPlain(range: ApiRange): EditResult<void> {
-    const fromIdx = this.registry.indexOf(range.from.block.id);
-    const toIdx = this.registry.indexOf(range.to.block.id);
-    if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
-      return fail({ code: "range-out-of-order", details: "range endpoints" });
-    }
-    const first = this.doc.body[fromIdx];
-    const last = this.doc.body[toIdx];
-    if (!first || first.kind !== "paragraph" || !last || last.kind !== "paragraph") {
-      return fail({
-        code: "invalid-state",
-        details: "cross-block delete requires paragraph endpoints",
-      });
-    }
-    const head = splitRunsAt(first.runs, range.from.offset).before;
-    const tail = splitRunsAt(last.runs, range.to.offset).after;
-    const merged = mergeAdjacentTextRuns([...head, ...tail]);
-
-    const nextBody = this.doc.body.slice();
-    nextBody[fromIdx] = { ...first, runs: merged };
-    // Remove blocks (fromIdx+1) .. toIdx — that many entries.
-    nextBody.splice(fromIdx + 1, toIdx - fromIdx);
-    if (nextBody.length === 0) {
-      nextBody.push({ kind: "paragraph", properties: {}, runs: [] });
-    }
-
-    const mutations: Mutation[] = [{ type: "bump", index: fromIdx }];
-    // Top-down removes so each index stays valid as we shrink the array.
-    for (let i = toIdx; i > fromIdx; i--) {
-      mutations.push({ type: "remove", index: i });
-    }
-    return this.commit({ body: nextBody }, mutations);
+    return runs.deleteRange(this.ctx, range, opts);
   }
 
   // === tracked changes — authoring mode ===
@@ -2238,31 +1992,16 @@ export class Editor {
     bytes: Uint8Array,
     opts: { mime: string; widthPx?: number; heightPx?: number; altText?: string },
   ): EditResult<BlockRef> {
-    const pos = this.selection.currentCaret();
-    if (!pos) return fail({ code: "invalid-position", details: "no selection" });
-    return this.insertImage(pos, bytes, opts);
+    return runs.insertImageAtSelection(this.ctx, bytes, opts);
   }
 
   /**
    * Unwrap span ancestors intersecting the selection, up to the block.
-   * Best-effort DOM-level cleanup — preserves the current in-place UX
-   * without re-rendering.
+   * Best-effort DOM-level cleanup — preserves the in-place UX without a
+   * re-render.
    */
   clearInlineFormattingAtSelection(): void {
-    const range = currentDomRangeInsideHosts(this.getContentHosts());
-    if (!range) return;
-    const block = closestBlockElement(range.startContainer, this.getContentHosts());
-    if (!block) return;
-    const spans: HTMLSpanElement[] = [];
-    const walker = document.createTreeWalker(block, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (n) =>
-        n instanceof HTMLSpanElement && range.intersectsNode(n)
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_SKIP,
-    });
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) spans.push(n as HTMLSpanElement);
-    for (const span of spans) unwrap(span);
-    this.scheduleChange();
+    runs.clearInlineFormattingAtSelection(this.ctx);
   }
 
   // === events + lifecycle ===
@@ -2391,52 +2130,7 @@ export class Editor {
     range: ApiRange,
     transform: (runs: InlineRun[]) => InlineRun[],
   ): EditResult<void> {
-    const fromIdx = this.registry.indexOf(range.from.block.id);
-    const toIdx = this.registry.indexOf(range.to.block.id);
-    if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
-      return fail({ code: "range-out-of-order", details: "range endpoints" });
-    }
-    const nextBody = this.doc.body.slice();
-    const bumps: Mutation[] = [];
-
-    if (fromIdx === toIdx) {
-      const block = nextBody[fromIdx];
-      if (!block || block.kind !== "paragraph") {
-        return fail({
-          code: "invalid-state",
-          details: `block ${range.from.block.id} not a paragraph`,
-        });
-      }
-      if (range.from.offset === range.to.offset) {
-        return fail({ code: "range-empty", details: "zero-width range" });
-      }
-      const headSplit = splitRunsAt(block.runs, range.from.offset);
-      const tailSplit = splitRunsAt(headSplit.after, range.to.offset - range.from.offset);
-      const middle = transform(tailSplit.before);
-      const merged = mergeAdjacentTextRuns([...headSplit.before, ...middle, ...tailSplit.after]);
-      nextBody[fromIdx] = { ...block, runs: merged };
-      bumps.push({ type: "bump", index: fromIdx });
-    } else {
-      // Multi-block range: first block's tail, all of middle blocks,
-      // last block's head get transformed.
-      for (let i = fromIdx; i <= toIdx; i++) {
-        const block = nextBody[i];
-        if (!block || block.kind !== "paragraph") continue;
-        let newRuns: InlineRun[];
-        if (i === fromIdx) {
-          const split = splitRunsAt(block.runs, range.from.offset);
-          newRuns = mergeAdjacentTextRuns([...split.before, ...transform(split.after)]);
-        } else if (i === toIdx) {
-          const split = splitRunsAt(block.runs, range.to.offset);
-          newRuns = mergeAdjacentTextRuns([...transform(split.before), ...split.after]);
-        } else {
-          newRuns = mergeAdjacentTextRuns(transform(block.runs));
-        }
-        nextBody[i] = { ...block, runs: newRuns };
-        bumps.push({ type: "bump", index: i });
-      }
-    }
-    return this.commit({ body: nextBody }, bumps);
+    return runs.mutateRunsInRange(this.ctx, range, transform);
   }
 
   /**
@@ -2759,38 +2453,8 @@ export class Editor {
     if (pos) this.placeCaret(pos.block.id, pos.offset);
   }
 
-  private onDragOver(e: DragEvent): void {
-    if (!hasImageInDataTransfer(e.dataTransfer)) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-  }
-
-  private async onDrop(e: DragEvent): Promise<void> {
-    if (!hasImageInDataTransfer(e.dataTransfer)) return;
-    e.preventDefault();
-    const dropRange = caretRangeFromPoint(e.clientX, e.clientY);
-    if (dropRange) {
-      const sel = window.getSelection();
-      if (sel) {
-        sel.removeAllRanges();
-        sel.addRange(dropRange);
-      }
-    }
-    const files = Array.from(e.dataTransfer?.files ?? []).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    for (const file of files) await this.insertImageFromFile(file);
-  }
-
-  private async insertImageFromFile(file: File): Promise<void> {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const dims = await readImageDimensions(file);
-    this.insertImageAtSelection(bytes, {
-      mime: file.type || "image/png",
-      widthPx: dims.width,
-      heightPx: dims.height,
-      altText: file.name,
-    });
+  private insertImageFromFile(file: File): Promise<void> {
+    return runs.insertImageFromFile(this.ctx, file);
   }
 }
 
