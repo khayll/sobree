@@ -64,19 +64,27 @@ function getNodeImpl(): Promise<NodeImpl | null> {
 }
 
 async function detectNodeImpl(): Promise<NodeImpl | null> {
-  const proc: unknown = (
-    globalThis as { process?: { versions?: { node?: string } } }
-  ).process;
+  const proc: unknown = (globalThis as { process?: { versions?: { node?: string } } }).process;
   const isNode =
     typeof proc === "object" &&
     proc !== null &&
     typeof (proc as { versions?: { node?: string } }).versions?.node === "string";
   if (!isNode) return null;
   try {
-    const c = (await import(/* @vite-ignore */ "node:crypto")) as
-      | typeof import("node:crypto");
-    return async (bytes: Uint8Array) =>
-      c.createHash("sha256").update(bytes).digest("hex");
+    // Structural type for just the slice of `node:crypto` we touch — so
+    // a browser-only consumer's `.d.ts` build (which type-checks this
+    // source via the workspace dev-condition) doesn't need `@types/node`.
+    // The specifier is held in a variable so TypeScript doesn't try to
+    // statically resolve the `node:` module in a DOM-only type context;
+    // the runtime import is unchanged.
+    type NodeCrypto = {
+      createHash(algorithm: string): {
+        update(data: Uint8Array): { digest(encoding: string): string };
+      };
+    };
+    const spec = "node:crypto";
+    const c = (await import(/* @vite-ignore */ spec)) as NodeCrypto;
+    return async (bytes: Uint8Array) => c.createHash("sha256").update(bytes).digest("hex");
   } catch {
     return null;
   }
