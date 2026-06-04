@@ -44,14 +44,12 @@ import { BlockRegistry } from "./internal/blockRegistry";
 import {
   type Mutation,
   allocateMediaPath,
-  mergeParagraphProps,
-  mergeSectionsAcross,
   mimeToExtension,
   pxToEmu,
-  removedSectionIndex,
   wrapTagToPatch,
 } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
+import * as blocks from "./ops/blocks";
 import * as comments from "./ops/comments";
 import * as parts from "./ops/parts";
 import * as query from "./query";
@@ -777,152 +775,35 @@ export class Editor {
 
   /** Replace the block at `target`'s index with `block`. */
   replaceBlock(target: BlockRef, block: Block): EditResult<BlockRef> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const next = this.doc.body.slice();
-    const wasSectionBreak = next[index]?.kind === "section_break";
-    next[index] = block;
-    // If a SectionBreak was the previous block here and the replacement
-    // isn't one, the two sections it separated must merge — there's
-    // nothing left to delimit them. The earlier section's properties
-    // survive.
-    const update: Partial<SobreeDocument> = { body: next };
-    if (wasSectionBreak && block.kind !== "section_break") {
-      update.sections = mergeSectionsAcross(
-        this.doc.sections,
-        removedSectionIndex(this.doc.body, index),
-      );
-    }
-    return this.commit(update, [{ type: "bump", index }]);
+    return blocks.replaceBlock(this.ctx, target, block);
   }
 
   /**
-   * Insert `block` before the target block. Returns the new ref.
-   *
-   * In track-changes mode (see `setTrackChanges`), if `block` is a
-   * paragraph it gets stamped with `revision: { type: "ins", author }`
-   * on its properties — the same paragraph-mark semantics as
-   * `splitBlock`. Non-paragraph blocks (table, section_break) don't
-   * carry the marker in v1 and insert plain.
+   * Insert `block` before the target block. Returns the new ref. In
+   * track-changes mode a paragraph block is stamped `revision: ins`;
+   * non-paragraph blocks insert plain.
    */
   insertBlockBefore(target: BlockRef, block: Block): EditResult<BlockRef> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const stamped = this.stampInsertedBlockIfTracked(block);
-    const next = this.doc.body.slice();
-    next.splice(index, 0, stamped);
-    return this.commit({ body: next }, [{ type: "insert", index }]);
+    return blocks.insertBlockBefore(this.ctx, target, block);
   }
 
-  /**
-   * Insert `block` after the target block. Returns the new ref.
-   * Tracked-mode behaviour matches `insertBlockBefore`.
-   */
+  /** Insert `block` after the target block. Returns the new ref. */
   insertBlockAfter(target: BlockRef, block: Block): EditResult<BlockRef> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const stamped = this.stampInsertedBlockIfTracked(block);
-    const next = this.doc.body.slice();
-    next.splice(index + 1, 0, stamped);
-    return this.commit({ body: next }, [{ type: "insert", index: index + 1 }]);
+    return blocks.insertBlockAfter(this.ctx, target, block);
   }
 
   /**
-   * Delete the target block.
-   *
-   * In track-changes mode, paragraph blocks aren't removed — their
-   * `properties.revision` is stamped `del` (the renderer shows the
-   * paragraph mark with a strikethrough ¶ glyph; the body text stays
-   * visible). If the paragraph carries the *current author's* pending
-   * `ins` marker (a paragraph the user themselves just created), the
-   * block is removed outright — cancelling an un-committed insert,
-   * matching the inline `deleteRange` semantics. Non-paragraph blocks
-   * (tables, section breaks) bypass tracking in v1 — they remove plainly.
+   * Delete the target block. In track-changes mode paragraph blocks are
+   * stamped `del` (kept visible) rather than removed; tables / section
+   * breaks remove plainly.
    */
   deleteBlock(target: BlockRef): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const current = this.doc.body[index];
-
-    if (this.trackChanges.enabled && current?.kind === "paragraph") {
-      const existing = current.properties.revision;
-      // Cancelling own pending ins → actually remove.
-      if (existing?.type === "ins" && existing.author === this.trackChanges.author) {
-        // fall through to plain remove below
-      } else {
-        const revision: RevisionMark =
-          this.trackChanges.author === undefined
-            ? { type: "del" }
-            : { type: "del", author: this.trackChanges.author };
-        const next = this.doc.body.slice();
-        next[index] = {
-          ...current,
-          properties: { ...current.properties, revision },
-        };
-        return this.commit({ body: next }, [{ type: "bump", index }]);
-      }
-    }
-
-    const wasSectionBreak = current?.kind === "section_break";
-    const next = this.doc.body.slice();
-    next.splice(index, 1);
-    if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
-    const update: Partial<SobreeDocument> = { body: next };
-    if (wasSectionBreak) {
-      update.sections = mergeSectionsAcross(
-        this.doc.sections,
-        removedSectionIndex(this.doc.body, index),
-      );
-    }
-    return this.commit(update, [{ type: "remove", index }]);
-  }
-
-  /**
-   * Stamp `revision: ins` on a paragraph block if tracked mode is on
-   * and the block doesn't already carry one. Helper for
-   * `insertBlockBefore` / `insertBlockAfter`. Non-paragraph blocks
-   * pass through unchanged.
-   */
-  private stampInsertedBlockIfTracked(block: Block): Block {
-    if (!this.trackChanges.enabled) return block;
-    if (block.kind !== "paragraph") return block;
-    if (block.properties.revision) return block;
-    const revision: RevisionMark =
-      this.trackChanges.author === undefined
-        ? { type: "ins" }
-        : { type: "ins", author: this.trackChanges.author };
-    return { ...block, properties: { ...block.properties, revision } };
+    return blocks.deleteBlock(this.ctx, target);
   }
 
   /** Merge a patch into each target paragraph's properties. */
   applyBlockProperties(targets: BlockRef[], patch: ParagraphPropertiesPatch): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs(targets);
-    if (lockCheck) return lockCheck;
-    const next = this.doc.body.slice();
-    const bumps: Mutation[] = [];
-    for (const ref of targets) {
-      const index = this.registry.indexOf(ref.id);
-      const block = next[index];
-      if (!block) continue;
-      if (block.kind !== "paragraph") {
-        return fail({
-          code: "invalid-state",
-          details: `block ${ref.id} is not a paragraph`,
-        });
-      }
-      next[index] = { ...block, properties: mergeParagraphProps(block.properties, patch) };
-      bumps.push({ type: "bump", index });
-    }
-    return this.commit({ body: next }, bumps);
+    return blocks.applyBlockProperties(this.ctx, targets, patch);
   }
 
   /**
