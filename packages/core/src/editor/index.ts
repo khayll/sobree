@@ -47,7 +47,6 @@ import type {
   TableCell,
   TableRow,
 } from "../doc/types";
-import { headingLevelOf, runsToText } from "../doc/walk";
 import { BlockRegistry } from "./internal/blockRegistry";
 import {
   type Mutation,
@@ -77,6 +76,9 @@ import {
 import { serializeHostsToDocument } from "./view/docSerialize/index";
 import { attachImageResize } from "./view/imageResize";
 import { EditorCommands } from "./commands";
+import type { EditorContext } from "./context";
+import * as comments from "./ops/comments";
+import * as query from "./query";
 import { EditorSelection } from "./selection";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
@@ -316,6 +318,13 @@ export class Editor {
    * and `emitChangeNow` sync only when this flag is set.
    */
   private domDirty = false;
+  /**
+   * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
+   * once in the constructor; closes over this instance's privates so the
+   * `commit` pipeline / lock checks stay private to the class. See
+   * `./context.ts`.
+   */
+  private readonly ctx: EditorContext;
 
   constructor(host: HTMLElement, options: EditorOptions = {}) {
     this.host = host;
@@ -399,6 +408,8 @@ export class Editor {
         if (sel) applySelectionToDom(this._hosts(), this.registry, sel);
       },
     });
+
+    this.ctx = this.buildContext();
 
     // `history.undo` / `history.redo` registered on the command bus
     // here (NOT in the keyboard plugin) so a headless caller — agent,
@@ -553,6 +564,63 @@ export class Editor {
       this.adoptYDocState();
     };
     this.ydoc.on("afterTransaction", this.ydocUpdateListener);
+  }
+
+  /**
+   * Assemble the {@link EditorContext} the behaviour modules operate on.
+   * Closes over `this` so the kernel methods (`commit`, `checkRefs`, …)
+   * stay private to the class while modules get a curated surface.
+   */
+  private buildContext(): EditorContext {
+    // biome-ignore lint/complexity/noThisInStatic: closure over the instance.
+    const self = this;
+    return {
+      host: self.host,
+      selection: self.selection,
+      registry: self.registry,
+      history: self.history,
+      ydoc: self.ydoc,
+      blobStore: self.blobStore,
+      blobCache: self.blobCache,
+      fontFaces: self.fontFaces,
+      get doc() {
+        return self.doc;
+      },
+      setDoc(doc) {
+        self.doc = doc;
+      },
+      getContentHosts: () => self.getContentHosts(),
+      _hosts: () => self._hosts(),
+      get trackChanges() {
+        return self.trackChanges;
+      },
+      setTrackChangesRaw(state) {
+        self.trackChanges = state;
+      },
+      get lastPartRefs() {
+        return self.lastPartRefs;
+      },
+      setLastPartRefs(refs) {
+        self.lastPartRefs = refs;
+      },
+      pendingPartRefMigrations: self.pendingPartRefMigrations,
+      commit: <T = void>(
+        update: Partial<SobreeDocument>,
+        mutations: readonly Mutation[],
+        value?: T,
+        reason?: string,
+      ) => self.commit<T>(update, mutations, value, reason),
+      ensureCurrent: () => self.ensureCurrent(),
+      syncFromDom: () => self.syncFromDom(),
+      checkRefs: (refs) => self.checkRefs(refs),
+      checkRange: (range, expect) => self.checkRange(range, expect),
+      emitChangeNow: () => self.emitChangeNow(),
+      mirrorToYDoc: () => self.mirrorToYDoc(),
+      scheduleChange: () => self.scheduleChange(),
+      setDomDirty: (value) => {
+        self.domDirty = value;
+      },
+    };
   }
 
   /**
@@ -771,47 +839,26 @@ export class Editor {
 
   /** Render current document to an HTML string. */
   toHtml(): string {
-    const scratch = document.createElement("div");
-    renderSobreeDocument(this.syncFromDom(), scratch);
-    return scratch.innerHTML;
+    return query.toHtml(this.ctx);
   }
 
   // === block-level queries ===
 
   getBlocks(): BlockInfo[] {
-    const doc = this.ensureCurrent();
-    return doc.body.map((block, index) => this.summariseBlock(block, index));
+    return query.getBlocks(this.ctx);
   }
 
   getBlock(index: number): BlockInfo {
-    const blocks = this.getBlocks();
-    const b = blocks[index];
-    if (!b) throw new Error(`block index ${index} out of range`);
-    return b;
+    return query.getBlock(this.ctx, index);
   }
 
   /** Same summary, looked up by stable id. Returns `null` if unknown. */
   getBlockById(id: string): BlockInfo | null {
-    const index = this.registry.indexOf(id);
-    if (index < 0) return null;
-    return this.getBlock(index);
+    return query.getBlockById(this.ctx, id);
   }
 
   getOutline(): OutlineItem[] {
-    const doc = this.ensureCurrent();
-    const out: OutlineItem[] = [];
-    doc.body.forEach((block, index) => {
-      if (block.kind !== "paragraph") return;
-      const level = headingLevelOf(block);
-      if (!level) return;
-      out.push({
-        level,
-        text: runsToText(block.runs),
-        blockIndex: index,
-        block: this.registry.refAt(index),
-      });
-    });
-    return out;
+    return query.getOutline(this.ctx);
   }
 
   // === core mutations (BlockRef / Position / Range in; EditResult out) ===
@@ -1620,20 +1667,12 @@ export class Editor {
 
   /** Re-lookup the block by id to get a fresh `BlockRef` (current version). */
   private refreshedPosition(at: InlinePosition): InlinePosition | null {
-    const info = this.getBlockById(at.block.id);
-    if (!info) return null;
-    return { block: { id: info.id, version: info.version }, offset: at.offset };
+    return query.refreshedPosition(this.ctx, at);
   }
 
   /** Place the caret at `(blockId, offset)` using a fresh block ref. */
   private placeCaret(blockId: string, offset: number): void {
-    const info = this.getBlockById(blockId);
-    if (!info) return;
-    const clamped = Math.max(0, Math.min(offset, info.length));
-    this.selection.set({
-      kind: "caret",
-      at: { block: { id: info.id, version: info.version }, offset: clamped },
-    });
+    query.placeCaret(this.ctx, blockId, offset);
   }
 
   /**
@@ -2389,24 +2428,12 @@ export class Editor {
 
   /** Mark comment `id` resolved (`Comment.done = true`). */
   resolveComment(id: number): EditResult<void> {
-    return this.setCommentDone(id, true);
+    return comments.resolveComment(this.ctx, id);
   }
 
   /** Re-open a resolved comment `id` (`Comment.done = false`). */
   reopenComment(id: number): EditResult<void> {
-    return this.setCommentDone(id, false);
-  }
-
-  private setCommentDone(id: number, done: boolean): EditResult<void> {
-    this.ensureCurrent();
-    const comments = this.doc.comments;
-    const target = comments?.[id];
-    if (!comments || !target) {
-      return fail({ code: "invalid-state", details: `no comment with id ${id}` });
-    }
-    const nextComments = { ...comments, [id]: { ...target, done } };
-    // No block bumps — comments live outside the body registry.
-    return this.commit({ comments: nextComments }, []);
+    return comments.reopenComment(this.ctx, id);
   }
 
   // === AtSelection sugar — DOM-aware convenience wrappers ===
@@ -2918,38 +2945,6 @@ export class Editor {
         console.error("[sobree] keydown listener threw:", err);
       }
     }
-  }
-
-  private summariseBlock(block: Block, index: number): BlockInfo {
-    const ref = this.registry.refAt(index);
-    const baseInfo = {
-      index,
-      id: ref.id,
-      version: ref.version,
-    };
-    if (block.kind === "paragraph") {
-      const info: BlockInfo = {
-        ...baseInfo,
-        kind: "paragraph",
-        text: runsToText(block.runs),
-        length: runsLength(block.runs),
-      };
-      if (block.properties.styleId) info.styleId = block.properties.styleId;
-      if (block.properties.alignment) info.alignment = block.properties.alignment;
-      return info;
-    }
-    if (block.kind === "table") {
-      const firstCell = block.rows[0]?.cells[0];
-      const firstPara = firstCell?.content.find((b): b is Paragraph => b.kind === "paragraph");
-      const preview = firstPara ? runsToText(firstPara.runs) : "";
-      return {
-        ...baseInfo,
-        kind: "table",
-        text: preview,
-        length: 0,
-      };
-    }
-    return { ...baseInfo, kind: block.kind, text: "", length: 0 };
   }
 
   // === clipboard / drag-drop image insertion ===
