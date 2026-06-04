@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Mission
+
+**Sobree is the best free WYSIWYG print-view-first native OOXML viewer and editor, with an API-based interface for the AI era.**
+
 Guidance for AI coding agents and humans working on this repo.
 
 ## Rule 0 — How we work
