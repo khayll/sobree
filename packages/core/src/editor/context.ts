@@ -40,6 +40,10 @@ export interface EditorContext {
   readonly doc: SobreeDocument;
   /** Replace the cached document wholesale (rare — most paths use `commit`). */
   setDoc(doc: SobreeDocument): void;
+  /** Full document replace: reset registry, re-render, mirror, emit change. */
+  setDocument(doc: SobreeDocument): void;
+  /** Re-render the current `doc` into the hosts (no selection restore, no emit). */
+  renderCurrent(): void;
   /** The content host(s) the renderer paints into (may differ from `host`). */
   getContentHosts(): HTMLElement[];
   /** The host(s) a DOM selection may live in. */
@@ -65,10 +69,7 @@ export interface EditorContext {
   ensureCurrent(): SobreeDocument;
   syncFromDom(): SobreeDocument;
   checkRefs(refs: readonly BlockRef[]): EditResult<never> | null;
-  checkRange(
-    range: ApiRange,
-    expect: Record<string, number> | undefined,
-  ): EditResult<never> | null;
+  checkRange(range: ApiRange, expect: Record<string, number> | undefined): EditResult<never> | null;
   emitChangeNow(): void;
   mirrorToYDoc(): void;
   scheduleChange(): void;

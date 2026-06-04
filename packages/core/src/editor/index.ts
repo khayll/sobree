@@ -1,32 +1,18 @@
 import "./editor.css";
 import * as Y from "yjs";
-import { BlobCache, type BlobStore, sha256Hex } from "../blob";
+import { BlobCache, type BlobStore } from "../blob";
 import {
-  applyDocumentToYDoc,
-  applyPartRefsToYDoc,
-  projectYDoc,
-  seedYDoc,
-  Y_PARTS_KEY,
-} from "../ydoc";
-import {
+  type Range as ApiRange,
   type BlockRef,
   type EditError,
   type EditResult,
   type InlinePosition,
-  type Range as ApiRange,
   type Selection,
   fail,
   lockConflict,
   ok,
 } from "../doc/api";
 import { emptyDocument } from "../doc/builders";
-import { pruneOrphanParts } from "../doc/parts";
-import {
-  type EmbedFontFaces,
-  type EmbedFontOptions,
-  embedFontIntoDoc,
-  removeFontFromDoc,
-} from "../fonts";
 import {
   type RunPropertiesPatch,
   applyRunPropertiesToRuns,
@@ -47,6 +33,13 @@ import type {
   TableCell,
   TableRow,
 } from "../doc/types";
+import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
+import { FontFaceRegistry } from "../fonts";
+import { History } from "../history";
+import { MARK_COMMAND_DEFS, isMarkActive, rangeAtSelection, toggleMark } from "../plugins/marks";
+import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
+import { EditorCommands } from "./commands";
+import type { EditorContext } from "./context";
 import { BlockRegistry } from "./internal/blockRegistry";
 import {
   type Mutation,
@@ -58,39 +51,19 @@ import {
   removedSectionIndex,
   wrapTagToPatch,
 } from "./internal/mutations";
-import {
-  applySelectionToDom,
-  blockElementAtIndex,
-  countBlocks,
-} from "./internal/positionMap";
-import { EditorTable } from "./table";
-import { renderSobreeDocument } from "./view/docRenderer/index";
-import { FontFaceRegistry } from "../fonts";
-import { History } from "../history";
-import {
-  MARK_COMMAND_DEFS,
-  isMarkActive,
-  rangeAtSelection,
-  toggleMark,
-} from "../plugins/marks";
-import { serializeHostsToDocument } from "./view/docSerialize/index";
-import { attachImageResize } from "./view/imageResize";
-import { EditorCommands } from "./commands";
-import type { EditorContext } from "./context";
+import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import * as comments from "./ops/comments";
+import * as parts from "./ops/parts";
 import * as query from "./query";
 import { EditorSelection } from "./selection";
+import { EditorTable } from "./table";
+import { renderSobreeDocument } from "./view/docRenderer/index";
+import { serializeHostsToDocument } from "./view/docSerialize/index";
+import { attachImageResize } from "./view/imageResize";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
 export { EditorCommands } from "./commands";
 export { EditorSelection } from "./selection";
-import {
-  decideFormatRun,
-  decideRevisionRun,
-  snapshotFormatRevision,
-  stampDeleteRevision,
-  stampInsertRevision,
-} from "./revisionRuns";
 import {
   caretRangeFromPoint,
   closestBlockElement,
@@ -99,6 +72,13 @@ import {
   readImageDimensions,
   unwrap,
 } from "./dom";
+import {
+  decideFormatRun,
+  decideRevisionRun,
+  snapshotFormatRevision,
+  stampDeleteRevision,
+  stampInsertRevision,
+} from "./revisionRuns";
 
 // === exported types ===
 
@@ -352,38 +332,9 @@ export class Editor {
     this.blobCache = this.blobStore
       ? new BlobCache({
           store: this.blobStore,
-          onResolved: (hash) => this.onBlobResolved(hash),
+          onResolved: (hash) => parts.onBlobResolved(this.ctx, hash),
         })
       : null;
-
-    // Two construction paths:
-    //
-    //   A. The provided Y.Doc is empty (or none was provided): seed it
-    //      from `initialDocument` (or the empty doc). This is the v0.1
-    //      default — solo embedder, no provider yet.
-    //
-    //   B. The provided Y.Doc has body content already: adopt its
-    //      state instead of seeding. This is the "peer joined an
-    //      active room" scenario — Phase 2's providers populate the
-    //      Y.Doc *before* the Editor is constructed, and we trust
-    //      whatever's there.
-    const ydocBody = this.ydoc.getArray<Y.Map<unknown>>("body");
-    if (ydocBody.length === 0) {
-      // Path A: seed.
-      this.doc = options.initialDocument ?? emptyDocument();
-      this.registry.reset(this.doc.body.length);
-      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
-      seedYDoc(this.ydoc, this.doc, this.allBlockIds());
-      this.lastPartRefs = {};
-    } else {
-      // Path B: adopt.
-      const projected = projectYDoc(this.ydoc);
-      this.doc = projected.doc;
-      this.registry.adoptIds(projected.ids);
-      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
-      this.lastPartRefs = projected.partRefs;
-      this.resolveCachedPartRefsInto(this.doc);
-    }
 
     this.selection = new EditorSelection(this);
     this.table = new EditorTable(this);
@@ -410,6 +361,36 @@ export class Editor {
     });
 
     this.ctx = this.buildContext();
+
+    // Two construction paths (run after the context exists so the adopt
+    // path can resolve cached part refs through it):
+    //
+    //   A. The provided Y.Doc is empty (or none was provided): seed it
+    //      from `initialDocument` (or the empty doc). This is the v0.1
+    //      default — solo embedder, no provider yet.
+    //
+    //   B. The provided Y.Doc has body content already: adopt its
+    //      state instead of seeding. This is the "peer joined an
+    //      active room" scenario — Phase 2's providers populate the
+    //      Y.Doc *before* the Editor is constructed, and we trust
+    //      whatever's there.
+    const ydocBody = this.ydoc.getArray<Y.Map<unknown>>("body");
+    if (ydocBody.length === 0) {
+      // Path A: seed.
+      this.doc = options.initialDocument ?? emptyDocument();
+      this.registry.reset(this.doc.body.length);
+      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
+      seedYDoc(this.ydoc, this.doc, this.allBlockIds());
+      this.lastPartRefs = {};
+    } else {
+      // Path B: adopt.
+      const projected = projectYDoc(this.ydoc);
+      this.doc = projected.doc;
+      this.registry.adoptIds(projected.ids);
+      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
+      this.lastPartRefs = projected.partRefs;
+      parts.resolveCachedPartRefsInto(this.ctx, this.doc);
+    }
 
     // `history.undo` / `history.redo` registered on the command bus
     // here (NOT in the keyboard plugin) so a headless caller — agent,
@@ -589,6 +570,8 @@ export class Editor {
       setDoc(doc) {
         self.doc = doc;
       },
+      setDocument: (doc) => self.setDocument(doc),
+      renderCurrent: () => self.renderCurrent(),
       getContentHosts: () => self.getContentHosts(),
       _hosts: () => self._hosts(),
       get trackChanges() {
@@ -637,11 +620,9 @@ export class Editor {
     // Resolve hash-addressed parts through the local cache. Hashes
     // not yet cached: kick off background fetches; `onBlobResolved`
     // patches + re-renders when they land.
-    this.resolveCachedPartRefsInto(this.doc);
+    parts.resolveCachedPartRefsInto(this.ctx, this.doc);
     if (this.blobCache) {
-      const missing = Object.values(projected.partRefs).filter(
-        (h) => !this.blobCache!.has(h),
-      );
+      const missing = Object.values(projected.partRefs).filter((h) => !this.blobCache!.has(h));
       if (missing.length > 0) {
         void this.blobCache.ensureLoaded(missing);
       }
@@ -661,59 +642,14 @@ export class Editor {
    * is owned by the caller. Missing hashes stay out of `rawParts`;
    * the renderer handles missing parts gracefully (placeholder).
    */
-  private resolveCachedPartRefsInto(doc: SobreeDocument): void {
-    if (!this.blobCache) return;
-    for (const [path, hash] of Object.entries(this.lastPartRefs)) {
-      if (doc.rawParts[path]) continue; // inline-parts entry wins if both present
-      const bytes = this.blobCache.get(hash);
-      if (bytes) doc.rawParts[path] = bytes;
-    }
-  }
-
   /**
-   * Callback fired by the BlobCache when a background fetch lands.
-   * Walks `lastPartRefs` to find which paths reference this hash,
-   * patches `this.doc.rawParts`, and re-renders so the user sees
-   * the part appear.
+   * Wait for every currently-referenced binary part to be available in
+   * the local cache. Useful before `toDocx()` so the exported file
+   * contains all images / fonts. Resolves immediately when no
+   * `blobStore` is configured (bytes are always inline).
    */
-  private onBlobResolved(hash: string): void {
-    if (!this.blobCache) return;
-    let touched = false;
-    for (const [path, refHash] of Object.entries(this.lastPartRefs)) {
-      if (refHash !== hash) continue;
-      const bytes = this.blobCache.get(hash);
-      if (bytes && !this.doc.rawParts[path]) {
-        this.doc.rawParts[path] = bytes;
-        touched = true;
-      }
-    }
-    if (!touched) return;
-    // Re-render so the renderer picks up the freshly-resolved part.
-    // This is a full re-render; future Phase 3.2.x can scope it to
-    // just the affected images / fonts.
-    const hosts = this.getContentHosts();
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.host;
-    this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
-    this.emitChangeNow();
-  }
-
-  /**
-   * Wait for every currently-referenced binary part to be available
-   * in the local cache. Useful before `toDocx()` so the exported
-   * file contains all images / fonts.
-   *
-   * Returns a resolved Promise immediately when no `blobStore` is
-   * configured (today's default — bytes are always inline).
-   */
-  async ensurePartsLoaded(): Promise<void> {
-    if (!this.blobCache) return;
-    const hashes = Object.values(this.lastPartRefs);
-    if (hashes.length === 0) return;
-    await this.blobCache.ensureLoaded(hashes);
-    // After fetches land, re-resolve into `this.doc`.
-    this.resolveCachedPartRefsInto(this.doc);
+  ensurePartsLoaded(): Promise<void> {
+    return parts.ensurePartsLoaded(this.ctx);
   }
 
   // === primary document I/O ===
@@ -747,16 +683,24 @@ export class Editor {
     this.doc = doc;
     this.registry.reset(doc.body.length);
     this.lastSerialisedBlocks = doc.body.map((b) => JSON.stringify(b));
-    const hosts = this.getContentHosts();
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.host;
-    // Sync `@font-face` registrations BEFORE rendering so newly-embedded
-    // fonts are already available to the render pass.
-    this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
+    this.renderCurrent();
     this.domDirty = false;
     this.mirrorToYDoc();
     this.emitChangeNow();
+  }
+
+  /**
+   * Re-render the current `doc` into the content hosts. Syncs
+   * `@font-face` registrations BEFORE rendering so newly-embedded fonts
+   * are available to the render pass. No selection restore, no change
+   * emit — callers sequence those.
+   */
+  private renderCurrent(): void {
+    const hosts = this.getContentHosts();
+    for (const h of hosts) h.replaceChildren();
+    const firstHost = hosts[0] ?? this.host;
+    this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
+    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
   }
 
   /**
@@ -769,52 +713,21 @@ export class Editor {
    * in-memory across many edits.
    */
   pruneUnusedParts(): { kept: number; pruned: string[] } {
-    const { doc, kept, pruned } = pruneOrphanParts(this.doc);
-    if (pruned.length === 0) return { kept, pruned };
-    this.doc = doc;
-    this.mirrorToYDoc();
-    return { kept, pruned };
+    return parts.pruneUnusedParts(this.ctx);
   }
 
   /**
-   * Embed a TTF/OTF font into the document. Thin wrapper around
-   * `embedFontIntoDoc()` from the fonts module — handles the
-   * setDocument round so the renderer + `@font-face` registry pick
-   * up the new face automatically.
-   *
-   * Refuses (with a warning) when the font's OS/2 `fsType` field
-   * marks it as restricted, unless `opts.allowRestricted` is true.
-   * Pass any subset of {regular, bold, italic, boldItalic}; missing
-   * faces are simply not embedded.
+   * Embed a TTF/OTF font into the document. Refuses (with a warning)
+   * restricted fonts unless `opts.allowRestricted` is true. Pass any
+   * subset of {regular, bold, italic, boldItalic}; missing faces are
+   * simply not embedded.
    */
   embedFont(
     name: string,
     faces: EmbedFontFaces,
     opts: EmbedFontOptions = {},
   ): { warnings: string[] } {
-    const before = this.doc.rawParts;
-    const result = embedFontIntoDoc(this.doc, name, faces, opts);
-    if (result.next !== this.doc) {
-      // Diff which part paths the font module just added — they're
-      // candidates for migration to the BlobStore (Phase 3.2+).
-      const addedPartPaths: Array<{ path: string; bytes: Uint8Array }> = [];
-      if (this.blobStore && this.blobCache) {
-        for (const [path, bytes] of Object.entries(result.next.rawParts)) {
-          if (!before[path]) addedPartPaths.push({ path, bytes });
-        }
-        for (const { path } of addedPartPaths) {
-          this.pendingPartRefMigrations.add(path);
-        }
-      }
-      this.setDocument(result.next);
-      // Fire migrations AFTER setDocument so the partPath is
-      // already in `lastPartRefs`-adjacent state. Errors are logged
-      // inside migratePartToBlobStore.
-      for (const { path, bytes } of addedPartPaths) {
-        void this.migratePartToBlobStore(path, bytes);
-      }
-    }
-    return { warnings: result.warnings };
+    return parts.embedFont(this.ctx, name, faces, opts);
   }
 
   /**
@@ -823,8 +736,7 @@ export class Editor {
    * (or just export) to GC them.
    */
   removeEmbeddedFont(name: string): void {
-    const next = removeFontFromDoc(this.doc, name);
-    if (next !== this.doc) this.setDocument(next);
+    parts.removeEmbeddedFont(this.ctx, name);
   }
 
   /** Monotonic counter bumped on each `change` event. */
@@ -878,7 +790,10 @@ export class Editor {
     // survive.
     const update: Partial<SobreeDocument> = { body: next };
     if (wasSectionBreak && block.kind !== "section_break") {
-      update.sections = mergeSectionsAcross(this.doc.sections, removedSectionIndex(this.doc.body, index));
+      update.sections = mergeSectionsAcross(
+        this.doc.sections,
+        removedSectionIndex(this.doc.body, index),
+      );
     }
     return this.commit(update, [{ type: "bump", index }]);
   }
@@ -940,10 +855,7 @@ export class Editor {
     if (this.trackChanges.enabled && current?.kind === "paragraph") {
       const existing = current.properties.revision;
       // Cancelling own pending ins → actually remove.
-      if (
-        existing?.type === "ins" &&
-        existing.author === this.trackChanges.author
-      ) {
+      if (existing?.type === "ins" && existing.author === this.trackChanges.author) {
         // fall through to plain remove below
       } else {
         const revision: RevisionMark =
@@ -965,7 +877,10 @@ export class Editor {
     if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
     const update: Partial<SobreeDocument> = { body: next };
     if (wasSectionBreak) {
-      update.sections = mergeSectionsAcross(this.doc.sections, removedSectionIndex(this.doc.body, index));
+      update.sections = mergeSectionsAcross(
+        this.doc.sections,
+        removedSectionIndex(this.doc.body, index),
+      );
     }
     return this.commit(update, [{ type: "remove", index }]);
   }
@@ -988,10 +903,7 @@ export class Editor {
   }
 
   /** Merge a patch into each target paragraph's properties. */
-  applyBlockProperties(
-    targets: BlockRef[],
-    patch: ParagraphPropertiesPatch,
-  ): EditResult<void> {
+  applyBlockProperties(targets: BlockRef[], patch: ParagraphPropertiesPatch): EditResult<void> {
     this.ensureCurrent();
     const lockCheck = this.checkRefs(targets);
     if (lockCheck) return lockCheck;
@@ -1169,7 +1081,7 @@ export class Editor {
     if (this.blobStore && this.blobCache) {
       this.pendingPartRefMigrations.add(partPath);
       // Fire-and-forget background migration. Errors are logged inside.
-      void this.migratePartToBlobStore(partPath, bytes);
+      void parts.migratePartToBlobStore(this.ctx, partPath, bytes);
     }
     const widthPx = opts.widthPx ?? 200;
     const heightPx = opts.heightPx ?? 150;
@@ -1205,10 +1117,7 @@ export class Editor {
    * intermediate paragraphs are removed outright and the first +
    * last blocks merge into one.
    */
-  deleteRange(
-    range: ApiRange,
-    opts: { expect?: Record<string, number> } = {},
-  ): EditResult<void> {
+  deleteRange(range: ApiRange, opts: { expect?: Record<string, number> } = {}): EditResult<void> {
     this.ensureCurrent();
     const lockCheck = this.checkRange(range, opts.expect);
     if (lockCheck) return lockCheck;
@@ -1251,20 +1160,14 @@ export class Editor {
       let newRuns: InlineRun[];
       if (i === fromIdx) {
         const split = splitRunsAt(block.runs, range.from.offset);
-        const tailStamped = split.after.flatMap((r) =>
-          stampDeleteRevision(r, author),
-        );
+        const tailStamped = split.after.flatMap((r) => stampDeleteRevision(r, author));
         newRuns = mergeAdjacentTextRuns([...split.before, ...tailStamped]);
       } else if (i === toIdx) {
         const split = splitRunsAt(block.runs, range.to.offset);
-        const headStamped = split.before.flatMap((r) =>
-          stampDeleteRevision(r, author),
-        );
+        const headStamped = split.before.flatMap((r) => stampDeleteRevision(r, author));
         newRuns = mergeAdjacentTextRuns([...headStamped, ...split.after]);
       } else {
-        newRuns = mergeAdjacentTextRuns(
-          block.runs.flatMap((r) => stampDeleteRevision(r, author)),
-        );
+        newRuns = mergeAdjacentTextRuns(block.runs.flatMap((r) => stampDeleteRevision(r, author)));
       }
 
       let nextBlock: Paragraph = { ...block, runs: newRuns };
@@ -1304,7 +1207,10 @@ export class Editor {
     const first = this.doc.body[fromIdx];
     const last = this.doc.body[toIdx];
     if (!first || first.kind !== "paragraph" || !last || last.kind !== "paragraph") {
-      return fail({ code: "invalid-state", details: "cross-block delete requires paragraph endpoints" });
+      return fail({
+        code: "invalid-state",
+        details: "cross-block delete requires paragraph endpoints",
+      });
     }
     const head = splitRunsAt(first.runs, range.from.offset).before;
     const tail = splitRunsAt(last.runs, range.to.offset).after;
@@ -1351,8 +1257,7 @@ export class Editor {
    */
   setTrackChanges(state: TrackChangesState): void {
     const same =
-      this.trackChanges.enabled === state.enabled &&
-      this.trackChanges.author === state.author;
+      this.trackChanges.enabled === state.enabled && this.trackChanges.author === state.author;
     if (same) return;
     this.trackChanges = { ...state };
     for (const cb of this.listeners["track-changes-change"]) {
@@ -1442,11 +1347,7 @@ export class Editor {
         // their own un-committed split rather than layering del on
         // top of ins. Same intuition as the inline "own ins" cancel
         // path in `stampDeleteRevision`.
-        if (
-          this.trackChanges.enabled &&
-          sel.kind === "caret" &&
-          sel.at.offset === 0
-        ) {
+        if (this.trackChanges.enabled && sel.kind === "caret" && sel.at.offset === 0) {
           const idx = this.registry.indexOf(sel.at.block.id);
           if (idx > 0) {
             const result = this.markParagraphBreakForDelete(idx);
@@ -1777,9 +1678,7 @@ export class Editor {
     this.ensureCurrent();
     const lockCheck = this.checkRange(range, opts.expect);
     if (lockCheck) return lockCheck;
-    return this.mutateRunsInRange(range, (runs) =>
-      runs.map((r) => decideFormatRun(r, "accept")),
-    );
+    return this.mutateRunsInRange(range, (runs) => runs.map((r) => decideFormatRun(r, "accept")));
   }
 
   /**
@@ -1794,9 +1693,7 @@ export class Editor {
     this.ensureCurrent();
     const lockCheck = this.checkRange(range, opts.expect);
     if (lockCheck) return lockCheck;
-    return this.mutateRunsInRange(range, (runs) =>
-      runs.map((r) => decideFormatRun(r, "reject")),
-    );
+    return this.mutateRunsInRange(range, (runs) => runs.map((r) => decideFormatRun(r, "reject")));
   }
 
   /**
@@ -1954,8 +1851,7 @@ export class Editor {
       // Peer's revision — leave it alone.
       return ok<void>(undefined as void, []);
     }
-    const revision: RevisionMark =
-      author === undefined ? { type: "del" } : { type: "del", author };
+    const revision: RevisionMark = author === undefined ? { type: "del" } : { type: "del", author };
     const next = this.doc.body.slice();
     next[index] = {
       ...block,
@@ -2127,11 +2023,7 @@ export class Editor {
    * paragraph-mark first, then coalesced inline ins/del spans, then
    * coalesced format-change spans.
    */
-  private collectParagraphRevisions(
-    block: Paragraph,
-    ref: BlockRef,
-    out: RevisionSpan[],
-  ): void {
+  private collectParagraphRevisions(block: Paragraph, ref: BlockRef, out: RevisionSpan[]): void {
     const length = runsLength(block.runs);
 
     // Paragraph-mark
@@ -2154,13 +2046,15 @@ export class Editor {
     // because the loop manages its own open/openFmt state machines.
     let offset = 0;
     let open: {
-      start: number; end: number;
+      start: number;
+      end: number;
       author: string | undefined;
       kinds: Set<"ins" | "del">;
       date: string | undefined;
     } | null = null;
     let openFmt: {
-      start: number; end: number;
+      start: number;
+      end: number;
       author: string | undefined;
       date: string | undefined;
     } | null = null;
@@ -2202,7 +2096,8 @@ export class Editor {
         } else {
           flush();
           open = {
-            start: offset, end: offset + len,
+            start: offset,
+            end: offset + len,
             author: rev.author,
             kinds: new Set<"ins" | "del">([rev.type]),
             date: rev.date,
@@ -2379,50 +2274,52 @@ export class Editor {
     author: string | undefined,
   ): { next: Table; changed: boolean } {
     let anyChanged = false;
-    const nextRows = table.rows.map((row: TableRow): TableRow => ({
-      ...row,
-      cells: row.cells.map((cell: TableCell): TableCell => {
-        let cellChanged = false;
-        const nextContent: Block[] = cell.content.map((inner: Block): Block => {
-          if (inner.kind !== "paragraph") return inner;
-          let pChanged = false;
-          const newRuns = inner.runs.flatMap((r) => {
-            let next: InlineRun = r;
-            const rev = r.kind === "text" ? r.properties.revision : undefined;
-            if (rev && (author === undefined || rev.author === author)) {
-              const decided = decideRevisionRun(next, decision);
+    const nextRows = table.rows.map(
+      (row: TableRow): TableRow => ({
+        ...row,
+        cells: row.cells.map((cell: TableCell): TableCell => {
+          let cellChanged = false;
+          const nextContent: Block[] = cell.content.map((inner: Block): Block => {
+            if (inner.kind !== "paragraph") return inner;
+            let pChanged = false;
+            const newRuns = inner.runs.flatMap((r) => {
+              let next: InlineRun = r;
+              const rev = r.kind === "text" ? r.properties.revision : undefined;
+              if (rev && (author === undefined || rev.author === author)) {
+                const decided = decideRevisionRun(next, decision);
+                pChanged = true;
+                if (decided.length === 0) return decided;
+                next = decided[0]!;
+              }
+              const rf = next.kind === "text" ? next.properties.revisionFormat : undefined;
+              if (rf && (author === undefined || rf.author === author)) {
+                next = decideFormatRun(next, decision);
+                pChanged = true;
+              }
+              return [next];
+            });
+            let nextPara: Paragraph = pChanged
+              ? { ...inner, runs: mergeAdjacentTextRuns(newRuns) }
+              : inner;
+            // Paragraph-mark — strip-as-fallback only. v1 doesn't merge
+            // cell paragraphs across boundaries.
+            const pRev = inner.properties.revision;
+            if (pRev && (author === undefined || pRev.author === author)) {
+              const { revision: _strip, ...rest } = nextPara.properties;
+              nextPara = { ...nextPara, properties: rest };
               pChanged = true;
-              if (decided.length === 0) return decided;
-              next = decided[0]!;
             }
-            const rf = next.kind === "text" ? next.properties.revisionFormat : undefined;
-            if (rf && (author === undefined || rf.author === author)) {
-              next = decideFormatRun(next, decision);
-              pChanged = true;
+            if (pChanged) {
+              cellChanged = true;
+              anyChanged = true;
             }
-            return [next];
+            return nextPara;
           });
-          let nextPara: Paragraph = pChanged
-            ? { ...inner, runs: mergeAdjacentTextRuns(newRuns) }
-            : inner;
-          // Paragraph-mark — strip-as-fallback only. v1 doesn't merge
-          // cell paragraphs across boundaries.
-          const pRev = inner.properties.revision;
-          if (pRev && (author === undefined || pRev.author === author)) {
-            const { revision: _strip, ...rest } = nextPara.properties;
-            nextPara = { ...nextPara, properties: rest };
-            pChanged = true;
-          }
-          if (pChanged) {
-            cellChanged = true;
-            anyChanged = true;
-          }
-          return nextPara;
-        });
-        if (!cellChanged) return cell;
-        return { ...cell, content: nextContent };
+          if (!cellChanged) return cell;
+          return { ...cell, content: nextContent };
+        }),
       }),
-    }));
+    );
     return { next: anyChanged ? { ...table, rows: nextRows } : table, changed: anyChanged };
   }
 
@@ -2624,7 +2521,10 @@ export class Editor {
     if (fromIdx === toIdx) {
       const block = nextBody[fromIdx];
       if (!block || block.kind !== "paragraph") {
-        return fail({ code: "invalid-state", details: `block ${range.from.block.id} not a paragraph` });
+        return fail({
+          code: "invalid-state",
+          details: `block ${range.from.block.id} not a paragraph`,
+        });
       }
       if (range.from.offset === range.to.offset) {
         return fail({ code: "range-empty", details: "zero-width range" });
@@ -2666,7 +2566,7 @@ export class Editor {
     update: Partial<SobreeDocument>,
     mutations: readonly Mutation[],
     value?: T,
-    _reason: string = "commit",
+    _reason = "commit",
   ): EditResult<T> {
     const savedSelection = this.selection.get();
 
@@ -2812,7 +2712,7 @@ export class Editor {
     // mirrored inline — that would re-introduce the bytes into the
     // Y.Doc. Without a BlobStore, the skip set is empty and behavior
     // is identical to today.
-    const skip = this.computePartPathSkipSet();
+    const skip = parts.computePartPathSkipSet(this.ctx);
     applyDocumentToYDoc(
       this.ydoc,
       this.doc,
@@ -2820,64 +2720,6 @@ export class Editor {
       "local",
       skip ? { skipPartPaths: skip } : {},
     );
-  }
-
-  /**
-   * Returns the set of part paths that mirror should NOT write
-   * inline — they're (or will soon be) tracked via the partRefs
-   * Y.Map instead. Returns `undefined` when there's nothing to skip
-   * (the common no-BlobStore case) so the mirror takes its
-   * fastest path.
-   */
-  private computePartPathSkipSet(): ReadonlySet<string> | undefined {
-    if (this.pendingPartRefMigrations.size === 0) {
-      const refKeys = Object.keys(this.lastPartRefs);
-      if (refKeys.length === 0) return undefined;
-      return new Set(refKeys);
-    }
-    const out = new Set<string>(Object.keys(this.lastPartRefs));
-    for (const p of this.pendingPartRefMigrations) out.add(p);
-    return out;
-  }
-
-  /**
-   * Background migrate inline part bytes into the BlobStore. Called
-   * by mutators (`insertImage`, `embedFont`) when a `BlobStore` is
-   * configured. The local `doc.rawParts` keeps its inline copy so
-   * the renderer stays synchronous; the Y.Doc gets a `partRefs`
-   * entry referencing the BlobStore content hash, and any stale
-   * `parts` entry is deleted.
-   *
-   * Robust against errors: an upload failure logs and leaves the
-   * path in the pending set so a future call can retry. The local
-   * renderer is unaffected (bytes are still in `doc.rawParts`).
-   */
-  private async migratePartToBlobStore(
-    partPath: string,
-    bytes: Uint8Array,
-  ): Promise<void> {
-    if (!this.blobStore || !this.blobCache) return;
-    this.pendingPartRefMigrations.add(partPath);
-    try {
-      const hash = await sha256Hex(bytes);
-      this.blobCache.put(hash, bytes);
-      await this.blobStore.put(bytes);
-      this.ydoc.transact(() => {
-        // Write the partRef (the new authoritative reference).
-        applyPartRefsToYDoc(this.ydoc, { [partPath]: hash }, "local");
-        // Delete any stale inline parts entry. The mirror's skip set
-        // will prevent re-introducing it.
-        this.ydoc.getMap<Uint8Array>(Y_PARTS_KEY).delete(partPath);
-      }, "local");
-      this.lastPartRefs = { ...this.lastPartRefs, [partPath]: hash };
-    } catch (err) {
-      console.error(
-        `[sobree] failed to migrate part ${partPath} to BlobStore:`,
-        err,
-      );
-    } finally {
-      this.pendingPartRefMigrations.delete(partPath);
-    }
   }
 
   /**
@@ -3071,9 +2913,7 @@ export class Editor {
   }
 }
 
-
 // === helpers ===
-
 
 /**
  * Strip binary `rawParts` from a document before emitting on the event
