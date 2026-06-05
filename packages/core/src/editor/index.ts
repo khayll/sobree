@@ -22,6 +22,7 @@ import { MARK_COMMAND_DEFS, isMarkActive, rangeAtSelection, toggleMark } from ".
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
 import { EditorCommands } from "./commands";
 import type { EditorContext } from "./context";
+import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
@@ -186,17 +187,9 @@ export class Editor {
   private dragOverListener: ((e: DragEvent) => void) | null = null;
   private dropListener: ((e: DragEvent) => void) | null = null;
   private revision = 0;
-  private readonly listeners: {
-    change: Set<(p: ChangePayload) => void>;
-    selection: Set<(p: SelectionPayload) => void>;
-    keydown: Set<(p: KeyDownPayload) => void>;
-    "track-changes-change": Set<(p: TrackChangesState) => void>;
-  } = {
-    change: new Set(),
-    selection: new Set(),
-    keydown: new Set(),
-    "track-changes-change": new Set(),
-  };
+  /** The editor's observable event surface (change / selection / keydown
+   *  / track-changes-change). See `./events.ts`. */
+  private readonly events = new EditorEvents();
   /**
    * Authoring mode for revisions. Off by default — mutations apply
    * plainly. On, `insertRun` / `deleteRange` route through
@@ -879,13 +872,7 @@ export class Editor {
       this.trackChanges.enabled === state.enabled && this.trackChanges.author === state.author;
     if (same) return;
     this.trackChanges = { ...state };
-    for (const cb of this.listeners["track-changes-change"]) {
-      try {
-        cb({ ...this.trackChanges });
-      } catch (err) {
-        console.error("[editor] track-changes-change listener threw:", err);
-      }
-    }
+    this.events.emitTrackChanges({ ...this.trackChanges });
   }
 
   // === tracked changes & comments — review actions ===
@@ -1016,9 +1003,7 @@ export class Editor {
   // === events + lifecycle ===
 
   on<E extends EditorEvent>(event: E, cb: (p: EditorEventPayload[E]) => void): Unsubscribe {
-    const set = this.listeners[event] as Set<(p: EditorEventPayload[E]) => void>;
-    set.add(cb);
-    return () => set.delete(cb);
+    return this.events.on(event, cb);
   }
 
   destroy(): void {
@@ -1065,10 +1050,7 @@ export class Editor {
     for (const h of this.getContentHosts()) h.replaceChildren();
     this.host.removeAttribute("contenteditable");
     this.host.classList.remove("sobree-editor");
-    this.listeners.change.clear();
-    this.listeners.selection.clear();
-    this.listeners.keydown.clear();
-    this.listeners["track-changes-change"].clear();
+    this.events.clear();
   }
 
   // === internal accessors (used by EditorSelection) ===
@@ -1236,22 +1218,15 @@ export class Editor {
    */
   private emitChangeNow(): void {
     this.revision += 1;
-    if (this.listeners.change.size === 0) return;
+    if (!this.events.hasChangeListeners()) return;
     const stripped = stripBinary(this.doc);
-    const payload: ChangePayload = {
+    this.events.emitChange({
       doc: stripped,
       // Alias for backwards compat — same reference, no clone cost.
       document: stripped,
       revision: this.revision,
       documentVersion: this.registry.documentVersion(),
-    };
-    for (const cb of this.listeners.change) {
-      try {
-        cb(payload);
-      } catch (err) {
-        console.error("[sobree] change listener threw:", err);
-      }
-    }
+    });
   }
 
   // === Y.Doc mirroring ===
@@ -1302,64 +1277,11 @@ export class Editor {
    * even when no subscribers exist (the early-return keeps it cheap).
    */
   private fireSelection(): void {
-    if (this.listeners.selection.size === 0) return;
-    const sel = this.selection.get();
-    let range: ApiRange | null = null;
-    let caret: InlinePosition | null = null;
-    if (sel) {
-      if (sel.kind === "range") {
-        range = sel.range;
-        caret = sel.range.from;
-      } else {
-        caret = sel.at;
-      }
-    }
-    const payload: SelectionPayload = {
-      selection: sel,
-      range,
-      caret,
-      block: caret?.block ?? null,
-    };
-    for (const cb of this.listeners.selection) {
-      try {
-        cb(payload);
-      } catch (err) {
-        console.error("[sobree] selection listener threw:", err);
-      }
-    }
+    this.events.emitSelection(this.selection.get());
   }
 
-  /**
-   * Normalise a DOM `KeyboardEvent` into a {@link KeyDownPayload} and
-   * dispatch to subscribers in registration order. Subscribers can
-   * `preventDefault()` (browser default) and / or `stopPropagation()`
-   * (further subscribers). The editor itself binds no shortcuts —
-   * everything goes through plugins.
-   */
   private fireKeyDown(e: KeyboardEvent): void {
-    if (this.listeners.keydown.size === 0) return;
-    let stopped = false;
-    const payload: KeyDownPayload = {
-      key: e.key.length === 1 ? e.key.toLowerCase() : e.key,
-      code: e.code,
-      ctrl: e.ctrlKey,
-      shift: e.shiftKey,
-      alt: e.altKey,
-      meta: e.metaKey,
-      preventDefault: () => e.preventDefault(),
-      stopPropagation: () => {
-        stopped = true;
-      },
-      originalEvent: e,
-    };
-    for (const cb of this.listeners.keydown) {
-      if (stopped) break;
-      try {
-        cb(payload);
-      } catch (err) {
-        console.error("[sobree] keydown listener threw:", err);
-      }
-    }
+    this.events.emitKeyDown(e);
   }
 
 }
