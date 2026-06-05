@@ -13,22 +13,8 @@ import {
   ok,
 } from "../doc/api";
 import { emptyDocument } from "../doc/builders";
-import {
-  type RunPropertiesPatch,
-  mergeAdjacentTextRuns,
-  runLength,
-  runsLength,
-} from "../doc/runs";
-import type {
-  Block,
-  InlineRun,
-  Paragraph,
-  RevisionMark,
-  SobreeDocument,
-  Table,
-  TableCell,
-  TableRow,
-} from "../doc/types";
+import type { RunPropertiesPatch } from "../doc/runs";
+import type { Block, InlineRun, SobreeDocument } from "../doc/types";
 import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
 import { FontFaceRegistry } from "../fonts";
 import { History } from "../history";
@@ -42,6 +28,7 @@ import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./interna
 import * as blocks from "./ops/blocks";
 import * as comments from "./ops/comments";
 import * as parts from "./ops/parts";
+import * as review from "./ops/review";
 import * as runs from "./ops/runs";
 import * as query from "./query";
 import { EditorSelection } from "./selection";
@@ -53,7 +40,6 @@ import { attachImageResize } from "./view/imageResize";
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
 export { EditorCommands } from "./commands";
 export { EditorSelection } from "./selection";
-import { decideFormatRun, decideRevisionRun } from "./revisionRuns";
 
 // === exported types ===
 
@@ -1275,687 +1261,74 @@ export class Editor {
     range: ApiRange,
     opts: { expect?: Record<string, number> } = {},
   ): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRange(range, opts.expect);
-    if (lockCheck) return lockCheck;
-    return this.mutateRunsInRange(range, (runs) =>
-      runs.flatMap((r) => decideRevisionRun(r, "accept")),
-    );
+    return review.acceptRevision(this.ctx, range, opts);
   }
 
-  /**
-   * Reject the tracked changes inside `range`: insertions are removed
-   * (the inserted text is dropped), deletions are restored (the
-   * revision marker is stripped, deleted text kept). The inverse of
-   * `acceptRevision`.
-   */
+  /** Reject the tracked changes inside `range`. Inverse of `acceptRevision`. */
   rejectRevision(
     range: ApiRange,
     opts: { expect?: Record<string, number> } = {},
   ): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRange(range, opts.expect);
-    if (lockCheck) return lockCheck;
-    return this.mutateRunsInRange(range, (runs) =>
-      runs.flatMap((r) => decideRevisionRun(r, "reject")),
-    );
+    return review.rejectRevision(this.ctx, range, opts);
   }
 
-  /**
-   * Accept tracked format changes inside `range`: each text run with a
-   * `revisionFormat` snapshot drops the snapshot; the current
-   * `properties` stay. Runs without one pass through.
-   */
+  /** Accept tracked format changes inside `range` (drop the snapshot). */
   acceptFormatRevision(
     range: ApiRange,
     opts: { expect?: Record<string, number> } = {},
   ): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRange(range, opts.expect);
-    if (lockCheck) return lockCheck;
-    return this.mutateRunsInRange(range, (runs) => runs.map((r) => decideFormatRun(r, "accept")));
+    return review.acceptFormatRevision(this.ctx, range, opts);
   }
 
-  /**
-   * Reject tracked format changes inside `range`: each run reverts its
-   * `properties` to `revisionFormat.before`. Inverse of
-   * `acceptFormatRevision`.
-   */
+  /** Reject tracked format changes inside `range` (revert to `before`). */
   rejectFormatRevision(
     range: ApiRange,
     opts: { expect?: Record<string, number> } = {},
   ): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRange(range, opts.expect);
-    if (lockCheck) return lockCheck;
-    return this.mutateRunsInRange(range, (runs) => runs.map((r) => decideFormatRun(r, "reject")));
+    return review.rejectFormatRevision(this.ctx, range, opts);
   }
 
   /**
-   * Accept the paragraph-mark revision on `target`.
-   *
-   * Per the semantics in `ParagraphProperties.revision`'s docblock:
-   *   - `ins` → strip the marker; the paragraph break stays permanent.
-   *   - `del` → merge this paragraph's content into the *previous*
-   *     paragraph; the paragraph break is consumed.
-   *
-   * Returns `range-empty`-coded failure if the block has no paragraph
-   * revision, and `invalid-state` if a `del` accept would require
-   * merging with a non-paragraph (table, section break) — those merges
-   * aren't well-defined yet.
+   * Accept the paragraph-mark revision on `target`. `ins` strips the
+   * marker (the break stays); `del` merges this paragraph into the
+   * previous one.
    */
   acceptParagraphRevision(target: BlockRef): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const block = this.doc.body[index];
-    if (!block || block.kind !== "paragraph") {
-      return fail({ code: "invalid-position", details: "target is not a paragraph" });
-    }
-    const rev = block.properties.revision;
-    if (!rev) {
-      return fail({ code: "range-empty", details: "no paragraph-level revision to accept" });
-    }
-    if (rev.type === "ins") {
-      const { revision: _strip, ...rest } = block.properties;
-      const next = this.doc.body.slice();
-      next[index] = { ...block, properties: rest };
-      return this.commit({ body: next }, [{ type: "bump", index }]);
-    }
-    // del → merge into previous paragraph (the break is consumed).
-    return this.mergeWithPrevious(index);
+    return review.acceptParagraphRevision(this.ctx, target);
   }
 
   /**
-   * Reject the paragraph-mark revision on `target`.
-   *   - `ins` → merge this paragraph into the *previous* one (the split
-   *     introduced by the tracked Enter is undone).
-   *   - `del` → strip the marker; the paragraph break stays.
+   * Reject the paragraph-mark revision on `target`. `ins` undoes the
+   * split (merge into previous); `del` strips the marker.
    */
   rejectParagraphRevision(target: BlockRef): EditResult<void> {
-    this.ensureCurrent();
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const block = this.doc.body[index];
-    if (!block || block.kind !== "paragraph") {
-      return fail({ code: "invalid-position", details: "target is not a paragraph" });
-    }
-    const rev = block.properties.revision;
-    if (!rev) {
-      return fail({ code: "range-empty", details: "no paragraph-level revision to reject" });
-    }
-    if (rev.type === "del") {
-      const { revision: _strip, ...rest } = block.properties;
-      const next = this.doc.body.slice();
-      next[index] = { ...block, properties: rest };
-      return this.commit({ body: next }, [{ type: "bump", index }]);
-    }
-    // ins → undo the split: merge into previous paragraph.
-    return this.mergeWithPrevious(index);
+    return review.rejectParagraphRevision(this.ctx, target);
   }
 
-  /**
-   * Concatenate `body[index]`'s runs onto the end of `body[index-1]`
-   * and remove `body[index]`. The previous block must be a paragraph;
-   * otherwise we bail with `invalid-state`. Used by accept/reject of
-   * paragraph-mark revisions where the decision means "this paragraph
-   * break should not exist".
-   */
-  private mergeWithPrevious(index: number): EditResult<void> {
-    if (index <= 0) {
-      // No previous block — the paragraph break before index 0 is
-      // implicit (start-of-doc), so a `del` marker there is
-      // semantically nonsensical. Strip it instead of leaving the
-      // block in a half-state where the marker says "delete this
-      // break" but nothing happens — the dock then thinks the
-      // revision is still unresolved and the user can't progress.
-      return this.stripParagraphMarker(index);
-    }
-    const prev = this.doc.body[index - 1];
-    const cur = this.doc.body[index];
-    if (!prev || !cur || cur.kind !== "paragraph") {
-      return fail({ code: "invalid-state", details: "current block is not a paragraph" });
-    }
-    if (prev.kind !== "paragraph") {
-      return fail({
-        code: "invalid-state",
-        details: "previous block is not a paragraph — cross-kind merge unsupported",
-      });
-    }
-    const next = this.doc.body.slice();
-    next[index - 1] = {
-      ...prev,
-      runs: mergeAdjacentTextRuns([...prev.runs, ...cur.runs]),
-    };
-    next.splice(index, 1);
-    if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
-    return this.commit({ body: next }, [
-      { type: "bump", index: index - 1 },
-      { type: "remove", index },
-    ]);
-  }
-
-  /**
-   * Strip the `revision` marker from `body[index]`'s paragraph
-   * properties, leaving the block (and its content) in place.
-   * Fallback for merge-impossible cases — see `mergeWithPrevious`'s
-   * `index <= 0` branch and `applyAllRevisions`' second pass.
-   */
-  private stripParagraphMarker(index: number): EditResult<void> {
-    const block = this.doc.body[index];
-    if (!block || block.kind !== "paragraph") {
-      return fail({ code: "invalid-position", details: "target is not a paragraph" });
-    }
-    if (!block.properties.revision) return ok<void>(undefined as void, []);
-    const { revision: _strip, ...rest } = block.properties;
-    const next = this.doc.body.slice();
-    next[index] = { ...block, properties: rest };
-    return this.commit({ body: next }, [{ type: "bump", index }]);
-  }
-
-  /**
-   * Flag `body[index]`'s paragraph break as a tracked deletion —
-   * stamp `properties.revision = { type: "del", author }`. Used by
-   * `handleTrackedInput` for the Backspace-at-start-of-paragraph
-   * keystroke.
-   *
-   * Two short-circuits:
-   *   - If the paragraph already carries the *same author's* pending
-   *     `ins` (the user is backspacing into a split they themselves
-   *     just made), drop the marker and merge into the previous
-   *     paragraph — cancelling an un-committed insert rather than
-   *     layering del on top of ins.
-   *   - If the paragraph carries some OTHER revision (peer's ins, an
-   *     existing del), leave it alone with a no-op success. The
-   *     reviewer should resolve those via accept/reject first.
-   */
   private markParagraphBreakForDelete(index: number): EditResult<void> {
-    const block = this.doc.body[index];
-    if (!block || block.kind !== "paragraph") {
-      return fail({ code: "invalid-position", details: "target is not a paragraph" });
-    }
-    const author = this.trackChanges.author;
-    const existing = block.properties.revision;
-    if (existing?.type === "ins" && existing.author === author) {
-      // Own pending split — cancel it by merging back into previous.
-      return this.mergeWithPrevious(index);
-    }
-    if (existing) {
-      // Peer's revision — leave it alone.
-      return ok<void>(undefined as void, []);
-    }
-    const revision: RevisionMark = author === undefined ? { type: "del" } : { type: "del", author };
-    const next = this.doc.body.slice();
-    next[index] = {
-      ...block,
-      properties: { ...block.properties, revision },
-    };
-    return this.commit({ body: next }, [{ type: "bump", index }]);
+    return review.markParagraphBreakForDelete(this.ctx, index);
   }
 
   /**
-   * Enumerate every logical tracked change in the document.
-   *
-   * Consecutive revision-bearing runs by the same author coalesce into
-   * one `RevisionSpan` — so a delete-then-insert replacement is one
-   * span, and two unrelated insertions in a paragraph (separated by
-   * plain text) are two. Each span's `range` carries fresh, versioned
-   * `BlockRef`s, ready to hand to `acceptRevision` / `rejectRevision`.
-   *
-   * Call after each `change` — the ranges are positional, so re-query
-   * rather than caching across edits.
+   * Enumerate every logical tracked change. Consecutive same-author
+   * revision runs coalesce into one `RevisionSpan` with fresh versioned
+   * refs. Re-query after each `change`.
    */
   getRevisions(): RevisionSpan[] {
-    this.ensureCurrent();
-    const spans: RevisionSpan[] = [];
-    for (let i = 0; i < this.doc.body.length; i++) {
-      const block = this.doc.body[i];
-      if (!block) continue;
-      if (block.kind === "table") {
-        // Walk into table cells. Cell paragraphs aren't tracked in
-        // the registry (they don't have stable BlockRefs), so we
-        // surface their revisions under the *containing table's*
-        // BlockRef as a sentinel. The dock count + `acceptAllRevisions`
-        // see them; per-cell single-accept via the popover isn't
-        // supported yet (requires the registry to know about cell
-        // paragraphs — a separate refactor).
-        const info = this.getBlock(i);
-        const tableRef: BlockRef = { id: info.id, version: info.version };
-        for (const row of block.rows) {
-          for (const cell of row.cells) {
-            for (const inner of cell.content) {
-              if (inner.kind !== "paragraph") continue;
-              this.collectParagraphRevisions(inner, tableRef, spans);
-            }
-          }
-        }
-        continue;
-      }
-      if (block.kind !== "paragraph") continue;
-      const info = this.getBlock(i);
-      const ref: BlockRef = { id: info.id, version: info.version };
-      // Paragraph-mark revision (level: "paragraph"). Surface it first
-      // so review UIs see one entry per block, ordered with inline
-      // revisions to follow.
-      const pRev = block.properties.revision;
-      if (pRev) {
-        spans.push({
-          range: {
-            from: { block: ref, offset: 0 },
-            to: { block: ref, offset: info.length },
-          },
-          ...(pRev.author !== undefined ? { author: pRev.author } : {}),
-          kinds: [pRev.type],
-          ...(pRev.date !== undefined ? { date: pRev.date } : {}),
-          level: "paragraph",
-        });
-      }
-      let offset = 0;
-      let open: {
-        start: number;
-        end: number;
-        author: string | undefined;
-        kinds: Set<"ins" | "del">;
-        date: string | undefined;
-      } | null = null;
-      // Parallel walker for format-change spans — same coalescing rule
-      // (same author, contiguous). Format spans don't have ins/del
-      // kinds; we use a synthetic `kinds: ["ins"]` (with `level:
-      // "format"`) so the consumer shape stays uniform.
-      let openFmt: {
-        start: number;
-        end: number;
-        author: string | undefined;
-        date: string | undefined;
-      } | null = null;
-      const flushFmt = (): void => {
-        if (!openFmt) return;
-        spans.push({
-          range: {
-            from: { block: ref, offset: openFmt.start },
-            to: { block: ref, offset: openFmt.end },
-          },
-          ...(openFmt.author !== undefined ? { author: openFmt.author } : {}),
-          kinds: ["ins"],
-          ...(openFmt.date !== undefined ? { date: openFmt.date } : {}),
-          level: "format",
-        });
-        openFmt = null;
-      };
-      const flush = (): void => {
-        if (!open) return;
-        spans.push({
-          range: {
-            from: { block: ref, offset: open.start },
-            to: { block: ref, offset: open.end },
-          },
-          ...(open.author !== undefined ? { author: open.author } : {}),
-          kinds: [...open.kinds],
-          ...(open.date !== undefined ? { date: open.date } : {}),
-          level: "inline",
-        });
-        open = null;
-      };
-      for (const run of block.runs) {
-        const len = runLength(run);
-        const rev = run.kind === "text" ? run.properties.revision : undefined;
-        if (rev) {
-          // Coalesce into the open span when the author matches (both
-          // `undefined` counts as a match — anonymous revisions group).
-          if (open && open.author === rev.author) {
-            open.end = offset + len;
-            open.kinds.add(rev.type);
-          } else {
-            flush();
-            open = {
-              start: offset,
-              end: offset + len,
-              author: rev.author,
-              kinds: new Set<"ins" | "del">([rev.type]),
-              date: rev.date,
-            };
-          }
-        } else {
-          flush();
-        }
-        // Format-revision walker — independent of ins/del so a run can
-        // be both (e.g. inserted text whose subsequent format was
-        // tracked-changed).
-        const rf = run.kind === "text" ? run.properties.revisionFormat : undefined;
-        if (rf) {
-          if (openFmt && openFmt.author === rf.author) {
-            openFmt.end = offset + len;
-          } else {
-            flushFmt();
-            openFmt = {
-              start: offset,
-              end: offset + len,
-              author: rf.author,
-              date: rf.date,
-            };
-          }
-        } else {
-          flushFmt();
-        }
-        offset += len;
-      }
-      flush();
-      flushFmt();
-    }
-    return spans;
+    return review.getRevisions(this.ctx);
   }
 
   /**
-   * Walk one paragraph and append its revision spans to `out`. Used by
-   * `getRevisions` for both top-level paragraphs (where `ref` is the
-   * paragraph's own BlockRef) and for paragraphs inside table cells
-   * (where `ref` is the *containing table's* BlockRef as a sentinel —
-   * cell paragraphs don't have their own registry entry yet).
-   *
-   * Emits the same three-level span shape as the inline walker:
-   * paragraph-mark first, then coalesced inline ins/del spans, then
-   * coalesced format-change spans.
-   */
-  private collectParagraphRevisions(block: Paragraph, ref: BlockRef, out: RevisionSpan[]): void {
-    const length = runsLength(block.runs);
-
-    // Paragraph-mark
-    const pRev = block.properties.revision;
-    if (pRev) {
-      out.push({
-        range: {
-          from: { block: ref, offset: 0 },
-          to: { block: ref, offset: length },
-        },
-        ...(pRev.author !== undefined ? { author: pRev.author } : {}),
-        kinds: [pRev.type],
-        ...(pRev.date !== undefined ? { date: pRev.date } : {}),
-        level: "paragraph",
-      });
-    }
-
-    // Inline + format walkers — same logic as in `getRevisions`'s
-    // top-level loop. Kept inline (rather than calling the loop)
-    // because the loop manages its own open/openFmt state machines.
-    let offset = 0;
-    let open: {
-      start: number;
-      end: number;
-      author: string | undefined;
-      kinds: Set<"ins" | "del">;
-      date: string | undefined;
-    } | null = null;
-    let openFmt: {
-      start: number;
-      end: number;
-      author: string | undefined;
-      date: string | undefined;
-    } | null = null;
-    const flush = (): void => {
-      if (!open) return;
-      out.push({
-        range: {
-          from: { block: ref, offset: open.start },
-          to: { block: ref, offset: open.end },
-        },
-        ...(open.author !== undefined ? { author: open.author } : {}),
-        kinds: [...open.kinds],
-        ...(open.date !== undefined ? { date: open.date } : {}),
-        level: "inline",
-      });
-      open = null;
-    };
-    const flushFmt = (): void => {
-      if (!openFmt) return;
-      out.push({
-        range: {
-          from: { block: ref, offset: openFmt.start },
-          to: { block: ref, offset: openFmt.end },
-        },
-        ...(openFmt.author !== undefined ? { author: openFmt.author } : {}),
-        kinds: ["ins"],
-        ...(openFmt.date !== undefined ? { date: openFmt.date } : {}),
-        level: "format",
-      });
-      openFmt = null;
-    };
-    for (const run of block.runs) {
-      const len = runLength(run);
-      const rev = run.kind === "text" ? run.properties.revision : undefined;
-      if (rev) {
-        if (open && open.author === rev.author) {
-          open.end = offset + len;
-          open.kinds.add(rev.type);
-        } else {
-          flush();
-          open = {
-            start: offset,
-            end: offset + len,
-            author: rev.author,
-            kinds: new Set<"ins" | "del">([rev.type]),
-            date: rev.date,
-          };
-        }
-      } else {
-        flush();
-      }
-      const rf = run.kind === "text" ? run.properties.revisionFormat : undefined;
-      if (rf) {
-        if (openFmt && openFmt.author === rf.author) {
-          openFmt.end = offset + len;
-        } else {
-          flushFmt();
-          openFmt = { start: offset, end: offset + len, author: rf.author, date: rf.date };
-        }
-      } else {
-        flushFmt();
-      }
-      offset += len;
-    }
-    flush();
-    flushFmt();
-  }
-
-  /**
-   * Accept every tracked change in the document. With `opts.author`,
-   * accept only that author's changes. One commit for the whole sweep.
+   * Accept every tracked change in the document (optionally filtered by
+   * `opts.author`). One commit for the whole sweep.
    */
   acceptAllRevisions(opts: { author?: string } = {}): EditResult<void> {
-    return this.applyAllRevisions("accept", opts.author);
+    return review.acceptAllRevisions(this.ctx, opts);
   }
 
   /** Reject every tracked change (optionally filtered by author). */
   rejectAllRevisions(opts: { author?: string } = {}): EditResult<void> {
-    return this.applyAllRevisions("reject", opts.author);
-  }
-
-  private applyAllRevisions(
-    decision: "accept" | "reject",
-    author: string | undefined,
-  ): EditResult<void> {
-    this.ensureCurrent();
-    // Two passes:
-    //   1. Inline revisions on every paragraph's runs (existing path).
-    //   2. Paragraph-mark revisions — collected as a list of "merge with
-    //      previous" actions, applied bottom-up so the indices stay valid
-    //      as paragraphs collapse.
-    const nextBody = this.doc.body.slice();
-    const bumps: Mutation[] = [];
-    const removes: number[] = [];
-
-    for (let i = 0; i < nextBody.length; i++) {
-      const block = nextBody[i];
-      if (!block) continue;
-      // Tables: sweep their cell paragraphs too. We process inline +
-      // format + paragraph-mark *within* each cell, but `merge with
-      // previous` for a cell paragraph-mark del falls back to
-      // strip-the-marker (merging across cell paragraph boundaries
-      // requires structural cell-content edits we keep separate).
-      if (block.kind === "table") {
-        const tableChanged = this.sweepTableCellRevisions(block, decision, author);
-        if (tableChanged.changed) {
-          nextBody[i] = tableChanged.next;
-          bumps.push({ type: "bump", index: i });
-        }
-        continue;
-      }
-      if (block.kind !== "paragraph") continue;
-
-      let changed = false;
-      const newRuns = block.runs.flatMap((r) => {
-        let next: InlineRun = r;
-        // Inline ins/del revision.
-        const rev = r.kind === "text" ? r.properties.revision : undefined;
-        if (rev && (author === undefined || rev.author === author)) {
-          const decided = decideRevisionRun(next, decision);
-          changed = true;
-          // `decideRevisionRun` may return [] (drop) or a single run.
-          if (decided.length === 0) return decided;
-          next = decided[0]!;
-        }
-        // Format-change revision (rPrChange).
-        const rf = next.kind === "text" ? next.properties.revisionFormat : undefined;
-        if (rf && (author === undefined || rf.author === author)) {
-          next = decideFormatRun(next, decision);
-          changed = true;
-        }
-        return [next];
-      });
-      let nextBlock: Block = block;
-      if (changed) {
-        nextBlock = { ...block, runs: mergeAdjacentTextRuns(newRuns) };
-      }
-
-      // Paragraph-mark revision on this block.
-      const pRev = block.properties.revision;
-      if (pRev && (author === undefined || pRev.author === author)) {
-        // "Strip the marker" — accept-ins / reject-del — keeps the
-        // paragraph split, just clears the mark.
-        // "Merge with previous" — accept-del / reject-ins — collapses
-        // this paragraph into the previous one.
-        const stripMarker =
-          (decision === "accept" && pRev.type === "ins") ||
-          (decision === "reject" && pRev.type === "del");
-        if (stripMarker) {
-          const { revision: _strip, ...rest } = (nextBlock as Paragraph).properties;
-          nextBlock = { ...(nextBlock as Paragraph), properties: rest };
-          changed = true;
-        } else {
-          // Schedule a merge — defer to second pass.
-          removes.push(i);
-          // Still apply the inline changes for this block first.
-          if (changed) nextBody[i] = nextBlock;
-          continue;
-        }
-      }
-
-      if (changed) {
-        nextBody[i] = nextBlock;
-        bumps.push({ type: "bump", index: i });
-      }
-    }
-
-    // Second pass — apply paragraph-mark merges bottom-up so indices
-    // stay valid as paragraphs collapse. For merge-impossible cases
-    // (first block, or previous block is a non-paragraph), strip the
-    // marker as a best-effort fallback: the user asked us to resolve
-    // all revisions, so leaving a marker in place defeats the intent
-    // and traps the reviewer in the dock with "unresolved" items they
-    // can't actually act on.
-    if (removes.length > 0) {
-      removes.sort((a, b) => b - a);
-      for (const i of removes) {
-        const cur = nextBody[i];
-        if (!cur || cur.kind !== "paragraph") continue;
-        const prev = i > 0 ? nextBody[i - 1] : null;
-        const canMerge = prev != null && prev.kind === "paragraph";
-        if (!canMerge) {
-          // Strip the marker rather than no-op the merge.
-          if (cur.properties.revision) {
-            const { revision: _strip, ...rest } = cur.properties;
-            nextBody[i] = { ...cur, properties: rest };
-            bumps.push({ type: "bump", index: i });
-          }
-          continue;
-        }
-        nextBody[i - 1] = {
-          ...prev,
-          runs: mergeAdjacentTextRuns([...prev.runs, ...cur.runs]),
-        };
-        nextBody.splice(i, 1);
-        bumps.push({ type: "bump", index: i - 1 });
-        bumps.push({ type: "remove", index: i });
-      }
-      if (nextBody.length === 0) nextBody.push({ kind: "paragraph", properties: {}, runs: [] });
-    }
-
-    if (bumps.length === 0) return ok<void>(undefined as void, []);
-    return this.commit({ body: nextBody }, bumps);
-  }
-
-  /**
-   * Walk a table's cell paragraphs and apply the accept/reject
-   * decision to inline + format + paragraph-mark revisions inside.
-   * Returns `{ next, changed }` so the caller knows whether to bump
-   * the table block. Paragraph-mark del within a cell falls back to
-   * strip-the-marker rather than attempting a cross-cell-paragraph
-   * merge — that structural edit is out of v1 scope for tables.
-   */
-  private sweepTableCellRevisions(
-    table: Table,
-    decision: "accept" | "reject",
-    author: string | undefined,
-  ): { next: Table; changed: boolean } {
-    let anyChanged = false;
-    const nextRows = table.rows.map(
-      (row: TableRow): TableRow => ({
-        ...row,
-        cells: row.cells.map((cell: TableCell): TableCell => {
-          let cellChanged = false;
-          const nextContent: Block[] = cell.content.map((inner: Block): Block => {
-            if (inner.kind !== "paragraph") return inner;
-            let pChanged = false;
-            const newRuns = inner.runs.flatMap((r) => {
-              let next: InlineRun = r;
-              const rev = r.kind === "text" ? r.properties.revision : undefined;
-              if (rev && (author === undefined || rev.author === author)) {
-                const decided = decideRevisionRun(next, decision);
-                pChanged = true;
-                if (decided.length === 0) return decided;
-                next = decided[0]!;
-              }
-              const rf = next.kind === "text" ? next.properties.revisionFormat : undefined;
-              if (rf && (author === undefined || rf.author === author)) {
-                next = decideFormatRun(next, decision);
-                pChanged = true;
-              }
-              return [next];
-            });
-            let nextPara: Paragraph = pChanged
-              ? { ...inner, runs: mergeAdjacentTextRuns(newRuns) }
-              : inner;
-            // Paragraph-mark — strip-as-fallback only. v1 doesn't merge
-            // cell paragraphs across boundaries.
-            const pRev = inner.properties.revision;
-            if (pRev && (author === undefined || pRev.author === author)) {
-              const { revision: _strip, ...rest } = nextPara.properties;
-              nextPara = { ...nextPara, properties: rest };
-              pChanged = true;
-            }
-            if (pChanged) {
-              cellChanged = true;
-              anyChanged = true;
-            }
-            return nextPara;
-          });
-          if (!cellChanged) return cell;
-          return { ...cell, content: nextContent };
-        }),
-      }),
-    );
-    return { next: anyChanged ? { ...table, rows: nextRows } : table, changed: anyChanged };
+    return review.rejectAllRevisions(this.ctx, opts);
   }
 
   /** Mark comment `id` resolved (`Comment.done = true`). */
@@ -2121,17 +1494,6 @@ export class Editor {
     return this.checkRefs(refs);
   }
 
-  /**
-   * Apply a runs transform to the runs covered by `range`. Returns
-   * `EditResult<void>`. Handles both single- and multi-block ranges.
-   * Assumes locks have already been checked.
-   */
-  private mutateRunsInRange(
-    range: ApiRange,
-    transform: (runs: InlineRun[]) => InlineRun[],
-  ): EditResult<void> {
-    return runs.mutateRunsInRange(this.ctx, range, transform);
-  }
 
   /**
    * Apply a mutation to `this.doc`, update the registry, re-render, fire
