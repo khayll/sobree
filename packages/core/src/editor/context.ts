@@ -44,6 +44,13 @@ export interface EditorContext {
   setDocument(doc: SobreeDocument): void;
   /** Re-render the current `doc` into the hosts (no selection restore, no emit). */
   renderCurrent(): void;
+  /**
+   * Soft-revert the in-memory doc to `snapshot` and re-render (resets the
+   * serialised-block cache + dom-dirty flag; no registry reset, mirror, or
+   * emit). Used to roll back the browser's native IME mutations before a
+   * tracked re-insert.
+   */
+  restoreSnapshot(snapshot: SobreeDocument): void;
   /** The content host(s) the renderer paints into (may differ from `host`). */
   getContentHosts(): HTMLElement[];
   /** The host(s) a DOM selection may live in. */

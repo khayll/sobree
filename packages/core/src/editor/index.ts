@@ -30,6 +30,7 @@ import * as comments from "./ops/comments";
 import * as parts from "./ops/parts";
 import * as review from "./ops/review";
 import * as runs from "./ops/runs";
+import { type TrackedInput, createTrackedInput } from "./ops/trackedInput";
 import * as query from "./query";
 import { EditorSelection } from "./selection";
 import { EditorTable } from "./table";
@@ -204,31 +205,13 @@ export class Editor {
    */
   private trackChanges: TrackChangesState = { enabled: false };
   /**
-   * One-shot warning set for tracked-mode beforeinput types we don't
-   * (yet) route through the API — paragraph splits, paste, IME, etc.
-   * We let the browser handle them untracked rather than swallowing
-   * the keystroke, but log the inputType the first time we see it so
-   * the gap is visible during development.
+   * Track-changes authoring input handler — routes tracked-mode
+   * `beforeinput` / IME composition / paste through the typed API so
+   * resulting runs carry revision markers. Holds the IME composition
+   * snapshot + warn-once state. Built in the constructor. See
+   * `ops/trackedInput`.
    */
-  private trackedInputWarned = new Set<string>();
-  /**
-   * Active IME composition state (`compositionstart` → `compositionend`).
-   * `null` outside composition or in non-tracked mode.
-   *
-   * Snapshot-then-restore is the only practical way to track IME-typed
-   * text: we can't intercept `beforeinput` during composition without
-   * breaking input methods on most platforms, so we let the browser
-   * mutate the DOM natively during composition, then on `compositionend`
-   * we roll back to the pre-composition AST and re-insert the final
-   * composed string (`event.data`) through `insertRun` — which stamps
-   * the `revision: ins` marker per `TrackChangesState`.
-   */
-  private composition: {
-    /** AST snapshot taken at `compositionstart`. */
-    snapshot: SobreeDocument;
-    /** Caret position at `compositionstart`, used as the insertion point. */
-    caret: InlinePosition | null;
-  } | null = null;
+  private trackedInput!: TrackedInput;
   private compositionStartListener: ((e: CompositionEvent) => void) | null = null;
   private compositionEndListener: ((e: CompositionEvent) => void) | null = null;
   /** Document-level `selectionchange` listener. Funnels every cursor
@@ -322,6 +305,7 @@ export class Editor {
     });
 
     this.ctx = this.buildContext();
+    this.trackedInput = createTrackedInput(this.ctx);
 
     // Two construction paths (run after the context exists so the adopt
     // path can resolve cached part refs through it):
@@ -453,8 +437,8 @@ export class Editor {
       // `revision` properties block `mergeAdjacentTextRuns`, so the
       // new plain run stays plain.
       const inTracked = this.trackChanges.enabled;
-      const inRevisionWrapper = !inTracked && this.caretInsideRevisionWrapper();
-      if ((inTracked || inRevisionWrapper) && this.handleTrackedInput(ie)) {
+      const inRevisionWrapper = !inTracked && this.trackedInput.caretInsideRevisionWrapper();
+      if ((inTracked || inRevisionWrapper) && this.trackedInput.handleBeforeInput(ie)) {
         e.preventDefault();
         return;
       }
@@ -464,11 +448,11 @@ export class Editor {
     };
     host.addEventListener("beforeinput", this.beforeInputListener);
 
-    // IME composition — see `this.composition`'s docblock. Listeners
-    // are unconditional but the work only happens when tracked mode
-    // was on at `compositionstart`.
-    this.compositionStartListener = (e) => this.handleCompositionStart(e);
-    this.compositionEndListener = (e) => this.handleCompositionEnd(e);
+    // IME composition — handled by the trackedInput module (it holds the
+    // composition snapshot). Listeners are unconditional but the work only
+    // happens when tracked mode was on at `compositionstart`.
+    this.compositionStartListener = (e) => this.trackedInput.handleCompositionStart(e);
+    this.compositionEndListener = (e) => this.trackedInput.handleCompositionEnd(e);
     host.addEventListener("compositionstart", this.compositionStartListener);
     host.addEventListener("compositionend", this.compositionEndListener);
 
@@ -483,7 +467,7 @@ export class Editor {
     this.keydownListener = (e) => this.fireKeyDown(e);
     host.addEventListener("keydown", this.keydownListener);
 
-    this.pasteListener = (e) => this.onPaste(e);
+    this.pasteListener = (e) => void this.trackedInput.onPaste(e);
     host.addEventListener("paste", this.pasteListener);
 
     this.dragOverListener = (e) => runs.onDragOver(this.ctx, e);
@@ -533,6 +517,7 @@ export class Editor {
       },
       setDocument: (doc) => self.setDocument(doc),
       renderCurrent: () => self.renderCurrent(),
+      restoreSnapshot: (snapshot) => self.restoreSnapshot(snapshot),
       getContentHosts: () => self.getContentHosts(),
       _hosts: () => self._hosts(),
       get trackChanges() {
@@ -662,6 +647,19 @@ export class Editor {
     const firstHost = hosts[0] ?? this.host;
     this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
     renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
+  }
+
+  /**
+   * Soft-revert to a doc `snapshot` and re-render. Resets the
+   * serialised-block cache + dom-dirty flag; no registry reset, mirror, or
+   * change emit. Used to undo native IME mutations before a tracked
+   * re-insert (see `ops/trackedInput`).
+   */
+  private restoreSnapshot(snapshot: SobreeDocument): void {
+    this.doc = snapshot;
+    this.lastSerialisedBlocks = snapshot.body.map((b) => JSON.stringify(b));
+    this.domDirty = false;
+    this.renderCurrent();
   }
 
   /**
@@ -890,364 +888,6 @@ export class Editor {
     }
   }
 
-  /**
-   * Route a tracked-mode `beforeinput` event through the typed API so
-   * the resulting runs carry revision markers. Returns `true` if the
-   * event was consumed (caller should `preventDefault`), `false` to
-   * let the browser handle it natively (untracked).
-   *
-   * **Handled inputTypes** (the 95% case — typing and deleting text):
-   *
-   *   - `insertText`, `insertReplacementText` — typed characters,
-   *     dictation / autocomplete replacements.
-   *   - `deleteContentBackward`, `deleteContentForward` — Backspace
-   *     and Delete keys, including over a selection.
-   *   - `deleteWordBackward`, `deleteWordForward` — Option-Backspace
-   *     style word deletions; the browser collapses to the right
-   *     selection range before firing, we just delete it.
-   *   - `deleteByCut` — Cmd-X. The clipboard side has already been
-   *     populated by the browser; we mark the source range deleted.
-   *
-   * **Unhandled** (return `false`, fall through, warn-once):
-   *
-   *   - `insertParagraph` / `insertLineBreak` — block split / soft
-   *     break. Word tracks these as `<w:ins>` on the paragraph mark;
-   *     the corresponding AST mutation (split-block as a tracked op)
-   *     hasn't landed yet.
-   *   - `insertFromPaste` — paste is handled at the `paste` event level
-   *     in `onPaste` (not here), where tracked-mode plain-text paste is
-   *     already routed through `insertRun` / `splitBlock`. Rich-paste
-   *     (HTML) in tracked mode falls back to plain text by design.
-   *   - `insertCompositionText` — handled separately via
-   *     `compositionstart` / `compositionend` listeners
-   *     (`handleCompositionStart` / `handleCompositionEnd`). We let the
-   *     IME render natively during composition, then on end we restore
-   *     the pre-composition AST and re-insert the final composed string
-   *     through this `insertRun` path.
-   *
-   * Falling through means the keystroke still works (no broken UX in
-   * tracked mode), it just doesn't get a revision marker. The console
-   * warning makes the gap visible.
-   *
-   * Caret restoration: after every routed mutation we set the model
-   * selection to where the caret would have ended up on the equivalent
-   * direct-edit operation. Because tracked-mode `deleteRange` leaves
-   * the runs in place (marked `del`), offsets don't shift — caret math
-   * is straightforward.
-   */
-  private handleTrackedInput(ie: InputEvent): boolean {
-    const sel = this.selection.get();
-    if (!sel) return false;
-
-    switch (ie.inputType) {
-      case "insertText":
-      case "insertReplacementText": {
-        const text = ie.data ?? "";
-        if (!text) return false;
-        const insertAt = this.markedRangeForReplace(sel);
-        if (!insertAt) return false;
-        const run: InlineRun = { kind: "text", text, properties: {} };
-        const result = this.insertRun(insertAt, run);
-        if (!result.ok) return true; // consumed but failed — don't fall through
-        this.placeCaret(insertAt.block.id, insertAt.offset + text.length);
-        return true;
-      }
-      case "deleteContentBackward":
-      case "deleteWordBackward": {
-        // Special case: caret at offset 0 of a paragraph in tracked
-        // mode. Conceptually the user wants to "delete the paragraph
-        // break before this paragraph" — i.e. merge this paragraph
-        // into the previous one. Stamp the current paragraph's
-        // properties.revision = del so accept merges them; reject
-        // strips the marker and the split stays. Mirrors how Word
-        // surfaces this keystroke as a tracked block-level edit.
-        //
-        // If the paragraph already carries the current author's own
-        // pending `ins` (a paragraph break THEY just created in
-        // tracked mode), we drop the marker outright — cancelling
-        // their own un-committed split rather than layering del on
-        // top of ins. Same intuition as the inline "own ins" cancel
-        // path in `stampDeleteRevision`.
-        if (this.trackChanges.enabled && sel.kind === "caret" && sel.at.offset === 0) {
-          const idx = this.registry.indexOf(sel.at.block.id);
-          if (idx > 0) {
-            const result = this.markParagraphBreakForDelete(idx);
-            if (!result.ok) return true;
-            // Caret stays at offset 0 of this block — the paragraph
-            // hasn't been removed yet, just flagged.
-            this.placeCaret(sel.at.block.id, 0);
-            return true;
-          }
-          // At block 0 — no preceding break to delete. Fall through;
-          // the browser's no-op is the right behaviour.
-        }
-
-        const target = this.rangeForBackwardDelete(sel, ie.inputType);
-        if (!target) return false;
-        const result = this.deleteRange(target);
-        if (!result.ok) return true;
-        this.placeCaret(target.from.block.id, target.from.offset);
-        return true;
-      }
-      case "deleteContentForward":
-      case "deleteWordForward": {
-        const target = this.rangeForForwardDelete(sel, ie.inputType);
-        if (!target) return false;
-        const result = this.deleteRange(target);
-        if (!result.ok) return true;
-        this.placeCaret(target.from.block.id, target.from.offset);
-        return true;
-      }
-      case "deleteByCut": {
-        if (sel.kind !== "range") return false;
-        const result = this.deleteRange(sel.range);
-        if (!result.ok) return true;
-        this.placeCaret(sel.range.from.block.id, sel.range.from.offset);
-        return true;
-      }
-      case "insertParagraph": {
-        // Enter — split the current paragraph at the caret (replacing
-        // any selected range first, matching browser semantics).
-        const at = this.markedRangeForReplace(sel);
-        if (!at) return false;
-        const result = this.splitBlock(at);
-        if (!result.ok) return true;
-        // result.value is the BlockRef of the new (second) paragraph;
-        // caret goes to offset 0 there.
-        this.placeCaret(result.value.id, 0);
-        return true;
-      }
-      case "insertLineBreak": {
-        // Shift+Enter — insert a soft `<br>` BreakRun. In tracked mode
-        // it carries `revision: ins` directly on its properties.
-        const at = this.markedRangeForReplace(sel);
-        if (!at) return false;
-        const breakRun: InlineRun = {
-          kind: "break",
-          type: "line",
-          properties: {
-            revision:
-              this.trackChanges.author === undefined
-                ? { type: "ins" }
-                : { type: "ins", author: this.trackChanges.author },
-          },
-        };
-        const result = this.insertRun(at, breakRun);
-        if (!result.ok) return true;
-        // BreakRun has length 1 — caret moves one past the break.
-        this.placeCaret(at.block.id, at.offset + 1);
-        return true;
-      }
-      default:
-        if (!this.trackedInputWarned.has(ie.inputType)) {
-          this.trackedInputWarned.add(ie.inputType);
-          console.warn(
-            `[editor] track-changes: inputType "${ie.inputType}" not yet routed through the API — falling through to the browser (this edit will be untracked). Phase B follow-up.`,
-          );
-        }
-        return false;
-    }
-  }
-
-  /**
-   * Snapshot the pre-composition AST + caret so `handleCompositionEnd`
-   * can roll back the browser's native IME mutations and re-insert the
-   * final composed string through the tracked-mode `insertRun`. No-op
-   * when tracked mode is off — IME falls through to the browser as
-   * always (untracked, but functional).
-   */
-  private handleCompositionStart(_e: CompositionEvent): void {
-    if (!this.trackChanges.enabled) {
-      this.composition = null;
-      return;
-    }
-    // `this.doc` is immutable per-commit; capturing the reference is a
-    // cheap O(1) snapshot. The browser's DOM mutations during the
-    // composition will set `domDirty = true` via the `input` listener,
-    // which we'll undo by re-rendering from this snapshot at end.
-    this.composition = {
-      snapshot: this.doc,
-      caret: this.selection.currentCaret(),
-    };
-  }
-
-  /**
-   * Commit a tracked IME composition. Restores the AST to its
-   * pre-composition snapshot, re-renders, then inserts `event.data`
-   * through `insertRun` at the captured caret — so the final composed
-   * string lands as a tracked `ins` instead of as plain text from the
-   * browser's native IME commit.
-   *
-   * Bails out (and clears state) if tracked mode was toggled off
-   * mid-composition or the snapshot is missing; the browser's native
-   * commit then stands as-is (untracked, but functional).
-   */
-  private handleCompositionEnd(e: CompositionEvent): void {
-    const state = this.composition;
-    this.composition = null;
-    if (!state || !state.caret) return;
-    const text = e.data ?? "";
-
-    // Roll back to the pre-composition AST. We can't trust the DOM
-    // state because the IME may have written intermediate composition
-    // text that won't be there after this returns — better to re-render
-    // from the snapshot and then perform a clean tracked insert.
-    this.doc = state.snapshot;
-    this.lastSerialisedBlocks = state.snapshot.body.map((b) => JSON.stringify(b));
-    this.domDirty = false;
-    const hosts = this.getContentHosts();
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.host;
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
-
-    // Empty composition — user cancelled / IME committed nothing.
-    // Restore the caret and stop here.
-    if (text === "") {
-      this.selection.set({ kind: "caret", at: state.caret });
-      return;
-    }
-
-    // Look up a fresh block ref after the re-render (the registry
-    // versions haven't changed since the snapshot, but `getBlockById`
-    // is the canonical way and keeps this resilient to future changes
-    // in commit semantics).
-    const info = this.getBlockById(state.caret.block.id);
-    if (!info) return;
-    const at: InlinePosition = {
-      block: { id: info.id, version: info.version },
-      offset: state.caret.offset,
-    };
-    // Restore the caret first so any side-effect that reads selection
-    // sees the right place.
-    this.selection.set({ kind: "caret", at });
-    const result = this.insertRun(at, { kind: "text", text, properties: {} });
-    if (result.ok) {
-      this.placeCaret(info.id, at.offset + text.length);
-    }
-  }
-
-  /**
-   * Resolve the position to insert at when the user types over the
-   * current selection. For a caret, that's the caret itself; for a
-   * range, we delete the range first (which in tracked mode marks the
-   * runs `del` but keeps them in place — so the `from` offset is still
-   * the right insertion point afterwards). Returns `null` if the
-   * selection spans blocks or the delete failed.
-   */
-  private markedRangeForReplace(sel: Selection): InlinePosition | null {
-    if (!sel) return null;
-    if (sel.kind === "caret") {
-      return this.refreshedPosition(sel.at);
-    }
-    if (sel.range.from.block.id !== sel.range.to.block.id) return null;
-    const del = this.deleteRange(sel.range);
-    if (!del.ok) return null;
-    return this.refreshedPosition(sel.range.from);
-  }
-
-  /**
-   * Range a Backspace-style key should delete. Range-selection wins
-   * if there is one (just delete the selection). Otherwise step one
-   * character left of the caret — at offset 0 we have nothing to do
-   * (and Word does nothing in that position too, in v1; cross-block
-   * backspace is a follow-up).
-   */
-  private rangeForBackwardDelete(
-    sel: Selection,
-    _kind: "deleteContentBackward" | "deleteWordBackward",
-  ): ApiRange | null {
-    if (!sel) return null;
-    if (sel.kind === "range") return sel.range;
-    if (sel.at.offset === 0) return null;
-    // v1: word-backward still deletes a single char. The browser would
-    // hand us a wider range via getTargetRanges() but we'd then need
-    // to map DOM ranges back to ApiRanges — kept simple for now.
-    const at = this.refreshedPosition(sel.at);
-    if (!at) return null;
-    return {
-      from: { block: at.block, offset: at.offset - 1 },
-      to: at,
-    };
-  }
-
-  /** Forward-delete equivalent of `rangeForBackwardDelete`. */
-  private rangeForForwardDelete(
-    sel: Selection,
-    _kind: "deleteContentForward" | "deleteWordForward",
-  ): ApiRange | null {
-    if (!sel) return null;
-    if (sel.kind === "range") return sel.range;
-    const at = this.refreshedPosition(sel.at);
-    if (!at) return null;
-    const info = this.getBlockById(at.block.id);
-    if (!info || at.offset >= info.length) return null;
-    return {
-      from: at,
-      to: { block: at.block, offset: at.offset + 1 },
-    };
-  }
-
-  /** Re-lookup the block by id to get a fresh `BlockRef` (current version). */
-  private refreshedPosition(at: InlinePosition): InlinePosition | null {
-    return query.refreshedPosition(this.ctx, at);
-  }
-
-  /** Place the caret at `(blockId, offset)` using a fresh block ref. */
-  private placeCaret(blockId: string, offset: number): void {
-    query.placeCaret(this.ctx, blockId, offset);
-  }
-
-  /**
-   * True when the current DOM selection's caret sits inside an `<ins>`,
-   * `<del>`, or `<span.sobree-revision-format>` wrapper — the markup
-   * the renderer emits for tracked revisions. Used by `beforeinput` in
-   * mode-off to detect when we have to take over the insert path: if
-   * we don't, the browser's contenteditable inserts the new character
-   * INSIDE the wrapper and the post-input DOM-sync stamps it with the
-   * wrapper's revision marker (an edit the user explicitly opted out
-   * of tracking).
-   *
-   * Returns `false` for a normal caret in plain text, in a `<strong>`
-   * / `<em>` / etc. — those wrappers *should* inherit (formatting),
-   * unlike revision wrappers which encode "edit history."
-   */
-  private caretInsideRevisionWrapper(): boolean {
-    const sel = typeof window !== "undefined" ? window.getSelection() : null;
-    if (!sel || sel.rangeCount === 0) return false;
-    const range = sel.getRangeAt(0);
-    const { startContainer } = range;
-
-    const el =
-      startContainer.nodeType === Node.ELEMENT_NODE
-        ? (startContainer as Element)
-        : startContainer.parentElement;
-    if (!el) return false;
-
-    // Aggressive but reliable: any caret position in a block that
-    // contains *any* revision wrapper triggers the intercept. We
-    // started with a tighter "caret is inside / adjacent to a
-    // wrapper" check, but the browser's contentEditable inheritance
-    // rule fires in too many caret configurations to predict — text
-    // nodes at the boundary, element-typed startContainers, the
-    // moment after a re-render, etc. Intercepting at block scope
-    // means the next character lands as a separate AST run no
-    // matter where in the block the caret happens to be, and
-    // `mergeAdjacentTextRuns` keeps the AST clean by coalescing
-    // adjacent runs that share properties.
-    //
-    // Perf cost: every insert in a partially-tracked block goes
-    // through `insertRun` instead of native contentEditable. That's
-    // a sync commit + re-render per keystroke; modern browsers
-    // handle thousands of these per second, so even a doc with many
-    // tracked paragraphs types smoothly. Plain text in *untouched*
-    // blocks stays on the fast browser path.
-    const block = el.closest<HTMLElement>("[data-block-id]");
-    if (!block) return false;
-    return !!block.querySelector(
-      "ins.sobree-revision, del.sobree-revision, span.sobree-revision-format",
-    );
-  }
-
   // === tracked changes & comments — review actions ===
 
   /**
@@ -1303,10 +943,6 @@ export class Editor {
    */
   rejectParagraphRevision(target: BlockRef): EditResult<void> {
     return review.rejectParagraphRevision(this.ctx, target);
-  }
-
-  private markParagraphBreakForDelete(index: number): EditResult<void> {
-    return review.markParagraphBreakForDelete(this.ctx, index);
   }
 
   /**
@@ -1409,7 +1045,7 @@ export class Editor {
       this.compositionStartListener =
       this.compositionEndListener =
         null;
-    this.composition = null;
+    this.trackedInput.reset();
     if (this.selectionChangeListener) {
       document.removeEventListener("selectionchange", this.selectionChangeListener);
       this.selectionChangeListener = null;
@@ -1726,98 +1362,6 @@ export class Editor {
     }
   }
 
-  // === clipboard / drag-drop image insertion ===
-
-  private async onPaste(e: ClipboardEvent): Promise<void> {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    // Image-file paste — handled the same way in tracked and untracked
-    // modes; image-as-revision is a follow-up (would need to extend
-    // `stampInsertRevision` to drawing runs).
-    for (const item of Array.from(items)) {
-      if (item.kind !== "file") continue;
-      if (!item.type.startsWith("image/")) continue;
-      e.preventDefault();
-      const file = item.getAsFile();
-      if (!file) continue;
-      await this.insertImageFromFile(file);
-      return;
-    }
-
-    // Tracked-mode text paste — intercept so the inserted runs flow
-    // through `insertRun` (which stamps `revision: ins` per
-    // `TrackChangesState`'s semantics) instead of the browser's native
-    // contentEditable paste, which mutates the DOM directly and the
-    // post-input sync would land plain runs with no marker.
-    //
-    // v1 scope: plain text only (`text/plain`). Multi-line text uses
-    // `splitBlock` between lines — each line becomes a tracked paragraph
-    // (the splits themselves carry `revision: ins` on the new
-    // paragraphs' properties, matching the live-typed Enter path).
-    // HTML / rich paste in tracked mode falls back to plain-text — a
-    // deliberate trade-off so the marker contract stays tight.
-    if (this.trackChanges.enabled) {
-      const text = e.clipboardData?.getData("text/plain") ?? "";
-      if (text === "") return;
-      e.preventDefault();
-      this.pasteTrackedText(text);
-    }
-  }
-
-  /**
-   * Insert `text` at the current selection in track-changes mode, with
-   * each `\n` becoming a `splitBlock`. Used by `onPaste` for plain-text
-   * paste; could be reused for tracked drop (a follow-up). Splits the
-   * line list once up-front and walks it so each insertRun lands at the
-   * caret of the *current* paragraph (which may be a fresh one from a
-   * preceding splitBlock).
-   */
-  private pasteTrackedText(text: string): void {
-    const sel = this.selection.get();
-    // Replace any selection first (same as live-typing path).
-    const insertAt = this.markedRangeForReplace(sel);
-    if (!insertAt) return;
-    // Normalise CRLF/CR → LF so the line walk is uniform.
-    const lines = text.replace(/\r\n?/g, "\n").split("\n");
-    let pos: InlinePosition | null = insertAt;
-    let lastInsertedLength = 0;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      if (line !== "" && pos) {
-        const r = this.insertRun(pos, { kind: "text", text: line, properties: {} });
-        if (!r.ok) return;
-        lastInsertedLength = line.length;
-      } else {
-        lastInsertedLength = 0;
-      }
-      // For every line *except* the last, split — produces the next
-      // paragraph (whose properties carry `revision: ins`).
-      if (i < lines.length - 1 && pos) {
-        const afterInsert = this.refreshedPosition({
-          block: pos.block,
-          offset: pos.offset + lastInsertedLength,
-        });
-        if (!afterInsert) return;
-        const split = this.splitBlock(afterInsert);
-        if (!split.ok) return;
-        pos = { block: split.value, offset: 0 };
-      } else {
-        pos = pos
-          ? this.refreshedPosition({
-              block: pos.block,
-              offset: pos.offset + lastInsertedLength,
-            })
-          : null;
-      }
-    }
-    // Final caret restoration — past the last inserted character.
-    if (pos) this.placeCaret(pos.block.id, pos.offset);
-  }
-
-  private insertImageFromFile(file: File): Promise<void> {
-    return runs.insertImageFromFile(this.ctx, file);
-  }
 }
 
 // === helpers ===
