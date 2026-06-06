@@ -9,7 +9,7 @@
  */
 
 import type { SobreePlugin } from "@sobree/core";
-import { BlockTools, type BlockToolsOptions } from "./index";
+import { BlockTools, type BlockToolsOptions } from "./blockTools";
 
 /**
  * User-overridable subset of `BlockToolsOptions`. The non-overridable
