@@ -187,13 +187,20 @@ export function createSobree(
 
   const viewport = new Viewport(host);
 
-  const sobreeOpts: SobreeOptions = {};
-  if (initialDocument) sobreeOpts.initialDocument = initialDocument;
-  if (options.pageSetup) sobreeOpts.pageSetup = options.pageSetup;
-  if (options.changeDebounceMs !== undefined)
-    sobreeOpts.changeDebounceMs = options.changeDebounceMs;
-  if (options.ydoc) sobreeOpts.ydoc = options.ydoc;
-  if (options.blobStore) sobreeOpts.blobStore = options.blobStore;
+  // Conditional-spread idiom for `exactOptionalPropertyTypes: true`:
+  // optional fields can be present-with-value or absent — NOT
+  // present-with-undefined. `&& { k: v }` includes the key only when
+  // the source has a real value. `changeDebounceMs` uses `!== undefined`
+  // because 0 is a legitimate value.
+  const sobreeOpts: SobreeOptions = {
+    ...(initialDocument && { initialDocument }),
+    ...(options.pageSetup && { pageSetup: options.pageSetup }),
+    ...(options.changeDebounceMs !== undefined && {
+      changeDebounceMs: options.changeDebounceMs,
+    }),
+    ...(options.ydoc && { ydoc: options.ydoc }),
+    ...(options.blobStore && { blobStore: options.blobStore }),
+  };
 
   const sobree = new Sobree(viewport.slot, sobreeOpts);
 

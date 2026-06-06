@@ -92,9 +92,10 @@ async function main(): Promise<void> {
     log("local mode (no --ws-url) — Y.Doc is ephemeral");
   }
 
-  const sobreeOpts: Parameters<typeof createSobreeMcpServer>[0] = { ydoc };
-  if (args.origin) sobreeOpts.origin = args.origin;
-  const { server, destroy } = createSobreeMcpServer(sobreeOpts);
+  const { server, destroy } = createSobreeMcpServer({
+    ydoc,
+    ...(args.origin && { origin: args.origin }),
+  });
 
   // Stdio transport — Claude Desktop and most MCP clients speak
   // this. The server reads JSON-RPC messages from stdin and writes
