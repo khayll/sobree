@@ -1,6 +1,8 @@
 import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { InlineRun, Paragraph, SobreeDocument, TextRun } from "../doc/types";
 import { Editor, type TrackChangesState } from "./";
+import type { EditorContext } from "./context";
+import * as review from "./ops/review";
 import { describe, expect, it } from "vitest";
 
 function setupEditor(doc: SobreeDocument): Editor {
@@ -538,9 +540,9 @@ describe("track-changes mode (authoring)", () => {
   });
 
   // jsdom doesn't provide DataTransfer, so the paste tests below call
-  // the private `pasteTrackedText` directly via cast — the same path
+  // `trackedInput.pasteTrackedText` directly via cast — the same path
   // `onPaste` reaches once it's extracted plain text from the clipboard.
-  type PasteAccess = { pasteTrackedText: (text: string) => void };
+  type PasteAccess = { trackedInput: { pasteTrackedText: (text: string) => void } };
 
   it("tracked paste of single-line text stamps the run as ins", () => {
     const ed = setupEditor(plainDoc());
@@ -550,7 +552,7 @@ describe("track-changes mode (authoring)", () => {
       kind: "caret",
       at: { block: { id: block.id, version: block.version }, offset: 5 },
     });
-    (ed as unknown as PasteAccess).pasteTrackedText(" THERE");
+    (ed as unknown as PasteAccess).trackedInput.pasteTrackedText(" THERE");
     const r = (ed.getDocument().body[0] as Paragraph).runs;
     const inserted = r.find(
       (x): x is TextRun => x.kind === "text" && x.text === " THERE",
@@ -572,7 +574,7 @@ describe("track-changes mode (authoring)", () => {
       kind: "caret",
       at: { block: { id: block.id, version: block.version }, offset: 11 },
     });
-    (ed as unknown as PasteAccess).pasteTrackedText("\nLine two\nLine three");
+    (ed as unknown as PasteAccess).trackedInput.pasteTrackedText("\nLine two\nLine three");
     const body = ed.getDocument().body as Paragraph[];
     expect(body).toHaveLength(3);
     expect(body[0]?.runs.map((r) => (r.kind === "text" ? r.text : "")).join("")).toBe("Hello world");
@@ -595,7 +597,7 @@ describe("track-changes mode (authoring)", () => {
       kind: "caret",
       at: { block: { id: block.id, version: block.version }, offset: 11 },
     });
-    (ed as unknown as PasteAccess).pasteTrackedText("\r\nA\rB");
+    (ed as unknown as PasteAccess).trackedInput.pasteTrackedText("\r\nA\rB");
     const body = ed.getDocument().body as Paragraph[];
     // 1 (original) + 2 new = 3 paragraphs.
     expect(body).toHaveLength(3);
@@ -726,14 +728,19 @@ describe("block-level revisions (paragraph mark)", () => {
   // actually invokes when the user presses Backspace; calling the
   // private helper directly keeps the test reliable without jsdom's
   // contentEditable quirks.
-  type MarkAccess = { markParagraphBreakForDelete: (i: number) => { ok: boolean } };
+  // markParagraphBreakForDelete moved to ops/review; reach it through the
+  // editor's internal context (the runtime backspace path gets there via
+  // trackedInput.handleBeforeInput).
+  type CtxAccess = { ctx: EditorContext };
+  const markBreak = (ed: Editor, i: number) =>
+    review.markParagraphBreakForDelete((ed as unknown as CtxAccess).ctx, i);
 
   it("backspace-at-start in tracked mode stamps paragraph-del on the current block", () => {
     const d = emptyDocument();
     d.body = [paragraph([text("First")]), paragraph([text("Second")])];
     const ed = setupEditor(d);
     ed.setTrackChanges({ enabled: true, author: "Alice" });
-    const r = (ed as unknown as MarkAccess).markParagraphBreakForDelete(1);
+    const r = markBreak(ed, 1);
     expect(r.ok).toBe(true);
     const body = ed.getDocument().body as Paragraph[];
     expect(body).toHaveLength(2);
@@ -753,7 +760,7 @@ describe("block-level revisions (paragraph mark)", () => {
     ];
     const ed = setupEditor(d);
     ed.setTrackChanges({ enabled: true, author: "Alice" });
-    const r = (ed as unknown as MarkAccess).markParagraphBreakForDelete(1);
+    const r = markBreak(ed, 1);
     expect(r.ok).toBe(true);
     const body = ed.getDocument().body as Paragraph[];
     // Merged back into First — split cancelled, no trace.
@@ -771,7 +778,7 @@ describe("block-level revisions (paragraph mark)", () => {
     ];
     const ed = setupEditor(d);
     ed.setTrackChanges({ enabled: true, author: "Alice" });
-    const r = (ed as unknown as MarkAccess).markParagraphBreakForDelete(1);
+    const r = markBreak(ed, 1);
     expect(r.ok).toBe(true);
     const body = ed.getDocument().body as Paragraph[];
     // Bob's marker untouched.

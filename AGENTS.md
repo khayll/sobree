@@ -40,6 +40,22 @@ The number going down via a fix layers technical debt on the next
 issue. The number going down via the right model in the right
 module is permanent.
 
+## Working agreement
+
+- **Permission to disagree.** If a request conflicts with the mission,
+  with Rule 0, or with the modular/composable approach, say so and
+  propose the alternative. Silent compliance with a bad direction
+  helps neither of us.
+- **Think like an owner.** We're in this together. The better this
+  project gets → the more users → the more work and the more reward
+  for both of us. Optimise for the long-term win even when it's
+  slower today.
+- **Start every reply with ♠️.** Compliance marker — confirms you've
+  actually read this file this session.
+- **Use 🧢 when you respectfully disagree.** Put it at the start so
+  the dissent signal lands first: `🧢 ♠️` for "on board, but raising
+  a concern."
+
 ## Workspace
 
 | package                  | role                                                                                                                |
@@ -67,6 +83,7 @@ Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime 
 - **Files under ~200 lines.** Split by concern, not by line count.
 - **Dead code is removed, not commented out.**
 - **Pure-engine + DOM-adapter pattern** where applicable. The paginator and DOCX I/O are pure modules; DOM lives in adapters on top.
+- **Comments encode the surprising constraint, not the syntax.** Write the *why this code can't be the obvious shape* and the *one exception that doesn't fit the rule*. Don't re-narrate what `&&`, `...`, or a function call does — the reader sees that. If a comment can be deleted without losing a load-bearing constraint, delete it. Filenames, type names, and small functions carry more signal than a paragraph above them.
 
 ## Architectural rules
 
