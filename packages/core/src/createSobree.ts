@@ -187,11 +187,9 @@ export function createSobree(
 
   const viewport = new Viewport(host);
 
-  // Conditional-spread idiom for `exactOptionalPropertyTypes: true`:
-  // optional fields can be present-with-value or absent — NOT
-  // present-with-undefined. `&& { k: v }` includes the key only when
-  // the source has a real value. `changeDebounceMs` uses `!== undefined`
-  // because 0 is a legitimate value.
+  // `exactOptionalPropertyTypes: true` forbids `T | undefined` on
+  // optional fields, so spread-when-truthy. `changeDebounceMs` uses
+  // `!== undefined` because 0 is a valid value.
   const sobreeOpts: SobreeOptions = {
     ...(initialDocument && { initialDocument }),
     ...(options.pageSetup && { pageSetup: options.pageSetup }),

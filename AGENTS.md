@@ -67,6 +67,7 @@ Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime 
 - **Files under ~200 lines.** Split by concern, not by line count.
 - **Dead code is removed, not commented out.**
 - **Pure-engine + DOM-adapter pattern** where applicable. The paginator and DOCX I/O are pure modules; DOM lives in adapters on top.
+- **Comments encode the surprising constraint, not the syntax.** Write the *why this code can't be the obvious shape* and the *one exception that doesn't fit the rule*. Don't re-narrate what `&&`, `...`, or a function call does — the reader sees that. If a comment can be deleted without losing a load-bearing constraint, delete it. Filenames, type names, and small functions carry more signal than a paragraph above them.
 
 ## Architectural rules
 
