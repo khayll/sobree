@@ -132,7 +132,8 @@ export async function importDocx(
   // partIds; the referenced header/footer XML parts are loaded into
   // `headerFooterBodies` so the editor can render them.
   const sections = sectPrEls.map((el) => readSection(el, rels));
-  const headerFooterBodies = loadHeaderFooterBodies(sections, unzipped.text, rels);
+  const { bodies: headerFooterBodies, frames: headerFooterFrames } =
+    loadHeaderFooterParts(sections, unzipped.text, rels);
 
   // Thread `word/*` media and other embedded binary parts through the AST
   // so the export path can round-trip them. Keyed by ZIP-level path so
@@ -184,6 +185,7 @@ export async function importDocx(
       ? { settings: { defaultTabStopTwips: settings.defaultTabStopTwips } }
       : {}),
     ...(finalAnchoredFrames.length > 0 ? { anchoredFrames: finalAnchoredFrames } : {}),
+    ...(Object.keys(headerFooterFrames).length > 0 ? { headerFooterFrames } : {}),
     ...(inlineFrames.length > 0 ? { inlineFrames } : {}),
   };
   // If the doc was truly empty, give it a blank paragraph so Word opens it.
@@ -214,12 +216,13 @@ export async function importDocx(
  * images that live in `word/media/*`. If headers ever need their own
  * `_rels/header1.xml.rels` (rare), that's a follow-up.
  */
-function loadHeaderFooterBodies(
+function loadHeaderFooterParts(
   sections: readonly SectionProperties[],
   textParts: Record<string, string>,
   rels: Map<string, string>,
-): Record<string, Block[]> {
+): { bodies: Record<string, Block[]>; frames: Record<string, AnchoredFrame[]> } {
   const bodies: Record<string, Block[]> = {};
+  const frames: Record<string, AnchoredFrame[]> = {};
   const seen = new Set<string>();
   for (const section of sections) {
     for (const ref of [...section.headerRefs, ...section.footerRefs]) {
@@ -242,14 +245,29 @@ function loadHeaderFooterBodies(
       const headerRels = headerRelsXml
         ? mergeRels(parseRels(headerRelsXml), rels)
         : rels;
+      // Extract floating frames FIRST: `parseAnchoredFrames` claims
+      // (removes) each anchored `<w:drawing>` from the XML so the flow
+      // walker below doesn't also render it (double-render). Map the part's
+      // own paragraph children to indices so a `verticalFrom="paragraph"`
+      // frame records which header/footer paragraph it anchors to (the
+      // renderer then positions it at that paragraph's rendered Y, same as
+      // body frames). Textbox bodies run through the same block walker as
+      // the document body so their formatting/lists/tables survive.
+      const root = parsed.documentElement;
+      const partFrames = parseAnchoredFrames(parsed, {
+        rels: headerRels,
+        bodyParagraphIndexByElement: paragraphIndexInContainer(root),
+        parseBlockBody: (txbxContent) =>
+          convertBlocksFromContainer(txbxContent, { rels: headerRels }).body,
+      });
+      if (partFrames.length > 0) frames[ref.partId] = partFrames;
       // Header part roots: `<w:hdr>` or `<w:ftr>`. Both wrap a stream
       // of paragraphs + tables identical in shape to `<w:body>`.
-      const root = parsed.documentElement;
       const { body } = convertBlocksFromContainer(root, { rels: headerRels });
       bodies[ref.partId] = body;
     }
   }
-  return bodies;
+  return { bodies, frames };
 }
 
 /**
@@ -285,20 +303,28 @@ function mergeRels(
  */
 function buildBodyParagraphIndex(doc: Document): Map<Element, number> {
   const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-  const map = new Map<Element, number>();
   const body = doc.getElementsByTagNameNS(W_NS, "body")[0];
-  if (!body) return map;
+  return body ? paragraphIndexInContainer(body) : new Map();
+}
+
+/**
+ * Map a block container's direct `<w:p>` children to their block index
+ * (the index `convertBlocksFromContainer` will assign and the renderer
+ * stamps as `data-block-index`). Tables advance the counter — anchored
+ * frames live inside paragraphs, not tables, so the table element itself
+ * isn't mapped, but the indices must still line up with the block list.
+ * Used for `<w:body>`, `<w:hdr>` and `<w:ftr>` alike so anchored frames in
+ * any of them can record their anchor paragraph.
+ */
+function paragraphIndexInContainer(container: Element): Map<Element, number> {
+  const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const map = new Map<Element, number>();
   let index = 0;
-  for (const child of Array.from(body.children)) {
+  for (const child of Array.from(container.children)) {
     if (child.namespaceURI === W_NS && child.localName === "p") {
       map.set(child, index);
       index++;
     } else if (child.namespaceURI === W_NS && child.localName === "tbl") {
-      // Tables count toward body block indices too, but we don't need
-      // the table element itself in the map — anchored frames live
-      // inside paragraphs, not tables. Still advance the counter so
-      // the indices line up with how the body-block list will be
-      // numbered downstream.
       index++;
     }
   }

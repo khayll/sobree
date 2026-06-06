@@ -282,6 +282,43 @@ function synthFrameFromNestedGroup(
   };
 }
 
+/**
+ * Read a textbox's `<wps:bodyPr lIns/tIns/rIns/bIns>` internal insets
+ * (EMU) into the `padding` the renderer applies. Returns `undefined`
+ * unless at least one inset is declared — a bare `bodyPr` (no inset
+ * attrs) keeps the no-padding behaviour. When some sides are declared
+ * and others omitted, the omitted ones fall back to Word's factory
+ * defaults (lIns/rIns = 91440 = 0.1in, tIns/bIns = 45720 = 0.05in) so a
+ * partially-specified box still gets Word's geometry.
+ */
+function readBodyPrInsets(
+  wsp: Element,
+): { topEmu: number; rightEmu: number; bottomEmu: number; leftEmu: number } | undefined {
+  const bodyPr = firstChildNS(wsp, NS.wps, "bodyPr");
+  if (!bodyPr) return undefined;
+  const read = (name: string): number | undefined => {
+    const v = bodyPr.getAttribute(name);
+    if (v === null) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const l = read("lIns");
+  const t = read("tIns");
+  const r = read("rIns");
+  const b = read("bIns");
+  if (l === undefined && t === undefined && r === undefined && b === undefined) {
+    return undefined;
+  }
+  const DEFAULT_LR = 91440;
+  const DEFAULT_TB = 45720;
+  return {
+    leftEmu: l ?? DEFAULT_LR,
+    topEmu: t ?? DEFAULT_TB,
+    rightEmu: r ?? DEFAULT_LR,
+    bottomEmu: b ?? DEFAULT_TB,
+  };
+}
+
 function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
   // Textbox if there's `<wps:txbx><w:txbxContent>`. Otherwise a
   // geometric shape — `<wps:spPr><a:prstGeom prst="...">` carries
@@ -298,6 +335,13 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
       if (fill !== undefined) out.fill = fill;
       const border = readBorder(wsp);
       if (border !== undefined) out.border = border;
+      // `<wps:bodyPr lIns/tIns/rIns/bIns>` are the textbox's internal
+      // insets (EMU). They push the text in from the frame edge — Word
+      // aligns jellap's contact box text to the body by combining the
+      // column x-offset with lIns (≈2.5mm). Without reading them the text
+      // hugs the frame's left edge and misaligns.
+      const padding = readBodyPrInsets(wsp);
+      if (padding !== undefined) out.padding = padding;
       return out;
     }
   }

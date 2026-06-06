@@ -3,27 +3,18 @@ import {
   type VerticalAlign,
   resolvedDimensions,
 } from "./pageSetup";
-import { renderBlocks } from "../editor/view/docRenderer/block";
+import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
+import { resolveAnchorPosition } from "../editor/view/docRenderer/anchorPosition";
+import { EMU_PER_PX } from "../editor/view/docRenderer/units";
 import {
-  type AnchorLayerContext,
-  renderAnchorLayer,
-} from "../editor/view/docRenderer/anchorLayer";
-import type {
-  AnchoredFrame,
-  Block,
-  NamedStyle,
-  NumberingDefinition,
-  SectionProperties,
-} from "../doc/types";
+  type ZoneRenderContext,
+  paintZoneFrames,
+  renderZone,
+  setZoneText,
+} from "./paperZone";
+import type { AnchoredFrame, SectionProperties } from "../doc/types";
 
-export interface ZoneRenderContext {
-  blocks: readonly Block[];
-  numbering: readonly NumberingDefinition[];
-  styles: readonly NamedStyle[];
-  rawParts: Record<string, Uint8Array>;
-  pageNumber: number;
-  totalPages: number;
-}
+export type { ZoneRenderContext } from "./paperZone";
 
 /**
  * A single paper — exactly one page. Fixed width and height from the page
@@ -69,6 +60,15 @@ export class Paper {
   readonly comments: HTMLElement;
   private readonly header: HTMLElement;
   private readonly footer: HTMLElement;
+  /**
+   * Floating overlays for the header / footer zones. Unlike `.paper-
+   * anchors` (which overlays only the content rectangle), these span the
+   * whole paper card so a header frame's page/margin-relative offsets
+   * land at the right spot above the content area. Painted from
+   * `headerFooterFrames[partId]` — a zone is flow + floats, like the body.
+   */
+  private readonly headerAnchors: HTMLElement;
+  private readonly footerAnchors: HTMLElement;
 
   constructor(container: HTMLElement, setup: PageSetup) {
     this.outer = document.createElement("div");
@@ -102,7 +102,23 @@ export class Paper {
     this.footer.className = "paper-footer";
     this.footer.contentEditable = "false";
 
-    this.root.append(this.header, this.content, this.footnotes, this.footer, this.anchors);
+    this.headerAnchors = document.createElement("div");
+    this.headerAnchors.className = "paper-zone-anchors is-empty";
+    this.headerAnchors.contentEditable = "false";
+
+    this.footerAnchors = document.createElement("div");
+    this.footerAnchors.className = "paper-zone-anchors is-empty";
+    this.footerAnchors.contentEditable = "false";
+
+    this.root.append(
+      this.header,
+      this.content,
+      this.footnotes,
+      this.footer,
+      this.anchors,
+      this.headerAnchors,
+      this.footerAnchors,
+    );
 
     this.comments = document.createElement("div");
     this.comments.className = "paper-comments is-empty";
@@ -166,6 +182,57 @@ export class Paper {
   setFooterBlocks(ctx: ZoneRenderContext): void {
     renderZone(this.footer, ctx);
     this.applyZoneOverflowPadding();
+  }
+
+  /**
+   * Paint the header zone's floating frames. Resolved against the header
+   * flow (so `verticalFrom="paragraph"` anchors to a header paragraph).
+   * Pass `[]` to clear. Mirrors `setAnchoredFrames` for body.
+   */
+  setHeaderFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
+    paintZoneFrames(this.headerAnchors, this.resolveFrames(frames, this.header), ctx);
+  }
+
+  setFooterFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
+    paintZoneFrames(this.footerAnchors, this.resolveFrames(frames, this.footer), ctx);
+  }
+
+  /**
+   * Resolve each frame's `relativeFrom` origin to an absolute card-relative
+   * position, returning clones whose `offsetX/YEmu` are the final
+   * coordinates the (full-card, `inset:0`) overlay paints at. The pure
+   * `resolveAnchorPosition` owns the semantics; here we just supply the
+   * measured geometry: page margins (from the CSS vars) and — for
+   * `verticalFrom="paragraph"` — the anchor paragraph's rendered top,
+   * located within `zoneFlow` by the `data-block-index` `renderBlocks`
+   * stamps. `offsetTop` is zoom-invariant in Chromium, so the measurement
+   * stays logical at any render tier.
+   */
+  private resolveFrames(
+    frames: readonly AnchoredFrame[],
+    zoneFlow: HTMLElement,
+  ): AnchoredFrame[] {
+    // Margins come from the page-geometry CSS vars (the pgMar values),
+    // NOT the overflow-adjusted `padding-top` — a `margin`-relative frame
+    // anchors to the page margin, which a tall header doesn't move. px →
+    // EMU keeps it consistent with the `offsetTop` measurements below.
+    const marginTopEmu = parsePxFromMm(this.root.style.getPropertyValue("--margin-top")) * EMU_PER_PX;
+    const marginLeftEmu = parsePxFromMm(this.root.style.getPropertyValue("--margin-left")) * EMU_PER_PX;
+    return frames.map((f) => {
+      let anchorParaTopEmu: number | null = null;
+      if (f.anchor.verticalFrom === "paragraph" && f.anchor.paragraphIndex !== undefined) {
+        const el = zoneFlow.querySelector<HTMLElement>(
+          `[data-block-index="${f.anchor.paragraphIndex}"]`,
+        );
+        if (el) anchorParaTopEmu = offsetTopWithin(el, this.root) * EMU_PER_PX;
+      }
+      const { xEmu, yEmu } = resolveAnchorPosition(f, {
+        marginTopEmu,
+        marginLeftEmu,
+        anchorParaTopEmu,
+      });
+      return { ...f, offsetXEmu: xEmu, offsetYEmu: yEmu };
+    });
   }
 
   /**
@@ -234,17 +301,26 @@ export class Paper {
     frames: readonly AnchoredFrame[],
     ctx: AnchorLayerContext,
   ): void {
-    const fresh = renderAnchorLayer(frames, ctx);
-    // Keep the same DOM node so external observers (selection layer,
-    // CSS) can hold stable references — copy children + classes from
-    // the freshly built layer.
-    this.anchors.replaceChildren(...Array.from(fresh.children));
-    this.anchors.classList.toggle("is-empty", frames.length === 0);
+    paintZoneFrames(this.anchors, this.resolveFrames(frames, this.content), ctx);
   }
 
   destroy(): void {
     this.outer.remove();
   }
+}
+
+/** Sum `offsetTop` up the `offsetParent` chain until `ancestor`, giving
+ *  an element's top relative to that ancestor's padding box. `offsetTop`
+ *  is logical-px (CSS `zoom` on an ancestor doesn't perturb it in
+ *  Chromium), so the result is render-tier-independent. */
+function offsetTopWithin(el: HTMLElement, ancestor: HTMLElement): number {
+  let top = 0;
+  let cur: HTMLElement | null = el;
+  while (cur && cur !== ancestor) {
+    top += cur.offsetTop;
+    cur = cur.offsetParent as HTMLElement | null;
+  }
+  return top;
 }
 
 const MM_TO_PX = 96 / 25.4;
@@ -261,53 +337,6 @@ function parsePxFromMm(value: string): number {
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
-}
-
-function renderZone(zone: HTMLElement, ctx: ZoneRenderContext): void {
-  zone.replaceChildren();
-  if (ctx.blocks.length === 0) {
-    zone.classList.add("is-empty");
-    return;
-  }
-  renderBlocks(ctx.blocks, zone, ctx.numbering, ctx.styles, ctx.rawParts);
-  substituteFieldNodes(zone, ctx.pageNumber, ctx.totalPages);
-  // "Empty" here = no rendered text anywhere; an image-only header
-  // still counts as non-empty so the `is-empty` CSS doesn't collapse
-  // away its space.
-  const hasContent =
-    (zone.textContent ?? "").trim().length > 0 ||
-    zone.querySelector("img, svg, table, .sobree-field") !== null;
-  zone.classList.toggle("is-empty", !hasContent);
-}
-
-function setZoneText(zone: HTMLElement, text: string): void {
-  zone.textContent = text;
-  zone.classList.toggle("is-empty", text.trim() === "");
-}
-
-/**
- * Walk the rendered header/footer subtree, replacing each
- * `<span class="sobree-field" data-field="...">` node's text with the
- * live PAGE / NUMPAGES value for this paper.
- *
- * Done as a post-render pass instead of inside the inline renderer so
- * `renderBlocks` stays page-agnostic (it has no concept of "which page
- * is this paragraph on") and the header pipeline keeps the substitution
- * concern in one place.
- */
-function substituteFieldNodes(
-  zone: HTMLElement,
-  pageNumber: number,
-  totalPages: number,
-): void {
-  const fields = zone.querySelectorAll<HTMLElement>("span.sobree-field");
-  for (const field of Array.from(fields)) {
-    const instr = (field.dataset.field ?? "").trim().toUpperCase();
-    if (instr === "PAGE") field.textContent = String(pageNumber);
-    else if (instr === "NUMPAGES") field.textContent = String(totalPages);
-    // Unknown instructions keep whatever the AST cached (Word writes a
-    // cached value for non-resolvable fields, e.g. SECTION). No-op.
-  }
 }
 
 /**

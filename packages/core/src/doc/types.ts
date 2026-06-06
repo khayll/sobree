@@ -32,6 +32,15 @@ export interface SobreeDocument {
    * emits each body to its own OOXML part at export time.
    */
   headerFooterBodies: Record<string, Block[]>;
+  /**
+   * Floating objects that live inside a header/footer part, keyed by the
+   * SAME `HeaderFooterRef.partId` as `headerFooterBodies`. A header part
+   * is a self-contained sub-document: its flow blocks live in
+   * `headerFooterBodies[partId]`, its anchored frames here. The renderer
+   * paints these into a per-zone overlay exactly like body `anchoredFrames`.
+   * Empty/absent for the common header-without-floats case.
+   */
+  headerFooterFrames?: Record<string, AnchoredFrame[]>;
   /** Named styles (Heading1, Quote, Body Text, …) defined at the doc level. */
   styles: NamedStyle[];
   /** List/numbering definitions referenced by `Paragraph.properties.numbering`. */

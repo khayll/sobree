@@ -507,6 +507,18 @@ export class Sobree {
       fromSetup.headerRefs = section0.headerRefs;
       fromSetup.footerRefs = section0.footerRefs;
       if (section0.titlePage !== undefined) fromSetup.titlePage = section0.titlePage;
+      // `PageSetup` models only the four page margins, so
+      // `pageSetupToSection` fills the header/footer offsets (the
+      // `<w:pgMar w:header/footer>` distances) with Word's factory
+      // default (720tw). Sections 1+ come straight from the AST with the
+      // document's real values, so without preserving them section 0's
+      // running header sits at a different offset than the rest — the
+      // logo / header content visibly jumps between page 1 and later
+      // pages (jellap: 720tw → 12.7mm on page 1 vs the doc's 284tw →
+      // 5mm on pages 2+). Same class as the refs preservation above.
+      const m0 = section0.pageMargins;
+      if (m0?.headerTwips !== undefined) fromSetup.pageMargins.headerTwips = m0.headerTwips;
+      if (m0?.footerTwips !== undefined) fromSetup.pageMargins.footerTwips = m0.footerTwips;
     }
     const composed: SectionProperties[] = [fromSetup, ...doc.sections.slice(1)];
     this.stack.setSections(composed);
@@ -522,6 +534,9 @@ export class Sobree {
       hasRichZones
         ? {
             headerFooterBodies: doc.headerFooterBodies,
+            ...(doc.headerFooterFrames
+              ? { headerFooterFrames: doc.headerFooterFrames }
+              : {}),
             numbering: doc.numbering ?? [],
             styles: doc.styles ?? [],
             rawParts: doc.rawParts ?? {},
