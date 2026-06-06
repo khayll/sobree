@@ -88,16 +88,33 @@
    frame. Hidden via `is-empty` when the page has no anchored frames. */
 .paper-anchors {
   position: absolute;
-  top: var(--margin-top, 25mm);
-  right: var(--margin-right, 20mm);
-  bottom: var(--margin-bottom, 25mm);
-  left: var(--margin-left, 20mm);
+  /* Full-card coordinate system. Each frame's left/top is its ABSOLUTE
+     card-relative position — the renderer resolves the OOXML origin
+     (`relativeFrom` page / margin / paragraph) per frame, so the overlay
+     can't bake one fixed origin into its inset. */
+  inset: 0;
   pointer-events: none;
   isolation: isolate;
   z-index: 1;
 }
 
 .paper-anchors.is-empty {
+  display: none;
+}
+
+/* Floating layer for a HEADER / FOOTER zone. Full-card coordinate system
+   like `.paper-anchors` (each frame's left/top is absolute, resolved from
+   its `relativeFrom` origin by the renderer). Above the body layer so
+   header decorations aren't occluded by content. */
+.paper-zone-anchors {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  isolation: isolate;
+  z-index: 2;
+}
+
+.paper-zone-anchors.is-empty {
   display: none;
 }
 

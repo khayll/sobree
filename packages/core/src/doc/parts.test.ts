@@ -1,7 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { collectLivePartPaths, pruneOrphanParts } from "./parts";
 import { emptyDocument } from "./builders";
-import type { Block, DrawingRun, Paragraph, SobreeDocument } from "./types";
+import type {
+  AnchoredFrame,
+  Block,
+  DrawingRun,
+  Paragraph,
+  SobreeDocument,
+} from "./types";
+
+/** Geometry-only frame fields; content is supplied per-test. */
+function frameShell(): Omit<AnchoredFrame, "content"> {
+  return {
+    id: "f",
+    anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page" },
+    offsetXEmu: 0,
+    offsetYEmu: 0,
+    widthEmu: 100,
+    heightEmu: 100,
+  };
+}
+
+function pictureFrame(partPath: string): AnchoredFrame {
+  return { ...frameShell(), content: { kind: "picture", partPath } };
+}
 
 function drawing(partPath: string): DrawingRun {
   return {
@@ -78,6 +100,41 @@ describe("collectLivePartPaths", () => {
     ];
     expect(collectLivePartPaths(doc)).toEqual(new Set(["word/media/logo.png"]));
   });
+
+  it("collects picture paths from body anchored frames", () => {
+    const doc = makeDoc([]);
+    doc.anchoredFrames = [pictureFrame("word/media/float.png")];
+    expect(collectLivePartPaths(doc)).toEqual(new Set(["word/media/float.png"]));
+  });
+
+  it("collects picture paths from header/footer frames (incl. nested + textbox)", () => {
+    const doc = makeDoc([]);
+    doc.headerFooterFrames = {
+      "header1.xml": [
+        pictureFrame("word/media/headerlogo.png"),
+        {
+          ...frameShell(),
+          content: { kind: "textbox", body: [paraWithImage("word/media/intbx.png")] },
+        },
+        {
+          ...frameShell(),
+          content: {
+            kind: "group",
+            children: [pictureFrame("word/media/grpchild.png")],
+            childCoordSystemCx: 100,
+            childCoordSystemCy: 100,
+          },
+        },
+      ],
+    };
+    expect(collectLivePartPaths(doc)).toEqual(
+      new Set([
+        "word/media/headerlogo.png",
+        "word/media/intbx.png",
+        "word/media/grpchild.png",
+      ]),
+    );
+  });
 });
 
 describe("pruneOrphanParts", () => {
@@ -111,5 +168,17 @@ describe("pruneOrphanParts", () => {
     const result = pruneOrphanParts(doc);
     expect(result.pruned).toEqual(["word/media/zombie.jpg"]);
     expect(Object.keys(result.doc.rawParts)).toEqual(["word/media/h.png"]);
+  });
+
+  it("preserves a header anchored-frame picture on prune", () => {
+    const doc = makeDoc([]);
+    doc.headerFooterFrames = {
+      "header1.xml": [pictureFrame("word/media/badge.png")],
+    };
+    doc.rawParts["word/media/badge.png"] = new Uint8Array([1]);
+    doc.rawParts["word/media/zombie.jpg"] = new Uint8Array([2]);
+    const result = pruneOrphanParts(doc);
+    expect(result.pruned).toEqual(["word/media/zombie.jpg"]);
+    expect(Object.keys(result.doc.rawParts)).toEqual(["word/media/badge.png"]);
   });
 });
