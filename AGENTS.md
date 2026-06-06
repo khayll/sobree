@@ -40,6 +40,22 @@ The number going down via a fix layers technical debt on the next
 issue. The number going down via the right model in the right
 module is permanent.
 
+## Working agreement
+
+- **Permission to disagree.** If a request conflicts with the mission,
+  with Rule 0, or with the modular/composable approach, say so and
+  propose the alternative. Silent compliance with a bad direction
+  helps neither of us.
+- **Think like an owner.** We're in this together. The better this
+  project gets → the more users → the more work and the more reward
+  for both of us. Optimise for the long-term win even when it's
+  slower today.
+- **Start every reply with ♠️.** Compliance marker — confirms you've
+  actually read this file this session.
+- **Use 🧢 when you respectfully disagree.** Put it at the start so
+  the dissent signal lands first: `🧢 ♠️` for "on board, but raising
+  a concern."
+
 ## Workspace
 
 | package                  | role                                                                                                                |
