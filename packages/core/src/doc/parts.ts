@@ -18,7 +18,7 @@
  *     orphans drop on round-trip without an explicit prune.
  */
 
-import type { Block, InlineRun, SobreeDocument } from "./types";
+import type { AnchoredFrame, Block, InlineRun, SobreeDocument } from "./types";
 import { walkBlock } from "./walk";
 import { fontLivenessPaths } from "../fonts/liveness";
 
@@ -37,6 +37,15 @@ export function collectLivePartPaths(doc: SobreeDocument): Set<string> {
     for (const block of blocks) collectFromBlock(block, live);
   }
 
+  // Floating layers reference media too: a frame can be a picture, or a
+  // textbox/group that nests pictures. Body and header/footer frames are
+  // walked the same way — without this, an anchored picture's bytes would
+  // be pruned out on export despite the frame still pointing at them.
+  for (const frame of doc.anchoredFrames ?? []) collectFromFrame(frame, live);
+  for (const frames of Object.values(doc.headerFooterFrames ?? {})) {
+    for (const frame of frames) collectFromFrame(frame, live);
+  }
+
   // Embedded font parts. The fonts module owns its own walker so the
   // liveness logic stays font-agnostic here.
   for (const path of fontLivenessPaths(doc)) live.add(path);
@@ -50,6 +59,26 @@ function collectFromBlock(block: Block, live: Set<string>): void {
       if (run.kind === "drawing" && run.partPath) live.add(run.partPath);
     },
   });
+}
+
+/** Add every `rawParts` key an anchored frame points at — directly (a
+ *  picture's `partPath`), via its textbox body, or via nested group
+ *  children. Mirrors `collectFromBlock` for the floating layer. */
+function collectFromFrame(frame: AnchoredFrame, live: Set<string>): void {
+  const c = frame.content;
+  switch (c.kind) {
+    case "picture":
+      live.add(c.partPath);
+      return;
+    case "textbox":
+      for (const block of c.body) collectFromBlock(block, live);
+      return;
+    case "group":
+      for (const child of c.children) collectFromFrame(child, live);
+      return;
+    case "shape":
+      return;
+  }
 }
 
 /**

@@ -15,10 +15,11 @@ interface SobreeDocument {
   body: Block[];                              // top-level content
   sections: SectionProperties[];              // page setup per section
   headerFooterBodies: Record<string, Block[]>;
+  headerFooterFrames?: Record<string, AnchoredFrame[]>; // floating drawings inside a header/footer part
   styles: NamedStyle[];
   numbering: NumberingDefinition[];
   rawParts: Record<string, Uint8Array>;       // images, fonts, etc.
-  anchoredFrames?: AnchoredFrame[];           // floating drawings (see below)
+  anchoredFrames?: AnchoredFrame[];           // floating drawings in the body (see below)
 }
 ```
 
@@ -44,6 +45,9 @@ many breaks have been seen.
   absolutely positioned rather than in-flow. Wrapping textboxes that
   carry real prose are converted to in-flow blocks on import so they
   paginate; decorations (watermarks, `wrapNone` floats) stay anchored.
+  A header/footer part is its own sub-document: its floating drawings
+  live in `headerFooterFrames[partId]` (same key as its flow blocks in
+  `headerFooterBodies`) and render into a per-zone overlay.
 
 ## Runs
 

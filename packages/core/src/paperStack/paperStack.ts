@@ -8,6 +8,7 @@ import {
 import { paginateBlocks } from "./paginationAdapter";
 import { Paper } from "./paper";
 import { renderBlocks } from "../editor/view/docRenderer/block";
+import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { restoreSelection, saveSelection } from "../util/selection";
 import type {
   AnchoredFrame,
@@ -27,6 +28,9 @@ import type {
  */
 export interface RichZonesSource {
   headerFooterBodies: Record<string, Block[]>;
+  /** Floating frames per header/footer part, keyed by the same partId as
+   *  `headerFooterBodies`. Absent for docs whose zones have no floats. */
+  headerFooterFrames?: Record<string, AnchoredFrame[]>;
   numbering: readonly NumberingDefinition[];
   styles: readonly NamedStyle[];
   rawParts: Record<string, Uint8Array>;
@@ -572,45 +576,76 @@ export class PaperStack {
 
   private renderAllZones(): void {
     const pages = this.papers.length;
+    const richZones = this.richZones;
+    const ctx = richZones ? this.anchorLayerCtx(richZones) : null;
     this.papers.forEach((paper, i) => {
       const pageNum = i + 1;
       const sectionIdx = this.sectionIndexForPage(i);
       const isFirstOfSection = this.isFirstPaperOfSection(i, sectionIdx);
-      const headerBlocks = this.pickRichZone("header", sectionIdx, isFirstOfSection);
-      const footerBlocks = this.pickRichZone("footer", sectionIdx, isFirstOfSection);
+      const header = this.pickRichZone("header", sectionIdx, isFirstOfSection);
+      const footer = this.pickRichZone("footer", sectionIdx, isFirstOfSection);
 
-      if (this.richZones && headerBlocks !== null) {
+      if (richZones && ctx && header !== null) {
         paper.setHeaderBlocks({
-          blocks: headerBlocks,
-          numbering: this.richZones.numbering,
-          styles: this.richZones.styles,
-          rawParts: this.richZones.rawParts,
+          blocks: header.body,
+          numbering: richZones.numbering,
+          styles: richZones.styles,
+          rawParts: richZones.rawParts,
           pageNumber: pageNum,
           totalPages: pages,
         });
+        // A zone is flow + floats: paint the same part's anchored frames
+        // into the header overlay. The same partId resolves on every
+        // page that uses this header, and each paint builds independent
+        // DOM, so a repeating header paints on every page with no cloning.
+        paper.setHeaderFrames(richZones.headerFooterFrames?.[header.partId] ?? [], ctx);
       } else {
         const hTpl = zoneTemplateFor(this.setup.header, pageNum, pages);
         paper.setHeaderText(substituteVariables(hTpl, { page: pageNum, pages }));
+        paper.setHeaderFrames([], this.emptyAnchorCtx());
       }
 
-      if (this.richZones && footerBlocks !== null) {
+      if (richZones && ctx && footer !== null) {
         paper.setFooterBlocks({
-          blocks: footerBlocks,
-          numbering: this.richZones.numbering,
-          styles: this.richZones.styles,
-          rawParts: this.richZones.rawParts,
+          blocks: footer.body,
+          numbering: richZones.numbering,
+          styles: richZones.styles,
+          rawParts: richZones.rawParts,
           pageNumber: pageNum,
           totalPages: pages,
         });
+        paper.setFooterFrames(richZones.headerFooterFrames?.[footer.partId] ?? [], ctx);
       } else {
         const fTpl = zoneTemplateFor(this.setup.footer, pageNum, pages);
         paper.setFooterText(substituteVariables(fTpl, { page: pageNum, pages }));
+        paper.setFooterFrames([], this.emptyAnchorCtx());
       }
     });
     // Repaint floating layer alongside zones so a setRichZones (or
     // setSections) call that triggers renderAllZones also refreshes
     // anchor placement.
     this.paintAnchorLayers();
+  }
+
+  /**
+   * Build the `AnchorLayerContext` shared by body + zone overlays. The
+   * injected `renderBody` routes textbox bodies through the full
+   * `renderBlocks` pipeline so anchored text matches body formatting,
+   * keeping `anchorLayer` decoupled from `block.ts`.
+   */
+  private anchorLayerCtx(richZones: RichZonesSource): AnchorLayerContext {
+    return {
+      rawParts: richZones.rawParts,
+      pictureUrlCache: this.anchorPictureUrlCache,
+      renderBody: (blocks: Block[], host: HTMLElement) => {
+        renderBlocks(blocks, host, richZones.numbering, richZones.styles, richZones.rawParts);
+      },
+    };
+  }
+
+  /** Context for clearing an overlay to empty (no rich zones to draw). */
+  private emptyAnchorCtx(): AnchorLayerContext {
+    return { rawParts: {}, pictureUrlCache: this.anchorPictureUrlCache };
   }
 
   /**
@@ -628,37 +663,27 @@ export class PaperStack {
     const frames = this.anchoredFrames;
     if (!this.richZones || frames === null) {
       // No floating layer wanted — clear every paper's overlay.
-      for (const p of this.papers) {
-        p.setAnchoredFrames([], {
-          rawParts: {},
-          pictureUrlCache: this.anchorPictureUrlCache,
-        });
-      }
+      for (const p of this.papers) p.setAnchoredFrames([], this.emptyAnchorCtx());
       return;
     }
-    const richZones = this.richZones;
-    const ctx = {
-      rawParts: richZones.rawParts,
-      pictureUrlCache: this.anchorPictureUrlCache,
-      // Inject the full block renderer so anchored textbox bodies
-      // render with the same paragraph/list/table pipeline as body
-      // content — anchorLayer stays decoupled from block.ts.
-      renderBody: (blocks: Block[], host: HTMLElement) => {
-        renderBlocks(blocks, host, richZones.numbering, richZones.styles, richZones.rawParts);
-      },
-    };
+    const ctx = this.anchorLayerCtx(this.richZones);
     // Build per-page assignment. A paragraph-anchored frame lives on
     // the page whose .paper-content contains an element stamped with
     // `data-block-index="N"` where N === paragraphIndex. Anything
     // else falls onto the first page of its section (currently always
     // section 0 — multi-section frame routing is a follow-up).
+    // Assign each frame to a PAGE only — the per-frame origin resolution
+    // (`relativeFrom` → absolute position, including the anchor paragraph's
+    // rendered Y) happens in `Paper.setAnchoredFrames`, which can see the
+    // laid-out content. Here we just route a paragraph-anchored frame to
+    // the page whose `.paper-content` holds its `data-block-index`.
     const perPage: AnchoredFrame[][] = this.papers.map(() => []);
-    const paragraphPage = this.buildParagraphPageIndex();
+    const paragraphIndex = this.buildParagraphIndex();
     for (const frame of frames) {
       let page = 0;
       if (frame.anchor.paragraphIndex !== undefined) {
-        const found = paragraphPage.get(frame.anchor.paragraphIndex);
-        if (found !== undefined) page = found;
+        const found = paragraphIndex.get(frame.anchor.paragraphIndex);
+        if (found !== undefined) page = found.page;
       }
       const bucket = perPage[page];
       if (bucket) bucket.push(frame);
@@ -675,13 +700,13 @@ export class PaperStack {
    * this is the only piece of mutual knowledge between body flow and
    * the floating layer needed for paragraph anchoring.
    */
-  private buildParagraphPageIndex(): Map<number, number> {
-    const out = new Map<number, number>();
+  private buildParagraphIndex(): Map<number, { page: number; el: HTMLElement }> {
+    const out = new Map<number, { page: number; el: HTMLElement }>();
     for (let i = 0; i < this.papers.length; i++) {
       const stamped = this.papers[i]!.content.querySelectorAll<HTMLElement>("[data-block-index]");
       for (const el of Array.from(stamped)) {
         const n = Number(el.dataset.blockIndex);
-        if (Number.isFinite(n) && !out.has(n)) out.set(n, i);
+        if (Number.isFinite(n) && !out.has(n)) out.set(n, { page: i, el });
       }
     }
     return out;
@@ -722,7 +747,7 @@ export class PaperStack {
     kind: "header" | "footer",
     sectionIdx: number,
     isFirstOfSection: boolean,
-  ): readonly Block[] | null {
+  ): { partId: string; body: readonly Block[] } | null {
     if (!this.richZones || !this.sections) return null;
     // OOXML §17.10.3: when a section omits headerReference / footerReference,
     // the corresponding zone is inherited from the prior section. Walk back
@@ -751,7 +776,9 @@ export class PaperStack {
       ? refs.find((r) => r.type === "first") ?? refs.find((r) => r.type === "default")
       : refs.find((r) => r.type === "default") ?? refs[0];
     if (!preferred) return null;
-    return this.richZones.headerFooterBodies[preferred.partId] ?? null;
+    const body = this.richZones.headerFooterBodies[preferred.partId];
+    if (body === undefined) return null;
+    return { partId: preferred.partId, body };
   }
 }
 
