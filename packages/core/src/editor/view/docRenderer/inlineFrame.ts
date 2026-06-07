@@ -99,13 +99,31 @@ export function renderInlineFrameBlock(
 
   if (frame.textbox) {
     const tb = frame.textbox;
+    // A frame with NO decorations is just a textbox of content (the
+    // per-project entries on complex-multipage: Client / Period / …
+    // / Project Description). Word's `noAutofit` never clips — the text
+    // fills/overflows the shape — so render the region IN FLOW, sized to
+    // its content: the declared height becomes a floor (`min-height`), and
+    // longer prose grows the region (and the wrapper) instead of being cut
+    // off. Decorative frames (section pills: a centred line over a
+    // rounded-rect background picture) keep the absolute fixed-height
+    // overlay below — there the textbox sits ON TOP of the decoration.
+    const textboxOnly = frame.pictures.length === 0 && frame.shapes.length === 0;
     const region = document.createElement("div");
-    region.style.position = "absolute";
-    region.style.left = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
-    region.style.top = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
-    region.style.width = `${tb.sizeEmu.wEmu * scaleX * 100}%`;
-    region.style.height = `${emuToMm(tb.sizeEmu.hEmu)}mm`;
-    region.style.overflow = "hidden";
+    if (textboxOnly) {
+      region.style.marginLeft = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
+      if (tb.offsetEmu.yEmu > 0) region.style.marginTop = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
+      region.style.width = `${tb.sizeEmu.wEmu * scaleX * 100}%`;
+      region.style.minHeight = `${emuToMm(tb.sizeEmu.hEmu)}mm`;
+      // overflow defaults to visible — prose extends past the declared box.
+    } else {
+      region.style.position = "absolute";
+      region.style.left = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
+      region.style.top = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
+      region.style.width = `${tb.sizeEmu.wEmu * scaleX * 100}%`;
+      region.style.height = `${emuToMm(tb.sizeEmu.hEmu)}mm`;
+      region.style.overflow = "hidden";
+    }
     region.style.boxSizing = "border-box";
     // Honour the textbox's vertical anchor (`<wps:bodyPr anchor>`): a
     // flex column whose justification places the body at top / centre /
