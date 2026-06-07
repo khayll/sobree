@@ -70,6 +70,14 @@ export function renderInlineFrameBlock(
   // Word's page count (a `min-height` that grows would inflate page count).
   wrapper.style.height = `${emuToMm(frame.sizeEmu.hEmu)}mm`;
   wrapper.style.overflow = "visible";
+  // `.paper-content` is a flex column, so the frame is a flex item. Its
+  // children are all absolutely positioned (no in-flow content), so the
+  // flex `min-height: auto` resolves to 0 — and on a densely-packed page
+  // where the column overflows, the default `flex-shrink: 1` would compress
+  // the frame to 0, collapsing the box and clipping its text. Pin it: the
+  // height above is the FIXED extent (not a growing min-height), so
+  // flex-shrink:0 simply holds every frame at exactly its extent.
+  wrapper.style.flexShrink = "0";
   if (frame.pageBreakBefore) wrapper.setAttribute("data-page-break-before", "");
   if (frame.keepNext) wrapper.setAttribute("data-keep-next", "");
 
