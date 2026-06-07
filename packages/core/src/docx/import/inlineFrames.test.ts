@@ -127,7 +127,8 @@ describe("parseInlineFrames", () => {
     expect(f.pageBreakBefore).toBe(true);
     expect(f.groupExtentEmu).toEqual({ wEmu: 5000000, hEmu: 500000 });
     expect(f.sizeEmu).toEqual({ wEmu: 5000000, hEmu: 500000 });
-    expect(f.textbox).toEqual({
+    expect(f.textboxes).toHaveLength(1);
+    expect(f.textboxes[0]).toEqual({
       offsetEmu: { xEmu: 500000, yEmu: 100000 },
       sizeEmu: { wEmu: 4000000, hEmu: 300000 },
       body: [
@@ -250,6 +251,46 @@ describe("parseInlineFrames", () => {
     expect(parsed!.hostParagraphEl.getAttribute("id")).toBe("HOST");
   });
 
+  it("captures ALL textboxes in a group, incl. NESTED groups (title + details)", () => {
+    // A real "Project: X" entry: the title textbox + arrow picture are
+    // nested inside a <wpg:grpSp>, while the details textbox sits at the
+    // top level. The importer must descend into the nested group so all
+    // three survive (matches complex-multipage's HRB entry).
+    const doc = xml(`<w:body>
+      <w:p>
+        <w:r><w:drawing><wp:inline><wp:extent cx="3000000" cy="2000000"/>
+          <a:graphic><a:graphicData><wpg:wgp>
+            <wpg:grpSpPr><a:xfrm><a:chExt cx="3000000" cy="2000000"/></a:xfrm></wpg:grpSpPr>
+            <wpg:grpSp>
+              <wpg:grpSpPr><a:xfrm><a:chExt cx="3000000" cy="400000"/></a:xfrm></wpg:grpSpPr>
+              <pic:pic><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="300000" cy="400000"/></a:xfrm></pic:spPr>
+                <pic:blipFill><a:blip r:embed="rIdArrow"/></pic:blipFill></pic:pic>
+              <wps:wsp><wps:spPr><a:xfrm><a:off x="400000" y="0"/><a:ext cx="2500000" cy="300000"/></a:xfrm></wps:spPr>
+                <wps:txbx><w:txbxContent><w:p>Project: HRB Mobile Banking</w:p></w:txbxContent></wps:txbx>
+              </wps:wsp>
+            </wpg:grpSp>
+            <wps:wsp><wps:spPr><a:xfrm><a:off x="0" y="400000"/><a:ext cx="3000000" cy="1600000"/></a:xfrm></wps:spPr>
+              <wps:txbx><w:txbxContent><w:p>Client: H &amp; R Block</w:p></w:txbxContent></wps:txbx>
+            </wps:wsp>
+          </wpg:wgp></a:graphicData></a:graphic>
+        </wp:inline></w:drawing></w:r>
+      </w:p>
+    </w:body>`);
+    const ctx = {
+      rels: new Map([["rIdArrow", "media/arrow.png"]]),
+      parseBlockBody: stubParseBlockBody,
+    };
+    const frames = parseInlineFrames(doc, ctx);
+    expect(frames).toHaveLength(1);
+    const f = frames[0]!.frame;
+    expect(f.textboxes).toHaveLength(2);
+    expect(f.textboxes[0]!.body[0]).toMatchObject({ runs: [{ text: "Project: HRB Mobile Banking" }] });
+    expect(f.textboxes[1]!.body[0]).toMatchObject({ runs: [{ text: "Client: H & R Block" }] });
+    // The arrow picture is captured too.
+    expect(f.pictures).toHaveLength(1);
+    expect(f.pictures[0]!.partPath).toContain("arrow.png");
+  });
+
   it("multiple inline frames retain document order", () => {
     const doc = xml(`<w:body>
       <w:p>
@@ -275,8 +316,8 @@ describe("parseInlineFrames", () => {
     </w:body>`);
     const frames = parseInlineFrames(doc, emptyCtx);
     expect(frames).toHaveLength(2);
-    const body0 = frames[0]!.frame.textbox?.body[0];
-    const body1 = frames[1]!.frame.textbox?.body[0];
+    const body0 = frames[0]!.frame.textboxes[0]?.body[0];
+    const body1 = frames[1]!.frame.textboxes[0]?.body[0];
     expect(body0).toMatchObject({ runs: [{ text: "First" }] });
     expect(body1).toMatchObject({ runs: [{ text: "Second" }] });
   });

@@ -21,7 +21,9 @@ import { partPathToUrl } from "./inline";
 import { applyParagraphProps } from "./properties";
 import type {
   Block,
+  DrawingRun,
   InlineFrame,
+  Paragraph,
   NamedStyle,
   NumberingDefinition,
 } from "../../../doc/types";
@@ -69,19 +71,37 @@ export function renderInlineFrameBlock(
   // relative to the content area; vertical uses sizeEmu in mm.
   const scaleX = frame.groupExtentEmu.wEmu > 0 ? 1 / frame.groupExtentEmu.wEmu : 0;
 
-  for (const pic of frame.pictures) {
-    const url = partPathToUrl(pic.partPath, rawParts);
-    if (!url) continue;
-    const img = document.createElement("img");
-    img.src = url;
-    img.alt = pic.altText ?? "";
-    img.style.position = "absolute";
-    img.style.left = `${pic.offsetEmu.xEmu * scaleX * 100}%`;
-    img.style.top = `${emuToMm(pic.offsetEmu.yEmu)}mm`;
-    img.style.width = `${pic.sizeEmu.wEmu * scaleX * 100}%`;
-    img.style.height = `${emuToMm(pic.sizeEmu.hEmu)}mm`;
-    img.style.objectFit = "fill";
-    wrapper.appendChild(img);
+  // A group with multiple textboxes (a "Project: X" entry: title + details)
+  // — or a single textbox with no decoration (a project detail block) — is
+  // PROSE: render its textboxes stacked IN FLOW (content-sized, no clip,
+  // per the textbox-only path) and carry the group's picture (the ► arrow)
+  // as a LEADING INLINE IMAGE on the first textbox so it sits beside the
+  // title. A single textbox OVER a picture/shape is a DECORATIVE pill —
+  // keep the absolute fixed-height overlay (the textbox sits on top).
+  const prose =
+    frame.textboxes.length > 1 ||
+    (frame.textboxes.length === 1 &&
+      frame.pictures.length === 0 &&
+      frame.shapes.length === 0);
+
+  // Decorative pictures paint as absolute overlays (a pill's rounded-rect
+  // background). For prose the same pictures become leading inline images
+  // (built below) instead, so skip the overlay pass.
+  if (!prose) {
+    for (const pic of frame.pictures) {
+      const url = partPathToUrl(pic.partPath, rawParts);
+      if (!url) continue;
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = pic.altText ?? "";
+      img.style.position = "absolute";
+      img.style.left = `${pic.offsetEmu.xEmu * scaleX * 100}%`;
+      img.style.top = `${emuToMm(pic.offsetEmu.yEmu)}mm`;
+      img.style.width = `${pic.sizeEmu.wEmu * scaleX * 100}%`;
+      img.style.height = `${emuToMm(pic.sizeEmu.hEmu)}mm`;
+      img.style.objectFit = "fill";
+      wrapper.appendChild(img);
+    }
   }
 
   for (const shape of frame.shapes) {
@@ -97,26 +117,39 @@ export function renderInlineFrameBlock(
     wrapper.appendChild(el);
   }
 
-  if (frame.textbox) {
-    const tb = frame.textbox;
-    // A frame with NO decorations is just a textbox of content (the
-    // per-project entries on complex-multipage: Client / Period / …
-    // / Project Description). Word's `noAutofit` never clips — the text
-    // fills/overflows the shape — so render the region IN FLOW, sized to
-    // its content: the declared height becomes a floor (`min-height`), and
-    // longer prose grows the region (and the wrapper) instead of being cut
-    // off. Decorative frames (section pills: a centred line over a
-    // rounded-rect background picture) keep the absolute fixed-height
-    // overlay below — there the textbox sits ON TOP of the decoration.
-    const textboxOnly = frame.pictures.length === 0 && frame.shapes.length === 0;
+  // The group's picture(s) → leading inline images on the FIRST prose
+  // textbox (the ► arrow before "Project: X"). Sized to the rendered
+  // group (frame.sizeEmu / groupExtentEmu) so the arrow keeps its shape.
+  const sx = frame.groupExtentEmu.wEmu > 0 ? frame.sizeEmu.wEmu / frame.groupExtentEmu.wEmu : 1;
+  const sy = frame.groupExtentEmu.hEmu > 0 ? frame.sizeEmu.hEmu / frame.groupExtentEmu.hEmu : 1;
+  const leadingImages: DrawingRun[] = prose
+    ? frame.pictures.map((pic): DrawingRun => ({
+        kind: "drawing",
+        partPath: pic.partPath,
+        widthEmu: Math.round(pic.sizeEmu.wEmu * sx),
+        heightEmu: Math.round(pic.sizeEmu.hEmu * sy),
+        placement: "inline",
+        // Centre the arrow on the title line (it's taller than the text).
+        verticalAlign: "middle",
+        ...(pic.altText !== undefined ? { altText: pic.altText } : {}),
+      }))
+    : [];
+
+  frame.textboxes.forEach((tb, i) => {
     const region = document.createElement("div");
-    if (textboxOnly) {
+    if (prose) {
+      // Content-sized, in flow: declared height is a floor; longer prose
+      // grows the region (and the wrapper) instead of clipping. Single-
+      // textbox frames keep their vertical offset; stacked multi-textbox
+      // frames flow naturally (each one's own offset would mis-space them).
       region.style.marginLeft = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
-      if (tb.offsetEmu.yEmu > 0) region.style.marginTop = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
+      if (frame.textboxes.length === 1 && tb.offsetEmu.yEmu > 0) {
+        region.style.marginTop = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
+      }
       region.style.width = `${tb.sizeEmu.wEmu * scaleX * 100}%`;
       region.style.minHeight = `${emuToMm(tb.sizeEmu.hEmu)}mm`;
-      // overflow defaults to visible — prose extends past the declared box.
     } else {
+      // Decorative overlay: absolute, fixed height, clipped (pill heading).
       region.style.position = "absolute";
       region.style.left = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
       region.style.top = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
@@ -146,9 +179,26 @@ export function renderInlineFrameBlock(
         `${emuToMm(p.bottomEmu)}mm ` +
         `${emuToMm(p.leftEmu)}mm`;
     }
-    renderBody(tb.body, region, numbering, styles, rawParts);
+    // Prepend the arrow(s) to the first prose textbox's first paragraph
+    // so the ► sits inline before the title (cloned — don't mutate the AST).
+    const body =
+      i === 0 && leadingImages.length > 0
+        ? prependLeadingImages(tb.body, leadingImages)
+        : tb.body;
+    renderBody(body, region, numbering, styles, rawParts);
     wrapper.appendChild(region);
-  }
+  });
 
   return wrapper;
+}
+
+/** Prepend inline images to the first paragraph in `blocks` (cloned, so
+ *  the source AST isn't mutated). Pass-through when there's no paragraph. */
+function prependLeadingImages(blocks: Block[], images: DrawingRun[]): Block[] {
+  const idx = blocks.findIndex((b) => b.kind === "paragraph");
+  if (idx === -1) return blocks;
+  const target = blocks[idx] as Paragraph;
+  const out = blocks.slice();
+  out[idx] = { ...target, runs: [...images, ...target.runs] };
+  return out;
 }

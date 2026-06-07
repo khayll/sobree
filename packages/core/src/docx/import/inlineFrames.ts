@@ -36,7 +36,7 @@
  * the body-paragraph walker (which lives in `paragraph.ts`).
  */
 
-import type { Block, FrameBorder, InlineFrame } from "../../doc/types";
+import type { Block, FrameBorder, InlineFrame, InlineFrameTextbox } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 
 export interface InlineFramesContext {
@@ -195,26 +195,30 @@ function buildInlineFrame(
     if (hasLastRenderedPageBreakSkippingTxbx(hostP)) pageBreakBefore = true;
   }
 
-  // Walk group children: each <wps:wsp> is either a textbox or a
-  // shape decoration; each <pic:pic> is a picture decoration.
-  let textbox: InlineFrame["textbox"];
+  // Walk group children (recursively): each <wps:wsp> is a textbox or a
+  // shape decoration, each <pic:pic> a picture, and a <wpg:grpSp> is a
+  // NESTED group we descend into. Word nests the title textbox + arrow of
+  // a "Project: X" entry inside a grpSp while the details textbox sits at
+  // the top level — both must be collected, in document order.
+  const textboxes: InlineFrameTextbox[] = [];
   const pictures: Array<InlineFrame["pictures"][number]> = [];
   const shapes: Array<InlineFrame["shapes"][number]> = [];
 
-  for (const child of Array.from(wpg.children)) {
-    if (child.namespaceURI === NS.wps && child.localName === "wsp") {
+  const collectFromGroup = (group: Element): void => {
+  for (const child of Array.from(group.children)) {
+    if (child.namespaceURI === NS.wpg && child.localName === "grpSp") {
+      collectFromGroup(child);
+    } else if (child.namespaceURI === NS.wps && child.localName === "wsp") {
       const txbx = firstChildNS(child, NS.wps, "txbx");
       if (txbx) {
-        // Textbox-bearing shape → contributes the frame's body.
-        // We honour only the FIRST textbox in a group for now; multi-
-        // textbox groups are rare in the corpus and need their own
-        // model (each becomes its own frame? or the group becomes
-        // a "group of frames"?). Defer to a follow-up.
-        if (textbox) continue;
+        // Textbox-bearing shape → contributes a body region. A group can
+        // hold several (a "Project: X" entry has a title textbox AND a
+        // details textbox); capture ALL of them in document order so the
+        // renderer can show every one.
         const txbxContent = firstChildNS(txbx, NS.w, "txbxContent");
         if (!txbxContent) continue;
         const { off, ext: shapeExt } = readShapeXfrm(child);
-        textbox = {
+        const textbox: InlineFrameTextbox = {
           offsetEmu: { xEmu: off.x, yEmu: off.y },
           sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
           body: ctx.parseBlockBody(txbxContent),
@@ -240,6 +244,7 @@ function buildInlineFrame(
           else if (anchor === "b") textbox.vAlign = "bottom";
           else textbox.vAlign = "top";
         }
+        textboxes.push(textbox);
       } else {
         // Shape-without-textbox → decoration.
         const { off, ext: shapeExt } = readShapeXfrm(child);
@@ -278,17 +283,19 @@ function buildInlineFrame(
       pictures.push(picture);
     }
   }
+  };
+  collectFromGroup(wpg);
 
   const out: InlineFrame = {
     kind: "inline_frame",
     groupExtentEmu,
     sizeEmu,
+    textboxes,
     pictures,
     shapes,
   };
   if (pageBreakBefore) out.pageBreakBefore = true;
   if (keepNext) out.keepNext = true;
-  if (textbox) out.textbox = textbox;
   return out;
 }
 

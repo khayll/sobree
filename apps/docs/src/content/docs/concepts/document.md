@@ -37,9 +37,11 @@ many breaks have been seen.
 - **SectionBreak** — a structural boundary that advances the active
   `SectionProperties` (see [Sections](#sections)).
 - **InlineFrame** — a `<w:drawing><wp:inline>` group that flows in body
-  order: a textbox body (recursive `Block[]`) plus decorative pictures /
-  shapes, positioned from the group's own coordinate system. This is how
-  framed section headings render.
+  order: one or more textboxes (each a recursive `Block[]`) plus decorative
+  pictures / shapes, positioned from the group's own coordinate system. A
+  section heading is a single centred textbox over a background picture; a
+  "Project: X" entry has a title textbox and a details textbox (and an arrow
+  picture) — all rendered.
 - **AnchoredFrame** — a `<wp:anchor>` floating drawing, kept in the
   document-level `anchoredFrames` array (not in `Block`) because it's
   absolutely positioned rather than in-flow. Wrapping textboxes that
