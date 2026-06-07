@@ -126,6 +126,13 @@ export const Y_META_FIELDS = {
   // `headerFooterFrames` (keyed by the same partId as `headerFooterBodies`).
   anchoredFrames: "anchoredFrames",
   headerFooterFrames: "headerFooterFrames",
+  // Document-side state that also rides only on the projected doc: footnote
+  // bodies, comment threads, and doc-level settings. Persisted so they
+  // survive reload / collab projection (footnotes/comments would otherwise
+  // vanish on refresh, defaultTabStop would revert).
+  footnotes: "footnotes",
+  comments: "comments",
+  settings: "settings",
   styles: "styles",
   numbering: "numbering",
   fonts: "fonts",
