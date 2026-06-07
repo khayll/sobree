@@ -101,12 +101,22 @@ describe("Phase 3.3 — session message + read-only peers", () => {
       const session = await peer.awaitSession();
       expect(session.isWritable).toBe(false);
 
+      // Wait for the initial sync handshake to settle BEFORE mutating.
+      // Otherwise our reply to the server's sync-step-1 would carry the
+      // insert as a sync-step-2 (which the server applies — only
+      // sync-*update* sub-messages are dropped for read-only peers),
+      // and the assertion below would race the handshake.
+      await peer.awaitSynced();
+
       // Try to insert something. The local Y.Doc updates and sends a
       // sync-update message; the server drops it.
       peer.ydoc.getArray("body").insert(0, ["should-be-dropped"]);
 
-      // Give the server time to process (or, in this case, NOT process).
-      await delay(100);
+      // Deterministically flush the relay: a sync round-trip whose reply
+      // we await. WebSocket preserves message order, so once the reply
+      // lands the server has already processed (and dropped) the
+      // sync-update sent just above — no timing guess needed.
+      await peer.flush();
 
       // The server-side room should NOT have the insert.
       const room = server.getRoom("readonly-room");
@@ -184,6 +194,15 @@ interface TestPeer {
   ydoc: Y.Doc;
   close: () => void;
   awaitSession: () => Promise<SessionPayload>;
+  /** Resolves once we've replied to the server's initial sync-step-1,
+   *  i.e. our half of the sync handshake is on the wire. After this,
+   *  local mutations only ever reach the server as sync-*update*
+   *  sub-messages — never folded into a step-2 reply. */
+  awaitSynced: () => Promise<void>;
+  /** Round-trip the relay: send a sync-step-1 and resolve when its
+   *  reply arrives. Because WebSocket preserves order, any message we
+   *  sent earlier has been processed by the server by then. */
+  flush: () => Promise<void>;
 }
 
 async function connect(url: string): Promise<TestPeer> {
@@ -198,6 +217,20 @@ async function wrapConnection(ws: WebSocket): Promise<TestPeer> {
   const sessionPromise = new Promise<SessionPayload>((resolve) => {
     sessionResolver = resolve;
   });
+
+  // Resolves the first time we reply to a server sync-step-1.
+  let syncedResolver: (() => void) | null = null;
+  const syncedPromise = new Promise<void>((resolve) => {
+    syncedResolver = resolve;
+  });
+
+  // FIFO of pending `flush()` waiters, each resolved by the next
+  // inbound sync message (the reply to a flush's sync-step-1).
+  const flushWaiters: Array<() => void> = [];
+
+  // Sub-message tags within a MESSAGE_SYNC envelope (y-protocols/sync):
+  // 0 = sync-step-1, 1 = sync-step-2, 2 = update.
+  const SYNC_STEP_1 = 0;
 
   // Attach the message listener BEFORE awaiting `open` — otherwise
   // messages the server sends immediately on connect (in our case,
@@ -215,10 +248,19 @@ async function wrapConnection(ws: WebSocket): Promise<TestPeer> {
     } else if (type === MESSAGE_SYNC) {
       const reply = encoding.createEncoder();
       encoding.writeVarUint(reply, MESSAGE_SYNC);
-      syncProtocol.readSyncMessage(decoder, reply, ydoc, "server");
+      const subType = syncProtocol.readSyncMessage(decoder, reply, ydoc, "server");
       if (encoding.length(reply) > 1) {
         ws.send(encoding.toUint8Array(reply), { binary: true });
       }
+      // Replying to the server's initial sync-step-1 means our state
+      // (empty, at handshake time) is now on the wire ahead of any
+      // later mutation. Signal that the handshake half is settled.
+      if (subType === SYNC_STEP_1) {
+        syncedResolver?.();
+        syncedResolver = null;
+      }
+      // Release one pending flush waiter (the reply to its step-1).
+      flushWaiters.shift()?.();
     } else if (type === MESSAGE_AWARENESS) {
       // Ignore in this test set.
     }
@@ -259,6 +301,15 @@ async function wrapConnection(ws: WebSocket): Promise<TestPeer> {
       ydoc.destroy();
     },
     awaitSession: () => sessionPromise,
+    awaitSynced: () => syncedPromise,
+    flush: () =>
+      new Promise<void>((resolve) => {
+        flushWaiters.push(resolve);
+        const enc = encoding.createEncoder();
+        encoding.writeVarUint(enc, MESSAGE_SYNC);
+        syncProtocol.writeSyncStep1(enc, ydoc);
+        ws.send(encoding.toUint8Array(enc), { binary: true });
+      }),
   };
 }
 
