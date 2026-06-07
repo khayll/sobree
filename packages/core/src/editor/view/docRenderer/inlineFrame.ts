@@ -62,21 +62,29 @@ export function renderInlineFrameBlock(
   // Frame's intrinsic height — the paginator measures this to decide
   // page boundaries. Width is the content width (100%) so the frame
   // fills the body column; pictures scale by sizeEmu / groupExtentEmu.
-  wrapper.style.minHeight = `${emuToMm(frame.sizeEmu.hEmu)}mm`;
-  // `.paper-content` is a flex column, so the frame is a flex item. Our
-  // explicit `min-height` above overrides the flex default `min-height:
-  // auto`, which would otherwise let the flex algorithm SHRINK the frame
-  // below its content when the page overflows — its in-flow textboxes then
-  // spill out and overlap the next block. `flex-shrink: 0` keeps the frame
-  // at its true content height.
-  wrapper.style.flexShrink = "0";
+  // An inline drawing occupies EXACTLY its `<wp:extent>` in the body flow —
+  // a fixed box, like a tall glyph. It never grows to its content: the
+  // textboxes are `<a:noAutofit/>` (Word never resizes them), so overflowing
+  // text spills VISIBLY but does not change the frame's flow height. Pinning
+  // the height to the rendered extent is what keeps pagination matching
+  // Word's page count (a `min-height` that grows would inflate page count).
+  wrapper.style.height = `${emuToMm(frame.sizeEmu.hEmu)}mm`;
+  wrapper.style.overflow = "visible";
   if (frame.pageBreakBefore) wrapper.setAttribute("data-page-break-before", "");
   if (frame.keepNext) wrapper.setAttribute("data-keep-next", "");
 
-  // Scale child decorations from the group's local coord system into
-  // the wrapper's rendered size. Horizontal axis uses 100% width
-  // relative to the content area; vertical uses sizeEmu in mm.
-  const scaleX = frame.groupExtentEmu.wEmu > 0 ? 1 / frame.groupExtentEmu.wEmu : 0;
+  // Children live in the group's child coordinate system (groupExtentEmu =
+  // `<a:chExt>`). The wrapper IS the group's rendered ext, so positioning
+  // AND sizing each child as a PERCENTAGE of groupExtentEmu in BOTH axes
+  // maps chExt → ext automatically — including the group's (often
+  // non-uniform) vertical scale `sy = sizeEmu.h / groupExtentEmu.h`. The
+  // old code applied scale only horizontally and used raw `emuToMm`
+  // vertically, rendering every textbox ~10% too short so its content
+  // clipped / overflowed.
+  const cw = frame.groupExtentEmu.wEmu;
+  const ch = frame.groupExtentEmu.hEmu;
+  const pctX = (emu: number): number => (cw > 0 ? (emu / cw) * 100 : 0);
+  const pctY = (emu: number): number => (ch > 0 ? (emu / ch) * 100 : 0);
 
   // A group with multiple textboxes (a "Project: X" entry: title + details)
   // — or a single textbox with no decoration (a project detail block) — is
@@ -102,10 +110,10 @@ export function renderInlineFrameBlock(
       img.src = url;
       img.alt = pic.altText ?? "";
       img.style.position = "absolute";
-      img.style.left = `${pic.offsetEmu.xEmu * scaleX * 100}%`;
-      img.style.top = `${emuToMm(pic.offsetEmu.yEmu)}mm`;
-      img.style.width = `${pic.sizeEmu.wEmu * scaleX * 100}%`;
-      img.style.height = `${emuToMm(pic.sizeEmu.hEmu)}mm`;
+      img.style.left = `${pctX(pic.offsetEmu.xEmu)}%`;
+      img.style.top = `${pctY(pic.offsetEmu.yEmu)}%`;
+      img.style.width = `${pctX(pic.sizeEmu.wEmu)}%`;
+      img.style.height = `${pctY(pic.sizeEmu.hEmu)}%`;
       img.style.objectFit = "fill";
       wrapper.appendChild(img);
     }
@@ -114,10 +122,10 @@ export function renderInlineFrameBlock(
   for (const shape of frame.shapes) {
     const el = document.createElement("div");
     el.style.position = "absolute";
-    el.style.left = `${shape.offsetEmu.xEmu * scaleX * 100}%`;
-    el.style.top = `${emuToMm(shape.offsetEmu.yEmu)}mm`;
-    el.style.width = `${shape.sizeEmu.wEmu * scaleX * 100}%`;
-    el.style.height = `${emuToMm(shape.sizeEmu.hEmu)}mm`;
+    el.style.left = `${pctX(shape.offsetEmu.xEmu)}%`;
+    el.style.top = `${pctY(shape.offsetEmu.yEmu)}%`;
+    el.style.width = `${pctX(shape.sizeEmu.wEmu)}%`;
+    el.style.height = `${pctY(shape.sizeEmu.hEmu)}%`;
     if (shape.fill) el.style.background = shape.fill;
     if (shape.geometry === "ellipse") el.style.borderRadius = "50%";
     else if (shape.geometry === "roundedRect") el.style.borderRadius = "8px";
@@ -144,26 +152,18 @@ export function renderInlineFrameBlock(
 
   frame.textboxes.forEach((tb, i) => {
     const region = document.createElement("div");
-    if (prose) {
-      // Content-sized, in flow: declared height is a floor; longer prose
-      // grows the region (and the wrapper) instead of clipping. Single-
-      // textbox frames keep their vertical offset; stacked multi-textbox
-      // frames flow naturally (each one's own offset would mis-space them).
-      region.style.marginLeft = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
-      if (frame.textboxes.length === 1 && tb.offsetEmu.yEmu > 0) {
-        region.style.marginTop = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
-      }
-      region.style.width = `${tb.sizeEmu.wEmu * scaleX * 100}%`;
-      region.style.minHeight = `${emuToMm(tb.sizeEmu.hEmu)}mm`;
-    } else {
-      // Decorative overlay: absolute, fixed height, clipped (pill heading).
-      region.style.position = "absolute";
-      region.style.left = `${tb.offsetEmu.xEmu * scaleX * 100}%`;
-      region.style.top = `${emuToMm(tb.offsetEmu.yEmu)}mm`;
-      region.style.width = `${tb.sizeEmu.wEmu * scaleX * 100}%`;
-      region.style.height = `${emuToMm(tb.sizeEmu.hEmu)}mm`;
-      region.style.overflow = "hidden";
-    }
+    // Every textbox is a fixed-size box positioned at its group-local
+    // offset (both axes scaled by %-of-groupExtent, so sy applies). The
+    // box NEVER changes the frame's flow height — that's the extent.
+    region.style.position = "absolute";
+    region.style.left = `${pctX(tb.offsetEmu.xEmu)}%`;
+    region.style.top = `${pctY(tb.offsetEmu.yEmu)}%`;
+    region.style.width = `${pctX(tb.sizeEmu.wEmu)}%`;
+    region.style.height = `${pctY(tb.sizeEmu.hEmu)}%`;
+    // `<a:noAutofit/>` semantics: prose project entries overflow VISIBLY
+    // (never cut off — the #18 complaint); decorative pill headings clip
+    // their single centred label to the rounded background.
+    region.style.overflow = prose ? "visible" : "hidden";
     region.style.boxSizing = "border-box";
     // Honour the textbox's vertical anchor (`<wps:bodyPr anchor>`): a
     // flex column whose justification places the body at top / centre /
@@ -186,17 +186,42 @@ export function renderInlineFrameBlock(
         `${emuToMm(p.bottomEmu)}mm ` +
         `${emuToMm(p.leftEmu)}mm`;
     }
+    // A `noAutofit` box has a FIXED authored height; trailing empty
+    // paragraphs (a bare paragraph mark + the style's default
+    // spacing-after) add no content in Word but, rendered, push real
+    // content past the box and into the next block. Drop them so the
+    // text fits the box Word sized it to. Render-time only — the AST
+    // keeps the paragraphs so export round-trips.
+    const trimmed = prose ? dropTrailingEmptyParagraphs(tb.body) : tb.body;
     // Prepend the arrow(s) to the first prose textbox's first paragraph
     // so the ► sits inline before the title (cloned — don't mutate the AST).
     const body =
       i === 0 && leadingImages.length > 0
-        ? prependLeadingImages(tb.body, leadingImages)
-        : tb.body;
+        ? prependLeadingImages(trimmed, leadingImages)
+        : trimmed;
     renderBody(body, region, numbering, styles, rawParts);
     wrapper.appendChild(region);
   });
 
   return wrapper;
+}
+
+/** Drop trailing paragraphs that carry no visible content (no runs, or
+ *  only empty/whitespace text runs). A non-text run (drawing, break,
+ *  field) counts as content and stops the trim. Returns a slice (or the
+ *  same array when nothing trails) — never mutates the input. */
+function dropTrailingEmptyParagraphs(blocks: Block[]): Block[] {
+  let end = blocks.length;
+  while (end > 0) {
+    const b = blocks[end - 1]!;
+    if (b.kind !== "paragraph" || !isBlankParagraph(b)) break;
+    end--;
+  }
+  return end === blocks.length ? blocks : blocks.slice(0, end);
+}
+
+function isBlankParagraph(p: Paragraph): boolean {
+  return p.runs.every((r) => r.kind === "text" && r.text.trim() === "");
 }
 
 /** Prepend inline images to the first paragraph in `blocks` (cloned, so
