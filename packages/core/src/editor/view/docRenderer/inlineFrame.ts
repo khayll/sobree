@@ -63,6 +63,13 @@ export function renderInlineFrameBlock(
   // page boundaries. Width is the content width (100%) so the frame
   // fills the body column; pictures scale by sizeEmu / groupExtentEmu.
   wrapper.style.minHeight = `${emuToMm(frame.sizeEmu.hEmu)}mm`;
+  // `.paper-content` is a flex column, so the frame is a flex item. Our
+  // explicit `min-height` above overrides the flex default `min-height:
+  // auto`, which would otherwise let the flex algorithm SHRINK the frame
+  // below its content when the page overflows — its in-flow textboxes then
+  // spill out and overlap the next block. `flex-shrink: 0` keeps the frame
+  // at its true content height.
+  wrapper.style.flexShrink = "0";
   if (frame.pageBreakBefore) wrapper.setAttribute("data-page-break-before", "");
   if (frame.keepNext) wrapper.setAttribute("data-keep-next", "");
 
