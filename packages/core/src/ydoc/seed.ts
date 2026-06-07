@@ -63,6 +63,9 @@ export function seedYDoc(ydoc: Y.Doc, doc: SobreeDocument, ids: readonly string[
     meta.set(Y_META_FIELDS.headerFooterBodies, JSON.stringify(doc.headerFooterBodies));
     meta.set(Y_META_FIELDS.anchoredFrames, JSON.stringify(doc.anchoredFrames ?? []));
     meta.set(Y_META_FIELDS.headerFooterFrames, JSON.stringify(doc.headerFooterFrames ?? {}));
+    meta.set(Y_META_FIELDS.footnotes, JSON.stringify(doc.footnotes ?? {}));
+    meta.set(Y_META_FIELDS.comments, JSON.stringify(doc.comments ?? {}));
+    meta.set(Y_META_FIELDS.settings, JSON.stringify(doc.settings ?? {}));
     meta.set(Y_META_FIELDS.styles, JSON.stringify(doc.styles));
     meta.set(Y_META_FIELDS.numbering, JSON.stringify(doc.numbering));
     meta.set(Y_META_FIELDS.fonts, JSON.stringify(doc.fonts));

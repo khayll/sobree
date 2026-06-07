@@ -57,6 +57,22 @@ describe("ydoc helpers", () => {
     expect(out.headerFooterFrames).toEqual(doc.headerFooterFrames);
   });
 
+  it("round-trips footnotes, comments and settings", () => {
+    const doc = seedDoc();
+    doc.footnotes = { 1: [paragraph([text("A footnote body.")])] };
+    doc.comments = { 7: { id: 7, author: "Alice", body: [paragraph([text("A note.")])] } };
+    doc.settings = { defaultTabStopTwips: 540 };
+
+    const ydoc = new Y.Doc();
+    seedYDoc(ydoc, doc, ids(doc.body.length));
+    const { doc: out } = projectYDoc(ydoc);
+
+    // These also rode only on the in-memory doc and vanished on refresh.
+    expect(out.footnotes).toEqual(doc.footnotes);
+    expect(out.comments).toEqual(doc.comments);
+    expect(out.settings).toEqual(doc.settings);
+  });
+
   it("applyDocumentToYDoc updates a single block in place", () => {
     const doc = seedDoc();
     const ydoc = new Y.Doc();

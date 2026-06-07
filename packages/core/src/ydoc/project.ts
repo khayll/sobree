@@ -3,6 +3,7 @@ import * as YModule from "yjs";
 import type {
   AnchoredFrame,
   Block,
+  Comment,
   FontDeclaration,
   NamedStyle,
   NumberingDefinition,
@@ -86,6 +87,9 @@ export function projectYDoc(ydoc: Y.Doc): {
     Y_META_FIELDS.headerFooterFrames,
     {},
   );
+  const footnotes = parseMeta<Record<number, Block[]>>(meta, Y_META_FIELDS.footnotes, {});
+  const comments = parseMeta<Record<number, Comment>>(meta, Y_META_FIELDS.comments, {});
+  const settings = parseMeta<{ defaultTabStopTwips?: number }>(meta, Y_META_FIELDS.settings, {});
   const styles = parseMeta<NamedStyle[]>(meta, Y_META_FIELDS.styles, []);
   const numbering = parseMeta<NumberingDefinition[]>(meta, Y_META_FIELDS.numbering, []);
   const fonts = parseMeta<FontDeclaration[]>(meta, Y_META_FIELDS.fonts, []);
@@ -109,6 +113,9 @@ export function projectYDoc(ydoc: Y.Doc): {
       // the same shape the importer produces (exactOptionalPropertyTypes).
       ...(anchoredFrames.length > 0 ? { anchoredFrames } : {}),
       ...(Object.keys(headerFooterFrames).length > 0 ? { headerFooterFrames } : {}),
+      ...(Object.keys(footnotes).length > 0 ? { footnotes } : {}),
+      ...(Object.keys(comments).length > 0 ? { comments } : {}),
+      ...(settings.defaultTabStopTwips !== undefined ? { settings } : {}),
       styles,
       numbering,
       rawParts,
