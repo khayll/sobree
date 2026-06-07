@@ -62,6 +62,21 @@ describe("evictTrailingEmptyParagraphs", () => {
     expect(host.lastElementChild?.tagName).toBe("P");
   });
 
+  it("preserves document order of evicted empties (boundary empty ends up last)", () => {
+    const cols = openColumnContainerIfNeeded(host, section({ columns: { count: 2 } }));
+    const first = p("");
+    const boundary = p("");
+    first.dataset.k = "first";
+    boundary.dataset.k = "boundary";
+    cols.append(p("Real"), first, boundary);
+    evictTrailingEmptyParagraphs(cols, host);
+    // host: [cols, first, boundary] — boundary (the doc-order-last empty,
+    // i.e. the section-boundary paragraph) must be the LAST child so the
+    // section break appended next sits right after it.
+    const evicted = [...host.children].slice(1) as HTMLElement[];
+    expect(evicted.map((e) => e.dataset.k)).toEqual(["first", "boundary"]);
+  });
+
   it("stops at the first non-empty paragraph", () => {
     const cols = openColumnContainerIfNeeded(host, section({ columns: { count: 2 } }));
     cols.append(p(""), p("Real"), p(""));
