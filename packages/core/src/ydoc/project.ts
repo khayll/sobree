@@ -1,6 +1,7 @@
 import type * as Y from "yjs";
 import * as YModule from "yjs";
 import type {
+  AnchoredFrame,
   Block,
   FontDeclaration,
   NamedStyle,
@@ -79,6 +80,12 @@ export function projectYDoc(ydoc: Y.Doc): {
     Y_META_FIELDS.headerFooterBodies,
     {},
   );
+  const anchoredFrames = parseMeta<AnchoredFrame[]>(meta, Y_META_FIELDS.anchoredFrames, []);
+  const headerFooterFrames = parseMeta<Record<string, AnchoredFrame[]>>(
+    meta,
+    Y_META_FIELDS.headerFooterFrames,
+    {},
+  );
   const styles = parseMeta<NamedStyle[]>(meta, Y_META_FIELDS.styles, []);
   const numbering = parseMeta<NumberingDefinition[]>(meta, Y_META_FIELDS.numbering, []);
   const fonts = parseMeta<FontDeclaration[]>(meta, Y_META_FIELDS.fonts, []);
@@ -98,6 +105,10 @@ export function projectYDoc(ydoc: Y.Doc): {
       body: blocks,
       sections,
       headerFooterBodies,
+      // Optional fields stay absent when empty so the projected doc keeps
+      // the same shape the importer produces (exactOptionalPropertyTypes).
+      ...(anchoredFrames.length > 0 ? { anchoredFrames } : {}),
+      ...(Object.keys(headerFooterFrames).length > 0 ? { headerFooterFrames } : {}),
       styles,
       numbering,
       rawParts,

@@ -7,7 +7,7 @@ import {
   paragraph,
   text,
 } from "../doc/builders";
-import type { SobreeDocument } from "../doc/types";
+import type { AnchoredFrame, SobreeDocument } from "../doc/types";
 import { applyDocumentToYDoc } from "./apply";
 import { projectYDoc } from "./project";
 import { seedYDoc } from "./seed";
@@ -34,6 +34,27 @@ describe("ydoc helpers", () => {
     expect(outIds).toEqual(ids(doc.body.length));
     expect(out.sections).toEqual(doc.sections);
     expect(out.styles).toEqual(doc.styles);
+  });
+
+  it("round-trips the floating layer (anchoredFrames + headerFooterFrames)", () => {
+    const doc = seedDoc();
+    const shape = (id: string): AnchoredFrame => ({
+      id,
+      anchor: { sectionIndex: 0, verticalFrom: "paragraph", horizontalFrom: "column", paragraphIndex: 0 },
+      offsetXEmu: 100, offsetYEmu: 200, widthEmu: 300, heightEmu: 400,
+      content: { kind: "shape", geometry: "rect" },
+    });
+    doc.anchoredFrames = [shape("body-1")];
+    doc.headerFooterFrames = { "header1.xml": [shape("hdr-1")] };
+
+    const ydoc = new Y.Doc();
+    seedYDoc(ydoc, doc, ids(doc.body.length));
+    const { doc: out } = projectYDoc(ydoc);
+
+    // Without persisting the floating layer, these vanish on reload —
+    // exactly the "refresh drops the header textbox + photo" bug.
+    expect(out.anchoredFrames).toEqual(doc.anchoredFrames);
+    expect(out.headerFooterFrames).toEqual(doc.headerFooterFrames);
   });
 
   it("applyDocumentToYDoc updates a single block in place", () => {

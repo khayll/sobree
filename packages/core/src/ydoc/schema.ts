@@ -120,6 +120,12 @@ export const Y_BLOCK_AST_KEY = "_ast";
 export const Y_META_FIELDS = {
   sections: "sections",
   headerFooterBodies: "headerFooterBodies",
+  // Floating layer (absolute-positioned drawings). Persisted alongside the
+  // flow content so it survives reload / collab projection — the renderer
+  // paints body frames from `anchoredFrames` and per-zone frames from
+  // `headerFooterFrames` (keyed by the same partId as `headerFooterBodies`).
+  anchoredFrames: "anchoredFrames",
+  headerFooterFrames: "headerFooterFrames",
   styles: "styles",
   numbering: "numbering",
   fonts: "fonts",
