@@ -42,12 +42,19 @@ export function evictTrailingEmptyParagraphs(
   host: HTMLElement,
 ): void {
   if (!container.classList.contains("sobree-section-cols")) return;
+  // Collect the trailing empties first, then re-append in DOCUMENT order.
+  // Popping `lastElementChild` and appending as we go would reverse them —
+  // which matters because the caller relies on the LAST trailing empty
+  // (the section-boundary paragraph) ending up immediately before the
+  // section break, where `collapseSectionTrailerEmpty` can collapse it.
+  const trailing: HTMLElement[] = [];
   while (container.lastElementChild) {
     const last = container.lastElementChild as HTMLElement;
     if (!isVisuallyEmptyParagraph(last)) break;
     container.removeChild(last);
-    host.appendChild(last);
+    trailing.unshift(last);
   }
+  for (const p of trailing) host.appendChild(p);
 }
 
 /**
@@ -68,6 +75,15 @@ export function collapseSectionTrailerEmpty(host: HTMLElement): void {
   if ((trailer.textContent ?? "").trim().length > 0) return;
   if (trailer.querySelector("img, svg, table")) return;
   trailer.classList.add("sobree-section-trailer-empty");
+  // The collapse must zero the paragraph's WHOLE vertical footprint, not
+  // just its box. `applyParagraphProps` already wrote an inline
+  // `margin-top/bottom` from the paragraph's `spacing.before/afterTwips`
+  // (jellap's boundary empty carries `afterTwips=240` → 4mm), and an
+  // inline value beats the class's `margin: 0`. Neutralise it inline here
+  // — we run after the renderer, so this is the last write and wins —
+  // otherwise the boundary paragraph still injects its spacing-after gap.
+  trailer.style.marginTop = "0";
+  trailer.style.marginBottom = "0";
 }
 
 function isVisuallyEmptyParagraph(el: HTMLElement): boolean {

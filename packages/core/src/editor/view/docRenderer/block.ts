@@ -161,22 +161,26 @@ export function renderBlocks(
       // ANYA section gets 4|4 instead of 3|3 because the section
       // break counts as the 8th item).
       if (block.kind === "section_break") {
+        // Evict the prior column section's trailing empties to `host`
+        // BEFORE the break, in document order, so the section-boundary
+        // empty ends up immediately before the break — where
+        // `collapseSectionTrailerEmpty` (below) can collapse it. Doing
+        // this after appending the break would leave the empties after
+        // it and defeat the collapse (the break wouldn't be last child).
+        evictTrailingEmptyParagraphs(appendTarget, host);
         host.appendChild(rendered);
       } else {
         appendTarget.appendChild(rendered);
       }
     }
     if (block.kind === "section_break") {
-      // Before closing the previous column container, evict any trailing
-      // empty paragraphs from inside it back to `host`. Word's column
-      // balancer doesn't count trailing empties when distributing
-      // content — jellap.docx's ANYA section has a single trailing
-      // empty paragraph that, if left in the column flow, makes CSS
-      // columns split 4|3 instead of 3|3 and mis-pairs the form
-      // labels (Foglalkozása ends up on the LEFT row 4 instead of on
-      // RIGHT row 1 next to Neve). Moving trailing empties out lets
-      // CSS balance the remaining 6 items as 3|3, matching Word.
-      evictTrailingEmptyParagraphs(appendTarget, host);
+      // Trailing empties were already evicted (in document order) to
+      // `host` just before the break was appended — see the section_break
+      // branch above. Word's column balancer doesn't count trailing
+      // empties (jellap.docx's ANYA section balances 3|3, not 4|3), and
+      // evicting before the break keeps the section-boundary empty
+      // adjacent to it for the collapse below.
+      //
       // Collapse the visual height of the empty paragraph that
       // immediately precedes this section break in `host`. Word stores
       // sectPrs INSIDE a paragraph's pPr; that paragraph is often an
