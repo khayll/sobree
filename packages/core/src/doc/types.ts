@@ -292,6 +292,26 @@ export interface SectionBreak {
  * **Status**: type declared (Phase 1.0). Importer does not yet emit
  * this; renderer treats it as a no-op. Wiring lands in Phase 1.1-1.2.
  */
+/** One textbox shape inside an inline-frame group: its intra-group
+ *  position + size and recursive body, plus optional chrome (fill /
+ *  border / text insets) and vertical text anchor. */
+export interface InlineFrameTextbox {
+  offsetEmu: { xEmu: number; yEmu: number };
+  sizeEmu: { wEmu: number; hEmu: number };
+  body: Block[];
+  fill?: string;
+  border?: FrameBorder;
+  /** `<wps:bodyPr>` text insets (lIns/tIns/rIns/bIns) → CSS padding. */
+  padding?: {
+    topEmu: number;
+    rightEmu: number;
+    bottomEmu: number;
+    leftEmu: number;
+  };
+  /** Vertical text anchor from `<wps:bodyPr anchor>`; defaults to "top". */
+  vAlign?: "top" | "center" | "bottom";
+}
+
 export interface InlineFrame {
   kind: "inline_frame";
 
@@ -325,30 +345,12 @@ export interface InlineFrame {
    *  doesn't require touching every child. */
   sizeEmu: { wEmu: number; hEmu: number };
 
-  /** The textbox SHAPE's intra-group position + size + body. The
-   *  renderer places `body` at the EXACT coordinates the author
-   *  intended. Optional because some drawings have only pictures /
-   *  shapes (no textbox content). */
-  textbox?: {
-    offsetEmu: { xEmu: number; yEmu: number };
-    sizeEmu: { wEmu: number; hEmu: number };
-    body: Block[];
-    fill?: string;
-    border?: FrameBorder;
-    /** `<wps:bodyPr>` text insets (lIns/tIns/rIns/bIns). The renderer
-     *  paints these as the region's CSS padding. */
-    padding?: {
-      topEmu: number;
-      rightEmu: number;
-      bottomEmu: number;
-      leftEmu: number;
-    };
-    /** Vertical text anchor from `<wps:bodyPr anchor>`. Word centers a
-     *  single heading line by sizing a short textbox and centering its
-     *  text; this carries that intent into the renderer's flex column.
-     *  Defaults to "top" when the attribute is absent. */
-    vAlign?: "top" | "center" | "bottom";
-  };
+  /** The group's textbox SHAPES, in document (child) order. Most groups
+   *  have one (a section "pill" heading: a centred line over a background
+   *  picture), but a "Project: X" entry has two — a title textbox and a
+   *  details textbox — and the renderer must show BOTH. Empty when the
+   *  group carries only pictures / shapes (no textbox content). */
+  textboxes: InlineFrameTextbox[];
 
   /** Decorative pictures inside the group. Each carries its own
    *  intra-group position. The renderer paints them as
