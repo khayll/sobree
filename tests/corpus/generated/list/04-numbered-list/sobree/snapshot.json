@@ -12,8 +12,8 @@
       "children": [
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "1",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -21,8 +21,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "2",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -30,8 +30,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "3",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -39,8 +39,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "4",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -48,8 +48,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "5",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",

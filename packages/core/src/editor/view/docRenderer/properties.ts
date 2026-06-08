@@ -77,8 +77,13 @@ export function applyParagraphProps(
   // case despite the cascade resolving caps=true.
   if (runDefaults.caps) el.style.textTransform = "uppercase";
 
+  // Carry the Word style id verbatim so serialize can reconstruct it
+  // losslessly. A `data-*` attribute, NOT a CSS class: style ids can
+  // contain spaces / mixed case ("Contact Information") that are illegal
+  // in class tokens and throw on `classList.add`. Headings are excluded —
+  // their id is recovered from the h1-h6 tag on serialize.
   if (props.styleId && !/^Heading[1-6]$/.test(props.styleId)) {
-    el.classList.add(`style-${props.styleId.toLowerCase()}`);
+    el.setAttribute("data-style-id", props.styleId);
   }
   if (effective.alignment) {
     el.style.textAlign =

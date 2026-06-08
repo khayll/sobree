@@ -21,8 +21,8 @@
       "children": [
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "2",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -30,8 +30,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "3",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -39,8 +39,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "4",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -63,8 +63,8 @@
       "children": [
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "6",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -72,8 +72,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "7",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -81,8 +81,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "8",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -240,8 +240,8 @@
       "children": [
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "12",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
@@ -249,8 +249,8 @@
         },
         {
           "attrs": {
-            "class": "style-listparagraph",
             "data-block-index": "13",
+            "data-style-id": "ListParagraph",
           },
           "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
           "tag": "LI",
