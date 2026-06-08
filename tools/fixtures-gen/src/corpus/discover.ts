@@ -16,8 +16,10 @@ import { join, relative } from "node:path";
 export interface CorpusEntry {
   /** Stable slug used in reports / CI output. */
   slug: string;
-  /** "generated" / "real-world". */
-  origin: "generated" | "real-world";
+  /** Origin dir name under `tests/corpus/` (e.g. "generated"). The
+   *  gitignored, local-only real-world corpus is discovered the same
+   *  way when present — no origin is named in code. */
+  origin: string;
   /** Category folder name (e.g. "form", "paragraph", "list"). */
   category: string;
   /** Absolute path to the docx file. */
@@ -43,9 +45,12 @@ export function discoverCorpus(opts: DiscoverOptions): CorpusEntry[] {
 
   const corpusRoot = join(opts.repoRoot, "tests", "corpus");
   if (existsSync(corpusRoot)) {
-    for (const origin of ["generated", "real-world"] as const) {
+    // Scan whatever origin dirs exist under tests/corpus/ rather than
+    // naming any. The synthetic `generated/` corpus is committed; the
+    // real-world corpus is gitignored and local-only, so it is present
+    // (and discovered) only on a contributor's machine, never in CI.
+    for (const origin of safeDirs(corpusRoot)) {
       const originDir = join(corpusRoot, origin);
-      if (!existsSync(originDir)) continue;
       for (const category of safeDirs(originDir)) {
         const categoryDir = join(originDir, category);
         for (const slugDir of safeDirs(categoryDir)) {

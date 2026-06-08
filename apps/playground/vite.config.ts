@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from "vite";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,16 +30,19 @@ export default defineConfig({
 });
 
 /**
- * Expose `tests/corpus/real-world/<category>/<slug>/libreoffice/*`
+ * Expose `tests/corpus/<origin>/<category>/<slug>/libreoffice/*`
  * via `/__corpus/<slug>/libreoffice/*` so the convergence-report
  * tooling (see apps/playground/src/main.ts `convergenceReport`) can
  * fetch the LO reference data without bundling it into the build.
  * Read-only, dev-server only.
+ *
+ * Scans whatever `<origin>/<category>` dirs exist under the corpus
+ * root rather than naming any — the real-world corpus is gitignored
+ * and local-only, so no committed code references it.
  */
 function serveCorpusMetrics(): Plugin {
   const here = dirname(fileURLToPath(import.meta.url));
-  const corpusRoot = resolve(here, "../../tests/corpus/real-world");
-  const categories = ["cv", "form", "contract"];
+  const corpusRoot = resolve(here, "../../tests/corpus");
   return {
     name: "sobree-serve-corpus",
     configureServer(server) {
@@ -48,18 +51,21 @@ function serveCorpusMetrics(): Plugin {
         const rel = req.url.replace(/^\/__corpus\//, "").replace(/\?.*$/, "");
         try {
           let body: Buffer | null = null;
-          // Search the known category subdirs for slug-rooted paths.
-          for (const cat of categories) {
-            const path = resolve(corpusRoot, cat, rel);
-            if (!path.startsWith(corpusRoot)) {
-              res.statusCode = 403;
-              return res.end("forbidden");
-            }
-            try {
-              body = await readFile(path);
-              break;
-            } catch {
-              // try next category
+          // The corpus is <root>/<origin>/<category>/<slug>/…; requests
+          // are slug-rooted, so try every origin/category pair present.
+          outer: for (const origin of await safeReaddir(corpusRoot)) {
+            for (const cat of await safeReaddir(resolve(corpusRoot, origin))) {
+              const path = resolve(corpusRoot, origin, cat, rel);
+              if (!path.startsWith(corpusRoot)) {
+                res.statusCode = 403;
+                return res.end("forbidden");
+              }
+              try {
+                body = await readFile(path);
+                break outer;
+              } catch {
+                // try next origin/category
+              }
             }
           }
           if (!body) {
@@ -77,4 +83,13 @@ function serveCorpusMetrics(): Plugin {
       });
     },
   };
+}
+
+/** `readdir` that yields `[]` for a missing/non-dir path instead of throwing. */
+async function safeReaddir(dir: string): Promise<string[]> {
+  try {
+    return await readdir(dir);
+  } catch {
+    return [];
+  }
 }
