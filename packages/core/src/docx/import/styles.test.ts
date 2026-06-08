@@ -99,3 +99,31 @@ describe("parseStylesXml + ensureWordBaseline", () => {
     expect(resolved.runDefaults.fontSizePt).toBe(11);
   });
 });
+
+describe("heading style id canonicalisation", () => {
+  it("canonicalises a spaced `Heading 2` so its colour/caps resolve via `Heading2`", () => {
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="Heading 2">
+        <w:name w:val="heading 2"/>
+        <w:rPr><w:caps w:val="1"/><w:color w:val="357CA2"/></w:rPr>
+      </w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    expect(styles.find((s) => s.id === "Heading2")).toBeDefined();
+    expect(styles.find((s) => s.id === "Heading 2")).toBeUndefined();
+    // The paragraph importer emits the canonical id; the cascade must hit it.
+    const { runDefaults } = resolveStyleCascade(styles, "Heading2");
+    expect(runDefaults.color).toBe("#357CA2");
+    expect(runDefaults.caps).toBe(true);
+  });
+
+  it("canonicalises basedOn references that point at a renamed heading", () => {
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="Heading 1"><w:name w:val="heading 1"/><w:rPr><w:color w:val="111111"/></w:rPr></w:style>
+      <w:style w:type="paragraph" w:styleId="Sub"><w:basedOn w:val="Heading 1"/></w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    expect(styles.find((s) => s.id === "Sub")?.basedOn).toBe("Heading1");
+    expect(resolveStyleCascade(styles, "Sub").runDefaults.color).toBe("#111111");
+  });
+});
