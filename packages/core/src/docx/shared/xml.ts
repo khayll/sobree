@@ -47,6 +47,25 @@ export function wVal(el: Element | null): string | null {
   return el.getAttributeNS(NS.w, "val") ?? el.getAttribute("w:val");
 }
 
+/**
+ * Read an OOXML on/off toggle property (`CT_OnOff`: `<w:pageBreakBefore>`,
+ * `<w:b>`, `<w:keepNext>`, …). Absent → false. Present with no `w:val` →
+ * true (a bare element means "on"). Present with `w:val` →
+ * "false"/"0"/"off" mean OFF; anything else ON.
+ *
+ * Reading these by mere presence is a classic OOXML bug: Word writes the
+ * explicit-off form (`<w:pageBreakBefore w:val="0"/>`) in DocDefaults and
+ * styles, so presence-only flips the property ON for every consumer — e.g.
+ * a page break before every paragraph.
+ */
+export function wOnOff(root: Document | Element, localName: string): boolean {
+  const el = wFirst(root, localName);
+  if (!el) return false;
+  const val = wVal(el);
+  if (val === null) return true;
+  return val !== "false" && val !== "0" && val !== "off";
+}
+
 /** Build an XML declaration header + root element. Used by the exporter. */
 export function xmlDocument(rootXml: string): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n${rootXml}`;
