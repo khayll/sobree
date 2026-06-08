@@ -1,14 +1,26 @@
 /**
  * List rendering: turn a numbered/bulleted paragraph's numbering
- * definition into the right `<ol>` / `<ul>` container with correct
- * marker geometry and glyph.
+ * definition into the right `<ol>` / `<ul>` container with a faithful
+ * hanging marker.
  *
  * `paragraphListInfo` reads the numbering definition for a paragraph
- * (ordered vs bulleted, indent geometry, bullet glyph). `createListContainer`
- * builds the list element from that info. The caller (renderBlocks)
- * owns the grouping logic (consecutive same-`numId` paragraphs share
- * one container) and the per-`<li>` rendering — those need the
- * paragraph-level pipeline (props, runs, revision marks).
+ * (ordered vs bulleted, indent geometry, marker glyph/format).
+ * `createListContainer` builds the list element. The caller
+ * (renderBlocks) owns the grouping logic (consecutive same-`numId`
+ * paragraphs share one container) and the per-`<li>` rendering.
+ *
+ * ## Hanging geometry (the load-bearing bit)
+ *
+ * Word's `<w:lvl><w:pPr><w:ind w:left="L" w:hanging="H"/>` means: the
+ * text column (first line AND wraps) is at `L`, and the marker hangs `H`
+ * to its left, i.e. the marker sits at `L - H`. Native CSS markers
+ * (`list-style-position: outside`) hang by the marker's own glyph width,
+ * NOT by `H`, so they can't reproduce this. We instead render the marker
+ * as a fixed-`H`-wide `::before` box pulled left by `H` (see
+ * paperStack.css): the box spans `[L - H, L]`, the glyph sits at its left
+ * edge (`L - H`), and the text starts at `L`. Ordered markers read the
+ * native `list-item` counter (so `<ol start>` continuation across page
+ * splits keeps working) through a per-format CSS rule.
  */
 
 import { twipsToMm } from "./units";
@@ -17,16 +29,21 @@ import type { Block, NumberingDefinition } from "../../../doc/types";
 export interface ListInfo {
   numId: number;
   ordered: boolean;
-  /** Effective left indent (text wrap position) for this list level,
-   *  in twips — from the numbering definition's `<w:lvl><w:pPr><w:ind>`.
-   *  Applied as `padding-left` on the OL / UL so wrapped text lands at
-   *  the right position and the marker hangs to its left. */
+  /** Text-column indent (`<w:ind w:left>`), twips → the OL/UL
+   *  `padding-left`. First line and wraps both align here. */
   leftTwips?: number;
-  /** Twips the FIRST line hangs to the left of `leftTwips` (= `@w:hanging`).
-   *  The marker sits at `(leftTwips - hangingTwips)` from the content edge. */
+  /** Marker hang (`<w:ind w:hanging>`), twips → the width of the
+   *  `::before` marker box; the marker sits at `leftTwips - hangingTwips`. */
   hangingTwips?: number;
-  /** The level's lvlText glyph (post-Wingdings remapping), for bullets. */
+  /** Bullet glyph (post-Wingdings remapping), for unordered lists. */
   bulletGlyph?: string;
+  /** CSS counter-style class suffix for ordered lists (`decimal`,
+   *  `lower-latin`, …) — selects the matching `::before` rule. */
+  counterStyle?: string;
+  /** Literal text around the number in `lvlText` (`%1.` → suffix `.`;
+   *  `(%1)` → prefix `(`, suffix `)`). */
+  markerPrefix?: string;
+  markerSuffix?: string;
 }
 
 /**
@@ -54,17 +71,22 @@ export function paragraphListInfo(
   if (lvl?.paragraphIndent?.hangingTwips !== undefined) {
     result.hangingTwips = lvl.paragraphIndent.hangingTwips;
   }
-  if (format === "bullet" && lvl?.text) {
+  if (result.ordered) {
+    result.counterStyle = counterStyleFor(format);
+    const { prefix, suffix } = parseLvlText(lvl?.text ?? "", num.level);
+    result.markerPrefix = prefix;
+    result.markerSuffix = suffix;
+  } else if (lvl?.text) {
     result.bulletGlyph = lvl.text;
   }
   return result;
 }
 
 /**
- * Build the `<ol>` / `<ul>` container for a run of list items sharing
- * a `numId`. Sets marker geometry (padding-left + hanging custom
- * property) and bullet glyph (native CSS keyword where one exists,
- * else a `::marker`-content custom property).
+ * Build the `<ol>` / `<ul>` container for a run of list items sharing a
+ * `numId`. Sets the text-column `padding-left`, the `--sobree-list-hang`
+ * marker-box width, and the marker content (glyph or counter format) the
+ * CSS `::before` rules consume.
  */
 export function createListContainer(
   info: ListInfo,
@@ -72,57 +94,63 @@ export function createListContainer(
 ): HTMLElement {
   const listEl = document.createElement(info.ordered ? "ol" : "ul");
   listEl.dataset.sectionIndex = String(sectionIndex);
-  // OOXML's `<w:ind w:left="X" w:hanging="Y"/>` on the numbering
-  // level says:
-  //   text starts at `left` twips from the content edge
-  //   the marker hangs `hanging` twips to the LEFT of text
-  // ⇒ marker x = (left - hanging) from the content edge.
-  //
-  // CSS list-style-position: outside puts the marker right at the
-  // LI's content-box edge — which equals the UL's padding-left. So
-  // setting `padding-left = (left - hanging)` puts the marker at the
-  // right spot, and the `--sobree-list-hanging-mm` custom property (a
-  // sitewide CSS rule consumes it) shifts the first line of text by
-  // `hanging` to land at `left` total.
+  listEl.classList.add("sobree-hang");
+
   if (info.leftTwips !== undefined) {
-    const left = info.leftTwips;
-    const hanging = info.hangingTwips ?? 0;
-    const markerOffset = Math.max(0, left - hanging);
-    listEl.style.paddingLeft = `${twipsToMm(markerOffset)}mm`;
-    if (hanging > 0) {
-      listEl.style.setProperty("--sobree-list-hanging-mm", `${twipsToMm(hanging)}mm`);
-    }
+    listEl.style.paddingLeft = `${twipsToMm(info.leftTwips)}mm`;
   }
-  // Bullet glyph from the numbering definition's `lvlText`. For glyphs
-  // that map cleanly to a CSS list-style-type keyword (▪ → square,
-  // • → disc, ○ → circle) we set the keyword so the browser draws the
-  // native marker. For all OTHER glyphs (❖ ◆ ★ — Wingdings/Symbol
-  // chars without a CSS equivalent), stamp the glyph as a custom
-  // property; a sitewide `::marker` rule reads it as marker content.
-  if (!info.ordered && info.bulletGlyph) {
-    const cssKeyword = cssListStyleForGlyph(info.bulletGlyph);
-    if (cssKeyword !== "fallback") {
-      listEl.style.listStyleType = cssKeyword;
-    } else {
-      listEl.style.setProperty("--sobree-bullet-glyph", `"${info.bulletGlyph}"`);
-      // Suppress the browser-default disc so the ::marker content shows alone.
-      listEl.style.listStyleType = "none";
-      listEl.classList.add("sobree-list-custom-bullet");
-    }
+  // The marker box width = hanging. Even with no explicit hanging we
+  // give it a tiny gap so the marker doesn't collide with the text.
+  const hangingMm = twipsToMm(info.hangingTwips ?? 0);
+  listEl.style.setProperty("--sobree-list-hang", `${hangingMm}mm`);
+
+  if (info.ordered) {
+    listEl.classList.add(`lst-${info.counterStyle ?? "decimal"}`);
+    listEl.style.setProperty("--mk-pre", cssString(info.markerPrefix ?? ""));
+    listEl.style.setProperty("--mk-suf", cssString(info.markerSuffix ?? "."));
+  } else {
+    listEl.classList.add("lst-bullet");
+    listEl.style.setProperty("--sobree-bullet", cssString(info.bulletGlyph ?? "•"));
   }
   return listEl;
 }
 
+/** Map an OOXML `numFmt` to the CSS `<counter-style>` class suffix used
+ *  by the `.lst-*` `::before` rules. Unknown formats fall back to
+ *  decimal (Word's own default for unrecognised list formats). */
+function counterStyleFor(format: string | undefined): string {
+  switch (format) {
+    case "lowerLetter":
+      return "lower-latin";
+    case "upperLetter":
+      return "upper-latin";
+    case "lowerRoman":
+      return "lower-roman";
+    case "upperRoman":
+      return "upper-roman";
+    case "decimalZero":
+      return "decimal-zero";
+    default:
+      return "decimal";
+  }
+}
+
 /**
- * Map a bullet glyph to a CSS `list-style-type` keyword, or "fallback"
- * when no native keyword matches (caller uses a `::marker`-content
- * custom property instead).
+ * Split a level's `lvlText` into the literal text before / after the
+ * level's own number placeholder (`%{level+1}`). `%1.` → `{prefix:"",
+ * suffix:"."}`; `(%1)` → `{prefix:"(", suffix:")"}`. Other levels'
+ * placeholders (nested numbering, `%1.%2.`) are stripped — we render a
+ * single level's marker, matching the prior native-`<ol>` behaviour.
  */
-function cssListStyleForGlyph(glyph: string): string {
-  if (!glyph) return "disc";
-  const first = glyph[0]!;
-  if (first === "▪" || first === "■") return "square";
-  if (first === "○" || first === "◦") return "circle";
-  if (first === "•" || first === "●" || first === "◉") return "disc";
-  return "fallback";
+function parseLvlText(text: string, level: number): { prefix: string; suffix: string } {
+  const token = `%${level + 1}`;
+  const i = text.indexOf(token);
+  const strip = (s: string): string => s.replace(/%\d+/g, "");
+  if (i === -1) return { prefix: "", suffix: text ? strip(text) : "." };
+  return { prefix: strip(text.slice(0, i)), suffix: strip(text.slice(i + token.length)) };
+}
+
+/** Quote a value as a CSS string for a custom property, escaping `\` and `"`. */
+function cssString(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }

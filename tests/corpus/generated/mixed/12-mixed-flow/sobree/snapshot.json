@@ -18,6 +18,9 @@
       "text": "Body paragraph following the heading. The next block should …",
     },
     {
+      "attrs": {
+        "class": "sobree-hang lst-decimal",
+      },
       "children": [
         {
           "attrs": {
@@ -47,7 +50,7 @@
           "text": "Third numbered item.",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --mk-pre: ""; --mk-suf: ".";",
       "tag": "OL",
       "text": "First numbered item.Second numbered item.Third numbered item…",
     },
@@ -60,6 +63,9 @@
       "text": "Body paragraph after the first numbered list. Next: a bullet…",
     },
     {
+      "attrs": {
+        "class": "sobree-hang lst-bullet",
+      },
       "children": [
         {
           "attrs": {
@@ -89,7 +95,7 @@
           "text": "Bullet three.",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm; list-style-type: disc;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --sobree-bullet: "•";",
       "tag": "UL",
       "text": "Bullet one.Bullet two.Bullet three.",
     },
@@ -237,6 +243,9 @@
       "text": "Body paragraph after the table. The next block is a SECOND n…",
     },
     {
+      "attrs": {
+        "class": "sobree-hang lst-decimal",
+      },
       "children": [
         {
           "attrs": {
@@ -257,7 +266,7 @@
           "text": "Second item of the second list.",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --mk-pre: ""; --mk-suf: ".";",
       "tag": "OL",
       "text": "Restarted at 1 (new numId).Second item of the second list.",
     },

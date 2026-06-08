@@ -276,35 +276,52 @@
   margin: 0;
 }
 
-/* Custom bullet glyphs (Wingdings ❖, ◆, ★ etc.). When the list's
- * numbering definition specifies a `lvlText` that doesn't map to a
- * CSS list-style-type keyword, the renderer stamps the literal glyph
- * as `--sobree-bullet-glyph` on the UL/OL and sets
- * `list-style-type: none`. This rule restores a marker via the CSS
- * ::marker pseudo-element using the custom glyph. The trailing space
- * after the glyph gives breathing room before the LI text. */
-.paper-content ul.sobree-list-custom-bullet > li::marker,
-.paper-content ol.sobree-list-custom-bullet > li::marker {
-  content: var(--sobree-bullet-glyph) "  ";
+/* Hanging list markers — Word's `<w:lvl><w:pPr><w:ind w:left="L"
+ * w:hanging="H"/>`. The marker is a fixed `H`-wide `::before` box pulled
+ * left by `H`, so the glyph sits at `L - H` and the text + wrapped lines
+ * align at `L` (the OL/UL `padding-left`, set by the renderer). Native
+ * markers can't reproduce this — `list-style-position: outside` hangs by
+ * the glyph's own width, not `H`, leaving the text at the wrong column.
+ *
+ * Ordered markers read the native `list-item` counter (so `<ol start>`
+ * continuation across page splits keeps working) via one rule per
+ * counter-style; the renderer adds the matching `.lst-*` class and sets
+ * the `--mk-pre` / `--mk-suf` literals parsed from `lvlText`. Bullets put
+ * the glyph in `--sobree-bullet`. */
+.paper-content .sobree-hang > li {
+  list-style: none;
 }
-
-/* OOXML list indent — Word's `<w:ind w:left="X" w:hanging="Y"/>`
- * gives the wrap column X and a hanging pull-back Y for the first
- * line. Reading complex-multipage Skills Profile bullets in Word
- * shows the WRAP line aligned with where text starts AFTER the
- * marker — i.e. the second line lines up with the first line of
- * actual text, not Y past it.
- *
- * Implementation: the UL's `padding-left` (set by the renderer to
- * the marker column) defines the column for both first-line and
- * wrap. The marker is drawn with `list-style-position: outside`,
- * so it hangs LEFT of the text into the UL's padding zone. No
- * per-LI `padding-left` or `text-indent` is added — that was the
- * source of the wrap-deeper-than-first-line indent bug.
- *
- * The `--sobree-list-hanging-mm` custom property is kept on the UL
- * for downstream consumers (positionMap etc.) but no longer drives
- * any CSS layout. */
+.paper-content .sobree-hang > li::before {
+  display: inline-block;
+  box-sizing: border-box;
+  width: var(--sobree-list-hang, 0);
+  margin-left: calc(-1 * var(--sobree-list-hang, 0));
+  /* A marker wider than the hang (e.g. "10." in a tight list) overflows
+   * to the right instead of wrapping — Word likewise lets the number
+   * push into the text gap. */
+  white-space: nowrap;
+}
+.paper-content .sobree-hang.lst-bullet > li::before {
+  content: var(--sobree-bullet, "\2022");
+}
+.paper-content .sobree-hang.lst-decimal > li::before {
+  content: var(--mk-pre, "") counter(list-item, decimal) var(--mk-suf, ".");
+}
+.paper-content .sobree-hang.lst-decimal-zero > li::before {
+  content: var(--mk-pre, "") counter(list-item, decimal-leading-zero) var(--mk-suf, ".");
+}
+.paper-content .sobree-hang.lst-lower-latin > li::before {
+  content: var(--mk-pre, "") counter(list-item, lower-latin) var(--mk-suf, ".");
+}
+.paper-content .sobree-hang.lst-upper-latin > li::before {
+  content: var(--mk-pre, "") counter(list-item, upper-latin) var(--mk-suf, ".");
+}
+.paper-content .sobree-hang.lst-lower-roman > li::before {
+  content: var(--mk-pre, "") counter(list-item, lower-roman) var(--mk-suf, ".");
+}
+.paper-content .sobree-hang.lst-upper-roman > li::before {
+  content: var(--mk-pre, "") counter(list-item, upper-roman) var(--mk-suf, ".");
+}
 
 /* Two-column header rows ("YOUR NAME [tab/gap] GitHub: link...")
  * use flex layout so the right portion lands at the end of the line.

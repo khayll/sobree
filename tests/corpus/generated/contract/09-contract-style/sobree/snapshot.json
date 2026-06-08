@@ -194,6 +194,9 @@
       "text": "The Parties agree to the following terms (collectively, the …",
     },
     {
+      "attrs": {
+        "class": "sobree-hang lst-decimal",
+      },
       "children": [
         {
           "attrs": {
@@ -241,7 +244,7 @@
           "text": "Governing Law. This Agreement shall be governed by and const…",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --mk-pre: ""; --mk-suf: ".";",
       "tag": "OL",
       "text": "Scope. Provider shall deliver consulting services as describ…",
     },

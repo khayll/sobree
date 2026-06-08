@@ -1,6 +1,9 @@
 {
   "blocks": [
     {
+      "attrs": {
+        "class": "sobree-hang lst-bullet",
+      },
       "children": [
         {
           "attrs": {
@@ -48,7 +51,7 @@
           "text": "Top-level bullet C",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm; list-style-type: disc;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --sobree-bullet: "•";",
       "tag": "UL",
       "text": "Top-level bullet ANested under AAlso nested under ATop-level…",
     },

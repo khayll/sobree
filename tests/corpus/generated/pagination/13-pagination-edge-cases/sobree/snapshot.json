@@ -210,6 +210,9 @@
       "text": "Splittable paragraph. Lorem ipsum dolor sit amet, consectetu…",
     },
     {
+      "attrs": {
+        "class": "sobree-hang lst-decimal",
+      },
       "children": [
         {
           "attrs": {
@@ -248,7 +251,7 @@
           "text": "Short item four.",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --mk-pre: ""; --mk-suf: ".";",
       "tag": "OL",
       "text": "Short item one.Short item two.Oversized item three — Lorem i…",
     },

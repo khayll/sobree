@@ -41,6 +41,22 @@ describe("paragraphListInfo", () => {
     expect(paragraphListInfo(listParagraph(9), [bulletNumbering(1, "•")])).toEqual({
       numId: 9,
       ordered: true,
+      counterStyle: "decimal",
+      markerPrefix: "",
+      markerSuffix: ".",
+    });
+  });
+
+  it("derives ordered counter-style + lvlText affixes", () => {
+    const num: NumberingDefinition = {
+      numId: 3,
+      abstractFormat: { levels: [{ level: 0, format: "lowerLetter", text: "(%1)" }] },
+    };
+    expect(paragraphListInfo(listParagraph(3), [num])).toMatchObject({
+      ordered: true,
+      counterStyle: "lower-latin",
+      markerPrefix: "(",
+      markerSuffix: ")",
     });
   });
 
@@ -72,28 +88,34 @@ describe("createListContainer", () => {
     expect(createListContainer({ numId: 1, ordered: true }, 0).tagName).toBe("OL");
   });
 
-  it("sets padding-left to the marker offset (left - hanging) and the hanging custom property", () => {
+  it("sets padding-left to the text column (left) and --sobree-list-hang to the marker-box width (hanging)", () => {
     const el = createListContainer(
       { numId: 1, ordered: false, leftTwips: 720, hangingTwips: 360 },
       0,
     );
-    // (720 - 360) = 360 twips ≈ 6mm marker offset
-    expect(el.style.paddingLeft).toBe("6mm");
-    // hanging 360 twips ≈ 6mm
-    expect(el.style.getPropertyValue("--sobree-list-hanging-mm")).toBe("6mm");
+    // text column at `left` = 720 twips ≈ 13mm; marker box = hanging 360 ≈ 6mm
+    expect(el.style.paddingLeft).toBe("13mm");
+    expect(el.style.getPropertyValue("--sobree-list-hang")).toBe("6mm");
+    expect(el.classList.contains("sobree-hang")).toBe(true);
   });
 
-  it("maps a known glyph to a native list-style-type keyword", () => {
-    const el = createListContainer({ numId: 1, ordered: false, bulletGlyph: "▪" }, 0);
-    expect(el.style.listStyleType).toBe("square");
-    expect(el.classList.contains("sobree-list-custom-bullet")).toBe(false);
+  it("renders any bullet glyph via --sobree-bullet + the lst-bullet class (no native marker)", () => {
+    for (const glyph of ["▪", "❖", "•"]) {
+      const el = createListContainer({ numId: 1, ordered: false, bulletGlyph: glyph }, 0);
+      expect(el.classList.contains("lst-bullet")).toBe(true);
+      expect(el.style.getPropertyValue("--sobree-bullet")).toBe(`"${glyph}"`);
+      expect(el.style.listStyleType).toBe("");
+    }
   });
 
-  it("falls back to ::marker custom property for non-CSS glyphs", () => {
-    const el = createListContainer({ numId: 1, ordered: false, bulletGlyph: "❖" }, 0);
-    expect(el.style.listStyleType).toBe("none");
-    expect(el.style.getPropertyValue("--sobree-bullet-glyph")).toBe('"❖"');
-    expect(el.classList.contains("sobree-list-custom-bullet")).toBe(true);
+  it("sets the ordered counter-style class + marker affixes", () => {
+    const el = createListContainer(
+      { numId: 2, ordered: true, counterStyle: "decimal", markerPrefix: "", markerSuffix: "." },
+      0,
+    );
+    expect(el.tagName).toBe("OL");
+    expect(el.classList.contains("lst-decimal")).toBe(true);
+    expect(el.style.getPropertyValue("--mk-suf")).toBe('"."');
   });
 
   it("stamps the section index", () => {
