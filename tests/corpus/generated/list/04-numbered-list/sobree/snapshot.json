@@ -9,6 +9,9 @@
       "text": "Intro paragraph before the list.",
     },
     {
+      "attrs": {
+        "class": "sobree-hang lst-decimal",
+      },
       "children": [
         {
           "attrs": {
@@ -56,7 +59,7 @@
           "text": "Fifth item.",
         },
       ],
-      "style": "padding-left: 6mm; --sobree-list-hanging-mm: 6mm;",
+      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --mk-pre: ""; --mk-suf: ".";",
       "tag": "OL",
       "text": "First item.Second item.Third item — a longer one with enough…",
     },
