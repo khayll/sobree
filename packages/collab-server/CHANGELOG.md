@@ -1,5 +1,13 @@
 # @sobree/collab-server
 
+## 0.1.2
+
+### Patch Changes
+
+- 38cfb11: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+
 ## 0.1.1
 
 ### Patch Changes
