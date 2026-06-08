@@ -42,8 +42,18 @@ export function parseNumberingXml(xml: string | undefined): NumberingDefinition[
     return [];
   }
 
-  // 1. Build the abstractNumId → AbstractNumberingFormat lookup.
-  const abstracts = new Map<number, AbstractNumberingFormat>();
+  // 1. Read each <w:abstractNum>: its own levels plus its style-link
+  //    hooks. An abstractNum can DEFER its levels to a numbering style
+  //    via `<w:numStyleLink val="X">` (it then carries no <w:lvl> of its
+  //    own); the abstractNum that DEFINES style "X" carries
+  //    `<w:styleLink val="X">` and the real levels. Both sides live in
+  //    numbering.xml, so we match them BY NAME here — no styles.xml
+  //    lookup needed. Without this, a bullet list whose abstractNum is a
+  //    numStyleLink reads as empty and falls back to `decimal` (renders
+  //    numbered instead of bulleted).
+  const rawLevels = new Map<number, NumberingLevel[]>();
+  const numStyleLinkOf = new Map<number, string>();
+  const levelsByStyleDefinition = new Map<string, NumberingLevel[]>();
   for (const absEl of wAll(doc, "abstractNum")) {
     const idStr =
       absEl.getAttributeNS(NS.w, "abstractNumId") ??
@@ -51,7 +61,23 @@ export function parseNumberingXml(xml: string | undefined): NumberingDefinition[
     if (!idStr) continue;
     const id = Number.parseInt(idStr, 10);
     if (!Number.isFinite(id)) continue;
-    abstracts.set(id, { levels: readLevels(absEl) });
+    const levels = readLevels(absEl);
+    rawLevels.set(id, levels);
+    const numStyleLink = wVal(wFirst(absEl, "numStyleLink"));
+    if (numStyleLink) numStyleLinkOf.set(id, numStyleLink);
+    const styleLink = wVal(wFirst(absEl, "styleLink"));
+    if (styleLink) levelsByStyleDefinition.set(styleLink, levels);
+  }
+
+  // Resolve numStyleLink references (after the full pass, so the
+  // definition is always available regardless of document order): an
+  // abstractNum with no levels of its own borrows the linked definition's.
+  const abstracts = new Map<number, AbstractNumberingFormat>();
+  for (const [id, levels] of rawLevels) {
+    const link = numStyleLinkOf.get(id);
+    const resolved =
+      levels.length === 0 && link ? (levelsByStyleDefinition.get(link) ?? levels) : levels;
+    abstracts.set(id, { levels: resolved });
   }
 
   // 2. Walk every <w:num>, resolve its abstractNumId, emit a
