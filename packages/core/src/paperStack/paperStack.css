@@ -203,11 +203,14 @@
      vertical padding (= page margins). */
   height: 100%;
   min-height: 100px;
-  display: flex;
-  flex-direction: column;
-  /* Default to top-aligned. The Paper class swaps `justify-content`
-     based on the section's vAlign. */
-  justify-content: flex-start;
+  /* `flow-root` establishes one block formatting context for the whole
+     page body. Two reasons: (1) a floated image (text-wrap) displaces the
+     line boxes of the FOLLOWING paragraphs, not just its own — Word's
+     wrap behaviour — and the float stays contained to this page; (2) a
+     single BFC measures the same way the paginator reads it (no flex-item
+     quirks). `Paper` swaps this to a `flex` column only for vAlign
+     center / bottom / both, which need the free space redistributed. */
+  display: flow-root;
 }
 
 /* Table-cell paragraph line-height tightening.

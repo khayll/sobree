@@ -139,7 +139,7 @@ export class Paper {
     s.setProperty("--margin-right", `${m.right}mm`);
     s.setProperty("--margin-bottom", `${m.bottom}mm`);
     s.setProperty("--margin-left", `${m.left}mm`);
-    this.content.style.justifyContent = justifyContentFor(setup.verticalAlign);
+    applyVerticalAlign(this.content, setup.verticalAlign);
   }
 
   /**
@@ -149,7 +149,7 @@ export class Paper {
    * PaperStack after pagination distributes content.
    */
   applySectionOverride(section: SectionProperties): void {
-    this.content.style.justifyContent = justifyContentFor(section.vAlign);
+    applyVerticalAlign(this.content, section.vAlign);
     // Header / footer offsets from `<w:pgMar w:header w:footer/>`.
     // Word positions the header text headerTwips from the page TOP,
     // and the body starts AT LEAST headerTwips + header content height
@@ -337,6 +337,29 @@ function parsePxFromMm(value: string): number {
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
+}
+
+/**
+ * Lay out the content box for a section's vertical alignment.
+ *
+ * `top` (the default) keeps the CSS `display: flow-root` — one block
+ * formatting context for the whole page body, so a floated image wraps
+ * text across the FOLLOWING paragraphs and the paginator measures what it
+ * renders. `center` / `bottom` / `both` need the free vertical space
+ * redistributed, which a single BFC can't do, so those switch to a flex
+ * column (a floated image in such a section then confines its wrap to the
+ * anchor paragraph — a vanishingly rare combination).
+ */
+function applyVerticalAlign(el: HTMLElement, v: VerticalAlign | undefined): void {
+  if (v === "center" || v === "bottom" || v === "both") {
+    el.style.display = "flex";
+    el.style.flexDirection = "column";
+    el.style.justifyContent = justifyContentFor(v);
+  } else {
+    el.style.display = "";
+    el.style.flexDirection = "";
+    el.style.justifyContent = "";
+  }
 }
 
 /**
