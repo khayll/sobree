@@ -204,7 +204,30 @@ function renderDrawing(
   if (d.heightEmu > 0) img.style.height = `${emuToPx(d.heightEmu)}px`;
   if (d.verticalAlign === "middle") img.style.verticalAlign = "middle";
   if (d.placement === "anchor" && d.anchor) applyAnchorPositioning(img, d.anchor);
+  else if (d.placement === "floatLeft" || d.placement === "floatRight") {
+    applyFloat(img, d);
+  }
   return img;
+}
+
+/**
+ * A displacing-wrap anchored image rendered as a CSS float at the head of
+ * its anchor paragraph: the browser shortens the line boxes of this
+ * paragraph AND the following ones until the float's height is exhausted —
+ * exactly how Word wraps body text around the image. `floatMarginsEmu`
+ * carries the OOXML `distT/B/L/R` clearance straight onto the box.
+ */
+function applyFloat(
+  img: HTMLImageElement,
+  d: import("../../../doc/types").DrawingRun,
+): void {
+  img.style.float = d.placement === "floatLeft" ? "left" : "right";
+  const m = d.floatMarginsEmu;
+  if (m) {
+    img.style.margin =
+      `${emuToMm(m.topEmu)}mm ${emuToMm(m.rightEmu)}mm ` +
+      `${emuToMm(m.bottomEmu)}mm ${emuToMm(m.leftEmu)}mm`;
+  }
 }
 
 /**
