@@ -143,6 +143,15 @@ export interface AnchoredFrame {
    *  floats over text and reserves nothing. Absent ⇒ unknown (treated
    *  as non-displacing). */
   wrap?: "square" | "topAndBottom" | "tight" | "through" | "none";
+  /** `wrapText` side from `<wp:wrapSquare|Tight|Through wrapText="…">` —
+   *  which sides of the frame body text flows on. Default `bothSides`.
+   *  Only meaningful for the displacing wrap modes; drives whether a
+   *  floated image goes `float: left` (text on the right) or `right`. */
+  wrapText?: "bothSides" | "left" | "right" | "largest";
+  /** Text-distance insets — `distT/B/L/R` on `<wp:anchor>`, in EMU. The
+   *  gap Word keeps between the frame and the text wrapping around it;
+   *  rendered as margins on the floated frame. */
+  textDistancesEmu?: { topEmu: number; rightEmu: number; bottomEmu: number; leftEmu: number };
   /** What this frame contains. */
   content: AnchoredContent;
 }

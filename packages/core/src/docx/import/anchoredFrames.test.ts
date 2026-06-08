@@ -78,6 +78,30 @@ describe("parseAnchoredFrames", () => {
     expect(frames[0]!.behindText).toBe(true);
   });
 
+  it("captures wrap mode, wrapText side, and distT/B/L/R clearance", () => {
+    const rels = new Map([["rId7", "media/image1.png"]]);
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:anchor behindDoc="0" distT="0" distB="0" distL="114300" distR="228600">
+        <wp:positionH relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>
+        <wp:extent cx="914400" cy="914400"/>
+        <wp:wrapSquare wrapText="right"/>
+        <a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+          <pic:pic><pic:blipFill><a:blip r:embed="rId7"/></pic:blipFill></pic:pic>
+        </a:graphicData></a:graphic>
+      </wp:anchor>
+    </w:drawing></w:r></w:p></w:body>`);
+    const f = parseAnchoredFrames(doc, { rels })[0]!;
+    expect(f.wrap).toBe("square");
+    expect(f.wrapText).toBe("right");
+    expect(f.textDistancesEmu).toEqual({
+      topEmu: 0,
+      bottomEmu: 0,
+      leftEmu: 114300,
+      rightEmu: 228600,
+    });
+  });
+
   it("parses a shape with fill and prstGeom", () => {
     const doc = xml(`<w:body><w:p><w:r><w:drawing>
       <wp:anchor>
