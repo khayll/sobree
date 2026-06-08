@@ -90,8 +90,12 @@ describe("applyParagraphProps", () => {
     expect(el.style.fontSize).toBe("8pt");
   });
 
-  it("adds style-<id> class for non-heading styles only", () => {
-    expect(p({ styleId: "Footer" }).classList.contains("style-footer")).toBe(true);
-    expect(p({ styleId: "Heading2" }).classList.contains("style-heading2")).toBe(false);
+  it("carries the style id verbatim in data-style-id for non-heading styles only", () => {
+    expect(p({ styleId: "Footer" }).getAttribute("data-style-id")).toBe("Footer");
+    expect(p({ styleId: "Heading2" }).getAttribute("data-style-id")).toBe(null);
+    // Mixed case + spaces survive intact (would throw on classList.add).
+    expect(p({ styleId: "Contact Information" }).getAttribute("data-style-id")).toBe(
+      "Contact Information",
+    );
   });
 });

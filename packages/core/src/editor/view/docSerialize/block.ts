@@ -133,11 +133,11 @@ function paragraphFromElement(
     }
   }
 
-  // Style classes like `.style-quote` feed back into Word style ids.
-  const classStyle = Array.from(el.classList).find((c) => c.startsWith("style-"));
-  if (classStyle && !properties.styleId) {
-    const id = capitalise(classStyle.slice(6));
-    properties.styleId = id;
+  // `data-style-id` carries the Word style id verbatim (set by the
+  // renderer) — feed it straight back, no case / space mangling.
+  const dataStyleId = el.getAttribute("data-style-id");
+  if (dataStyleId && !properties.styleId) {
+    properties.styleId = dataStyleId;
   }
 
   return {
@@ -145,8 +145,4 @@ function paragraphFromElement(
     properties,
     runs: serializeInlineChildren(el),
   };
-}
-
-function capitalise(s: string): string {
-  return s.length === 0 ? s : s[0]!.toUpperCase() + s.slice(1);
 }

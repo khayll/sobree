@@ -30,7 +30,7 @@ import type {
   ParagraphIndent,
   RunProperties,
 } from "../../doc/types";
-import { parseXml, wAll, wFirst, wVal } from "../shared/xml";
+import { parseXml, wAll, wFirst, wOnOff, wVal } from "../shared/xml";
 import { readShading } from "../shared/shading";
 import { NS } from "../shared/namespaces";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
@@ -383,8 +383,10 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
     if (Object.keys(indent).length > 0) out.indent = indent;
   }
 
-  // <w:pageBreakBefore/>
-  if (wFirst(pPr, "pageBreakBefore")) out.pageBreakBefore = true;
+  // <w:pageBreakBefore/> — a CT_OnOff toggle. Honour the explicit-off
+  // form (`w:val="0"`) Word writes in DocDefaults / styles; reading by
+  // presence alone would inherit a page break onto every paragraph.
+  if (wOnOff(pPr, "pageBreakBefore")) out.pageBreakBefore = true;
 
   // <w:shd w:val="clear" w:fill="…"/> — paragraph background colour.
   const shading = readShading(pPr);
