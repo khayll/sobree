@@ -143,6 +143,15 @@ export interface AnchoredFrame {
    *  floats over text and reserves nothing. Absent ⇒ unknown (treated
    *  as non-displacing). */
   wrap?: "square" | "topAndBottom" | "tight" | "through" | "none";
+  /** `wrapText` side from `<wp:wrapSquare|Tight|Through wrapText="…">` —
+   *  which sides of the frame body text flows on. Default `bothSides`.
+   *  Only meaningful for the displacing wrap modes; drives whether a
+   *  floated image goes `float: left` (text on the right) or `right`. */
+  wrapText?: "bothSides" | "left" | "right" | "largest";
+  /** Text-distance insets — `distT/B/L/R` on `<wp:anchor>`, in EMU. The
+   *  gap Word keeps between the frame and the text wrapping around it;
+   *  rendered as margins on the floated frame. */
+  textDistancesEmu?: { topEmu: number; rightEmu: number; bottomEmu: number; leftEmu: number };
   /** What this frame contains. */
   content: AnchoredContent;
 }
@@ -469,10 +478,18 @@ export interface DrawingRun {
    *   - "inline"  — flows in the paragraph like a tall character.
    *   - "anchor"  — positioned absolutely (`<wp:anchor>`); `anchor`
    *                 carries the offset + frame-of-reference.
+   *   - "floatLeft" / "floatRight" — a `<wp:anchor>` image with a
+   *                 displacing wrap (square/tight/through), converted to a
+   *                 CSS float at the head of its anchor paragraph so body
+   *                 text flows around it. `floatMarginsEmu` carries the
+   *                 `distT/B/L/R` clearance.
    */
-  placement: "inline" | "anchor";
+  placement: "inline" | "anchor" | "floatLeft" | "floatRight";
   /** Set when `placement === "anchor"`. */
   anchor?: DrawingAnchor;
+  /** Set for `floatLeft` / `floatRight` — the text-clearance margins
+   *  (from the frame's `distT/B/L/R`), applied as CSS margins. */
+  floatMarginsEmu?: { topEmu: number; rightEmu: number; bottomEmu: number; leftEmu: number };
   /**
    * Vertical alignment for an `inline` image relative to the text on
    * its line. Defaults to the browser baseline (image bottom on the

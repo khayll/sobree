@@ -15,6 +15,7 @@ import { parseSettingsXml } from "./settings";
 import { mountFontTableFromZip } from "../../fonts";
 import { parseAnchoredFrames } from "./anchoredFrames";
 import { flowDisplacingTextboxes } from "./flowFrames";
+import { floatWrappingImages } from "./floatFrames";
 import { parseInlineFrames } from "./inlineFrames";
 import type {
   AnchoredFrame,
@@ -122,7 +123,7 @@ export async function importDocx(
   // of clipping in the absolute overlay. Pure decorations (pictures,
   // bordered boxes, behind-text, wrapNone floats) stay in
   // `anchoredFrames`.
-  const { body, frames: finalAnchoredFrames } = flowDisplacingTextboxes(
+  const { body: flowedBody, frames: flowedFrames } = flowDisplacingTextboxes(
     rawBody,
     anchoredFrames,
   );
@@ -132,6 +133,18 @@ export async function importDocx(
   // partIds; the referenced header/footer XML parts are loaded into
   // `headerFooterBodies` so the editor can render them.
   const sections = sectPrEls.map((el) => readSection(el, rels));
+
+  // Wrap-mode anchored PICTURES (square/tight/through) become CSS floats at
+  // the head of their anchor paragraph so body text flows around them.
+  // Needs section page geometry to pick the float side for `bothSides`, so
+  // it runs after `sections` is built (and after the textbox-flow pass,
+  // whose body edits keep paragraph indices stable).
+  const { body, frames: finalAnchoredFrames } = floatWrappingImages(
+    flowedBody,
+    flowedFrames,
+    sections,
+  );
+
   const { bodies: headerFooterBodies, frames: headerFooterFrames } =
     loadHeaderFooterParts(sections, unzipped.text, rels);
 

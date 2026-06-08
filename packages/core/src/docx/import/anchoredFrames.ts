@@ -133,7 +133,13 @@ function parseAnchoredFrame(
   };
   if (behindAttr === "1" || behindAttr === "true") out.behindText = true;
   const wrap = readWrapType(anchor);
-  if (wrap) out.wrap = wrap;
+  if (wrap) {
+    out.wrap = wrap;
+    const wrapText = readWrapText(anchor);
+    if (wrapText) out.wrapText = wrapText;
+    const dist = readTextDistances(anchor);
+    if (dist) out.textDistancesEmu = dist;
+  }
   return out;
 }
 
@@ -160,6 +166,51 @@ function readWrapType(anchor: Element): AnchoredFrame["wrap"] | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * `wrapText` (`bothSides` / `left` / `right` / `largest`) lives on the
+ * displacing wrap child (`<wp:wrapSquare|Tight|Through>`) and says which
+ * sides of the frame text flows on. `topAndBottom` / `none` don't carry it.
+ */
+function readWrapText(anchor: Element): AnchoredFrame["wrapText"] | undefined {
+  for (const child of Array.from(anchor.children)) {
+    if (child.namespaceURI !== NS.wp) continue;
+    if (
+      child.localName === "wrapSquare" ||
+      child.localName === "wrapTight" ||
+      child.localName === "wrapThrough"
+    ) {
+      const v = child.getAttribute("wrapText");
+      if (v === "left" || v === "right" || v === "bothSides" || v === "largest") return v;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Text-distance insets (`distT/B/L/R`) are attributes of `<wp:anchor>`
+ * itself (not the wrap child) — the clearance Word keeps between the frame
+ * and the wrapped text. Absent ⇒ undefined (no clearance modelled).
+ */
+function readTextDistances(anchor: Element): AnchoredFrame["textDistancesEmu"] | undefined {
+  const t = anchor.getAttribute("distT");
+  const b = anchor.getAttribute("distB");
+  const l = anchor.getAttribute("distL");
+  const r = anchor.getAttribute("distR");
+  if (t === null && b === null && l === null && r === null) return undefined;
+  return {
+    topEmu: emuAttr(t),
+    bottomEmu: emuAttr(b),
+    leftEmu: emuAttr(l),
+    rightEmu: emuAttr(r),
+  };
+}
+
+function emuAttr(v: string | null): number {
+  if (v === null) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function parseGraphicData(

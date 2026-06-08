@@ -46,7 +46,11 @@ many breaks have been seen.
   document-level `anchoredFrames` array (not in `Block`) because it's
   absolutely positioned rather than in-flow. Wrapping textboxes that
   carry real prose are converted to in-flow blocks on import so they
-  paginate; decorations (watermarks, `wrapNone` floats) stay anchored.
+  paginate; a wrap-mode picture (`square`/`tight`/`through`, captured
+  with its `wrapText` side + `distT/B/L/R` clearance) becomes a CSS
+  float at the head of its anchor paragraph so body text flows around
+  it; decorations (watermarks, `wrapNone`/behind-text floats) stay
+  anchored.
   A header/footer part is its own sub-document: its floating drawings
   live in `headerFooterFrames[partId]` (same key as its flow blocks in
   `headerFooterBodies`) and render into a per-zone overlay.
@@ -61,7 +65,7 @@ type InlineRun =
   | BreakRun       // line / column / page break
   | TabRun         // tab stop
   | FieldRun       // page number, NUMPAGES, etc.
-  | DrawingRun     // inline or anchored image (placement: "inline" | "anchor")
+  | DrawingRun     // image (placement: "inline" | "anchor" | "floatLeft" | "floatRight")
   | HyperlinkRun   // link wrapping child runs
   | FootnoteRefRun // footnote reference mark
   | CommentRefRun; // comment-range marker
@@ -69,7 +73,9 @@ type InlineRun =
 
 `DrawingRun` carries a rendered size (`widthEmu` × `heightEmu`) and a
 `placement` — `"inline"` flows like a tall character, `"anchor"` carries
-absolute positioning. Each non-text run counts as offset length 1 when
+absolute positioning, and `"floatLeft"`/`"floatRight"` make a wrap-mode
+anchored image a CSS float that body text flows around (with
+`floatMarginsEmu` for the OOXML text clearance). Each non-text run counts as offset length 1 when
 addressing a position (see [InlinePosition](/concepts/editing-model/#inlineposition)).
 
 ## Run properties
