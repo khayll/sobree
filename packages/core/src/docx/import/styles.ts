@@ -31,6 +31,7 @@ import type {
   RunProperties,
 } from "../../doc/types";
 import { parseXml, wAll, wFirst, wOnOff, wVal } from "../shared/xml";
+import { readParagraphBorders } from "./borders";
 import { readShading } from "../shared/shading";
 import { NS } from "../shared/namespaces";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
@@ -410,6 +411,12 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
   // form (`w:val="0"`) Word writes in DocDefaults / styles; reading by
   // presence alone would inherit a page break onto every paragraph.
   if (wOnOff(pPr, "pageBreakBefore")) out.pageBreakBefore = true;
+
+  // <w:pBdr> — divider rules. Word puts the top/bottom rule of a
+  // letterhead/résumé header on a STYLE (e.g. a "Name" style's top rule),
+  // so read it here too, not just on direct paragraphs.
+  const borders = readParagraphBorders(pPr);
+  if (borders) out.borders = borders;
 
   // <w:shd w:val="clear" w:fill="…"/> — paragraph background colour.
   const shading = readShading(pPr);
