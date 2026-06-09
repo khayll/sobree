@@ -39,6 +39,11 @@ export interface ViewportOptions {
  *           The point under the cursor stays under the cursor (zoom-to-cursor).
  *   - Pan:  wheel without modifiers — two-finger trackpad scroll deltas move
  *           the stage. Also supports click-drag with middle mouse or space.
+ *   - Touch (phones / tablets / touch laptops): one finger drags to pan, two
+ *           fingers pinch to zoom + drag to pan. Driven by Pointer Events so
+ *           it works across iOS Safari, Android Chrome, and touch-capable
+ *           desktops. Single-finger taps fall through to the editor so
+ *           tap-to-place-caret and long-press-to-select keep working.
  */
 export class Viewport {
   readonly container: HTMLElement;
@@ -55,6 +60,22 @@ export class Viewport {
   private readonly onRenderTierChange: ((t: number) => void) | null;
   private readonly onTransformChange: (() => void) | null;
   private readonly onWheel: (e: WheelEvent) => void;
+  private readonly onPointerDown: (e: PointerEvent) => void;
+  private readonly onPointerMove: (e: PointerEvent) => void;
+  private readonly onPointerUp: (e: PointerEvent) => void;
+  // ---------- touch-gesture state ----------
+  /**
+   * Live positions of every active touch pointer, keyed by `pointerId`.
+   * One entry → single-finger pan; two+ → pinch-zoom (we use the first two).
+   * Mouse / pen pointers are ignored here so the wheel path stays in charge
+   * of trackpads.
+   */
+  private readonly touchPoints = new Map<number, { x: number; y: number }>();
+  /** Finger-midpoint + spread from the previous touch frame, for computing
+   *  per-frame pan delta and pinch scale factor. */
+  private pinchPrevX = 0;
+  private pinchPrevY = 0;
+  private pinchPrevDist = 0;
   /** Current layout-side zoom factor (integer ≥ 1). See ViewportOptions. */
   private renderTier = 1;
   /** Suppresses `onTransformChange` during the constructor's initial
@@ -101,6 +122,18 @@ export class Viewport {
 
     this.onWheel = (e: WheelEvent) => this.handleWheel(e);
     container.addEventListener("wheel", this.onWheel, { passive: false });
+
+    // Touch gestures via Pointer Events (one listener set covers touch + pen).
+    // `touch-action: none` (see viewport.css) already suppresses the browser's
+    // native pan/zoom on the container, so without these handlers touch input
+    // does nothing — these supply the pan/pinch behaviour in its place.
+    this.onPointerDown = (e: PointerEvent) => this.handlePointerDown(e);
+    this.onPointerMove = (e: PointerEvent) => this.handlePointerMove(e);
+    this.onPointerUp = (e: PointerEvent) => this.handlePointerUp(e);
+    container.addEventListener("pointerdown", this.onPointerDown);
+    container.addEventListener("pointermove", this.onPointerMove, { passive: false });
+    container.addEventListener("pointerup", this.onPointerUp);
+    container.addEventListener("pointercancel", this.onPointerUp);
 
     this.applyTransform();
     this.constructed = true;
@@ -220,6 +253,10 @@ export class Viewport {
 
   destroy(): void {
     this.container.removeEventListener("wheel", this.onWheel);
+    this.container.removeEventListener("pointerdown", this.onPointerDown);
+    this.container.removeEventListener("pointermove", this.onPointerMove);
+    this.container.removeEventListener("pointerup", this.onPointerUp);
+    this.container.removeEventListener("pointercancel", this.onPointerUp);
     this.stage.remove();
     this.container.classList.remove("sobree-viewport");
   }
@@ -243,6 +280,105 @@ export class Viewport {
     this.tx -= dx;
     this.ty -= dy;
     this.applyTransform();
+  }
+
+  /**
+   * Touch begins. Track the finger and, once two are down, capture the
+   * midpoint + spread so the first move computes a delta against a real
+   * baseline (no jump). Single-finger touches are NOT preventDefault-ed:
+   * a stationary tap must reach the editor to place the caret, and a
+   * long-press must reach it to start a native text selection.
+   */
+  private handlePointerDown(e: PointerEvent): void {
+    if (e.pointerType !== "touch") return;
+    this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // Keep receiving moves even if the finger drifts off the container edge.
+    this.container.setPointerCapture?.(e.pointerId);
+    if (this.touchPoints.size >= 2) this.refreshPinchReference();
+  }
+
+  /**
+   * Touch moves. One finger pans; two fingers pinch-zoom about their
+   * midpoint while that midpoint's drift also pans. The same `zoomTo`
+   * anchoring used by the wheel path keeps the content under the fingers
+   * pinned, so pinch and pan compose into one natural transform.
+   */
+  private handlePointerMove(e: PointerEvent): void {
+    if (e.pointerType !== "touch") return;
+    const pt = this.touchPoints.get(e.pointerId);
+    if (!pt) return;
+    const prevX = pt.x;
+    const prevY = pt.y;
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+
+    if (this.touchPoints.size === 1) {
+      // Single-finger pan. `touch-action: none` already blocks native
+      // scroll, so no preventDefault is needed (and omitting it lets taps
+      // through to the editor untouched).
+      this.tx += pt.x - prevX;
+      this.ty += pt.y - prevY;
+      this.applyTransform();
+      return;
+    }
+
+    // Two-finger pinch + pan. Use the first two tracked fingers.
+    e.preventDefault();
+    const pair = this.firstTwoPoints();
+    if (!pair) return;
+    const [a, b] = pair;
+    const midX = (a.x + b.x) / 2;
+    const midY = (a.y + b.y) / 2;
+    const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+
+    const rect = this.container.getBoundingClientRect();
+    const factor = dist / (this.pinchPrevDist || dist);
+    const nextScale = clamp(this.scale * factor, this.minScale, this.maxScale);
+
+    // World point under the PREVIOUS midpoint; we re-pin it under the NEW
+    // midpoint at the new scale. This folds zoom-anchoring and midpoint pan
+    // into a single update.
+    const cx0 = this.pinchPrevX - rect.left;
+    const cy0 = this.pinchPrevY - rect.top;
+    const wx = (cx0 - this.tx) / this.scale;
+    const wy = (cy0 - this.ty) / this.scale;
+
+    this.scale = nextScale;
+    this.tx = midX - rect.left - wx * nextScale;
+    this.ty = midY - rect.top - wy * nextScale;
+    this.applyTransform();
+    this.onScaleChange?.(this.scale);
+
+    this.pinchPrevX = midX;
+    this.pinchPrevY = midY;
+    this.pinchPrevDist = dist;
+  }
+
+  /** Touch ends / cancels. Drop the finger; if two remain (a third lifted),
+   *  re-baseline the pinch so the next frame doesn't jump. */
+  private handlePointerUp(e: PointerEvent): void {
+    if (e.pointerType !== "touch") return;
+    if (!this.touchPoints.delete(e.pointerId)) return;
+    this.container.releasePointerCapture?.(e.pointerId);
+    if (this.touchPoints.size >= 2) this.refreshPinchReference();
+  }
+
+  /** Snapshot the current two-finger midpoint + spread as the pinch baseline. */
+  private refreshPinchReference(): void {
+    const pair = this.firstTwoPoints();
+    if (!pair) return;
+    const [a, b] = pair;
+    this.pinchPrevX = (a.x + b.x) / 2;
+    this.pinchPrevY = (a.y + b.y) / 2;
+    this.pinchPrevDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  }
+
+  /** The first two tracked touch points, or null if fewer than two are down. */
+  private firstTwoPoints(): [{ x: number; y: number }, { x: number; y: number }] | null {
+    const it = this.touchPoints.values();
+    const a = it.next().value;
+    const b = it.next().value;
+    return a && b ? [a, b] : null;
   }
 
   /**
@@ -347,8 +483,7 @@ export class Viewport {
       const tier = this.renderTier;
       const visualScale = this.scale / tier;
       const translateScale = 1 / tier;
-      stage.style.transform =
-        `translate3d(${this.tx * translateScale}px, ${this.ty * translateScale}px, 0) scale(${visualScale})`;
+      stage.style.transform = `translate3d(${this.tx * translateScale}px, ${this.ty * translateScale}px, 0) scale(${visualScale})`;
       // applyTransform fires onTransformChange; we skipped it above so
       // overlay listeners still need a kick.
       this.onTransformChange?.();
