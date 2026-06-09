@@ -36,6 +36,23 @@ import { NS } from "../shared/namespaces";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
 import { resolveStyleCascade } from "../../doc/styles";
 
+/**
+ * Canonicalise a heading style id to `HeadingN`.
+ *
+ * Word and OpenOffice name the heading styles inconsistently across docs:
+ * `Heading2`, `Heading 2`, `heading 2`. The paragraph importer already
+ * maps a heading PARAGRAPH's styleId to the canonical `HeadingN` (so it
+ * renders as `<hN>` and joins the `HeadingN` convention used by builders /
+ * serialize / markdown). The STYLE definition must canonicalise the same
+ * way, or `resolveStyleCascade` looks up `HeadingN` and misses the
+ * actual style — dropping its colour, caps, etc. Non-heading ids pass
+ * through unchanged.
+ */
+export function canonicalStyleId(id: string): string {
+  const m = id.match(/^heading\s*([1-6])$/i);
+  return m ? `Heading${m[1]}` : id;
+}
+
 export function parseStylesXml(
   xml: string | undefined,
   settings: DocSettings = { doNotUseHTMLParagraphAutoSpacing: false },
@@ -73,19 +90,25 @@ export function parseStylesXml(
 
   // 2. Walk every <w:style> element. Each becomes a NamedStyle.
   for (const styleEl of wAll(doc, "style")) {
-    const styleId =
+    const rawStyleId =
       styleEl.getAttributeNS(NS.w, "styleId") ??
       styleEl.getAttribute("w:styleId");
-    if (!styleId) continue;
+    if (!rawStyleId) continue;
+    // Canonicalise heading ids (`Heading 2` / `heading 2` → `Heading2`).
+    // The paragraph importer canonicalises a heading PARAGRAPH's styleId
+    // the same way; the STYLE definition must match or the cascade can't
+    // resolve it and the heading's colour / caps are silently dropped.
+    const styleId = canonicalStyleId(rawStyleId);
     const typeAttr =
       styleEl.getAttributeNS(NS.w, "type") ?? styleEl.getAttribute("w:type");
     const type = mapStyleType(typeAttr);
     if (!type) continue; // skip unknown style types silently
 
-    const displayName =
-      wVal(wFirst(styleEl, "name")) ?? styleId;
-    const basedOn = wVal(wFirst(styleEl, "basedOn")) ?? undefined;
-    const nextStyleId = wVal(wFirst(styleEl, "next")) ?? undefined;
+    const displayName = wVal(wFirst(styleEl, "name")) ?? rawStyleId;
+    // basedOn / next reference style ids too — canonicalise so a chain
+    // through a renamed heading style stays linked.
+    const basedOn = wVal(wFirst(styleEl, "basedOn"));
+    const nextStyleId = wVal(wFirst(styleEl, "next"));
 
     const rPr = wFirst(styleEl, "rPr");
     const pPr = wFirst(styleEl, "pPr");
@@ -96,8 +119,8 @@ export function parseStylesXml(
       id: styleId,
       type,
       displayName,
-      ...(basedOn ? { basedOn } : {}),
-      ...(nextStyleId ? { nextStyleId } : {}),
+      ...(basedOn ? { basedOn: canonicalStyleId(basedOn) } : {}),
+      ...(nextStyleId ? { nextStyleId: canonicalStyleId(nextStyleId) } : {}),
       ...(runDefaults ? { runDefaults } : {}),
       ...(paragraphDefaults ? { paragraphDefaults } : {}),
     });
