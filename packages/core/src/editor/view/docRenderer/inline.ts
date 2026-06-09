@@ -1,4 +1,11 @@
-import type { HyperlinkRun, InlineRun, RunProperties, TextRun } from "../../../doc/types";
+import type {
+  HyperlinkRun,
+  InlineRun,
+  NamedStyle,
+  RunProperties,
+  TextRun,
+} from "../../../doc/types";
+import { resolveRunStyle } from "../../../doc/styles";
 import { withFallbacks } from "./fontFallback";
 
 /**
@@ -13,21 +20,26 @@ export function appendInlineRuns(
   parent: HTMLElement,
   runs: readonly InlineRun[],
   rawParts: Record<string, Uint8Array> = {},
+  styles: readonly NamedStyle[] = [],
 ): void {
   if (runs.length === 0) {
     parent.appendChild(document.createElement("br"));
     return;
   }
   for (const run of runs) {
-    const node = renderRun(run, rawParts);
+    const node = renderRun(run, rawParts, styles);
     if (node) parent.appendChild(node);
   }
 }
 
-function renderRun(run: InlineRun, rawParts: Record<string, Uint8Array>): Node | null {
+function renderRun(
+  run: InlineRun,
+  rawParts: Record<string, Uint8Array>,
+  styles: readonly NamedStyle[],
+): Node | null {
   switch (run.kind) {
     case "text":
-      return renderTextRun(run);
+      return renderTextRun(run, styles);
     case "break":
       if (run.type === "line") return document.createElement("br");
       if (run.type === "page") {
@@ -61,7 +73,7 @@ function renderRun(run: InlineRun, rawParts: Record<string, Uint8Array>): Node |
     case "drawing":
       return renderDrawing(run, rawParts);
     case "hyperlink":
-      return renderHyperlink(run, rawParts);
+      return renderHyperlink(run, rawParts, styles);
     case "footnoteRef":
       return renderFootnoteRef(run);
     case "commentRef":
@@ -116,9 +128,18 @@ function renderCommentRef(run: import("../../../doc/types").CommentRefRun): HTML
  * The DOM shape round-trips cleanly through the serializer which walks
  * these wrappers back into a single flat `RunProperties`.
  */
-function renderTextRun(run: TextRun): Node {
+function renderTextRun(run: TextRun, styles: readonly NamedStyle[] = []): Node {
   let node: Node = document.createTextNode(run.text);
-  const p = run.properties;
+  // A run character style (`<w:rStyle>`) contributes its rPr UNDER any
+  // direct run formatting — Word's cascade order (char style < direct
+  // rPr). resolveStyleCascade returns the char style's own properties
+  // (character styles don't chain to DocDefaults), so the run's font /
+  // size still inherit from the paragraph; only what the char style sets
+  // (colour, underline, …) is added.
+  const p: RunProperties =
+    run.properties.styleId && styles.length > 0
+      ? { ...resolveRunStyle(styles, run.properties.styleId), ...run.properties }
+      : run.properties;
 
   if (p.verticalAlign === "superscript") node = wrap("sup", node);
   else if (p.verticalAlign === "subscript") node = wrap("sub", node);
@@ -184,10 +205,14 @@ function renderTextRun(run: TextRun): Node {
   return node;
 }
 
-function renderHyperlink(link: HyperlinkRun, rawParts: Record<string, Uint8Array>): Node {
+function renderHyperlink(
+  link: HyperlinkRun,
+  rawParts: Record<string, Uint8Array>,
+  styles: readonly NamedStyle[] = [],
+): Node {
   const a = document.createElement("a");
   a.setAttribute("href", link.href);
-  appendInlineRuns(a, link.children, rawParts);
+  appendInlineRuns(a, link.children, rawParts, styles);
   return a;
 }
 

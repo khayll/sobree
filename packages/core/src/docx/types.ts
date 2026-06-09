@@ -21,6 +21,10 @@ export interface DocxExportResult {
 
 /** A single inline run's formatting flags — what `<w:rPr>` tells us. */
 export interface RunFormat {
+  /** `<w:rStyle w:val="…">` — a character style applied to the run. Its
+   *  rPr (colour, underline, …) is resolved against the style cascade at
+   *  render time, under any direct run formatting. */
+  styleId?: string;
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;

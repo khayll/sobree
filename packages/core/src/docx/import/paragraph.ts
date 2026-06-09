@@ -226,6 +226,7 @@ function makeTextRun(text: string, properties: RunProperties): TextRun {
 
 function mapRunFormat(f: RunFormat): RunProperties {
   const out: RunProperties = {};
+  if (f.styleId) out.styleId = f.styleId;
   if (f.bold) out.bold = true;
   if (f.italic) out.italic = true;
   if (f.strike) out.strike = true;
