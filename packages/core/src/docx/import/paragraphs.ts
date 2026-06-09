@@ -3,6 +3,7 @@ import { NS } from "../shared/namespaces";
 import { halfPtToPt, ooxmlLineHeightToCss } from "../shared/units";
 import { wChildren, wFirst, wVal } from "../shared/xml";
 import { readShading } from "../shared/shading";
+import { readParagraphBorders } from "./borders";
 import type { ParagraphFormat } from "../types";
 
 /** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
@@ -373,30 +374,8 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
   // never reaches the AST and the renderer's existing
   // `effective.borders.bottom` branch fires only off the style
   // cascade (which doesn't have the divider).
-  const pBdrEl = wFirst(pPr, "pBdr");
-  if (pBdrEl) {
-    const borders: ParagraphFormat["borders"] = {};
-    for (const side of ["top", "bottom", "left", "right", "between"] as const) {
-      const child = wFirst(pBdrEl, side);
-      if (!child) continue;
-      const val = child.getAttribute("w:val") ?? "single";
-      if (val === "none" || val === "nil") continue;
-      const sz = child.getAttribute("w:sz");
-      const color = child.getAttribute("w:color");
-      const space = child.getAttribute("w:space");
-      const styleMap: Record<string, "single" | "double" | "dashed" | "dotted" | "thick" | "none"> = {
-        single: "single", double: "double", dashed: "dashed",
-        dotted: "dotted", thick: "thick", dotDash: "dashed", dashDot: "dashed",
-      };
-      borders[side] = {
-        style: styleMap[val] ?? "single",
-        sizeEighthsOfPt: sz ? Number(sz) : 4,
-        color: color && color !== "auto" ? `#${color}` : "auto",
-        ...(space ? { spaceTwips: Number(space) } : {}),
-      };
-    }
-    if (Object.keys(borders).length > 0) format.borders = borders;
-  }
+  const borders = readParagraphBorders(pPr);
+  if (borders) format.borders = borders;
 
   // <w:shd w:val="clear" w:fill="…"/> — paragraph background colour.
   const shading = readShading(pPr);

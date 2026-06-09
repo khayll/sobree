@@ -127,3 +127,25 @@ describe("heading style id canonicalisation", () => {
     expect(resolveStyleCascade(styles, "Sub").runDefaults.color).toBe("#111111");
   });
 });
+
+describe("style paragraph borders (<w:pBdr>)", () => {
+  it("reads a style's top rule into the cascade (nil sides skipped)", () => {
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="Name">
+        <w:pPr><w:pBdr>
+          <w:top w:val="single" w:color="367DA2" w:sz="24" w:space="6"/>
+          <w:bottom w:val="nil"/>
+        </w:pBdr></w:pPr>
+      </w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    const { paragraphDefaults } = resolveStyleCascade(styles, "Name");
+    expect(paragraphDefaults.borders?.top).toMatchObject({
+      style: "single",
+      color: "#367DA2",
+      sizeEighthsOfPt: 24,
+      spaceTwips: 6,
+    });
+    expect(paragraphDefaults.borders?.bottom).toBeUndefined();
+  });
+});
