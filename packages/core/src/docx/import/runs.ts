@@ -225,6 +225,12 @@ function normaliseRunText(text: string): string {
 
 function readRunFormat(rPr: Element): RunFormat {
   const format: RunFormat = {};
+  // `<w:rStyle>` — character style reference. Resolved against the style
+  // cascade at render time (its colour / underline / … layer under direct
+  // run formatting). Without this a run styled only via a char style
+  // (e.g. a "Blue" link colour) renders with just its paragraph style.
+  const rStyle = wVal(wFirst(rPr, "rStyle"));
+  if (rStyle) format.styleId = rStyle;
   if (hasBooleanProperty(rPr, "b")) format.bold = true;
   if (hasBooleanProperty(rPr, "i")) format.italic = true;
   if (hasBooleanProperty(rPr, "strike")) format.strike = true;

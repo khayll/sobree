@@ -71,13 +71,13 @@ export function renderParagraph(
     el.classList.add("sobree-tab-spread");
     const before = document.createElement("span");
     before.className = "sobree-tab-spread__before";
-    appendInlineRuns(before, split.before, rawParts);
+    appendInlineRuns(before, split.before, rawParts, styles);
     const after = document.createElement("span");
     after.className = "sobree-tab-spread__after";
-    appendInlineRuns(after, split.after, rawParts);
+    appendInlineRuns(after, split.after, rawParts, styles);
     el.append(before, after);
   } else {
-    appendInlineRuns(el, p.runs, rawParts);
+    appendInlineRuns(el, p.runs, rawParts, styles);
   }
   return el;
 }

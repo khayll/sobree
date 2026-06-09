@@ -48,6 +48,40 @@ export function resolveStyleCascade(
   return { runDefaults, paragraphDefaults };
 }
 
+/**
+ * Resolve a RUN character style (`<w:rStyle>`) to the run properties it
+ * contributes: its own rPr merged up its `basedOn` chain — but WITHOUT
+ * the Normal / DocDefaults anchor that `resolveStyleCascade` appends.
+ *
+ * A character style layers on top of the run's INHERITED paragraph
+ * formatting; folding the document defaults back in here would reset the
+ * run's font / size to the doc default (e.g. a colour-only "Blue" char
+ * style must not drag Times/12pt onto a Helvetica/10pt contact line). So
+ * we walk only the explicit `basedOn` chain and stop — no Normal anchor.
+ */
+export function resolveRunStyle(
+  styles: readonly NamedStyle[],
+  styleId: string,
+): RunProperties {
+  const chain: NamedStyle[] = [];
+  const seen = new Set<string>();
+  let id: string | undefined = styleId;
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    const s = styles.find((x) => x.id === id);
+    if (!s) break;
+    chain.push(s);
+    id = s.basedOn;
+  }
+  // Base-up so the named style itself wins on conflict.
+  let out: RunProperties = {};
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const rd = chain[i]?.runDefaults;
+    if (rd) out = { ...out, ...rd };
+  }
+  return out;
+}
+
 function mergeParagraphDefaults(
   base: ParagraphProperties,
   over: ParagraphProperties,

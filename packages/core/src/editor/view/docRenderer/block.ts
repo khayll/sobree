@@ -125,7 +125,7 @@ export function renderBlocks(
       li.dataset.blockIndex = String(i);
       applyParagraphProps(li, (block as Paragraph).properties, styles);
       stampBlockRevision(li, (block as Paragraph).properties);
-      appendInlineRuns(li, (block as Paragraph).runs, rawParts);
+      appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles);
       currentList.el.appendChild(li);
       continue;
     }
