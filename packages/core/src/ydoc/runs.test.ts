@@ -278,3 +278,33 @@ describe("deepEqual", () => {
     expect(deepEqual({ a: { b: [1, 2] } }, { a: { b: [1, 3] } })).toBe(false);
   });
 });
+
+describe("runs ↔ delta — structural embed parity", () => {
+  it("footnoteRef and commentRef round-trip (were silently DROPPED before)", () => {
+    const runs: InlineRun[] = [
+      { kind: "text", text: "claim", properties: {} },
+      { kind: "footnoteRef", id: 3 },
+      { kind: "commentRef", id: 7 },
+    ];
+    expect(rt(runs)).toEqual(runs);
+  });
+
+  it("an UNKNOWN future embed kind survives the round-trip verbatim", () => {
+    // The transport must not be a schema gatekeeper: data it doesn't
+    // know still belongs to the document.
+    const exotic = { kind: "mathZone", omml: "<m:oMath/>" } as unknown as InlineRun;
+    expect(rt([exotic])).toEqual([exotic]);
+  });
+
+  it("a future field on an existing kind survives without touching runs.ts", () => {
+    const run = {
+      kind: "drawing",
+      partPath: "word/media/i.png",
+      widthEmu: 1,
+      heightEmu: 1,
+      placement: "inline",
+      futureCrop: { l: 1, r: 2 },
+    } as unknown as InlineRun;
+    expect(rt([run])).toEqual([run]);
+  });
+});
