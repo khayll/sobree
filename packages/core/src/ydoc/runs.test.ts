@@ -88,6 +88,37 @@ describe("runs ↔ delta — round trip", () => {
     expect(rt([d])).toEqual([d]);
   });
 
+  it("float drawing round-trips its margins (Y.Doc parity — refresh must not drop them)", () => {
+    const d: DrawingRun = {
+      kind: "drawing",
+      partPath: "word/media/photo.png",
+      widthEmu: 1168400,
+      heightEmu: 1168400,
+      placement: "floatRight",
+      floatMarginsEmu: { topEmu: 152400, rightEmu: 152400, bottomEmu: 152400, leftEmu: 152400 },
+      verticalAlign: "middle",
+    };
+    expect(rt([d])).toEqual([d]);
+  });
+
+  it("anchored drawing round-trips its anchor", () => {
+    const d: DrawingRun = {
+      kind: "drawing",
+      partPath: "word/media/logo.png",
+      widthEmu: 500000,
+      heightEmu: 500000,
+      placement: "anchor",
+      anchor: {
+        offsetXEmu: 914400,
+        offsetYEmu: 457200,
+        relativeFromH: "margin",
+        relativeFromV: "paragraph",
+        behindDoc: true,
+      },
+    };
+    expect(rt([d])).toEqual([d]);
+  });
+
   it("drawing run without altText omits the field", () => {
     const d: DrawingRun = {
       kind: "drawing",

@@ -76,6 +76,12 @@ export type EmbedContent =
       heightEmu: number;
       placement: DrawingRun["placement"];
       altText?: string;
+      // Every layout-bearing DrawingRun field must round-trip — a field
+      // the renderer consumes but the embed drops renders correctly on
+      // first import and silently degrades after a refresh (Y.Doc parity).
+      anchor?: DrawingRun["anchor"];
+      floatMarginsEmu?: DrawingRun["floatMarginsEmu"];
+      verticalAlign?: DrawingRun["verticalAlign"];
     };
 
 /** The `link` mark — stamped on every char inside a HyperlinkRun. */
@@ -139,7 +145,11 @@ function appendRun(
       heightEmu: run.heightEmu,
       placement: run.placement,
     };
-    if (run.altText) (embed as { altText?: string }).altText = run.altText;
+    const e = embed as Extract<EmbedContent, { __sobree: "drawing" }>;
+    if (run.altText) e.altText = run.altText;
+    if (run.anchor) e.anchor = run.anchor;
+    if (run.floatMarginsEmu) e.floatMarginsEmu = run.floatMarginsEmu;
+    if (run.verticalAlign) e.verticalAlign = run.verticalAlign;
     pushOp(out, embed, parentMarks);
     return;
   }
@@ -264,6 +274,9 @@ function opToRun(op: DeltaOp): InlineRun {
       placement: embed.placement,
     };
     if (embed.altText) r.altText = embed.altText;
+    if (embed.anchor) r.anchor = embed.anchor;
+    if (embed.floatMarginsEmu) r.floatMarginsEmu = embed.floatMarginsEmu;
+    if (embed.verticalAlign) r.verticalAlign = embed.verticalAlign;
     return r;
   }
   // Unknown embed kind — fall back to empty text run.
