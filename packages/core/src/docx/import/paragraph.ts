@@ -1,6 +1,7 @@
 import { type ImportedItem, readParagraph } from "./paragraphs";
 import type { ImportedRun } from "./runs";
 import type {
+  Block,
   DrawingRun,
   HyperlinkRun,
   InlineRun,
@@ -26,6 +27,15 @@ export interface ConvertContext {
    *  page boundaries; a stray single hint is usually stale and
    *  ignored. */
   honorLastRenderedPageBreaks?: boolean;
+  /**
+   * Pre-built replacement Blocks keyed by their source `<w:p>` element
+   * (e.g. an InlineFrame derived from a drawing the paragraph hosted).
+   * Lives on the CONTEXT — not a body-walker option — because host
+   * paragraphs can sit anywhere a paragraph can: body, table cells,
+   * nested tables. A walker that doesn't consult it silently drops the
+   * replacement (the drawing was already claimed out of the XML).
+   */
+  replaceParagraphs?: Map<Element, Block>;
 }
 
 /**

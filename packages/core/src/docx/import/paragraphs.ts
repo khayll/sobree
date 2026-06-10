@@ -179,6 +179,15 @@ function collectParagraphChildren(
         return run;
       });
       out.push({ kind: "hyperlink", ...(relId ? { relId } : {}), runs });
+    } else if (child.localName === "sdt") {
+      // Run-level content control (`<w:sdt>` INSIDE a paragraph — e.g.
+      // a cover-page "E-mail Address" binding). The block-level SDT
+      // expander never sees these; without recursing into the
+      // sdtContent, every run inside the control silently vanishes.
+      const sdtContent = wFirst(child, "sdtContent");
+      if (sdtContent) {
+        collectParagraphChildren(sdtContent, out, revision, activeComments);
+      }
     } else if (child.localName === "ins" || child.localName === "del") {
       const nextRevision: ImportedRun["revision"] = {
         type: child.localName === "ins" ? "ins" : "del",

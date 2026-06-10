@@ -1,7 +1,7 @@
 import { appendInlineRuns } from "./inline";
 import { renderTable } from "./table";
 import { applyParagraphProps } from "./properties";
-import { createListContainer, paragraphListInfo } from "./lists";
+import { applyListItemLevel, createListContainer, paragraphListInfo } from "./lists";
 import { renderInlineFrameBlock } from "./inlineFrame";
 import { renderParagraph } from "./paragraph";
 import {
@@ -124,6 +124,7 @@ export function renderBlocks(
       li.dataset.sectionIndex = String(sectionIndex);
       li.dataset.blockIndex = String(i);
       applyParagraphProps(li, (block as Paragraph).properties, styles);
+      applyListItemLevel(li, block, numbering);
       stampBlockRevision(li, (block as Paragraph).properties);
       appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles);
       currentList.el.appendChild(li);

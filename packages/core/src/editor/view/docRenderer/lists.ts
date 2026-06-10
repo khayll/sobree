@@ -67,26 +67,31 @@ export function paragraphListInfo(
   if (!num) return null;
   const def = numbering.find((n) => n.numId === num.numId);
   const lvl = def?.abstractFormat.levels[num.level];
+  // The CONTAINER is anchored at level 0 (its padding-left is the level-0
+  // text column; `applyListItemLevel` shifts deeper items). Anchoring it
+  // at whatever level the group's FIRST paragraph happens to be would
+  // mis-indent every other level in the group.
+  const lvl0 = def?.abstractFormat.levels[0] ?? lvl;
   const format = lvl?.format;
   const result: ListInfo = {
     numId: num.numId,
     ordered: format !== "bullet",
   };
-  if (lvl?.paragraphIndent?.leftTwips !== undefined) {
-    result.leftTwips = lvl.paragraphIndent.leftTwips;
+  if (lvl0?.paragraphIndent?.leftTwips !== undefined) {
+    result.leftTwips = lvl0.paragraphIndent.leftTwips;
   }
-  if (lvl?.paragraphIndent?.hangingTwips !== undefined) {
-    result.hangingTwips = lvl.paragraphIndent.hangingTwips;
+  if (lvl0?.paragraphIndent?.hangingTwips !== undefined) {
+    result.hangingTwips = lvl0.paragraphIndent.hangingTwips;
   }
   if (result.ordered) {
     result.counterStyle = counterStyleFor(format);
     const { prefix, suffix } = parseLvlText(lvl?.text ?? "", num.level);
     result.markerPrefix = prefix;
     result.markerSuffix = suffix;
-  } else if (lvl?.text) {
-    result.bulletGlyph = lvl.text;
+  } else if (lvl0?.text) {
+    result.bulletGlyph = lvl0.text;
   }
-  const marker = lvl?.runDefaults;
+  const marker = lvl0?.runDefaults;
   if (marker?.color) result.markerColor = marker.color;
   if (marker?.fontFamily) result.markerFont = marker.fontFamily;
   if (marker?.fontSizePt !== undefined) result.markerSizePt = marker.fontSizePt;
@@ -135,6 +140,49 @@ export function createListContainer(
     listEl.style.setProperty("--sobree-marker-size", `${info.markerSizePt}pt`);
   }
   return listEl;
+}
+
+/**
+ * Apply a list item's OWN level styling. The shared container carries
+ * level-0 geometry and marker; an item at a deeper `ilvl` overrides per
+ * LI: extra indent (its level's text column relative to level 0), its
+ * marker-box width, glyph, and marker run formatting — CSS custom props
+ * set on the LI shadow the container's for this item's `::before`.
+ * Ordered sub-levels keep the container's counter (a flat `list-item`
+ * counter can't express per-level numbering — known limitation).
+ */
+export function applyListItemLevel(
+  li: HTMLElement,
+  block: Block,
+  numbering: readonly NumberingDefinition[],
+): void {
+  if (block.kind !== "paragraph") return;
+  const num = block.properties.numbering;
+  if (!num || num.level === 0) return;
+  const def = numbering.find((n) => n.numId === num.numId);
+  const lvl = def?.abstractFormat.levels[num.level];
+  const lvl0 = def?.abstractFormat.levels[0];
+  if (!lvl) return;
+  const dLeft =
+    (lvl.paragraphIndent?.leftTwips ?? 0) - (lvl0?.paragraphIndent?.leftTwips ?? 0);
+  if (dLeft > 0) li.style.marginLeft = `${twipsToMm(dLeft)}mm`;
+  if (lvl.paragraphIndent?.hangingTwips !== undefined) {
+    li.style.setProperty(
+      "--sobree-list-hang",
+      `${twipsToMm(lvl.paragraphIndent.hangingTwips)}mm`,
+    );
+  }
+  if (lvl.format === "bullet" && lvl.text) {
+    li.style.setProperty("--sobree-bullet", cssString(lvl.text));
+  }
+  const marker = lvl.runDefaults;
+  if (marker?.color) li.style.setProperty("--sobree-marker-color", marker.color);
+  if (marker?.fontFamily) {
+    li.style.setProperty("--sobree-marker-font", resolveFontFace(marker.fontFamily).stack);
+  }
+  if (marker?.fontSizePt !== undefined) {
+    li.style.setProperty("--sobree-marker-size", `${marker.fontSizePt}pt`);
+  }
 }
 
 /** Map an OOXML `numFmt` to the CSS `<counter-style>` class suffix used
