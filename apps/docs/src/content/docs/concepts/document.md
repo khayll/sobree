@@ -188,5 +188,6 @@ const { blob } = exportDocx(doc);
 ```
 
 `importDocx` accepts `File | Blob | ArrayBuffer | Uint8Array`. `exportDocx`
-returns `{ blob, bytes, warnings }`. Round-trip is byte-stable for
-paragraphs the editor didn't touch.
+returns `{ blob, bytes, warnings }`. An open → save cycle is a tested
+semantic fixpoint (see [DOCX I/O](/api/docx/#round-trip-stability) for
+the guarantee and the documented exporter gaps).

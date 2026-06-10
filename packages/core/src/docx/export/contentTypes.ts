@@ -8,6 +8,8 @@ const REL_TYPES = {
   hyperlink: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
   fontTable:
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+  numbering:
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
   font: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
 } as const;
 

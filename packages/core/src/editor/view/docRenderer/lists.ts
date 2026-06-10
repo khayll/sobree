@@ -24,6 +24,7 @@
  */
 
 import { twipsToMm } from "./units";
+import { resolveFontFace } from "./fontFallback";
 import type { Block, NumberingDefinition } from "../../../doc/types";
 
 export interface ListInfo {
@@ -37,6 +38,12 @@ export interface ListInfo {
   hangingTwips?: number;
   /** Bullet glyph (post-Wingdings remapping), for unordered lists. */
   bulletGlyph?: string;
+  /** Marker glyph's own run formatting (`<w:lvl><w:rPr>`): colour, font,
+   *  size. The font also matters for layout — Word lets the marker
+   *  font's strut set the bullet line height (see paperStack.css). */
+  markerColor?: string;
+  markerFont?: string;
+  markerSizePt?: number;
   /** CSS counter-style class suffix for ordered lists (`decimal`,
    *  `lower-latin`, …) — selects the matching `::before` rule. */
   counterStyle?: string;
@@ -79,6 +86,10 @@ export function paragraphListInfo(
   } else if (lvl?.text) {
     result.bulletGlyph = lvl.text;
   }
+  const marker = lvl?.runDefaults;
+  if (marker?.color) result.markerColor = marker.color;
+  if (marker?.fontFamily) result.markerFont = marker.fontFamily;
+  if (marker?.fontSizePt !== undefined) result.markerSizePt = marker.fontSizePt;
   return result;
 }
 
@@ -111,6 +122,17 @@ export function createListContainer(
   } else {
     listEl.classList.add("lst-bullet");
     listEl.style.setProperty("--sobree-bullet", cssString(info.bulletGlyph ?? "•"));
+  }
+  // Marker glyph formatting (the `::before` rules consume these). The
+  // font is deliberately carried even when the host may not ship it —
+  // when it DOES resolve, the marker's strut opens up the bullet line
+  // height exactly as Word lays it out.
+  if (info.markerColor) listEl.style.setProperty("--sobree-marker-color", info.markerColor);
+  if (info.markerFont) {
+    listEl.style.setProperty("--sobree-marker-font", resolveFontFace(info.markerFont).stack);
+  }
+  if (info.markerSizePt !== undefined) {
+    listEl.style.setProperty("--sobree-marker-size", `${info.markerSizePt}pt`);
   }
   return listEl;
 }

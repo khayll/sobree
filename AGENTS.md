@@ -168,6 +168,8 @@ Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime 
 
 Paragraph blocks store content as `Y.Text` (char-level CRDT); other blocks as JSON `_ast`. The Run↔Delta conversion lives in `packages/core/src/ydoc/runs.ts`; the diff that preserves CRDT semantics across full-document `applyDocument` calls lives in `packages/core/src/ydoc/textDiff.ts`. **Don't bypass these helpers:** anything that reads/writes paragraph text directly on Y.Text must go through them, or marks/embeds will diverge from the SobreeDocument projection. New non-text run kinds need: (1) an `EmbedContent` variant in `runs.ts`, (2) a case in `appendRun`, (3) a case in `opToRun`, (4) a round-trip test in `runs.test.ts`.
 
+**Y.Doc parity is a hard requirement.** The Y.Doc is the source of truth: a refresh (or a collab peer joining) renders from the seed → project round-trip, not from the original import. Every AST field the renderer consumes MUST survive that round-trip, or the document renders correctly on first import and silently degrades on reload — the worst kind of regression because nothing fails loudly and the corpus gate (which renders the fresh import) doesn't catch it. This applies to EXTENDING existing kinds, not just adding new ones: the run embeds in `runs.ts` enumerate fields explicitly, so a new field on e.g. `DrawingRun` is dropped unless you add it to the `EmbedContent` variant + both conversion directions + the round-trip test. (Bug history: `DrawingRun.floatMarginsEmu` rendered a floated image's text clearance on import and lost it on every reload.) When you add or extend an AST field, ask: "does this survive a reload?" — and prove it with a round-trip test.
+
 ### Fonts module
 
 - `api/fonts.md`

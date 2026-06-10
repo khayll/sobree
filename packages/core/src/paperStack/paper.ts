@@ -269,11 +269,23 @@ export class Paper {
     // earlier version added headerOffsetPx on top of headerPx and
     // double-counted ~13mm per page, stealing ~25mm of body budget
     // and triggering systemic page-1 overflow on complex-multipage.)
-    if (headerPx > marginTopPx + 1) {
-      this.root.style.paddingTop = `${headerPx}px`;
+    // Word's clearance rule is `headerOffset + header CONTENT height` vs
+    // the top margin. The zone's offsetHeight additionally includes
+    // Sobree's own decorative breathing pad (`.paper-header
+    // { padding-bottom: 4mm }` / `.paper-footer { padding-top: 4mm }`) —
+    // pure presentation inside the margin gap, NOT part of Word's
+    // reservation. Counting it overstated the requirement by 4mm, so a
+    // header that fits its margin in Word (offset + one line < margin)
+    // still pushed the body down and stole ~15px of page budget.
+    const headerReqPx =
+      headerPx - (Number.parseFloat(getComputedStyle(this.header).paddingBottom) || 0);
+    const footerReqPx =
+      footerPx - (Number.parseFloat(getComputedStyle(this.footer).paddingTop) || 0);
+    if (headerReqPx > marginTopPx + 1) {
+      this.root.style.paddingTop = `${headerReqPx}px`;
     }
-    if (footerPx > marginBottomPx + 1) {
-      this.root.style.paddingBottom = `${footerPx}px`;
+    if (footerReqPx > marginBottomPx + 1) {
+      this.root.style.paddingBottom = `${footerReqPx}px`;
     }
   }
 

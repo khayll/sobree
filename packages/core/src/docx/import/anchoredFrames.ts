@@ -35,6 +35,7 @@ import type {
   Block,
 } from "../../doc/types";
 import { NS } from "../shared/namespaces";
+import { readDrawingColor, type ThemePalette } from "../shared/drawingColor";
 
 export interface AnchoredFramesContext {
   /** RelationshipId → part path lookup, e.g. `"rId4" → "media/image1.png"`. */
@@ -57,6 +58,9 @@ export interface AnchoredFramesContext {
    * its true layout. When absent, falls back to flat text (tests).
    */
   parseBlockBody?: (txbxContent: Element) => Block[];
+  /** Theme colour palette (from `word/theme/theme1.xml`) so shape fills /
+   *  strokes declared as `<a:schemeClr>` resolve instead of vanishing. */
+  theme?: ThemePalette;
 }
 
 /**
@@ -382,9 +386,9 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
         kind: "textbox",
         body: parseTextboxBody(txbxContent, ctx),
       };
-      const fill = readSolidFill(wsp);
+      const fill = readSolidFill(wsp, ctx.theme);
       if (fill !== undefined) out.fill = fill;
-      const border = readBorder(wsp);
+      const border = readBorder(wsp, ctx.theme);
       if (border !== undefined) out.border = border;
       // `<wps:bodyPr lIns/tIns/rIns/bIns>` are the textbox's internal
       // insets (EMU). They push the text in from the frame edge — Word
@@ -400,9 +404,9 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
     kind: "shape",
     geometry: readGeometry(wsp),
   };
-  const fill = readSolidFill(wsp);
+  const fill = readSolidFill(wsp, ctx.theme);
   if (fill !== undefined) out.fill = fill;
-  const border = readBorder(wsp);
+  const border = readBorder(wsp, ctx.theme);
   if (border !== undefined) out.border = border;
   return out;
 }
@@ -560,10 +564,9 @@ function readGeometry(
   }
 }
 
-function readSolidFill(shape: Element): string | undefined {
-  // First `<a:solidFill><a:srgbClr val="RRGGBB"/></a:solidFill>` inside
-  // the shape's spPr. Theme colours / scheme references intentionally
-  // unsupported — fall through to undefined (renderer treats as no fill).
+function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
+  // First `<a:solidFill>` inside the shape's spPr — literal srgbClr or a
+  // theme schemeClr (+ transforms), resolved by `readDrawingColor`.
   const spPr =
     firstChildNS(shape, NS.wps, "spPr") ??
     firstChildNS(shape, NS.pic, "spPr");
@@ -572,15 +575,16 @@ function readSolidFill(shape: Element): string | undefined {
   // deeper inside a child shape.
   for (const fill of Array.from(spPr.children)) {
     if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
-      const srgb = firstChildNS(fill, NS.a, "srgbClr");
-      const val = srgb?.getAttribute("val");
-      if (val && /^[0-9A-Fa-f]{6}$/.test(val)) return `#${val.toUpperCase()}`;
+      return readDrawingColor(fill, theme);
     }
   }
   return undefined;
 }
 
-function readBorder(shape: Element):
+function readBorder(
+  shape: Element,
+  theme?: ThemePalette,
+):
   | { color: string; widthEmu: number; style: "solid" | "dashed" | "dotted" | "double" }
   | undefined {
   const spPr =
@@ -591,12 +595,11 @@ function readBorder(shape: Element):
   if (!ln) return undefined;
   const widthEmu = numAttr(ln, "w");
   const solidFill = firstChildNS(ln, NS.a, "solidFill");
-  const srgb = solidFill ? firstChildNS(solidFill, NS.a, "srgbClr") : null;
-  const val = srgb?.getAttribute("val");
-  if (!val || !/^[0-9A-Fa-f]{6}$/.test(val)) return undefined;
+  const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
+  if (!color) return undefined;
   const prstDash = firstChildNS(ln, NS.a, "prstDash");
   const style = coerceBorderStyle(prstDash?.getAttribute("val"));
-  return { color: `#${val.toUpperCase()}`, widthEmu: widthEmu || 0, style };
+  return { color, widthEmu: widthEmu || 0, style };
 }
 
 function coerceBorderStyle(

@@ -7,7 +7,7 @@
 
 import { applyParagraphProps } from "./properties";
 import { appendInlineRuns } from "./inline";
-import { withFallbacks } from "./fontFallback";
+import { resolveFontFace } from "./fontFallback";
 import { headingLevelOf } from "../../../doc/walk";
 import type { NamedStyle, Paragraph } from "../../../doc/types";
 
@@ -174,7 +174,11 @@ function cascadeDominantRunFont(el: HTMLElement, p: Paragraph): void {
   // chain leaves the font unset, purely to keep unitless line-height
   // honest. (Symmetric with the fontSize guard below.)
   if (family && !el.style.fontFamily) {
-    el.style.fontFamily = withFallbacks(family);
+    const face = resolveFontFace(family);
+    el.style.fontFamily = face.stack;
+    if (face.weight !== undefined && !el.style.fontWeight) {
+      el.style.fontWeight = String(face.weight);
+    }
   }
   if (sizePt !== undefined && !el.style.fontSize) {
     el.style.fontSize = `${sizePt}pt`;

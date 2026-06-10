@@ -5,6 +5,7 @@ import {
   renderRootRelsXml,
 } from "./contentTypes";
 import { renderDocumentXml } from "./document";
+import { renderNumberingXml } from "./numbering";
 import { emitHeadersAndFooters } from "./headers";
 import { renderStylesXml } from "./styles";
 import { type DocxParts, packageDocx } from "./zip";
@@ -40,6 +41,24 @@ export function exportDocx(doc: SobreeDocument): DocxExportResult {
 
   // Walk the body, emitting drawings that register image parts in ctx.
   const documentXml = renderDocumentXml(doc, sectPrXmls, ctx);
+
+  // Numbering definitions — without `word/numbering.xml` every list
+  // paragraph's `<w:numPr>` points at a numId that doesn't exist and
+  // Word drops the bullets/numbers entirely.
+  const numberingXml = renderNumberingXml(doc.numbering);
+  if (numberingXml) {
+    ctx.parts["word/numbering.xml"] = numberingXml;
+    ctx.contentTypeOverrides.push({
+      partName: "/word/numbering.xml",
+      contentType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
+    });
+    ctx.relationships.push({
+      id: `rId${ctx.nextRid++}`,
+      type: "numbering",
+      target: "numbering.xml",
+    });
+  }
 
   // Font table — staged before the safety-net loop so embedded font
   // partPaths are still picked up there. The fonts module owns all

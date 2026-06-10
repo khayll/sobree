@@ -7,6 +7,7 @@ import { parseFootnotesXml } from "./footnotes";
 import { parseCommentsXml } from "./comments";
 import { templateToBlocks } from "../../doc/pageSetupBridge";
 import { parseXml } from "../shared/xml";
+import { parseThemeXml, type ThemePalette } from "../shared/drawingColor";
 import type { DocxImportResult } from "../types";
 import { defaultStyles, emptyDocument } from "../../doc/builders";
 import { parseStylesXml } from "./styles";
@@ -48,6 +49,10 @@ export async function importDocx(
   stripMcFallbacks(xml);
   const relsXml = unzipped.text["word/_rels/document.xml.rels"];
   const rels = relsXml ? parseRels(relsXml) : new Map<string, string>();
+  // Theme colour palette — shape fills / strokes referencing
+  // `<a:schemeClr>` resolve against it (an accent-coloured rule would
+  // otherwise import with no colour and render invisible).
+  const theme = parseThemeXml(unzipped.text["word/theme/theme1.xml"]);
   // Walk the body's direct paragraph children FIRST to build a stable
   // element → index map. The new floating-layer parser uses this to
   // attribute each anchored frame to the body paragraph that contained
@@ -64,6 +69,7 @@ export async function importDocx(
     // pagination depends on honest line heights.
     parseBlockBody: (txbxContent) =>
       convertBlocksFromContainer(txbxContent, { rels }).body,
+    ...(theme ? { theme } : {}),
   });
   // Parse inline-drawing frames (`<w:drawing><wp:inline>` with
   // textbox payload) into the new InlineFrame model. Phase 1.1:
@@ -93,6 +99,7 @@ export async function importDocx(
     parseBlockBody: (txbxContent) =>
       convertBlocksFromContainer(txbxContent, { rels }).body,
     honorLastRenderedPageBreaks,
+    ...(theme ? { theme } : {}),
   });
   const inlineFrames: InlineFrame[] = parsedInlineFrames.map((p) => p.frame);
   // Build the replacement map BEFORE the lifter / body walker run.
@@ -146,7 +153,7 @@ export async function importDocx(
   );
 
   const { bodies: headerFooterBodies, frames: headerFooterFrames } =
-    loadHeaderFooterParts(sections, unzipped.text, rels);
+    loadHeaderFooterParts(sections, unzipped.text, rels, theme);
 
   // Thread `word/*` media and other embedded binary parts through the AST
   // so the export path can round-trip them. Keyed by ZIP-level path so
@@ -233,6 +240,7 @@ function loadHeaderFooterParts(
   sections: readonly SectionProperties[],
   textParts: Record<string, string>,
   rels: Map<string, string>,
+  theme?: ThemePalette,
 ): { bodies: Record<string, Block[]>; frames: Record<string, AnchoredFrame[]> } {
   const bodies: Record<string, Block[]> = {};
   const frames: Record<string, AnchoredFrame[]> = {};
@@ -272,6 +280,7 @@ function loadHeaderFooterParts(
         bodyParagraphIndexByElement: paragraphIndexInContainer(root),
         parseBlockBody: (txbxContent) =>
           convertBlocksFromContainer(txbxContent, { rels: headerRels }).body,
+        ...(theme ? { theme } : {}),
       });
       if (partFrames.length > 0) frames[ref.partId] = partFrames;
       // Header part roots: `<w:hdr>` or `<w:ftr>`. Both wrap a stream

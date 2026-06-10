@@ -195,6 +195,15 @@
    indicator in the gutter is still the discoverable affordance for
    entering zone-edit; no placeholder text is needed. */
 
+/* Hyperlinks are structural — their APPEARANCE comes from the document
+ * (the runs' Hyperlink character style, injected with Word's latent
+ * defaults when the docx doesn't define it). The UA's saturated blue +
+ * underline would override the document colours. */
+.paper-content a {
+  color: inherit;
+  text-decoration: none;
+}
+
 .paper-content {
   position: relative;
   /* Fill the page's content area so vertical-alignment has something
@@ -300,6 +309,16 @@
    * to the right instead of wrapping — Word likewise lets the number
    * push into the text gap. */
   white-space: nowrap;
+  /* Marker glyph formatting from the numbering level's `<w:rPr>` (set by
+   * the renderer as custom props). The FONT is load-bearing for layout,
+   * not just looks: Word lets the marker font's strut set the bullet
+   * line height, so a tall marker font (e.g. Arial Unicode MS) opens up
+   * list spacing and shifts page breaks. When the host lacks the font,
+   * this degrades to the inherited text metrics — the same divergence
+   * Word and LibreOffice already show on the same file. */
+  color: var(--sobree-marker-color, currentColor);
+  font-family: var(--sobree-marker-font, inherit);
+  font-size: var(--sobree-marker-size, inherit);
 }
 .paper-content .sobree-hang.lst-bullet > li::before {
   content: var(--sobree-bullet, "\2022");

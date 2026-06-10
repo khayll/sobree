@@ -18,10 +18,9 @@
  * fully-resolved abstract format — simpler for consumers.
  *
  * What we read per level: `numFmt` (decimal / bullet / …), `lvlText`
- * (the marker template), `ind` (left + hanging, in twips). Run
- * properties on the marker (`rPr`) are dropped for now — Word uses
- * them mostly for symbol font on bullets, which we don't render
- * faithfully yet anyway.
+ * (the marker template), `ind` (left + hanging, in twips), and the
+ * marker's own run properties (`rPr` → `NumberingLevel.runDefaults`:
+ * colour / font / size of the glyph itself).
  */
 
 import type {
@@ -29,6 +28,7 @@ import type {
   AbstractNumberingFormat,
   NumberingLevel,
   ParagraphIndent,
+  RunProperties,
 } from "../../doc/types";
 import { parseXml, wAll, wFirst, wVal } from "../shared/xml";
 import { NS } from "../shared/namespaces";
@@ -130,8 +130,32 @@ function readLevels(absEl: Element): NumberingLevel[] {
     const rPr = wFirst(lvlEl, "rPr");
     const rFonts = rPr ? wFirst(rPr, "rFonts") : null;
     const fontAscii = rFonts?.getAttribute("w:ascii") ?? rFonts?.getAttribute("w:hAnsi") ?? "";
-    if (fontAscii.toLowerCase().includes("wingdings") || fontAscii.toLowerCase().includes("symbol")) {
+    const isSymbolFont =
+      fontAscii.toLowerCase().includes("wingdings") || fontAscii.toLowerCase().includes("symbol");
+    if (isSymbolFont) {
       lvlText = mapSymbolFontCodepoints(lvlText, fontAscii);
+    }
+
+    // The marker's OWN run formatting. Colour paints the glyph (gray
+    // bullets are common); the font matters beyond looks — Word lets the
+    // marker font's strut set the bullet line height, so a tall marker
+    // font (Arial Unicode MS) visibly opens up list spacing and shifts
+    // page breaks. Symbol fonts are EXCLUDED from the font carry: their
+    // glyphs were just remapped to Unicode equivalents above, and on a
+    // host that ships the symbol font the remapped codepoint would
+    // render as the wrong glyph.
+    const marker: RunProperties = {};
+    if (rPr) {
+      const colorVal = wVal(wFirst(rPr, "color"));
+      if (colorVal && colorVal !== "auto" && /^[0-9A-Fa-f]{6}$/.test(colorVal)) {
+        marker.color = `#${colorVal.toUpperCase()}`;
+      }
+      if (fontAscii && !isSymbolFont) marker.fontFamily = fontAscii;
+      const szVal = wVal(wFirst(rPr, "sz"));
+      if (szVal) {
+        const halfPts = Number.parseInt(szVal, 10);
+        if (Number.isFinite(halfPts) && halfPts > 0) marker.fontSizePt = halfPts / 2;
+      }
     }
 
     const level: NumberingLevel = {
@@ -141,6 +165,7 @@ function readLevels(absEl: Element): NumberingLevel[] {
     };
     if (restart !== undefined && Number.isFinite(restart)) level.restart = restart;
     if (paragraphIndent) level.paragraphIndent = paragraphIndent;
+    if (Object.keys(marker).length > 0) level.runDefaults = marker;
     out.push(level);
   }
   return out;

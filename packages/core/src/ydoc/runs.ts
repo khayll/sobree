@@ -19,14 +19,24 @@
  * | InlineRun kind  | Delta op                                                            |
  * |-----------------|---------------------------------------------------------------------|
  * | `text`          | `{ insert: text, attributes: <run-property marks> }`                |
- * | `break`         | `{ insert: { __sobree: "break", type } }`                           |
- * | `tab`           | `{ insert: { __sobree: "tab" } }`                                   |
- * | `field`         | `{ insert: { __sobree: "field", instruction, cached? } }`           |
- * | `drawing`       | `{ insert: { __sobree: "drawing", partPath, … } }`                  |
  * | `hyperlink`     | recursively expand children; each char gets a `link: { href }` mark |
+ * | everything else | `{ insert: { __sobree: <kind>, ...run }, attributes: <marks> }`     |
  *
  * The `__sobree` discriminator prefix avoids any future collision with
  * Yjs-internal attribute names.
+ *
+ * # Losslessness (Y.Doc parity)
+ *
+ * Non-text runs are carried STRUCTURALLY: the embed is the whole run
+ * object (minus `kind`, which becomes the `__sobree` discriminator, and
+ * minus `properties`, which ride the op's attributes exactly like text
+ * marks). The `EmbedContent` type is DERIVED from the AST run types, so
+ * adding a field to e.g. `DrawingRun` round-trips automatically — there
+ * is no per-field whitelist to forget. (Bug history: an enumerated embed
+ * dropped `DrawingRun.floatMarginsEmu` — and the `footnoteRef` /
+ * `commentRef` kinds entirely — so they rendered on first import and
+ * vanished on every reload.) The AST is JSON-clean by architectural
+ * rule, which is what makes the structural carry sound.
  *
  * # Hyperlinks
  *
@@ -47,8 +57,10 @@
 
 import type {
   BreakRun,
+  CommentRefRun,
   DrawingRun,
   FieldRun,
+  FootnoteRefRun,
   HyperlinkRun,
   InlineRun,
   RunProperties,
@@ -64,19 +76,27 @@ export interface DeltaOp {
   attributes?: Record<string, unknown>;
 }
 
-/** All non-text run kinds become embed objects in the delta. */
+/** Run kinds that travel as atomic embeds (everything except text,
+ *  which is the Y.Text string itself, and hyperlink, which flattens to
+ *  a `link` mark on its children). */
+type EmbedRun = Exclude<InlineRun, TextRun | HyperlinkRun>;
+
+/** An embed is the run itself, structurally: `kind` becomes the
+ *  `__sobree` discriminator and `properties` move to the op's
+ *  attributes. DERIVED from the AST type — a new field on any embed
+ *  run kind is carried automatically; there is no per-field whitelist
+ *  that could silently drop it. */
+type EmbedOf<R extends EmbedRun> = Omit<R, "kind" | "properties"> & {
+  __sobree: R["kind"];
+};
+
 export type EmbedContent =
-  | { __sobree: "break"; type: BreakRun["type"] }
-  | { __sobree: "tab" }
-  | { __sobree: "field"; instruction: string; cached?: string }
-  | {
-      __sobree: "drawing";
-      partPath: string;
-      widthEmu: number;
-      heightEmu: number;
-      placement: DrawingRun["placement"];
-      altText?: string;
-    };
+  | EmbedOf<BreakRun>
+  | EmbedOf<TabRun>
+  | EmbedOf<FieldRun>
+  | EmbedOf<DrawingRun>
+  | EmbedOf<FootnoteRefRun>
+  | EmbedOf<CommentRefRun>;
 
 /** The `link` mark — stamped on every char inside a HyperlinkRun. */
 export interface LinkMark {
@@ -111,38 +131,6 @@ function appendRun(
     pushOp(out, run.text, marks);
     return;
   }
-  if (run.kind === "break") {
-    const marks = mergeMarks(parentMarks, runPropsToAttrs(run.properties));
-    pushOp(out, { __sobree: "break", type: run.type }, marks);
-    return;
-  }
-  if (run.kind === "tab") {
-    const marks = mergeMarks(parentMarks, runPropsToAttrs(run.properties));
-    pushOp(out, { __sobree: "tab" }, marks);
-    return;
-  }
-  if (run.kind === "field") {
-    const marks = mergeMarks(parentMarks, runPropsToAttrs(run.properties));
-    const embed: EmbedContent = {
-      __sobree: "field",
-      instruction: run.instruction,
-    };
-    if (run.cached !== undefined) (embed as { cached?: string }).cached = run.cached;
-    pushOp(out, embed, marks);
-    return;
-  }
-  if (run.kind === "drawing") {
-    const embed: EmbedContent = {
-      __sobree: "drawing",
-      partPath: run.partPath,
-      widthEmu: run.widthEmu,
-      heightEmu: run.heightEmu,
-      placement: run.placement,
-    };
-    if (run.altText) (embed as { altText?: string }).altText = run.altText;
-    pushOp(out, embed, parentMarks);
-    return;
-  }
   if (run.kind === "hyperlink") {
     const linkMark: LinkMark = { href: run.href };
     const childMarks = mergeMarks(parentMarks, {
@@ -152,6 +140,17 @@ function appendRun(
     appendRuns(run.children, out, childMarks);
     return;
   }
+  // Every other run kind is an ATOMIC embed, carried structurally: the
+  // whole run minus `kind` (→ the `__sobree` discriminator) and minus
+  // `properties` (which ride the op's attributes exactly like text
+  // marks). No per-field enumeration — a new field on any embed kind
+  // round-trips automatically, and a new run KIND added to the AST is
+  // carried without touching this module (Y.Doc parity by construction).
+  const { kind, properties, ...rest } = run as EmbedRun & {
+    properties?: RunProperties;
+  };
+  const marks = mergeMarks(parentMarks, runPropsToAttrs(properties));
+  pushOp(out, { __sobree: kind, ...rest } as EmbedContent, marks);
 }
 
 function pushOp(
@@ -236,38 +235,22 @@ function opToRun(op: DeltaOp): InlineRun {
   if (!embed || typeof embed !== "object") {
     return { kind: "text", text: "", properties: {} };
   }
-  if (embed.__sobree === "break") {
-    const props = attrsToRunProps(op.attributes);
-    const r: BreakRun = { kind: "break", type: embed.type };
-    if (Object.keys(props).length > 0) r.properties = props;
-    return r;
+  // Structural inverse of the embed encoding: `__sobree` → `kind`,
+  // every other field verbatim; the op's attributes → `properties`
+  // (omitted when empty, matching the AST's optional-field
+  // convention). Unknown FUTURE kinds pass through unchanged — the
+  // renderer ignores what it doesn't know, but the data survives.
+  const { __sobree, ...rest } = embed as EmbedContent & Record<string, unknown>;
+  if (typeof __sobree !== "string") {
+    // Malformed embed (no discriminator) — degrade to empty text.
+    return { kind: "text", text: "", properties: {} };
   }
-  if (embed.__sobree === "tab") {
-    const props = attrsToRunProps(op.attributes);
-    const r: TabRun = { kind: "tab" };
-    if (Object.keys(props).length > 0) r.properties = props;
-    return r;
+  const props = attrsToRunProps(op.attributes);
+  const run = { kind: __sobree, ...rest } as unknown as InlineRun;
+  if (Object.keys(props).length > 0) {
+    (run as { properties?: RunProperties }).properties = props;
   }
-  if (embed.__sobree === "field") {
-    const props = attrsToRunProps(op.attributes);
-    const r: FieldRun = { kind: "field", instruction: embed.instruction };
-    if (embed.cached !== undefined) r.cached = embed.cached;
-    if (Object.keys(props).length > 0) r.properties = props;
-    return r;
-  }
-  if (embed.__sobree === "drawing") {
-    const r: DrawingRun = {
-      kind: "drawing",
-      partPath: embed.partPath,
-      widthEmu: embed.widthEmu,
-      heightEmu: embed.heightEmu,
-      placement: embed.placement,
-    };
-    if (embed.altText) r.altText = embed.altText;
-    return r;
-  }
-  // Unknown embed kind — fall back to empty text run.
-  return { kind: "text", text: "", properties: {} };
+  return run;
 }
 
 function readLinkMark(attrs: Record<string, unknown> | undefined): LinkMark | null {

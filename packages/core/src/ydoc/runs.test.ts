@@ -88,6 +88,37 @@ describe("runs ↔ delta — round trip", () => {
     expect(rt([d])).toEqual([d]);
   });
 
+  it("float drawing round-trips its margins (Y.Doc parity — refresh must not drop them)", () => {
+    const d: DrawingRun = {
+      kind: "drawing",
+      partPath: "word/media/photo.png",
+      widthEmu: 1168400,
+      heightEmu: 1168400,
+      placement: "floatRight",
+      floatMarginsEmu: { topEmu: 152400, rightEmu: 152400, bottomEmu: 152400, leftEmu: 152400 },
+      verticalAlign: "middle",
+    };
+    expect(rt([d])).toEqual([d]);
+  });
+
+  it("anchored drawing round-trips its anchor", () => {
+    const d: DrawingRun = {
+      kind: "drawing",
+      partPath: "word/media/logo.png",
+      widthEmu: 500000,
+      heightEmu: 500000,
+      placement: "anchor",
+      anchor: {
+        offsetXEmu: 914400,
+        offsetYEmu: 457200,
+        relativeFromH: "margin",
+        relativeFromV: "paragraph",
+        behindDoc: true,
+      },
+    };
+    expect(rt([d])).toEqual([d]);
+  });
+
   it("drawing run without altText omits the field", () => {
     const d: DrawingRun = {
       kind: "drawing",
@@ -245,5 +276,35 @@ describe("deepEqual", () => {
   it("nested", () => {
     expect(deepEqual({ a: { b: [1, 2] } }, { a: { b: [1, 2] } })).toBe(true);
     expect(deepEqual({ a: { b: [1, 2] } }, { a: { b: [1, 3] } })).toBe(false);
+  });
+});
+
+describe("runs ↔ delta — structural embed parity", () => {
+  it("footnoteRef and commentRef round-trip (were silently DROPPED before)", () => {
+    const runs: InlineRun[] = [
+      { kind: "text", text: "claim", properties: {} },
+      { kind: "footnoteRef", id: 3 },
+      { kind: "commentRef", id: 7 },
+    ];
+    expect(rt(runs)).toEqual(runs);
+  });
+
+  it("an UNKNOWN future embed kind survives the round-trip verbatim", () => {
+    // The transport must not be a schema gatekeeper: data it doesn't
+    // know still belongs to the document.
+    const exotic = { kind: "mathZone", omml: "<m:oMath/>" } as unknown as InlineRun;
+    expect(rt([exotic])).toEqual([exotic]);
+  });
+
+  it("a future field on an existing kind survives without touching runs.ts", () => {
+    const run = {
+      kind: "drawing",
+      partPath: "word/media/i.png",
+      widthEmu: 1,
+      heightEmu: 1,
+      placement: "inline",
+      futureCrop: { l: 1, r: 2 },
+    } as unknown as InlineRun;
+    expect(rt([run])).toEqual([run]);
   });
 });

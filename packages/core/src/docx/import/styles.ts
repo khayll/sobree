@@ -298,6 +298,21 @@ function ensureWordBaseline(
       fontFamily: existing.fontFamily ?? "Calibri Light",
     };
   }
+
+  // Hyperlink character-style baseline. Word's latent-style default
+  // renders links #0563C1 + underlined even when styles.xml never
+  // defines "Hyperlink" — runs reference it via `<w:rStyle>` regardless.
+  // Sobree's `<a>` is appearance-neutral (CSS `color: inherit`), so
+  // without this injected definition such links would render as plain
+  // body text. A docx-defined Hyperlink style wins untouched.
+  if (!styles.some((s) => s.id === "Hyperlink")) {
+    styles.push({
+      id: "Hyperlink",
+      type: "character",
+      displayName: "Hyperlink",
+      runDefaults: { color: "#0563C1", underline: "single" },
+    });
+  }
 }
 
 // ---------- per-element readers ----------
