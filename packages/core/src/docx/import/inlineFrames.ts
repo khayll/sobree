@@ -38,6 +38,7 @@
 
 import type { Block, FrameBorder, InlineFrame, InlineFrameTextbox } from "../../doc/types";
 import { NS } from "../shared/namespaces";
+import { readDrawingColor, type ThemePalette } from "../shared/drawingColor";
 
 export interface InlineFramesContext {
   /** RelationshipId → part path lookup. */
@@ -66,6 +67,9 @@ export interface InlineFramesContext {
    * Without this flag, only explicit directives count.
    */
   honorLastRenderedPageBreaks?: boolean;
+  /** Theme colour palette (from `word/theme/theme1.xml`) so textbox /
+   *  shape fills declared as `<a:schemeClr>` resolve instead of vanishing. */
+  theme?: ThemePalette;
 }
 
 /**
@@ -223,9 +227,9 @@ function buildInlineFrame(
           sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
           body: ctx.parseBlockBody(txbxContent),
         };
-        const fill = readSolidFill(child);
+        const fill = readSolidFill(child, ctx.theme);
         if (fill !== undefined) textbox.fill = fill;
-        const border = readBorder(child);
+        const border = readBorder(child, ctx.theme);
         if (border !== undefined) textbox.border = border;
         // `<wps:bodyPr>` carries the text insets + vertical anchor. Word
         // centers a single heading line by top-anchoring it inside a
@@ -250,8 +254,8 @@ function buildInlineFrame(
         const { off, ext: shapeExt } = readShapeXfrm(child);
         if (shapeExt.cx <= 0 || shapeExt.cy <= 0) continue;
         const geom = readGeometry(child);
-        const fill = readSolidFill(child);
-        const border = readBorder(child);
+        const fill = readSolidFill(child, ctx.theme);
+        const border = readBorder(child, ctx.theme);
         const decoration: InlineFrame["shapes"][number] = {
           geometry: geom,
           offsetEmu: { xEmu: off.x, yEmu: off.y },
@@ -339,21 +343,19 @@ function readGeometry(
   }
 }
 
-function readSolidFill(shape: Element): string | undefined {
+function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
   const spPr =
     firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return undefined;
   for (const fill of Array.from(spPr.children)) {
     if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
-      const srgb = firstChildNS(fill, NS.a, "srgbClr");
-      const val = srgb?.getAttribute("val");
-      if (val && /^[0-9A-Fa-f]{6}$/.test(val)) return `#${val.toUpperCase()}`;
+      return readDrawingColor(fill, theme);
     }
   }
   return undefined;
 }
 
-function readBorder(shape: Element): FrameBorder | undefined {
+function readBorder(shape: Element, theme?: ThemePalette): FrameBorder | undefined {
   const spPr =
     firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return undefined;
@@ -361,12 +363,11 @@ function readBorder(shape: Element): FrameBorder | undefined {
   if (!ln) return undefined;
   const widthEmu = numAttr(ln, "w");
   const solidFill = firstChildNS(ln, NS.a, "solidFill");
-  const srgb = solidFill ? firstChildNS(solidFill, NS.a, "srgbClr") : null;
-  const val = srgb?.getAttribute("val");
-  if (!val || !/^[0-9A-Fa-f]{6}$/.test(val)) return undefined;
+  const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
+  if (!color) return undefined;
   const prstDash = firstChildNS(ln, NS.a, "prstDash");
   const style = coerceBorderStyle(prstDash?.getAttribute("val"));
-  return { color: `#${val.toUpperCase()}`, widthEmu: widthEmu || 0, style };
+  return { color, widthEmu: widthEmu || 0, style };
 }
 
 function coerceBorderStyle(
