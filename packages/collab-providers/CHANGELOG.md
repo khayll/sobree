@@ -1,5 +1,15 @@
 # @sobree/collab-providers
 
+## 0.1.4
+
+### Patch Changes
+
+- 7bddb71: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+- Updated dependencies [7bddb71]
+  - @sobree/core@0.1.4
+
 ## 0.1.3
 
 ### Patch Changes
