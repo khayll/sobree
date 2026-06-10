@@ -53,27 +53,89 @@ const CHAINS: Array<{ match: RegExp; chain: string }> = [
   // Common sans-serif neighbours.
   { match: /^arial$/i, chain: `Arial, 'Helvetica Neue', Helvetica, sans-serif` },
   { match: /^helvetica$/i, chain: `Helvetica, 'Helvetica Neue', Arial, sans-serif` },
+  { match: /^helvetica neue$/i, chain: `'Helvetica Neue', Helvetica, Arial, sans-serif` },
   { match: /^verdana$/i, chain: `Verdana, Geneva, Tahoma, sans-serif` },
 ];
 
 /**
- * Wrap `fontFamily` in quotes if it contains spaces or unusual
- * characters, and append a metric-compatible fallback chain. If the
- * font already matches a curated entry, use that chain directly so the
- * primary font isn't double-listed.
+ * Face-name weight / style suffix tokens, PostScript-naming style.
+ * Word's `<w:rFonts>` frequently carries a FACE name ("Helvetica Neue
+ * Light", "Helvetica Neue Medium") rather than a family. CSS font
+ * matching in browsers generally can't resolve those as families (Chrome
+ * resolves "Helvetica Neue" but not "Helvetica Neue Light"), so the name
+ * must decompose into family + `font-weight` — exactly how Word itself
+ * resolves the face internally.
  */
-export function withFallbacks(fontFamily: string): string {
+const FACE_TOKENS: Array<{ match: RegExp; weight?: number; italic?: boolean }> = [
+  { match: /^(thin|hairline)$/i, weight: 100 },
+  { match: /^(extralight|extra light|ultralight|ultra light)$/i, weight: 200 },
+  { match: /^light$/i, weight: 300 },
+  { match: /^(regular|book|roman)$/i, weight: 400 },
+  { match: /^medium$/i, weight: 500 },
+  { match: /^(semibold|semi bold|demibold|demi bold)$/i, weight: 600 },
+  { match: /^bold$/i, weight: 700 },
+  { match: /^(extrabold|extra bold|ultrabold|ultra bold)$/i, weight: 800 },
+  { match: /^(black|heavy)$/i, weight: 900 },
+  { match: /^(italic|oblique)$/i, italic: true },
+];
+
+/** A face name resolved for CSS: the family fallback stack, plus the
+ *  weight / italic the face name implied (absent when the name carried
+ *  no face tokens — the run's own bold/italic then fully decide). */
+export interface ResolvedFontFace {
+  stack: string;
+  weight?: number;
+  italic?: boolean;
+}
+
+/**
+ * Resolve an OOXML font NAME into a CSS family stack + implied weight.
+ *
+ * Curated whole-name chains win first ("Calibri Light" is a real family
+ * with its own calibrated chain — corpus baselines depend on it). Then
+ * trailing face tokens are stripped ("Helvetica Neue Light" → base
+ * "Helvetica Neue" + weight 300) and the BASE resolves through the same
+ * curated chains; the full face name stays first in the stack so hosts
+ * that do ship the exact face still use it. A name with no tokens and no
+ * curated chain keeps the documented unknown-font default (`, serif`).
+ */
+export function resolveFontFace(fontFamily: string): ResolvedFontFace {
   const trimmed = fontFamily.trim();
-  if (trimmed.length === 0) return trimmed;
+  if (trimmed.length === 0) return { stack: trimmed };
   for (const { match, chain } of CHAINS) {
-    if (match.test(trimmed)) return chain;
+    if (match.test(trimmed)) return { stack: chain };
   }
-  // Unknown font — quote if needed and end in a generic family. We
-  // can't know whether the font is serif or sans-serif without
-  // metadata; default to `serif` since most uncommon docx fonts are
-  // serif (legal/contract templates lean that way).
+
+  // Strip trailing face tokens (rightmost first: "Light Italic" → italic,
+  // then light). Stop at the first word that isn't a token.
+  const words = trimmed.split(/\s+/);
+  let weight: number | undefined;
+  let italic: boolean | undefined;
+  while (words.length > 1) {
+    const last = words[words.length - 1]!;
+    const token = FACE_TOKENS.find((t) => t.match.test(last));
+    if (!token) break;
+    if (token.weight !== undefined && weight === undefined) weight = token.weight;
+    if (token.italic) italic = true;
+    words.pop();
+  }
+
+  const base = words.join(" ");
+  if (base !== trimmed) {
+    const baseChain = CHAINS.find(({ match }) => match.test(base))?.chain;
+    const full = needsQuoting(trimmed) ? `'${trimmed}'` : trimmed;
+    const stack = baseChain
+      ? `${full}, ${baseChain}`
+      : `${full}, ${needsQuoting(base) ? `'${base}'` : base}, serif`;
+    return {
+      stack,
+      ...(weight !== undefined ? { weight } : {}),
+      ...(italic ? { italic } : {}),
+    };
+  }
+
   const quoted = needsQuoting(trimmed) ? `'${trimmed}'` : trimmed;
-  return `${quoted}, serif`;
+  return { stack: `${quoted}, serif` };
 }
 
 function needsQuoting(name: string): boolean {

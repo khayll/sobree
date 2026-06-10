@@ -6,7 +6,7 @@ import type {
   TextRun,
 } from "../../../doc/types";
 import { resolveRunStyle } from "../../../doc/styles";
-import { withFallbacks } from "./fontFallback";
+import { resolveFontFace } from "./fontFallback";
 
 /**
  * Render a list of InlineRuns into DOM children of `parent`. Empty run
@@ -369,7 +369,15 @@ function cssFromRunProps(p: RunProperties): string | null {
   const decls: string[] = [];
   if (p.color) decls.push(`color:${p.color}`);
   if (p.highlight) decls.push(`background:${normaliseHighlight(p.highlight)}`);
-  if (p.fontFamily) decls.push(`font-family:${withFallbacks(p.fontFamily)}`);
+  if (p.fontFamily) {
+    const face = resolveFontFace(p.fontFamily);
+    decls.push(`font-family:${face.stack}`);
+    // The face name's implied weight/style — but a span's font-weight
+    // would override the OUTER <strong>/<em> wrappers, so the run's own
+    // bold/italic win by suppressing the implied value.
+    if (face.weight !== undefined && !p.bold) decls.push(`font-weight:${face.weight}`);
+    if (face.italic && !p.italic) decls.push(`font-style:italic`);
+  }
   if (p.fontSizePt !== undefined) decls.push(`font-size:${p.fontSizePt}pt`);
   // `<w:caps/>` → CSS `text-transform: uppercase`. The source text
   // keeps its mixed-case characters (round-trip), the display is

@@ -12,7 +12,7 @@
  * there are no CSS-only typography fallbacks.
  */
 
-import { withFallbacks } from "./fontFallback";
+import { resolveFontFace } from "./fontFallback";
 import { twipsToMm } from "./units";
 import { resolveStyleCascade } from "../../../doc/styles";
 import type { NamedStyle, ParagraphProperties } from "../../../doc/types";
@@ -43,7 +43,15 @@ export function applyParagraphProps(
   // calculation off.
   const runDefaults = { ...cascadeRunDefaults, ...(props.runDefaults ?? {}) };
 
-  if (runDefaults.fontFamily) el.style.fontFamily = withFallbacks(runDefaults.fontFamily);
+  if (runDefaults.fontFamily) {
+    // A face NAME ("Helvetica Neue Light") resolves to family + implied
+    // weight/style; the explicit bold/italic assignments below override
+    // the implied ones when the cascade sets them.
+    const face = resolveFontFace(runDefaults.fontFamily);
+    el.style.fontFamily = face.stack;
+    if (face.weight !== undefined) el.style.fontWeight = String(face.weight);
+    if (face.italic) el.style.fontStyle = "italic";
+  }
   if (runDefaults.fontSizePt !== undefined) {
     el.style.fontSize = `${runDefaults.fontSizePt}pt`;
   }
