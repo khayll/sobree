@@ -102,6 +102,26 @@
   display: none;
 }
 
+/* BEHIND-text floating layer — hosts `<wp:anchor behindDoc="1">` frames
+   (page-background shapes, watermarks). Word paints these below the body
+   text but above the page white. The normal overlay layers are isolated
+   stacking contexts ABOVE the content, so a frame's own `z-index: -1`
+   can never escape them — behind-ness is expressed by hosting the frame
+   here instead. The layer is the paper's FIRST positioned child with
+   `z-index: 0`: equal stacking with the later z-auto siblings, so DOM
+   order puts it underneath them all. */
+.paper-anchors-behind {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  isolation: isolate;
+  z-index: 0;
+}
+
+.paper-anchors-behind.is-empty {
+  display: none;
+}
+
 /* Floating layer for a HEADER / FOOTER zone. Full-card coordinate system
    like `.paper-anchors` (each frame's left/top is absolute, resolved from
    its `relativeFrom` origin by the renderer). Above the body layer so

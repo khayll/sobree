@@ -223,6 +223,7 @@ function mapSymbolFontCodepoints(text: string, font: string): string {
       0xf076: "❖", // BLACK DIAMOND MINUS WHITE X
       0xf0d8: "▶", // BLACK RIGHT-POINTING TRIANGLE
       0xf0d9: "▷",
+      0xf07d: "▶", // Wingdings 3 "}" — right-pointing triangle (category bullets)
       0xf0fc: "✓", // CHECK MARK
       0xf0fb: "✗", // BALLOT X
     };
