@@ -46,3 +46,37 @@ describe("parseNumberingXml — numStyleLink resolution", () => {
     expect(defs.find((d) => d.numId === 1)?.abstractFormat.levels[0]?.format).toBe("decimal");
   });
 });
+
+describe("parseNumberingXml — marker rPr", () => {
+  const xml = (rPr: string) => `<w:numbering ${NS}>
+    <w:abstractNum w:abstractNumId="0">
+      <w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/>
+        <w:rPr>${rPr}</w:rPr>
+      </w:lvl>
+    </w:abstractNum>
+    <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
+  </w:numbering>`;
+  const lvl0 = (rPr: string) =>
+    parseNumberingXml(xml(rPr)).find((d) => d.numId === 1)?.abstractFormat.levels[0];
+
+  it("reads marker colour, font, and size into runDefaults", () => {
+    const lvl = lvl0(
+      `<w:rFonts w:hAnsi="Arial Unicode MS"/><w:color w:val="7f8685"/><w:sz w:val="20"/>`,
+    );
+    expect(lvl?.runDefaults).toEqual({
+      color: "#7F8685",
+      fontFamily: "Arial Unicode MS",
+      fontSizePt: 10,
+    });
+  });
+
+  it("suppresses SYMBOL fonts (remapped glyphs would render wrong) but keeps colour", () => {
+    const lvl = lvl0(`<w:rFonts w:ascii="Wingdings"/><w:color w:val="FF0000"/>`);
+    expect(lvl?.runDefaults?.fontFamily).toBeUndefined();
+    expect(lvl?.runDefaults?.color).toBe("#FF0000");
+  });
+
+  it("omits runDefaults entirely when the rPr carries nothing renderable", () => {
+    expect(lvl0(`<w:color w:val="auto"/>`)?.runDefaults).toBeUndefined();
+  });
+});
