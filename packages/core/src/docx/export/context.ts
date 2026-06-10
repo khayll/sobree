@@ -14,7 +14,7 @@ export interface ExportContext {
   /** Rels to append to `word/_rels/document.xml.rels`. */
   relationships: Array<{
     id: string;
-    type: "header" | "footer" | "image" | "hyperlink" | "fontTable";
+    type: "header" | "footer" | "image" | "hyperlink" | "fontTable" | "numbering";
     target: string;
     /** External targets (URLs) need `TargetMode="External"`. */
     external?: boolean;

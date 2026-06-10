@@ -66,12 +66,21 @@ final section's sectPr lands at body level.
 
 ## Round-trip stability
 
-For paragraphs the editor hasn't touched, export is byte-stable —
-import → export produces the same `.docx` modulo Word's own canonical
-formatting tweaks. Round-trip tests in `packages/core/src/docx/`
-verify this for paper sizes, margins, headers / footers, vAlign,
-title-page sections, tables, images, page numbering fields, and
-multi-section documents.
+Export regenerates the OOXML package from the AST (it does not splice
+original XML), so the guarantee is **semantic, not byte-level**: an
+open → save cycle is a tested fixpoint —
+`import(export(import(docx)))` equals `import(docx)` for every corpus
+document (`feature.exportFixpoint.test.ts`). Binary parts (images,
+fonts) are copied byte-for-byte. Focused round-trip suites additionally
+lock paper sizes, margins, headers / footers, vAlign, title-page
+sections, tables, images, page numbering fields, numbering definitions,
+and multi-section documents.
+
+Known exporter gaps (documented in the fixpoint test; each is a
+planned feature): `InlineFrame` blocks and anchored floating drawings
+are not yet serialized back to DrawingML — they render and edit fine in
+Sobree but are dropped on export; anchored / wrapped images export as
+inline pictures (the image survives, its wrap geometry doesn't).
 
 ## Headless usage
 
