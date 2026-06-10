@@ -9,7 +9,10 @@ import type { ParagraphFormat } from "../types";
 /** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
 export type ImportedItem =
   | { kind: "run"; run: ImportedRun }
-  | { kind: "hyperlink"; relId?: string; runs: ImportedRun[] };
+  /** `href` is set for HYPERLINK *fields* (the target lives in the field
+   *  instruction); `relId` for `<w:hyperlink r:id>` elements (resolved
+   *  against the rels table downstream). */
+  | { kind: "hyperlink"; relId?: string; href?: string; runs: ImportedRun[] };
 
 export interface ImportedParagraph {
   /** Items in document order. Hyperlinks contain inner runs. */
@@ -80,23 +83,38 @@ function collectParagraphChildren(
   let fieldState: "before" | "code" | "result" = "before";
   let fieldInstr = "";
   let fieldCached = "";
+  let fieldResultRuns: ImportedRun[] = [];
 
   const flushField = () => {
     if (fieldState === "before") return;
-    const run: ImportedRun = {
-      text: "",
-      format: {},
-      isHardBreak: false,
-      field: fieldCached !== ""
-        ? { instruction: fieldInstr.trim(), cached: fieldCached }
-        : { instruction: fieldInstr.trim() },
-    };
-    if (revision) run.revision = revision;
-    if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
-    out.push({ kind: "run", run });
+    const instruction = fieldInstr.trim();
+    // A HYPERLINK field IS a hyperlink — same semantics as
+    // `<w:hyperlink r:id>`, just with the target in the instruction and
+    // the link text in the RESULT runs. Normalise it to a hyperlink item
+    // so the link renders as an anchor with the result runs' own
+    // formatting (their rStyle gives Word's underline/colour). Collapsing
+    // it to a FieldRun (the PAGE/NUMPAGES shape) discarded all of that —
+    // links rendered as unstyled plain text.
+    const href = parseHyperlinkInstruction(instruction);
+    if (href !== null && fieldResultRuns.length > 0) {
+      out.push({ kind: "hyperlink", href, runs: fieldResultRuns });
+    } else {
+      const run: ImportedRun = {
+        text: "",
+        format: {},
+        isHardBreak: false,
+        field: fieldCached !== ""
+          ? { instruction, cached: fieldCached }
+          : { instruction },
+      };
+      if (revision) run.revision = revision;
+      if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
+      out.push({ kind: "run", run });
+    }
     fieldState = "before";
     fieldInstr = "";
     fieldCached = "";
+    fieldResultRuns = [];
   };
 
   for (const child of Array.from(container.children)) {
@@ -129,10 +147,16 @@ function collectParagraphChildren(
         continue;
       }
       if (fieldState === "result") {
-        // Swallow cached display text — the renderer substitutes the
-        // live value per page from `field.instruction`.
+        // Accumulate the cached display text (the renderer substitutes
+        // PAGE/NUMPAGES live from `field.instruction`) AND keep the
+        // fully-read result runs — a HYPERLINK field's flush emits them
+        // as the link's children, formatting intact.
         const t = wFirst(child, "t");
         if (t) fieldCached += t.textContent ?? "";
+        const resultRun = readRun(child);
+        if (revision) resultRun.revision = revision;
+        if (activeComments.size > 0) resultRun.commentIds = Array.from(activeComments);
+        fieldResultRuns.push(resultRun);
         continue;
       }
       if (fieldState === "code") {
@@ -194,6 +218,27 @@ function collectParagraphChildren(
     // caller or silently dropped — the highlighted range carries the
     // visual signal, so the reference glyph is redundant.
   }
+}
+
+/**
+ * Extract the target of a `HYPERLINK` field instruction, or `null` when
+ * the instruction is some other field.
+ *
+ *   HYPERLINK "https://x.y"            → https://x.y
+ *   HYPERLINK \l "bookmark"            → #bookmark
+ *   HYPERLINK "https://x.y" \l "frag"  → https://x.y#frag
+ *
+ * Switches like `\o "tooltip"` are ignored. (ECMA-376 §17.16.5.25.)
+ */
+function parseHyperlinkInstruction(instruction: string): string | null {
+  if (!/^\s*HYPERLINK\b/i.test(instruction)) return null;
+  const rest = instruction.replace(/^\s*HYPERLINK\b/i, "");
+  const anchor = /\\l\s+"([^"]*)"/.exec(rest);
+  // The first quoted string NOT belonging to a switch is the target URL.
+  const target = /(?:^|[^\\\w])\s*"([^"]*)"/.exec(rest.replace(/\\\w\s+"[^"]*"/g, ""));
+  if (target?.[1]) return anchor?.[1] ? `${target[1]}#${anchor[1]}` : target[1];
+  if (anchor?.[1]) return `#${anchor[1]}`;
+  return null;
 }
 
 function readCommentId(el: Element): number | null {
