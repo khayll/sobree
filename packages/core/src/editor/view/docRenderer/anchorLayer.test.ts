@@ -176,9 +176,14 @@ describe("renderAnchorLayer", () => {
     expect(childEl.style.height).toBe("20mm");
   });
 
-  it("places behindText frames with z-index -1", () => {
+  it("does NOT express behindText via z-index (layer routing owns it)", () => {
+    // The overlay layers are isolated stacking contexts ABOVE the body,
+    // so an in-layer z-index can never drop a frame below the text —
+    // the old `z-index: -1` silently painted behind-text frames ON TOP
+    // (visible the moment theme fills resolved). Behind-ness is now the
+    // Paper's job: it routes such frames into `.paper-anchors-behind`.
     const layer = renderAnchorLayer([pictureFrame({ behindText: true })], ctx());
     const el = layer.children[0] as HTMLElement;
-    expect(el.style.zIndex).toBe("-1");
+    expect(el.style.zIndex).toBe("");
   });
 });

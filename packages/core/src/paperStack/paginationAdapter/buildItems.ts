@@ -279,7 +279,24 @@ function listItemBoxes(list: HTMLElement, lid: string): DomItem[] {
     const pid = ensureParagraphId(li);
     const lineItems = paragraphLineItems(li, pid);
     out.push(...lineItems);
-    if (i < lis.length - 1) out.push({ type: "glue", height: 0 });
+    if (i < lis.length - 1) {
+      // Inter-item glue is the REAL laid-out gap (LI margins — Word's
+      // `<w:spacing w:after>` between bullets), measured exactly like
+      // the top-level block loop measures inter-block gaps. A hardcoded
+      // 0 here under-counted every spaced list by ~spacing×items and
+      // over-packed pages (healthcare's 17-bullet skills list measured
+      // ~140px short, pushing page-1 content through the bottom margin).
+      //
+      // `offsetTop`/`offsetHeight` are integer-rounded, so a fractional
+      // line box (18.4px) reports a phantom 1px "gap" per item. That's
+      // below the measurement resolution, not real spacing — counting it
+      // accumulates false fullness (~1px × bullets) and spills the last
+      // line of a tightly-fitting document onto an extra page. Real
+      // spacing gaps are ≥ a few px; ignore anything under 2.
+      const next = lis[i + 1]!;
+      const raw = next.offsetTop - (li.offsetTop + li.offsetHeight);
+      out.push({ type: "glue", height: raw >= 2 ? raw : 0 });
+    }
   }
   return out;
 }

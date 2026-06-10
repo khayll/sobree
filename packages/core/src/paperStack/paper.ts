@@ -69,6 +69,18 @@ export class Paper {
    */
   private readonly headerAnchors: HTMLElement;
   private readonly footerAnchors: HTMLElement;
+  /**
+   * BEHIND-text layers — one per frame origin (body / header / footer).
+   * A `<wp:anchor behindDoc="1">` frame must paint BELOW the body text
+   * but above the paper background. The normal overlay layers are
+   * `isolation: isolate` stacking contexts ABOVE the content, so a
+   * frame's own `z-index: -1` can never escape them — behind-ness must
+   * be expressed by WHICH layer hosts the frame. These sit first in the
+   * paper's DOM (painting below every later positioned sibling).
+   */
+  private readonly anchorsBehind: HTMLElement;
+  private readonly headerAnchorsBehind: HTMLElement;
+  private readonly footerAnchorsBehind: HTMLElement;
 
   constructor(container: HTMLElement, setup: PageSetup) {
     this.outer = document.createElement("div");
@@ -94,6 +106,16 @@ export class Paper {
     this.anchors.className = "paper-anchors is-empty";
     this.anchors.contentEditable = "false";
 
+    const behindLayer = (): HTMLElement => {
+      const layer = document.createElement("div");
+      layer.className = "paper-anchors-behind is-empty";
+      layer.contentEditable = "false";
+      return layer;
+    };
+    this.anchorsBehind = behindLayer();
+    this.headerAnchorsBehind = behindLayer();
+    this.footerAnchorsBehind = behindLayer();
+
     this.footnotes = document.createElement("div");
     this.footnotes.className = "paper-footnotes is-empty";
     this.footnotes.contentEditable = "false";
@@ -111,6 +133,12 @@ export class Paper {
     this.footerAnchors.contentEditable = "false";
 
     this.root.append(
+      // Behind-text layers FIRST: among positioned siblings with equal
+      // stacking (z-index 0 vs auto), DOM order decides — first paints
+      // lowest, so these sit under the text but over the paper white.
+      this.anchorsBehind,
+      this.headerAnchorsBehind,
+      this.footerAnchorsBehind,
       this.header,
       this.content,
       this.footnotes,
@@ -190,11 +218,15 @@ export class Paper {
    * Pass `[]` to clear. Mirrors `setAnchoredFrames` for body.
    */
   setHeaderFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
-    paintZoneFrames(this.headerAnchors, this.resolveFrames(frames, this.header), ctx);
+    const resolved = this.resolveFrames(frames, this.header);
+    paintZoneFrames(this.headerAnchorsBehind, resolved.filter((f) => f.behindText), ctx);
+    paintZoneFrames(this.headerAnchors, resolved.filter((f) => !f.behindText), ctx);
   }
 
   setFooterFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
-    paintZoneFrames(this.footerAnchors, this.resolveFrames(frames, this.footer), ctx);
+    const resolved = this.resolveFrames(frames, this.footer);
+    paintZoneFrames(this.footerAnchorsBehind, resolved.filter((f) => f.behindText), ctx);
+    paintZoneFrames(this.footerAnchors, resolved.filter((f) => !f.behindText), ctx);
   }
 
   /**
@@ -313,7 +345,9 @@ export class Paper {
     frames: readonly AnchoredFrame[],
     ctx: AnchorLayerContext,
   ): void {
-    paintZoneFrames(this.anchors, this.resolveFrames(frames, this.content), ctx);
+    const resolved = this.resolveFrames(frames, this.content);
+    paintZoneFrames(this.anchorsBehind, resolved.filter((f) => f.behindText), ctx);
+    paintZoneFrames(this.anchors, resolved.filter((f) => !f.behindText), ctx);
   }
 
   destroy(): void {

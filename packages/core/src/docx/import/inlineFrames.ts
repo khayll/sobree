@@ -119,23 +119,40 @@ export function parseInlineFrames(
 
     const graphicData = firstNS(inline, NS.a, "graphicData");
     if (!graphicData) continue;
-    const wpg = firstChildNS(graphicData, NS.wpg, "wgp");
-    if (!wpg) continue; // No group → handled as plain DrawingRun inline.
-
-    // The wgp must contain at least one textbox shape for this
-    // parser to claim the drawing. Pure-picture or pure-shape
-    // groups (no <wps:txbx>) stay with the legacy DrawingRun path
-    // until a later phase migrates those too.
-    const wsps = directChildrenNS(wpg, NS.wps, "wsp");
-    const hasTextbox = wsps.some((w) => firstChildNS(w, NS.wps, "txbx") !== null);
-    if (!hasTextbox) continue;
 
     const hostP = findAncestor(drawing, NS.w, "p");
     if (!hostP) continue;
 
-    const frame = buildInlineFrame(wpg, hostP, ctx, () => `inline-${counter++}`);
-    if (!frame) continue;
-    out.push({ frame, drawingEl: drawing, hostParagraphEl: hostP });
+    const wpg = firstChildNS(graphicData, NS.wpg, "wgp");
+    if (wpg) {
+      // The wgp must contain at least one textbox shape for this
+      // parser to claim the drawing. Pure-picture or pure-shape
+      // groups (no <wps:txbx>) stay with the legacy DrawingRun path
+      // until a later phase migrates those too.
+      const wsps = directChildrenNS(wpg, NS.wps, "wsp");
+      const hasTextbox = wsps.some((w) => firstChildNS(w, NS.wps, "txbx") !== null);
+      if (!hasTextbox) continue;
+
+      const frame = buildInlineFrame(wpg, hostP, ctx, () => `inline-${counter++}`);
+      if (!frame) continue;
+      out.push({ frame, drawingEl: drawing, hostParagraphEl: hostP });
+      continue;
+    }
+
+    // No group: a BARE `<wps:wsp>` shape directly under graphicData — a
+    // coloured rectangle used as decoration (e.g. a photo placeholder
+    // square). Claim it only when it carries NO textbox: pure shapes
+    // have no other rendering path (the legacy DrawingRun reader needs
+    // an image blip and drops them), while textbox-bearing bare shapes
+    // stay with the legacy lifter.
+    const bareWsp = firstChildNS(graphicData, NS.wps, "wsp");
+    if (bareWsp && firstChildNS(bareWsp, NS.wps, "txbx") === null) {
+      const frame = buildBareShapeFrame(inline, bareWsp, hostP, ctx);
+      if (frame) {
+        out.push({ frame, drawingEl: drawing, hostParagraphEl: hostP });
+        counter++;
+      }
+    }
   }
 
   // Claim pass: remove each successfully-parsed drawing AFTER the
@@ -300,6 +317,49 @@ function buildInlineFrame(
   };
   if (pageBreakBefore) out.pageBreakBefore = true;
   if (keepNext) out.keepNext = true;
+  return out;
+}
+
+/**
+ * Build an `InlineFrame` for a BARE `<wps:wsp>` shape (no `<wpg:wgp>`
+ * group) — a coloured rectangle flowing inline. The frame's coordinate
+ * space is the `<wp:extent>` of the inline drawing itself; the single
+ * shape fills it (its own xfrm offset/ext when present, else the full
+ * extent).
+ */
+function buildBareShapeFrame(
+  inline: Element,
+  wsp: Element,
+  hostP: Element,
+  ctx: InlineFramesContext,
+): InlineFrame | null {
+  const extent = firstChildNS(inline, NS.wp, "extent");
+  const wEmu = numAttr(extent, "cx");
+  const hEmu = numAttr(extent, "cy");
+  if (wEmu <= 0 || hEmu <= 0) return null;
+
+  const { off, ext } = readShapeXfrm(wsp);
+  const shape: InlineFrame["shapes"][number] = {
+    geometry: readGeometry(wsp),
+    offsetEmu: { xEmu: off.x, yEmu: off.y },
+    sizeEmu: { wEmu: ext.cx > 0 ? ext.cx : wEmu, hEmu: ext.cy > 0 ? ext.cy : hEmu },
+  };
+  const fill = readSolidFill(wsp, ctx.theme);
+  if (fill !== undefined) shape.fill = fill;
+  const border = readBorder(wsp, ctx.theme);
+  if (border !== undefined) shape.border = border;
+
+  const pPr = firstChildNS(hostP, NS.w, "pPr");
+  const out: InlineFrame = {
+    kind: "inline_frame",
+    groupExtentEmu: { wEmu, hEmu },
+    sizeEmu: { wEmu, hEmu },
+    textboxes: [],
+    pictures: [],
+    shapes: [shape],
+  };
+  if (pPr && firstChildNS(pPr, NS.w, "pageBreakBefore") !== null) out.pageBreakBefore = true;
+  if (pPr && firstChildNS(pPr, NS.w, "keepNext") !== null) out.keepNext = true;
   return out;
 }
 

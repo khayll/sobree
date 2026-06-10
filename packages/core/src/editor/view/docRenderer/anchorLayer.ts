@@ -85,8 +85,12 @@ function renderFrame(frame: AnchoredFrame, ctx: AnchorLayerContext): HTMLElement
   el.style.height = `${emuToMm(frame.heightEmu)}mm`;
   el.style.overflow = "hidden";
   el.style.boxSizing = "border-box";
-  if (frame.behindText) el.style.zIndex = "-1";
-  else if (frame.zIndex !== undefined) el.style.zIndex = String(frame.zIndex);
+  // `behindText` is NOT expressed here: the overlay layers are isolated
+  // stacking contexts, so no z-index a frame sets from inside can drop it
+  // below the body text. The Paper routes behind-text frames into the
+  // dedicated `.paper-anchors-behind` layer instead; within either layer
+  // only the frame's relative stacking matters.
+  if (frame.zIndex !== undefined) el.style.zIndex = String(frame.zIndex);
   // Let pointer events through to the body by default; selection
   // wiring (a follow-up step) will re-enable per-frame as needed.
   el.style.pointerEvents = "none";

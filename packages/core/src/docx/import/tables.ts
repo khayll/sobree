@@ -118,7 +118,12 @@ function readCell(tc: Element, ctx: ConvertContext): TableCell {
   for (const child of Array.from(tc.children)) {
     if (child.namespaceURI === null) continue;
     if (child.localName === "p") {
-      cell.content.push(convertParagraph(child, ctx));
+      // A host paragraph whose drawing became an InlineFrame is replaced
+      // wholesale — same contract as the body walker (the drawing has
+      // already been claimed out of the XML, so converting the source
+      // paragraph would render an empty husk and drop the frame).
+      const replacement = ctx.replaceParagraphs?.get(child);
+      cell.content.push(replacement ?? convertParagraph(child, ctx));
     } else if (child.localName === "tbl") {
       cell.content.push(convertTable(child, ctx));
     }

@@ -80,6 +80,11 @@ export function convertDocumentXml(
   const enrichedCtx: ConvertContext = {
     ...ctx,
     honorLastRenderedPageBreaks: hintCount >= 10,
+    // Fold the replacement map into the CONTEXT (not just the body
+    // walker's opts) — host paragraphs can live inside table cells,
+    // whose walker only sees ctx. Without this, a drawing claimed from
+    // a cell paragraph leaves an empty husk and the frame vanishes.
+    ...(opts?.replaceParagraphs ? { replaceParagraphs: opts.replaceParagraphs } : {}),
   };
   return convertBlocksFromContainer(body, enrichedCtx, opts);
 }
@@ -124,7 +129,7 @@ export function convertBlocksFromContainer(
   // was wrapped in an SDT and lost.
   const directChildren = expandSdtWrappers(Array.from(container.children));
 
-  const replaceParagraphs = opts?.replaceParagraphs;
+  const replaceParagraphs = ctx.replaceParagraphs ?? opts?.replaceParagraphs;
 
   for (const child of directChildren) {
     if (child.namespaceURI === null) continue;
