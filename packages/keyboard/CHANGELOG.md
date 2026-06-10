@@ -1,5 +1,15 @@
 # @sobree/keyboard
 
+## 0.1.3
+
+### Patch Changes
+
+- 0d62712: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+- Updated dependencies [0d62712]
+  - @sobree/core@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes
