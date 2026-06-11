@@ -11,6 +11,16 @@
   top: 0;
   left: 0;
   transform-origin: 0 0;
+  /* No will-change at rest — a standing `will-change: transform` pins the
+     compositor to a cached texture, so zoomed text stays a blurry 1×
+     stretch. The pin is applied only while a gesture or fit animation is
+     live (below); once input settles the Viewport also swaps translate3d
+     → translate, and the compositor re-rasterises text at the effective
+     scale. */
+}
+
+.sobree-viewport__stage.is-gesturing,
+.sobree-viewport__stage.is-animating {
   will-change: transform;
 }
 

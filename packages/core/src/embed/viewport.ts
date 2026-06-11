@@ -107,6 +107,8 @@ export class Viewport {
    *  browsers fire after the touch sequence must not reach the editor
    *  (it would teleport the caret to wherever the drag ended). */
   private suppressNextClick = false;
+  /** Debounce handle for the crisp-text settle pass (see scheduleSettle). */
+  private settleTimer: number | null = null;
 
   constructor(container: HTMLElement, options: ViewportOptions = {}) {
     this.container = container;
@@ -265,6 +267,7 @@ export class Viewport {
   }
 
   destroy(): void {
+    if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
     this.container.removeEventListener("wheel", this.onWheel);
     this.container.removeEventListener("pointerdown", this.onPointerDown);
     this.container.removeEventListener("pointermove", this.onPointerMove);
@@ -433,16 +436,64 @@ export class Viewport {
       this.stage.style.zoom = String(nextTier);
       this.onRenderTierChange?.(nextTier);
     }
-    // Chrome applies transforms in the post-zoom coordinate space, so a
-    // `translate(tx, ty)` on an element with `zoom: k` moves by `(tx*k, ty*k)`
-    // screen px. We store tx/ty in pre-zoom (container) pixels — the scheme
-    // that cursor-anchored zoomTo relies on — so divide by the tier here to
-    // cancel out zoom's translate multiplication. Otherwise the paper jumps
-    // sideways whenever the tier rolls over.
-    const visualScale = this.scale / this.renderTier;
-    const translateScale = 1 / this.renderTier;
-    this.stage.style.transform = `translate3d(${this.tx * translateScale}px, ${this.ty * translateScale}px, 0) scale(${visualScale})`;
+    // Fast path while the gesture is live: `will-change: transform` (via
+    // .is-gesturing) plus a 3D transform keep the stage on its own
+    // compositor layer, so each wheel tick / pinch frame just stretches
+    // the cached texture — soft but 60fps. The settle pass swaps to a
+    // crisp re-raster once input goes quiet.
+    this.stage.classList.add("is-gesturing");
+    this.stage.style.transform = this.transformCss(true);
+    this.scheduleSettle();
     if (this.constructed) this.onTransformChange?.();
+  }
+
+  /**
+   * The stage transform, expressed in the render tier's coordinate space.
+   * Chrome applies transforms post-`zoom`, so a `translate(tx, ty)` on an
+   * element with `zoom: k` moves by `(tx*k, ty*k)` screen px. We store
+   * tx/ty in pre-zoom (container) pixels — the scheme cursor-anchored
+   * zoomTo relies on — so divide by the tier to cancel zoom's translate
+   * multiplication. (Tier is permanently 1; kept for the single code path.)
+   *
+   * `threeD` selects the gesture-time form (`translate3d` — forces a
+   * compositor layer) vs the settled form (plain `translate` — lets the
+   * compositor drop the layer pin and re-rasterise text at the effective
+   * scale). Same matrix either way; only raster-cache behaviour differs.
+   */
+  private transformCss(threeD: boolean): string {
+    const visualScale = this.scale / this.renderTier;
+    const x = this.tx / this.renderTier;
+    const y = this.ty / this.renderTier;
+    return threeD
+      ? `translate3d(${x}px, ${y}px, 0) scale(${visualScale})`
+      : `translate(${x}px, ${y}px) scale(${visualScale})`;
+  }
+
+  /**
+   * Crisp-text pass: once no transform has been written for SETTLE_MS,
+   * drop `will-change` and the 3D form so the compositor re-rasterises
+   * the (now static) stage at `devicePixelRatio × scale` — text is then
+   * as sharp at 3× as a 3×-laid-out page, with zero layout involvement.
+   * Both pins are needed: either `will-change: transform` or a 3D
+   * transform alone keeps browsers (Safari especially) stretching the
+   * stale 1× texture. The next gesture frame re-pins before moving.
+   */
+  private scheduleSettle(): void {
+    if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
+    this.settleTimer = window.setTimeout(() => {
+      this.settleTimer = null;
+      // Mid-animation, retargeting the transition to the 2D form would
+      // restart its easing; the animation's own cleanup settles instead.
+      if (this.stage.classList.contains("is-animating")) return;
+      this.settle();
+    }, SETTLE_MS);
+  }
+
+  private settle(): void {
+    this.stage.classList.remove("is-gesturing");
+    this.stage.style.transform = this.transformCss(false);
+    // Same matrix as the gesture-time transform — nothing moved, so
+    // overlay listeners don't need an onTransformChange kick.
   }
 
   /**
@@ -466,11 +517,7 @@ export class Viewport {
     stage.classList.add("is-animating");
     if (tierChange) {
       // Write the target visual transform in the CURRENT tier's space.
-      const tier = this.renderTier;
-      const visualScale = this.scale / tier;
-      const translateScale = 1 / tier;
-      stage.style.transform =
-        `translate3d(${this.tx * translateScale}px, ${this.ty * translateScale}px, 0) scale(${visualScale})`;
+      stage.style.transform = this.transformCss(true);
       // applyTransform fires onTransformChange; we skipped it above so
       // overlay listeners still need a kick.
       this.onTransformChange?.();
@@ -500,6 +547,13 @@ export class Viewport {
       // to what's on screen — only re-rasterises text at the new
       // resolution.
       if (tierChange) this.applyTransform();
+      // The transition has landed — go crisp immediately rather than
+      // waiting out the settle debounce.
+      if (this.settleTimer !== null) {
+        window.clearTimeout(this.settleTimer);
+        this.settleTimer = null;
+      }
+      this.settle();
       // Final tick so overlays land at the exact resting position.
       this.onTransformChange?.();
     };
@@ -512,6 +566,14 @@ export class Viewport {
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
+
+/**
+ * Quiet time after the last transform write before the crisp-text settle
+ * pass runs. Long enough that successive wheel ticks / pinch frames of
+ * one gesture never trigger it (they arrive every ~8–50ms); short enough
+ * that text snaps sharp the moment the user pauses.
+ */
+const SETTLE_MS = 180;
 
 /**
  * Layout-side zoom tiers are RETIRED — this always returns 1 (pure
