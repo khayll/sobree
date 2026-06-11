@@ -353,17 +353,21 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-/** All ViewportOptions resolved to their defaults. */
+const VIEWPORT_DEFAULTS = {
+  minScale: 0.25,
+  maxScale: 6,
+  wheelZoomSensitivity: 0.005,
+  pinchZoomSensitivity: 0.02,
+  onScaleChange: null as ((scale: number) => void) | null,
+  onRenderTierChange: null as ((tier: number) => void) | null,
+  onTransformChange: null as (() => void) | null,
+};
+
+/** All ViewportOptions resolved to their defaults. The plain spread is
+ *  sound because `exactOptionalPropertyTypes` forbids callers passing an
+ *  explicit `undefined` that would clobber a default. */
 function resolveOptions(options: ViewportOptions) {
-  return {
-    minScale: options.minScale ?? 0.25,
-    maxScale: options.maxScale ?? 6,
-    wheelZoomSensitivity: options.wheelZoomSensitivity ?? 0.005,
-    pinchZoomSensitivity: options.pinchZoomSensitivity ?? 0.02,
-    onScaleChange: options.onScaleChange ?? null,
-    onRenderTierChange: options.onRenderTierChange ?? null,
-    onTransformChange: options.onTransformChange ?? null,
-  };
+  return { ...VIEWPORT_DEFAULTS, ...options };
 }
 
 /** The stage div with the slot div as its only child. */
