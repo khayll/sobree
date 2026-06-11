@@ -1,4 +1,5 @@
 import "./viewport.css";
+import type { GestureHost } from "./gestureHost";
 import { TouchGestures } from "./touchGestures";
 import { WheelGestures } from "./wheelGestures";
 
@@ -43,8 +44,11 @@ export interface ViewportOptions {
  *   - TouchGestures (mobile): one-finger drag pans (after a small slop so
  *     taps still place the caret); two-finger pinch zooms anchored at the
  *     finger midpoint. Mouse/pen drag stays text selection.
+ *
+ * Viewport itself implements GestureHost — panBy / zoomTo / getScale are
+ * its public API, so the controllers just receive `this`.
  */
-export class Viewport {
+export class Viewport implements GestureHost {
   readonly container: HTMLElement;
   readonly slot: HTMLElement;
   private readonly stage: HTMLElement;
@@ -68,32 +72,21 @@ export class Viewport {
   private settleTimer: number | null = null;
 
   constructor(container: HTMLElement, options: ViewportOptions = {}) {
+    const opts = resolveOptions(options);
     this.container = container;
-    this.minScale = options.minScale ?? 0.25;
-    this.maxScale = options.maxScale ?? 6;
-    this.onScaleChange = options.onScaleChange ?? null;
-    this.onRenderTierChange = options.onRenderTierChange ?? null;
-    this.onTransformChange = options.onTransformChange ?? null;
+    this.minScale = opts.minScale;
+    this.maxScale = opts.maxScale;
+    this.onScaleChange = opts.onScaleChange;
+    this.onRenderTierChange = opts.onRenderTierChange;
+    this.onTransformChange = opts.onTransformChange;
 
     container.classList.add("sobree-viewport");
-
-    this.stage = document.createElement("div");
-    this.stage.className = "sobree-viewport__stage";
-    this.slot = document.createElement("div");
-    this.slot.className = "sobree-viewport__slot";
-    this.stage.appendChild(this.slot);
+    this.stage = createStageElement();
+    this.slot = this.stage.firstElementChild as HTMLElement;
     container.appendChild(this.stage);
 
-    const host = {
-      panBy: (dx: number, dy: number) => this.panBy(dx, dy),
-      zoomTo: (s: number, x: number, y: number) => this.zoomTo(s, x, y),
-      getScale: () => this.scale,
-    };
-    this.wheelGestures = new WheelGestures(container, host, {
-      wheelZoomSensitivity: options.wheelZoomSensitivity ?? 0.005,
-      pinchZoomSensitivity: options.pinchZoomSensitivity ?? 0.02,
-    });
-    this.touchGestures = new TouchGestures(container, host);
+    this.wheelGestures = new WheelGestures(container, this, opts);
+    this.touchGestures = new TouchGestures(container, this);
 
     this.applyTransform();
     this.constructed = true;
@@ -358,6 +351,29 @@ export class Viewport {
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
+}
+
+/** All ViewportOptions resolved to their defaults. */
+function resolveOptions(options: ViewportOptions) {
+  return {
+    minScale: options.minScale ?? 0.25,
+    maxScale: options.maxScale ?? 6,
+    wheelZoomSensitivity: options.wheelZoomSensitivity ?? 0.005,
+    pinchZoomSensitivity: options.pinchZoomSensitivity ?? 0.02,
+    onScaleChange: options.onScaleChange ?? null,
+    onRenderTierChange: options.onRenderTierChange ?? null,
+    onTransformChange: options.onTransformChange ?? null,
+  };
+}
+
+/** The stage div with the slot div as its only child. */
+function createStageElement(): HTMLElement {
+  const stage = document.createElement("div");
+  stage.className = "sobree-viewport__stage";
+  const slot = document.createElement("div");
+  slot.className = "sobree-viewport__slot";
+  stage.appendChild(slot);
+  return stage;
 }
 
 /**
