@@ -1,5 +1,15 @@
 # @sobree/review
 
+## 0.1.6
+
+### Patch Changes
+
+- 35f46ff: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+- Updated dependencies [35f46ff]
+  - @sobree/core@0.1.6
+
 ## 0.1.5
 
 ### Patch Changes
