@@ -1,5 +1,15 @@
 # @sobree/block-tools
 
+## 0.1.7
+
+### Patch Changes
+
+- 072d31a: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+- Updated dependencies [072d31a]
+  - @sobree/core@0.1.7
+
 ## 0.1.6
 
 ### Patch Changes

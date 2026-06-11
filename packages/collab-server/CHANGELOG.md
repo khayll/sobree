@@ -1,5 +1,13 @@
 # @sobree/collab-server
 
+## 0.1.7
+
+### Patch Changes
+
+- 072d31a: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+
 ## 0.1.6
 
 ### Patch Changes
