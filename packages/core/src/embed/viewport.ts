@@ -39,6 +39,12 @@ export interface ViewportOptions {
  *           The point under the cursor stays under the cursor (zoom-to-cursor).
  *   - Pan:  wheel without modifiers — two-finger trackpad scroll deltas move
  *           the stage. Also supports click-drag with middle mouse or space.
+ *   - Touch (mobile): one-finger drag pans (after a small slop so taps
+ *           still place the caret); two-finger pinch zooms anchored at the
+ *           finger midpoint, and moving both fingers pans. Mouse/pen
+ *           pointers are deliberately excluded — mouse drag is text
+ *           selection. The container has `touch-action: none`, so without
+ *           these handlers touch devices could neither scroll nor zoom.
  */
 export class Viewport {
   readonly container: HTMLElement;
@@ -79,6 +85,28 @@ export class Viewport {
    * sustained horizontal motion.
    */
   private horizontalLock = false;
+  // ---------- touch gesture state ----------
+  /** Live touch pointers (pointerId → last client position). Mouse and
+   *  pen never enter this map — their drag is text selection, not pan. */
+  private readonly touchPoints = new Map<number, { x: number; y: number }>();
+  /** `idle` → no touches; `tap` → one finger down, within slop (a tap
+   *  must still reach the editor to place the caret); `pan` → one finger
+   *  past slop; `pinch` → two fingers. */
+  private touchMode: "idle" | "tap" | "pan" | "pinch" = "idle";
+  /** First touch's start position — slop is measured from here. */
+  private touchStartX = 0;
+  private touchStartY = 0;
+  /** Finger distance and scale captured when a pinch begins. */
+  private pinchStartDist = 1;
+  private pinchStartScale = 1;
+  private readonly onPointerDown: (e: PointerEvent) => void;
+  private readonly onPointerMove: (e: PointerEvent) => void;
+  private readonly onPointerEnd: (e: PointerEvent) => void;
+  private readonly onClickCapture: (e: MouseEvent) => void;
+  /** Set when a pan/pinch actually moved the stage — the synthetic click
+   *  browsers fire after the touch sequence must not reach the editor
+   *  (it would teleport the caret to wherever the drag ended). */
+  private suppressNextClick = false;
 
   constructor(container: HTMLElement, options: ViewportOptions = {}) {
     this.container = container;
@@ -101,6 +129,24 @@ export class Viewport {
 
     this.onWheel = (e: WheelEvent) => this.handleWheel(e);
     container.addEventListener("wheel", this.onWheel, { passive: false });
+
+    this.onPointerDown = (e: PointerEvent) => this.handleTouchDown(e);
+    this.onPointerMove = (e: PointerEvent) => this.handleTouchMove(e);
+    this.onPointerEnd = (e: PointerEvent) => this.handleTouchEnd(e);
+    container.addEventListener("pointerdown", this.onPointerDown);
+    container.addEventListener("pointermove", this.onPointerMove);
+    container.addEventListener("pointerup", this.onPointerEnd);
+    container.addEventListener("pointercancel", this.onPointerEnd);
+    this.onClickCapture = (e: MouseEvent) => {
+      if (!this.suppressNextClick) return;
+      this.suppressNextClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    container.addEventListener("click", this.onClickCapture, { capture: true });
+    // Older iOS Safari can still page-zoom on pinch despite
+    // `touch-action: none`; its proprietary GestureEvent is cancelable.
+    container.addEventListener("gesturestart", preventDefaultListener);
 
     this.applyTransform();
     this.constructed = true;
@@ -220,6 +266,12 @@ export class Viewport {
 
   destroy(): void {
     this.container.removeEventListener("wheel", this.onWheel);
+    this.container.removeEventListener("pointerdown", this.onPointerDown);
+    this.container.removeEventListener("pointermove", this.onPointerMove);
+    this.container.removeEventListener("pointerup", this.onPointerEnd);
+    this.container.removeEventListener("pointercancel", this.onPointerEnd);
+    this.container.removeEventListener("click", this.onClickCapture, { capture: true });
+    this.container.removeEventListener("gesturestart", preventDefaultListener);
     this.stage.remove();
     this.container.classList.remove("sobree-viewport");
   }
@@ -243,6 +295,81 @@ export class Viewport {
     this.tx -= dx;
     this.ty -= dy;
     this.applyTransform();
+  }
+
+  // ---------- touch gestures (mobile) ----------
+
+  private handleTouchDown(e: PointerEvent): void {
+    // A fresh press of ANY pointer type means the previous gesture's
+    // synthetic click (if the browser fired one) has already happened —
+    // disarm so a genuine tap is never swallowed.
+    this.suppressNextClick = false;
+    if (e.pointerType !== "touch") return;
+    this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.touchPoints.size === 1) {
+      // Don't pan yet: within the slop radius this is a tap that must
+      // reach the editor untouched (caret placement, button presses).
+      this.touchMode = "tap";
+      this.touchStartX = e.clientX;
+      this.touchStartY = e.clientY;
+    } else if (this.touchPoints.size === 2) {
+      this.beginPinch();
+    }
+    // 3+ fingers: the first two keep driving the pinch; extras are
+    // tracked only so their up-events balance.
+  }
+
+  private handleTouchMove(e: PointerEvent): void {
+    if (e.pointerType !== "touch") return;
+    const prev = this.touchPoints.get(e.pointerId);
+    if (!prev) return;
+    this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (this.touchMode === "tap") {
+      const SLOP_PX = 8;
+      if (Math.hypot(e.clientX - this.touchStartX, e.clientY - this.touchStartY) < SLOP_PX) {
+        return;
+      }
+      this.touchMode = "pan";
+    }
+    if (this.touchMode === "pan") {
+      this.suppressNextClick = true;
+      this.panBy(e.clientX - prev.x, e.clientY - prev.y);
+    } else if (this.touchMode === "pinch") {
+      this.suppressNextClick = true;
+      const [a, b] = [...this.touchPoints.values()];
+      if (!a || !b) return;
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      // Pan by however much THIS pointer moved the midpoint (half its
+      // delta), then zoom anchored at the midpoint. Together: fingers
+      // moving apart zoom in place, fingers translating drag the page.
+      this.panBy((e.clientX - prev.x) / 2, (e.clientY - prev.y) / 2);
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const next = this.pinchStartScale * (dist / this.pinchStartDist);
+      if (next !== this.scale) this.zoomTo(next, midX, midY);
+    }
+  }
+
+  private handleTouchEnd(e: PointerEvent): void {
+    if (e.pointerType !== "touch") return;
+    if (!this.touchPoints.delete(e.pointerId)) return;
+    if (this.touchPoints.size >= 2) {
+      this.beginPinch(); // re-anchor on the two survivors
+    } else if (this.touchPoints.size === 1) {
+      // Pinch collapsed to one finger — continue as a plain pan.
+      this.touchMode = "pan";
+    } else {
+      this.touchMode = "idle";
+    }
+  }
+
+  private beginPinch(): void {
+    const [a, b] = [...this.touchPoints.values()];
+    if (!a || !b) return;
+    this.touchMode = "pinch";
+    this.pinchStartDist = Math.max(Math.hypot(a.x - b.x, a.y - b.y), 1);
+    this.pinchStartScale = this.scale;
   }
 
   /**
@@ -296,13 +423,8 @@ export class Viewport {
   }
 
   private applyTransform(): void {
-    // Pick a layout-side zoom tier so text rasterises at the zoomed size
-    // rather than being a bitmap blit. Half-integer boundaries + a 0.5
-    // zoom-out tier so low zoom levels also get a matching layout size.
-    //   scale [0.35, 0.70) → tier 0.5
-    //   scale [0.70, 1.40) → tier 1
-    //   scale [1.40, 2.40) → tier 2
-    //   scale [2.40, 3.40) → tier 3   …
+    // Tier is permanently 1 (see pickRenderTier) — this branch never
+    // fires; it stays so the tier plumbing remains a single code path.
     const nextTier = pickRenderTier(this.scale);
     if (nextTier !== this.renderTier) {
       this.renderTier = nextTier;
@@ -407,4 +529,9 @@ function clamp(n: number, min: number, max: number): number {
  */
 function pickRenderTier(_scale: number): number {
   return 1;
+}
+
+/** Shared listener identity so add/remove pair up across ctor/destroy. */
+function preventDefaultListener(e: Event): void {
+  e.preventDefault();
 }
