@@ -392,14 +392,19 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 /**
- * Map a visual scale to the closest layout-side zoom tier. Tiers are
- * quantised (not continuous) so we don't re-layout the subtree on every
- * wheel tick — only when the scale crosses a tier boundary. The 0.5 tier
- * handles zoom-out levels so downscaled text is also rendered at a
- * matching layout size.
+ * Layout-side zoom tiers are RETIRED — this always returns 1 (pure
+ * `transform: scale`). The tier mechanism re-laid-out the page at CSS
+ * `zoom: k` for sharper text, assuming zoomed layout is proportionally
+ * identical to 1×. It is not: browsers scale font metrics and the
+ * page's mm-derived width through different rounding paths, so text
+ * REWRAPS at tier flips (measured: the same paragraph wrapped 7 lines
+ * at tier 1 and 4 at tier 0.5) and pagination shifts with it — zoom
+ * visibly changed line and page breaks, violating the WYSIWYG
+ * invariant that zoom is a pure visual magnifier. Modern compositors
+ * re-rasterise text at the current transform scale anyway, so
+ * sharpness no longer needs layout zoom. The tier plumbing (callback,
+ * getter) stays for API compatibility; it simply never leaves 1.
  */
-function pickRenderTier(scale: number): number {
-  if (scale < 0.7) return 0.5;
-  if (scale < 1.4) return 1;
-  return Math.round(scale); // 2 for [1.4, 2.5), 3 for [2.5, 3.5), …
+function pickRenderTier(_scale: number): number {
+  return 1;
 }
