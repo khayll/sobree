@@ -1,4 +1,6 @@
 import "./viewport.css";
+import { TouchGestures } from "./touchGestures";
+import { WheelGestures } from "./wheelGestures";
 
 export interface ViewportOptions {
   minScale?: number;
@@ -34,17 +36,13 @@ export interface ViewportOptions {
  *     └ stage   (absolutely positioned, transform: translate(tx,ty) scale(s))
  *         └ slot (where the embedded content lives — caller mounts here)
  *
- * Gestures:
- *   - Zoom: wheel with shiftKey OR ctrlKey (macOS pinch emits ctrlKey).
- *           The point under the cursor stays under the cursor (zoom-to-cursor).
- *   - Pan:  wheel without modifiers — two-finger trackpad scroll deltas move
- *           the stage. Also supports click-drag with middle mouse or space.
- *   - Touch (mobile): one-finger drag pans (after a small slop so taps
- *           still place the caret); two-finger pinch zooms anchored at the
- *           finger midpoint, and moving both fingers pans. Mouse/pen
- *           pointers are deliberately excluded — mouse drag is text
- *           selection. The container has `touch-action: none`, so without
- *           these handlers touch devices could neither scroll nor zoom.
+ * Input handling lives in two controllers driving this class through the
+ * GestureHost interface:
+ *   - WheelGestures: zoom on shift/ctrl/meta+wheel (macOS pinch emits
+ *     ctrlKey), pan on bare wheel with axis-locking.
+ *   - TouchGestures (mobile): one-finger drag pans (after a small slop so
+ *     taps still place the caret); two-finger pinch zooms anchored at the
+ *     finger midpoint. Mouse/pen drag stays text selection.
  */
 export class Viewport {
   readonly container: HTMLElement;
@@ -55,58 +53,17 @@ export class Viewport {
   private ty = 0;
   private readonly minScale: number;
   private readonly maxScale: number;
-  private readonly wheelZoomSensitivity: number;
-  private readonly pinchZoomSensitivity: number;
   private readonly onScaleChange: ((s: number) => void) | null;
   private readonly onRenderTierChange: ((t: number) => void) | null;
   private readonly onTransformChange: (() => void) | null;
-  private readonly onWheel: (e: WheelEvent) => void;
+  private readonly wheelGestures: WheelGestures;
+  private readonly touchGestures: TouchGestures;
   /** Current layout-side zoom factor (integer ≥ 1). See ViewportOptions. */
   private renderTier = 1;
   /** Suppresses `onTransformChange` during the constructor's initial
    *  `applyTransform` so consumers can capture `viewport` in their
    *  callback without TDZ traps. Flipped true at the end of the ctor. */
   private constructed = false;
-  // ---------- scroll-axis locking state ----------
-  /** Timestamp of the last wheel event, used to delimit gestures. */
-  private gestureLastTime = 0;
-  /** Dominant axis for the current gesture. Null until detected, cleared at gesture end. */
-  private gesturePrimaryAxis: "x" | "y" | null = null;
-  /**
-   * Signed cumulative dx within the current gesture. Drives lock release:
-   * wobble (±3-5px back-and-forth) cancels out; sustained one-way motion
-   * accumulates past the threshold quickly. Reset at gesture end.
-   */
-  private gestureSignedDx = 0;
-  /**
-   * Sticky horizontal-lock flag. Engaged by `fitTo` so alignment survives
-   * gentle diagonal trackpad gestures; broken when the gesture's signed
-   * cumulative dx crosses `X_RELEASE_THRESHOLD` — the user clearly intends
-   * sustained horizontal motion.
-   */
-  private horizontalLock = false;
-  // ---------- touch gesture state ----------
-  /** Live touch pointers (pointerId → last client position). Mouse and
-   *  pen never enter this map — their drag is text selection, not pan. */
-  private readonly touchPoints = new Map<number, { x: number; y: number }>();
-  /** `idle` → no touches; `tap` → one finger down, within slop (a tap
-   *  must still reach the editor to place the caret); `pan` → one finger
-   *  past slop; `pinch` → two fingers. */
-  private touchMode: "idle" | "tap" | "pan" | "pinch" = "idle";
-  /** First touch's start position — slop is measured from here. */
-  private touchStartX = 0;
-  private touchStartY = 0;
-  /** Finger distance and scale captured when a pinch begins. */
-  private pinchStartDist = 1;
-  private pinchStartScale = 1;
-  private readonly onPointerDown: (e: PointerEvent) => void;
-  private readonly onPointerMove: (e: PointerEvent) => void;
-  private readonly onPointerEnd: (e: PointerEvent) => void;
-  private readonly onClickCapture: (e: MouseEvent) => void;
-  /** Set when a pan/pinch actually moved the stage — the synthetic click
-   *  browsers fire after the touch sequence must not reach the editor
-   *  (it would teleport the caret to wherever the drag ended). */
-  private suppressNextClick = false;
   /** Debounce handle for the crisp-text settle pass (see scheduleSettle). */
   private settleTimer: number | null = null;
 
@@ -114,8 +71,6 @@ export class Viewport {
     this.container = container;
     this.minScale = options.minScale ?? 0.25;
     this.maxScale = options.maxScale ?? 6;
-    this.wheelZoomSensitivity = options.wheelZoomSensitivity ?? 0.005;
-    this.pinchZoomSensitivity = options.pinchZoomSensitivity ?? 0.02;
     this.onScaleChange = options.onScaleChange ?? null;
     this.onRenderTierChange = options.onRenderTierChange ?? null;
     this.onTransformChange = options.onTransformChange ?? null;
@@ -129,26 +84,16 @@ export class Viewport {
     this.stage.appendChild(this.slot);
     container.appendChild(this.stage);
 
-    this.onWheel = (e: WheelEvent) => this.handleWheel(e);
-    container.addEventListener("wheel", this.onWheel, { passive: false });
-
-    this.onPointerDown = (e: PointerEvent) => this.handleTouchDown(e);
-    this.onPointerMove = (e: PointerEvent) => this.handleTouchMove(e);
-    this.onPointerEnd = (e: PointerEvent) => this.handleTouchEnd(e);
-    container.addEventListener("pointerdown", this.onPointerDown);
-    container.addEventListener("pointermove", this.onPointerMove);
-    container.addEventListener("pointerup", this.onPointerEnd);
-    container.addEventListener("pointercancel", this.onPointerEnd);
-    this.onClickCapture = (e: MouseEvent) => {
-      if (!this.suppressNextClick) return;
-      this.suppressNextClick = false;
-      e.stopPropagation();
-      e.preventDefault();
+    const host = {
+      panBy: (dx: number, dy: number) => this.panBy(dx, dy),
+      zoomTo: (s: number, x: number, y: number) => this.zoomTo(s, x, y),
+      getScale: () => this.scale,
     };
-    container.addEventListener("click", this.onClickCapture, { capture: true });
-    // Older iOS Safari can still page-zoom on pinch despite
-    // `touch-action: none`; its proprietary GestureEvent is cancelable.
-    container.addEventListener("gesturestart", preventDefaultListener);
+    this.wheelGestures = new WheelGestures(container, host, {
+      wheelZoomSensitivity: options.wheelZoomSensitivity ?? 0.005,
+      pinchZoomSensitivity: options.pinchZoomSensitivity ?? 0.02,
+    });
+    this.touchGestures = new TouchGestures(container, host);
 
     this.applyTransform();
     this.constructed = true;
@@ -159,9 +104,7 @@ export class Viewport {
     this.scale = 1;
     this.tx = 0;
     this.ty = 0;
-    this.horizontalLock = false;
-    this.gesturePrimaryAxis = null;
-    this.gestureSignedDx = 0;
+    this.wheelGestures.resetLocks();
     this.applyTransform();
     this.onScaleChange?.(this.scale);
   }
@@ -221,9 +164,9 @@ export class Viewport {
     this.ty = tyNew;
     // Engage the sticky horizontal-scroll lock: fit-* deliberately picks an
     // X alignment (centre / paper-edge), so we don't want accidental
-    // sideways trackpad drift to break it. Heavy horizontal deltas in
-    // `applyScrollAxisLock` can still override.
-    this.horizontalLock = true;
+    // sideways trackpad drift to break it. Heavy horizontal deltas in the
+    // wheel controller's axis lock can still override.
+    this.wheelGestures.engageHorizontalLock();
     if (animate) this.applyTransformAnimated();
     else this.applyTransform();
     this.onScaleChange?.(this.scale);
@@ -268,161 +211,10 @@ export class Viewport {
 
   destroy(): void {
     if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
-    this.container.removeEventListener("wheel", this.onWheel);
-    this.container.removeEventListener("pointerdown", this.onPointerDown);
-    this.container.removeEventListener("pointermove", this.onPointerMove);
-    this.container.removeEventListener("pointerup", this.onPointerEnd);
-    this.container.removeEventListener("pointercancel", this.onPointerEnd);
-    this.container.removeEventListener("click", this.onClickCapture, { capture: true });
-    this.container.removeEventListener("gesturestart", preventDefaultListener);
+    this.wheelGestures.destroy();
+    this.touchGestures.destroy();
     this.stage.remove();
     this.container.classList.remove("sobree-viewport");
-  }
-
-  private handleWheel(e: WheelEvent): void {
-    // macOS trackpad pinch synthesizes wheel events with ctrlKey=true and small
-    // deltaY (~1–10). Discrete mouse wheel ticks with Shift held report ~±100
-    // deltaY. They need very different sensitivities or one feels sluggish.
-    const isPinch = e.ctrlKey && !e.shiftKey;
-    const isWheelZoom = e.shiftKey || e.metaKey;
-    if (isPinch || isWheelZoom) {
-      e.preventDefault();
-      const sensitivity = isPinch ? this.pinchZoomSensitivity : this.wheelZoomSensitivity;
-      const factor = Math.exp(-e.deltaY * sensitivity);
-      this.zoomTo(this.scale * factor, e.clientX, e.clientY);
-      return;
-    }
-    // Trackpad two-finger scroll — pan the stage, with axis-lock.
-    e.preventDefault();
-    const { dx, dy } = this.applyScrollAxisLock(e.deltaX, e.deltaY);
-    this.tx -= dx;
-    this.ty -= dy;
-    this.applyTransform();
-  }
-
-  // ---------- touch gestures (mobile) ----------
-
-  private handleTouchDown(e: PointerEvent): void {
-    // A fresh press of ANY pointer type means the previous gesture's
-    // synthetic click (if the browser fired one) has already happened —
-    // disarm so a genuine tap is never swallowed.
-    this.suppressNextClick = false;
-    if (e.pointerType !== "touch") return;
-    this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (this.touchPoints.size === 1) {
-      // Don't pan yet: within the slop radius this is a tap that must
-      // reach the editor untouched (caret placement, button presses).
-      this.touchMode = "tap";
-      this.touchStartX = e.clientX;
-      this.touchStartY = e.clientY;
-    } else if (this.touchPoints.size === 2) {
-      this.beginPinch();
-    }
-    // 3+ fingers: the first two keep driving the pinch; extras are
-    // tracked only so their up-events balance.
-  }
-
-  private handleTouchMove(e: PointerEvent): void {
-    if (e.pointerType !== "touch") return;
-    const prev = this.touchPoints.get(e.pointerId);
-    if (!prev) return;
-    this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if (this.touchMode === "tap") {
-      const SLOP_PX = 8;
-      if (Math.hypot(e.clientX - this.touchStartX, e.clientY - this.touchStartY) < SLOP_PX) {
-        return;
-      }
-      this.touchMode = "pan";
-    }
-    if (this.touchMode === "pan") {
-      this.suppressNextClick = true;
-      this.panBy(e.clientX - prev.x, e.clientY - prev.y);
-    } else if (this.touchMode === "pinch") {
-      this.suppressNextClick = true;
-      const [a, b] = [...this.touchPoints.values()];
-      if (!a || !b) return;
-      const midX = (a.x + b.x) / 2;
-      const midY = (a.y + b.y) / 2;
-      // Pan by however much THIS pointer moved the midpoint (half its
-      // delta), then zoom anchored at the midpoint. Together: fingers
-      // moving apart zoom in place, fingers translating drag the page.
-      this.panBy((e.clientX - prev.x) / 2, (e.clientY - prev.y) / 2);
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const next = this.pinchStartScale * (dist / this.pinchStartDist);
-      if (next !== this.scale) this.zoomTo(next, midX, midY);
-    }
-  }
-
-  private handleTouchEnd(e: PointerEvent): void {
-    if (e.pointerType !== "touch") return;
-    if (!this.touchPoints.delete(e.pointerId)) return;
-    if (this.touchPoints.size >= 2) {
-      this.beginPinch(); // re-anchor on the two survivors
-    } else if (this.touchPoints.size === 1) {
-      // Pinch collapsed to one finger — continue as a plain pan.
-      this.touchMode = "pan";
-    } else {
-      this.touchMode = "idle";
-    }
-  }
-
-  private beginPinch(): void {
-    const [a, b] = [...this.touchPoints.values()];
-    if (!a || !b) return;
-    this.touchMode = "pinch";
-    this.pinchStartDist = Math.max(Math.hypot(a.x - b.x, a.y - b.y), 1);
-    this.pinchStartScale = this.scale;
-  }
-
-  /**
-   * Axis-lock for pan gestures:
-   *   - Within a gesture (events ≤ GESTURE_GAP_MS apart), a clear dominant
-   *     axis zeros the other axis so a nearly-vertical swipe doesn't also
-   *     drift the paper sideways.
-   *   - An explicit `horizontalLock` set by `fitTo` survives across gestures,
-   *     keeping fit-page / fit-width alignment stable.
-   *   - Both locks release when the gesture's signed cumulative dx crosses
-   *     `X_RELEASE_THRESHOLD`. Signed sum cancels wobble (back-and-forth
-   *     averages to zero) while sustained one-way motion accumulates fast.
-   */
-  private applyScrollAxisLock(rawDx: number, rawDy: number): { dx: number; dy: number } {
-    const GESTURE_GAP_MS = 150;
-    const X_RELEASE_THRESHOLD = 60;
-    const AXIS_NOISE = 2;
-    const AXIS_RATIO = 2;
-
-    const now = performance.now();
-    if (now - this.gestureLastTime > GESTURE_GAP_MS) {
-      this.gesturePrimaryAxis = null;
-      this.gestureSignedDx = 0;
-    }
-    this.gestureLastTime = now;
-    this.gestureSignedDx += rawDx;
-
-    // Sustained or strong horizontal intent releases both locks. Wobble
-    // (±3-5px events that cancel) stays well below the threshold.
-    if (Math.abs(this.gestureSignedDx) >= X_RELEASE_THRESHOLD) {
-      this.horizontalLock = false;
-      this.gesturePrimaryAxis = null;
-      return { dx: rawDx, dy: rawDy };
-    }
-
-    let dx = rawDx;
-    let dy = rawDy;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (this.gesturePrimaryAxis === null && absDx + absDy > AXIS_NOISE) {
-      if (absDx * AXIS_RATIO < absDy) this.gesturePrimaryAxis = "y";
-      else if (absDy * AXIS_RATIO < absDx) this.gesturePrimaryAxis = "x";
-    }
-
-    if (this.gesturePrimaryAxis === "y") dx = 0;
-    else if (this.gesturePrimaryAxis === "x") dy = 0;
-    if (this.horizontalLock) dx = 0;
-
-    return { dx, dy };
   }
 
   private applyTransform(): void {
@@ -558,8 +350,9 @@ export class Viewport {
       this.onTransformChange?.();
     };
     stage.addEventListener("transitionend", cleanup);
-    // Safety: some transitions don't fire `transitionend` (e.g. same transform).
-    window.setTimeout(cleanup, 400);
+    // Safety: some transitions don't fire `transitionend` (e.g. same
+    // transform) — force cleanup just past the 320ms transition.
+    window.setTimeout(cleanup, TRANSITION_CLEANUP_MS);
   }
 }
 
@@ -574,6 +367,10 @@ function clamp(n: number, min: number, max: number): number {
  * that text snaps sharp the moment the user pauses.
  */
 const SETTLE_MS = 180;
+
+/** Fallback delay for the fit-animation cleanup — slightly past the
+ *  320ms `is-animating` transition (see viewport.css). */
+const TRANSITION_CLEANUP_MS = 400;
 
 /**
  * Layout-side zoom tiers are RETIRED — this always returns 1 (pure
@@ -591,9 +388,4 @@ const SETTLE_MS = 180;
  */
 function pickRenderTier(_scale: number): number {
   return 1;
-}
-
-/** Shared listener identity so add/remove pair up across ctor/destroy. */
-function preventDefaultListener(e: Event): void {
-  e.preventDefault();
 }
