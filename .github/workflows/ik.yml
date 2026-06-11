@@ -1,5 +1,13 @@
 name: ik
-on: [pull_request, push]
+# PRs run on the pull_request event (diff vs base → new-errors is
+# meaningful). Pushes to main keep the score history but are
+# report-only: with no diff baseline, `new-errors` silently degrades to
+# `score:60`, which fails every push while the absolute score is below
+# 60 — a gate that is red regardless of the push's content.
+on:
+  pull_request:
+  push:
+    branches: [main]
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -13,4 +21,4 @@ jobs:
       - uses: iszlai/ik-action@v1
         with:
           token: ${{ secrets.IK_TOKEN }}
-          fail-on: new-errors
+          fail-on: ${{ github.event_name == 'pull_request' && 'new-errors' || 'never' }}
