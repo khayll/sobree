@@ -12,11 +12,11 @@ export interface ViewportOptions {
   pinchZoomSensitivity?: number;
   onScaleChange?: (scale: number) => void;
   /**
-   * Fires when the render tier changes — an integer ≥1 chosen from the
-   * current scale. The stage is laid out at that tier via CSS `zoom` so
-   * text rasterises at the zoomed size rather than being blitted from a
-   * 1× bitmap. Callers that care about layout (e.g. a paginator) should
-   * re-run their measurement + layout pass when the tier changes.
+   * @deprecated Inert — never fires. Layout-side zoom tiers are retired
+   * (see `pickRenderTier`): the tier is permanently 1, because tiered
+   * CSS-`zoom` re-layout rewrapped text and shifted pagination at tier
+   * boundaries. Zoom is a pure `transform: scale`; sharpness comes from
+   * the settle-phase re-raster. Retained so existing wiring compiles.
    */
   onRenderTierChange?: (tier: number) => void;
   /**
@@ -106,7 +106,8 @@ export class Viewport implements GestureHost {
     return this.scale;
   }
 
-  /** Integer layout-side zoom currently applied via CSS `zoom` on the stage. */
+  /** @deprecated Always `1` — layout-side zoom tiers are retired (see
+   *  `pickRenderTier`). Retained so existing wiring compiles. */
   getRenderTier(): number {
     return this.renderTier;
   }

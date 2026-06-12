@@ -2,9 +2,21 @@
 
 ## Mission
 
-**Sobree is the best free WYSIWYG print-view-first native OOXML viewer and editor, with an API-based interface for the AI era.**
+- **Why** — help people view and edit documents without thinking
+  about the technology.
+- **How** — a free, web-based editor you can embed into any web app.
+- **What** — a WYSIWYG, print-view-first OOXML editor: native OOXML
+  document support, collaborative editing, and everything driven by
+  APIs. Plugin-based, with a framework-independent core: UI surfaces
+  — toolbar, keyboard shortcuts, zoom controls, review, and the like
+  — are all plugins working against the core API, never baked into
+  the core.
 
 Guidance for AI coding agents and humans working on this repo.
+
+Process checklists live next to this file: **`PR.md`** (before opening
+any PR) and **`RELEASE.md`** (before/after any release). They are part
+of the working agreement — read them when doing either.
 
 ## Rule 0 — How we work
 

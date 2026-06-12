@@ -229,7 +229,10 @@ export class Sobree {
     return this.stack.firstPaperRow;
   }
 
-  /** Pass through for Viewport's renderTier callback. */
+  /** @deprecated Inert in practice — Viewport's render tier is
+   *  permanently 1 and `onRenderTierChange` never fires (layout-side
+   *  zoom tiers are retired; zoom never changes layout). Retained so
+   *  existing wiring compiles. */
   setRenderTier(tier: number): void {
     this.stack.setRenderTier(tier);
   }
