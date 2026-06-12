@@ -58,7 +58,7 @@ mount plugins manually (see "Plugin slot" below).
 
 | name                                | returns               | what it does                                          |
 |-------------------------------------|-----------------------|-------------------------------------------------------|
-| `getMode()`                         | `"edit" \| "read"`    | Current mode.                                         |
+| `getMode()`                         | `SobreeMode`          | `"edit" \| "read"` — current mode.                    |
 | `setMode(mode)`                     | `void`                | Toggle edit / read; flips `contenteditable`.          |
 | `getPageSetup()`                    | `PageSetup`           | Section-0 page setup (JSON-clean).                    |
 | `setPageSetup(partial)`             | `void`                | Merge into section-0 setup; triggers repagination.    |
@@ -143,3 +143,12 @@ sobree.destroy();
 For the more ergonomic plugin-array path, use
 [`createSobree()`](/api/create-sobree/) instead — it owns the
 `SobreePlugin` lifecycle for you.
+
+## Advanced: PaperStack
+
+`Sobree` composes the `Editor` with a `PaperStack` — the paginated page
+renderer (one `Paper` per page; pagination, headers/footers, anchored
+frames). Both classes are exported for shells that need to compose
+them differently than `Sobree` does, but the stack's contract is
+otherwise internal: drive it through `Sobree` (`setPageSetup`,
+`paginate` events) rather than calling it directly.

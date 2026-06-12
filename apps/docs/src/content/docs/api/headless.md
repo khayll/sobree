@@ -69,7 +69,8 @@ class HeadlessSobree {
   ): EditResult<void>;
 
   // Events + lifecycle
-  on(event: "change", cb: (p: HeadlessChangePayload) => void): () => void;
+  // event: HeadlessEvent ("change"); returns a HeadlessUnsubscribe
+  on(event: "change", cb: (p: HeadlessChangePayload) => void): HeadlessUnsubscribe;
   destroy(): void;
 }
 

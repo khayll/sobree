@@ -83,6 +83,37 @@ Plus `*AtSelection` sugar (`setRunPropertiesAtSelection`,
 `wrapSelection`, etc.) for in-process toolbar code that wants to read
 the live DOM selection without building a `Range` itself.
 
+`wrapRange` / `wrapSelection` take a `WrapTag` — `"strong" | "em" |
+"u" | "s" | "sup" | "sub" | "mark"`. `applyRunProperties` takes a
+`RunPropertiesPatch` (partial `RunProperties`; `null` clears a
+property).
+
+## Tables
+
+`editor.table` is the table sub-API. Methods take the table's
+`BlockRef` plus an options object and return `EditResult<BlockRef>`
+like every other mutator:
+
+| method | options type |
+|---|---|
+| `insertRow(ref, opts)` / `insertColumn(ref, opts)` | `InsertRowOpts` / `InsertColumnOpts` — where (`InsertAt`: `"start" \| "end" \| "before" \| "after"` + index) and what to copy. |
+| `deleteRow(ref, index)` / `deleteColumn(ref, index)` | — |
+| `mergeCells(ref, opts)` | `MergeCellsOpts` — the rectangular cell range to merge. |
+| `setCellContent(cell, blocks)` / `setCellProperties(cell, …)` | `CellRef` — `{ table, row, col }` addressing one cell. |
+
+## Marks (for toolbar / agent authors)
+
+The mark layer is data, not hard-coded UI — the same catalogue drives
+the stock toolbar, the keyboard plugin, and any custom surface:
+
+| export | role |
+|---|---|
+| `MARK_COMMAND_DEFS` | The catalogue: one `MarkCommandDef` per toggleable mark (`ToggleableMark` tag, command name, run property). |
+| `MARK_PROP` / `MARK_ON` | Tag → `RunProperties` key, and the value that means "on" (`bold` → `true`, etc.). |
+| `toggleMark(editor, range, tag)` | Toggle a mark over a range. Registered on the bus as `mark.toggle.*` by the Editor itself. |
+| `isMarkActive(editor, range, tag)` | Is the mark on across the range? — drives pressed-state in toolbars. |
+| `rangeAtSelection(editor)` | The current DOM selection as an API `Range`. |
+
 ## Track changes
 
 The editor has a session-wide track-changes mode. When on, every
@@ -122,6 +153,22 @@ editor.on("track-changes-change",  (state) => /* { enabled, author? } */);
 The editor fires `keydown` on every host key press but binds **zero**
 shortcuts itself. The keyboard plugin maps keys to commands; replace it
 or skip it as you like.
+
+Event names are the `EditorEvent` union; payloads are
+`EditorEventPayload[E]` — `ChangePayload` (`{ doc, revision,
+documentVersion }`), `SelectionPayload`, `KeyDownPayload`, and
+`TrackChangesState` respectively. `on(...)` returns an `Unsubscribe`
+function.
+
+## Commands
+
+`editor.commands` is a named-command registry: plugins register
+`CommandDefinition`s and any surface executes them by name —
+`editor.commands.execute("mark.toggle.bold")`. `list()` returns
+`CommandSnapshot[]` (`{ name, title, isActive, isAvailable }`) for
+everything registered — how generic surfaces (command palettes, MCP
+tool catalogues) discover what's available. `ApiRangeType` is an alias
+of the editing-model `Range` for consumers that import types only.
 
 ## Reads
 

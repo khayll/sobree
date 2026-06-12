@@ -39,6 +39,12 @@ interface History {
 Access via `editor.history` (where `editor` is an `Editor` — i.e.
 `editor.editor.history` on the `createSobree()` handle).
 
+Exported companions: `HistoryDepth` is the `{ undo, redo }` shape,
+`HistoryEvent`/`HistoryListener` type the `on("change", …)`
+subscription, and `HistoryConfig` / `DEFAULT_HISTORY_CONFIG` hold the
+capture-timeout configuration for direct `History` construction in
+headless tests.
+
 ## Bus commands
 
 Two commands registered by the Editor itself (always available, even

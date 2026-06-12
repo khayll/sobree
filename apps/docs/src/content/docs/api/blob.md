@@ -181,6 +181,15 @@ cache. Returns immediately when no BlobStore is configured.
 Read-only access to the configured store + cache. `null` when no
 BlobStore is set.
 
+### Companion exports
+
+| export | role |
+|---|---|
+| `FetchBlobStoreOptions` | `fetchBlobStore` config — `baseUrl`, `headers`, custom `fetch`. |
+| `BlobCacheOptions` | `BlobCache` construction options for custom wiring. |
+| `BlobStoreError` | Error class store implementations should throw — callers can `instanceof` it. |
+| `isBlobHash(value)` | Type guard for `BlobHash` strings — useful when validating `partRefs` entries in a custom store. |
+
 ### Y.Doc schema
 
 When `BlobStore` is configured, the Y.Doc carries:

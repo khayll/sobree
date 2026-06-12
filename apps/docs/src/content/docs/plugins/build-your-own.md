@@ -387,6 +387,20 @@ For end-to-end coverage, mount a real Editor against a jsdom host —
 see `packages/keyboard/src/keyboard.test.ts` for the canonical
 pattern.
 
+## The shared toolkit
+
+Helpers core exports specifically for plugin authors (the stock
+plugins are built on the same ones):
+
+| export | role |
+|---|---|
+| `getFloatingCorner(host, placement)` | The shared floating-corner stack — one container per corner per host, so multiple plugins' docks (zoom controls, review panel, yours) stack instead of overlapping. `FloatingCornerPlacement` names the corner. |
+| `resolveStyleCascade(doc, styleId)` | Resolve a style chain (basedOn …) to effective properties — what toolbar state should reflect for a paragraph's `styleId`. |
+| `MARK_COMMAND_DEFS`, `isMarkActive`, `toggleMark` | The mark catalogue and helpers — see [Editor → Marks](/api/editor/). |
+
+`setup(ctx)` returns a `SobreePluginInstance` — just `{ destroy() }`;
+the factory-vs-class choice is yours.
+
 ## Related
 
 - [Plugin model](/concepts/plugins/) — the underlying mechanics
