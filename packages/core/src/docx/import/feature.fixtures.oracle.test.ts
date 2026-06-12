@@ -103,7 +103,11 @@ interface OracleTarget {
 function collectTargets(): OracleTarget[] {
   const out: OracleTarget[] = [];
   if (!existsSync(CORPUS_DIR)) return out;
-  for (const origin of ["generated"]) {
+  // `generated/` is committed and gates CI; `real-world/` is gitignored
+  // (local machines only), so including it costs CI nothing while
+  // producing the snapshots the corpus runner needs to diff real
+  // documents locally.
+  for (const origin of ["generated", "real-world"]) {
     const originDir = join(CORPUS_DIR, origin);
     if (!existsSync(originDir)) continue;
     for (const category of readdirSync(originDir)) {

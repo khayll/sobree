@@ -80,7 +80,10 @@ Known exporter gaps (documented in the fixpoint test; each is a
 planned feature): `InlineFrame` blocks and anchored floating drawings
 are not yet serialized back to DrawingML — they render and edit fine in
 Sobree but are dropped on export; anchored / wrapped images export as
-inline pictures (the image survives, its wrap geometry doesn't).
+inline pictures (the image survives, its wrap geometry doesn't);
+footnotes and comments are not yet emitted (`footnotes.xml` /
+`comments.xml`), so their reference marks and note bodies are dropped
+on save.
 
 ## Headless usage
 
