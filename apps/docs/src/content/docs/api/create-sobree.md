@@ -130,7 +130,7 @@ shared Y.Doc — see
 
 ## Polymorphic content
 
-The `content` option is type-detected:
+The `content` option (`SobreeContent`) is type-detected:
 
 | value type            | treated as                          | sync / async       |
 |-----------------------|-------------------------------------|--------------------|
@@ -166,6 +166,10 @@ The Markdown accepted by `content` and by `editor.loadMarkdown(...)` is
 Out of scope: tables, blockquotes, code fences, images, nested lists,
 reference-style links, footnotes, autolinks, HTML. For those, build the
 document with the [AST builders](/api/builders/).
+
+The parser is exported as `parseMarkdown(md): SobreeDocument` for
+seeding content outside the factory — headless flows, tests, server
+code building a Y.Doc with `seedYDoc`.
 
 ## The handle
 

@@ -14,6 +14,8 @@ construction for embedders who need custom zoom config, multiple
 editors sharing one viewport, or other off-piste layouts.
 :::
 
+Options are `ViewportOptions` — all optional:
+
 ```ts
 import { Viewport } from "@sobree/core";
 

@@ -74,7 +74,6 @@ export type {
 export * from "./doc/types";
 export * from "./doc/builders";
 export { resolveStyleCascade } from "./doc/styles";
-export { collectLivePartPaths, pruneOrphanParts } from "./doc/parts";
 
 // === fonts ===
 // Pure-function API for embedding/removing fonts and the @font-face
@@ -88,7 +87,6 @@ export {
   generateFontKey,
   obfuscate,
   deobfuscate,
-  isUnobfuscated,
   canEmbed,
   readFsType,
 } from "./fonts";
@@ -112,19 +110,13 @@ export type {
   HistoryEvent,
   HistoryListener,
 } from "./history";
-export { templateToBlocks, blocksToTemplate, pageSetupToSection, sectionToPageSetup } from "./doc/pageSetupBridge";
+export { templateToBlocks, blocksToTemplate } from "./doc/pageSetupBridge";
 export type { Selection, BlockRef, InlinePosition, Range } from "./doc/api";
 
 // === paper stack + page setup model ===
 export { PaperStack } from "./paperStack/paperStack";
 export { Paper } from "./paperStack/paper";
-export {
-  PAGE_SIZES,
-  DEFAULT_PAGE_SETUP,
-  resolvedDimensions,
-  substituteVariables,
-  zoneTemplateFor,
-} from "./paperStack/pageSetup";
+export { PAGE_SIZES, DEFAULT_PAGE_SETUP } from "./paperStack/pageSetup";
 export type { PageSetup, PageSizeKey, PageZoneText, VerticalAlign, Orientation, Margins } from "./paperStack/pageSetup";
 
 // === viewport ===
@@ -156,35 +148,13 @@ export type { ZoneKind, EnterZoneEditOptions } from "./zoneEdit";
 // === Y.Doc backing (Phase 1+) ===
 // The document is mirrored into a Y.Doc on every mutation. Paragraph
 // blocks store text as Y.Text (char-level CRDT); other blocks +
-// document meta as JSON. Embedders reach `editor.editor.ydoc` for
-// the live Y.Doc and use these helpers to project / seed / diff-apply
-// against it. `@sobree/collab-providers` (Phase 2) wraps the standard
-// Y providers around this surface.
-export {
-  Y_BLOCK_AST_KEY,
-  Y_BLOCK_ID_KEY,
-  Y_BLOCK_KIND_KEY,
-  Y_BLOCK_PROPS_KEY,
-  Y_BLOCK_TEXT_KEY,
-  Y_BODY_KEY,
-  Y_META_FIELDS,
-  Y_META_KEY,
-  Y_PARTS_KEY,
-  applyDocumentToYDoc,
-  buildBlockYMap,
-  diffApplyText,
-  populateParagraphYMap,
-  projectBlock,
-  projectYDoc,
-  seedYDoc,
-} from "./ydoc";
-export {
-  attrsToRunProps,
-  deltaToRuns,
-  runPropsToAttrs,
-  runsToDelta,
-} from "./ydoc";
-export type { DeltaOp, EmbedContent, LinkMark } from "./ydoc";
+// document meta as JSON. Embedders reach `editor.editor.ydoc` for the
+// live Y.Doc; these three are the blessed wire-level contract — seed a
+// fresh Y.Doc, project one back to a SobreeDocument, diff-apply a full
+// document. The schema keys and Run↔Delta conversion are internals:
+// anything finer-grained than these three couples the consumer to the
+// Y.Doc layout, which only `@sobree/core` owns.
+export { applyDocumentToYDoc, projectYDoc, seedYDoc } from "./ydoc";
 
 // === content-hashed blob layer (Phase 3.2+) ===
 // Optional. Pass a `BlobStore` to `createSobree({ blobStore })` and

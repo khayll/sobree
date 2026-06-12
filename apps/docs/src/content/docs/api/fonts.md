@@ -47,6 +47,12 @@ Every face is checked against the OS/2 `fsType` field before embedding:
 | `preview`          | Embed (no warning) — preview/print only |
 | `restricted`       | **Refuse**, push warning              |
 
+The check is exposed directly as `readFsType(bytes)` →
+`FsTypeReport` (`{ allowed, mode: EmbedMode, noSubset, bitmapOnly }`,
+where `EmbedMode` is the four-row union above). `embedFont` /
+`embedFontIntoDoc` return an `EmbedFontResult` carrying the updated
+document plus the per-face warnings.
+
 Override with `{ allowRestricted: true }` if you have separate licence
 clearance:
 
