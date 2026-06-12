@@ -46,14 +46,27 @@ fails the gate.
 
 ## 3. The gate
 
-All four green before any PR (details in `AGENTS.md` → Verification):
+All five green before any PR (details in `AGENTS.md` → Verification):
 
 ```sh
 pnpm typecheck
 pnpm test
 pnpm -F @sobree/docs build
 pnpm corpus:check
+pnpm docs:coverage
 ```
 
 Visual changes additionally get a playground spot-check
 (`pnpm dev` → localhost:5174) — jsdom doesn't catch layout.
+
+## 4. Docs follow the public surface
+
+`pnpm docs:coverage` mechanically blocks NEW public exports that no docs
+page mentions (allowlist in `scripts/docs-coverage.allow` is pre-ratchet
+debt and may only shrink). What it cannot catch is **stale prose** —
+docs describing behaviour the PR just changed. For that, check the
+`AGENTS.md` "Update checklist — when X changes, update Y" against your
+diff: if the PR changes the *behaviour* of anything with an API page
+(viewport, history, docx, …), the page changes in the same PR.
+(Bug history: the render-tier retirement shipped in three PRs while
+`api/viewport.md` kept instructing embedders to wire the dead callback.)
