@@ -7,7 +7,10 @@
 - **How** — a free, web-based editor you can embed into any web app.
 - **What** — a WYSIWYG, print-view-first OOXML editor: native OOXML
   document support, collaborative editing, and everything driven by
-  APIs.
+  APIs. Plugin-based, with a framework-independent core: UI surfaces
+  — toolbar, keyboard shortcuts, zoom controls, review, and the like
+  — are all plugins working against the core API, never baked into
+  the core.
 
 Guidance for AI coding agents and humans working on this repo.
 
