@@ -14,6 +14,7 @@
     "dev:docs": "pnpm --filter @sobree/docs dev",
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
+    "docs:coverage": "node scripts/docs-coverage.mjs",
     "test:changed": "pnpm -F @sobree/core test -- --changed HEAD",
     "test:core": "pnpm -F @sobree/core test",
     "test:oracle": "pnpm -F @sobree/core test -- fixtures.oracle",

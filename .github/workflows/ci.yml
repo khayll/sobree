@@ -55,6 +55,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Docs coverage ratchet
+        run: pnpm docs:coverage
+
       - name: Test
         run: pnpm test
 
