@@ -70,7 +70,7 @@ mount plugins manually (see "Plugin slot" below).
 | `getOutline()`                      | `OutlineItem[]`       | Heading outline for a TOC.                            |
 | `openDocx(src)`                     | `Promise<void>`       | Replace document from `.docx` bytes / File / Blob.    |
 | `exportDocx()`                      | `Blob`                | Serialise current document to `.docx`.                |
-| `setRenderTier(tier)`               | `void`                | Forwarded from Viewport's render-tier callback.       |
+| `setRenderTier(tier)`               | `void`                | Deprecated, inert — render tiers are retired (see [Viewport](/api/viewport/)). |
 | `destroy()`                         | `void`                | Tear down editor, plugins, paper stack.               |
 
 ## Track changes
