@@ -1,0 +1,12 @@
+# Cloudflare Workers Static Assets honours this file (copied into dist/
+# by Astro from public/).
+#
+# HTML carries no content hash, so a long-cached page can pin a reader to
+# stale docs after a deploy. A short TTL keeps navigation fast (edge +
+# browser cache) while bounding staleness to a few minutes.
+/*
+  Cache-Control: public, max-age=300, must-revalidate
+
+# Hashed Astro assets are immutable by construction — cache forever.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
