@@ -244,7 +244,7 @@ intended.
 ```sh
 pnpm typecheck                    # all workspaces
 pnpm test                         # vitest in each package
-pnpm -F @sobree/docs build        # catches stale / broken-MDX docs
+pnpm -F "@sobree/docs..." build   # builds core first, then docs (catches MDX errors)
 pnpm corpus:check                 # render fidelity gate (needs `soffice` on PATH)
 pnpm docs:coverage                # new public exports must be documented (ratchet)
 ```

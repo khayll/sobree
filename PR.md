@@ -51,7 +51,7 @@ All five green before any PR (details in `AGENTS.md` → Verification):
 ```sh
 pnpm typecheck
 pnpm test
-pnpm -F @sobree/docs build
+pnpm -F "@sobree/docs..." build
 pnpm corpus:check
 pnpm docs:coverage
 ```
