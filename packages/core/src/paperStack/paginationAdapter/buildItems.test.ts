@@ -23,6 +23,46 @@ function elements(html: string): HTMLElement[] {
   return Array.from(host.children) as HTMLElement[];
 }
 
+/** Stub a layout height jsdom can't compute. */
+function stubHeight(el: Element, px: number): void {
+  Object.defineProperty(el, "offsetHeight", { value: px, configurable: true });
+}
+
+describe("buildItems: tall table row driven by a non-paragraph cell", () => {
+  it("measures the row by its tallest cell, not its first — boxes sum to the true row height", () => {
+    // Regression guard for the fedramp revision-history table: a row whose
+    // height comes from a 9-item <ul> in one cell, next to a one-line date
+    // cell. Both cells have a single block child, so the old
+    // "dominant = most block children" tie picked the date cell and emitted
+    // a ~20px box for a ~680px row — the engine under-measured it and the
+    // table overflowed the page instead of breaking across pages.
+    const els = elements(`
+      <table><tbody><tr>
+        <td><p>01/20/2017</p></td>
+        <td><ul><li>a</li><li>b</li><li>c</li></ul></td>
+      </tr></tbody></table>
+    `);
+    const tr = els[0]!.querySelector("tr")!;
+    const dateP = tr.children[0]!.querySelector("p")!;
+    const ul = tr.children[1]!.querySelector("ul")!;
+    stubHeight(tr, 680); // taller than TALL_ROW_THRESHOLD → row-split path
+    stubHeight(dateP, 20);
+    stubHeight(ul, 657);
+
+    const boxes = buildItems(els).filter(
+      (it): it is Extract<typeof it, { type: "box" }> => it.type === "box" && it.height > 0,
+    );
+    const total = boxes.reduce((sum, b) => sum + b.height, 0);
+
+    // Faithful: the row's boxes account for its full height (never the
+    // 20px date cell), so the paginator can't under-measure and overflow.
+    expect(total).toBeGreaterThanOrEqual(680);
+    // The break unit is the list cell's content, not the date paragraph.
+    expect(boxes.some((b) => b.el === ul)).toBe(true);
+    expect(boxes.some((b) => b.el === dateP)).toBe(false);
+  });
+});
+
 describe("buildItems: forced page breaks", () => {
   it("`data-page-break` element emits Penalty(-Infinity) + zero-height monolithic box", () => {
     const els = elements(`
