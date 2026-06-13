@@ -55,3 +55,8 @@ float. After npm shows the new version:
 - Docs claims must match tested reality (e.g. export is a tested
   semantic fixpoint, not "byte-stable") — never let marketing language
   outrun the test suite.
+- **Publishing docs is automatic.** docs.sobree.dev is an assets-only
+  Cloudflare Worker (`apps/docs/wrangler.jsonc`) built + deployed by
+  Workers Builds on every push to `main` — so a merged docs change is
+  live within minutes (5-minute HTML TTL). No manual deploy step;
+  verify on the live URL after merge.

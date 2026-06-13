@@ -1,0 +1,19 @@
+{
+  // Cloudflare Workers Static Assets config for docs.sobree.dev.
+  //
+  // Assets-only Worker — no server code, no `main`, no bindings. Wrangler
+  // serves the static Starlight/Astro build in `./dist` from Cloudflare's
+  // edge. Deploy: `npx wrangler deploy -c apps/docs/wrangler.jsonc`
+  // (Workers Builds runs this automatically on push to `main`).
+  //
+  // SECURITY: this file is in a PUBLIC repo. It must describe SHAPE, never
+  // SECRETS. Do NOT add a `vars` block (those are plaintext env vars —
+  // use dashboard secrets / `wrangler secret` instead), and don't paste
+  // account_id / zone_id / KV / R2 / D1 ids here. Deploy auth is injected
+  // by Workers Builds at build time; it never lives in the repo.
+  "name": "sobree-docs",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}
