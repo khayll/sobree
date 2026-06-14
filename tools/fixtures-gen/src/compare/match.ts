@@ -50,6 +50,22 @@ const ELLIPSIS = "…";
  *  later-document blocks don't accidentally match early lines, large
  *  enough to cover a few-cell table row that all renders at one Y. */
 const SUBSTRING_LOOKAHEAD = 5;
+/**
+ * How far forward the prefix scan may reach for a block's first line.
+ * A block should match the NEAREST forward occurrence of its text, not
+ * a coincidental hit anywhere in the document. Without this bound the
+ * scan ran to end-of-document, so on a long report a block could match
+ * a stray later line, jump the cursor near the end, and strand every
+ * subsequent block as "none" — the cursor never recovered. Measured to
+ * dominate the unbounded scan: every corpus fixture matches at least as
+ * many blocks as before, and the desync'd long reports leap (31-page
+ * report 85 → 360 matched blocks; short docs, already matching within a
+ * couple of pages, unchanged). ~2-3 pages of lines — wide enough to
+ * cover a two-column article's reading-order gaps (40 was too tight
+ * there) and a table row's other cells, narrow enough that a
+ * coincidental later-section line can't latch the cursor.
+ */
+const PREFIX_SCAN_WINDOW = 60;
 
 export function matchBlocksToLines(
   blocks: SnapshotBlock[],
@@ -67,17 +83,20 @@ export function matchBlocksToLines(
     }
 
     // Try prefix match first — the common case for paragraphs and the
-    // first cell of every table row.
+    // first cell of every table row. Bounded to PREFIX_SCAN_WINDOW so a
+    // missing block can't latch onto a coincidental far-ahead line and
+    // desync the cursor for the rest of the document.
     const startProbe = prefix.slice(0, Math.min(20, prefix.length));
+    const scanLimit = Math.min(flatLines.length, cursor + PREFIX_SCAN_WINDOW);
     let start = cursor;
     while (
-      start < flatLines.length &&
+      start < scanLimit &&
       !stripLeadingMarker(normalize(flatLines[start]!.text)).startsWith(startProbe)
     ) {
       start++;
     }
 
-    if (start < flatLines.length) {
+    if (start < scanLimit) {
       // Prefix match found — greedily consume lines until concatenation covers `prefix`.
       const lines: LineMetric[] = [];
       let concat = "";
