@@ -194,24 +194,30 @@ function tallRowParagraphBoxes(tr: HTMLElement): DomItem[] {
     (c): c is HTMLElement => c.tagName === "TD" || c.tagName === "TH",
   );
   if (cells.length === 0) return [singleBox(tr, { monolithic: true })];
-  // Dominant cell = cell with most paragraph-like children. Ties go to
-  // the leftmost cell (consistent ordering, doesn't matter for layout).
+  // Dominant cell = the one DRIVING the row's height (tallest content),
+  // not the one with the most block children. Selecting by count tied a
+  // 9-item `<ul>` revision cell with the one-line date cell next to it
+  // (both have a single block child), picked the date cell, and emitted
+  // a 20px box for a 680px row — so the engine under-measured the row,
+  // never broke the page, and the table overflowed. Height is the real
+  // "which cell makes this row tall" signal.
   let dominant = cells[0]!;
-  let domCount = cellParagraphs(cells[0]!).length;
+  let domHeight = cellContentHeight(cells[0]!);
   for (let i = 1; i < cells.length; i++) {
-    const c = cellParagraphs(cells[i]!).length;
-    if (c > domCount) {
+    const h = cellContentHeight(cells[i]!);
+    if (h > domHeight) {
       dominant = cells[i]!;
-      domCount = c;
+      domHeight = h;
     }
   }
   const paras = cellParagraphs(dominant);
   if (paras.length === 0) return [singleBox(tr, { monolithic: true })];
 
   const out: DomItem[] = [];
+  const boxes: DomBox[] = [];
   for (let i = 0; i < paras.length; i++) {
     const p = paras[i]!;
-    out.push({
+    const box: DomBox = {
       type: "box",
       height: measureBlockHeight(p),
       el: p,
@@ -219,10 +225,27 @@ function tallRowParagraphBoxes(tr: HTMLElement): DomItem[] {
       isFirstLineOfParagraph: true,
       isLastLineOfParagraph: true,
       ...(i === 0 ? { isFirstParaOfRow: true } : {}),
-    });
+    };
+    boxes.push(box);
+    out.push(box);
     if (i < paras.length - 1) out.push({ type: "glue", height: 0 });
   }
+  // Faithfulness invariant: the row's boxes must sum to the row's TRUE
+  // rendered height, or the engine under-measures it. The dominant
+  // cell's paragraph heights don't include cell padding, inter-cell
+  // borders, or a non-dominant cell that's nonetheless taller than its
+  // own text — so push any residual onto the last box. Over-measuring
+  // is harmless (worst case the row breaks one px early); under-
+  // measuring overflows the page.
+  const residual = tr.offsetHeight - boxes.reduce((sum, b) => sum + b.height, 0);
+  if (residual > 0) boxes[boxes.length - 1]!.height += residual;
   return out;
+}
+
+/** Total height of a cell's breakable block children — the signal for
+ *  which cell drives a tall row's height. */
+function cellContentHeight(cell: HTMLElement): number {
+  return cellParagraphs(cell).reduce((sum, p) => sum + measureBlockHeight(p), 0);
 }
 
 /**
