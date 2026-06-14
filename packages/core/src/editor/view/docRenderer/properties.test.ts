@@ -38,6 +38,21 @@ describe("applyParagraphProps", () => {
     expect(Number(el.style.lineHeight)).toBeCloseTo(1.575, 3);
   });
 
+  it("lineRule=exact emits a FIXED pt line-height (line twips → pt), font-independent", () => {
+    // line=640 twips = 32pt; the big-font value the stat fact-sheet uses.
+    expect(p({ spacing: { line: 640, lineRule: "exact" } }).style.lineHeight).toBe("32pt");
+    // Independent of the run font (exact is a fixed box, not a multiplier).
+    expect(
+      p({ spacing: { line: 360, lineRule: "exact" }, runDefaults: { fontFamily: "Calibri" } }).style
+        .lineHeight,
+    ).toBe("18pt");
+  });
+
+  it("lineRule=atLeast keeps natural leading (a minimum must never clip a taller line)", () => {
+    const el = p({ spacing: { line: 360, lineRule: "atLeast" } });
+    expect(el.style.lineHeight).toBe(""); // unset → natural leading
+  });
+
   it("stamps data-page-break-before and data-keep-next", () => {
     expect(p({ pageBreakBefore: true }).hasAttribute("data-page-break-before")).toBe(true);
     expect(p({ keepNext: true }).hasAttribute("data-keep-next")).toBe(true);
