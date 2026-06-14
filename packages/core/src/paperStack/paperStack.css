@@ -400,3 +400,16 @@
 }
 
 
+
+/* Unequal multi-column sections (Word `<w:cols w:equalWidth="0">`). CSS
+ * multi-column can't size columns individually, so the column tracks are
+ * laid side by side with explicit per-column widths (set inline in mm by
+ * `flowUnequalColumnSections`); each `.sobree-col` is one filled track.
+ * `align-items: flex-start` keeps short columns top-aligned like Word. */
+.paper-content .sobree-cols-unequal {
+  display: flex;
+  align-items: flex-start;
+}
+.paper-content .sobree-cols-unequal .sobree-col {
+  flex: 0 0 auto;
+}

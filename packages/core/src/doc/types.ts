@@ -784,9 +784,27 @@ export interface SectionProperties {
 }
 
 export interface SectionColumns {
-  /** Number of equal-width columns. */
+  /** Number of columns. */
   count: number;
-  /** Inter-column gap in twips (Word's `<w:cols w:space>` attribute). */
+  /** Default inter-column gap in twips (Word's `<w:cols w:space>`). Used
+   *  for equal columns and as the fallback gap when a per-column space
+   *  is absent. */
+  spaceTwips?: number;
+  /** `false` when the section declares explicit per-column widths
+   *  (Word's `<w:cols w:equalWidth="0">`). Absent/`true` → equal columns,
+   *  which the renderer flows with CSS multi-column. */
+  equalWidth?: boolean;
+  /** Per-column geometry from `<w:col w:w w:space>`, present only for the
+   *  unequal case. `length === count`. Each entry's `spaceTwips` is the
+   *  gap AFTER that column (the last column's is usually absent). The
+   *  renderer flows blocks across these tracks at their true widths. */
+  columns?: SectionColumn[];
+}
+
+export interface SectionColumn {
+  /** Column width in twips (`<w:col w:w>`). */
+  widthTwips: number;
+  /** Trailing gap after this column in twips (`<w:col w:space>`). */
   spaceTwips?: number;
 }
 

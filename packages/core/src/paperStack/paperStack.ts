@@ -6,6 +6,8 @@ import {
   zoneTemplateFor,
 } from "./pageSetup";
 import { paginateBlocks } from "./paginationAdapter";
+import { flowUnequalColumnSections } from "./paginationAdapter/columnFlow";
+import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
 import { Paper } from "./paper";
 import { renderBlocks } from "../editor/view/docRenderer/block";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
@@ -243,8 +245,8 @@ export class PaperStack {
     let pageHeights: number[] = [];
     for (let attempt = 0; attempt <= MAX_REPAGINATE_RETRIES; attempt++) {
       this.runPaginationOnce(baselineBudgetPx, pageHeights);
-      this.distributeFootnotes();
-      const newHeights = this.computePageHeights(baselineBudgetPx);
+      distributeFootnotes(this.papers);
+      const newHeights = footnotePageHeights(this.papers, baselineBudgetPx);
       const stable = arraysEqual(newHeights, pageHeights);
       pageHeights = newHeights;
       // Stable + no overflow → done. Stable + overflow shouldn't
@@ -279,83 +281,6 @@ export class PaperStack {
   }
 
   /**
-   * Per-page footnote pinning. After body pagination completes, scan
-   * each paper for footnote references (`<sup class="sobree-footnote-ref">`)
-   * and populate that paper's `.paper-footnotes` zone with the cited
-   * bodies — matching Word's "footnote bodies render at the bottom of
-   * the page where they're referenced" behaviour.
-   *
-   * Footnote bodies are sourced from two places:
-   *   1. The doc-end `<aside class="sobree-footnotes">` the renderer
-   *      initially appends to paper[0].content. We harvest the `<li>`s
-   *      out of it before the aside itself gets re-paginated as a block.
-   *   2. Any footnote zones already populated from a previous repaginate
-   *      pass — those bodies stay in scope across iterations.
-   *
-   * Caveat: body budget is NOT reduced for footnote-zone height. On
-   * pages with many footnotes, the footnote zone may extend past the
-   * page bottom into the footer area. True budget-reservation is its
-   * own paginator feature.
-   */
-  private distributeFootnotes(): void {
-    // 1. Harvest existing footnote bodies (from any source) into a
-    //    Map<id, HTMLElement>. Bodies are cloned on each insertion so
-    //    a footnote referenced from multiple pages renders multiple
-    //    times without DOM ownership conflicts.
-    const bodies = new Map<number, HTMLElement>();
-    for (const p of this.papers) {
-      for (const li of Array.from(p.footnotes.querySelectorAll("li[id^='sobree-footnote-']"))) {
-        const id = footnoteIdFromAttr(li.id);
-        if (id !== null) bodies.set(id, li as HTMLElement);
-      }
-      p.footnotes.replaceChildren();
-      p.footnotes.classList.add("is-empty");
-    }
-    // Also harvest from any doc-end `<aside>` left over from the
-    // renderer. The paginator treats it as a regular block, so it may
-    // have landed on any page — scan them all.
-    for (const p of this.papers) {
-      for (const aside of Array.from(p.content.querySelectorAll("aside.sobree-footnotes"))) {
-        for (const li of Array.from(aside.querySelectorAll("li[id^='sobree-footnote-']"))) {
-          const id = footnoteIdFromAttr(li.id);
-          if (id !== null) bodies.set(id, li as HTMLElement);
-        }
-        aside.remove();
-      }
-    }
-    if (bodies.size === 0) return;
-
-    // 2. For each paper, collect referenced ids in document order then
-    //    populate the footnote zone.
-    for (const paper of this.papers) {
-      const refs = paper.content.querySelectorAll("[id^='sobree-footnote-ref-']");
-      if (refs.length === 0) continue;
-      const seen = new Set<number>();
-      const list = document.createElement("ol");
-      list.className = "sobree-footnotes__list";
-      for (const ref of Array.from(refs)) {
-        const id = footnoteIdFromAttr(
-          (ref as HTMLElement).id.replace("sobree-footnote-ref-", "sobree-footnote-"),
-        );
-        if (id === null || seen.has(id)) continue;
-        seen.add(id);
-        const source = bodies.get(id);
-        if (!source) continue;
-        const clone = source.cloneNode(true) as HTMLElement;
-        // Per-paper id keeps the anchor link working when the same
-        // footnote pins to multiple pages: only the first occurrence
-        // owns the canonical id.
-        if (paper.footnotes.querySelector(`#${clone.id}`)) clone.removeAttribute("id");
-        list.appendChild(clone);
-      }
-      if (list.children.length > 0) {
-        paper.footnotes.appendChild(list);
-        paper.footnotes.classList.remove("is-empty");
-      }
-    }
-  }
-
-  /**
    * One round of consolidate → merge → paginate → distribute.
    * Re-entrant: each call re-collects blocks from every paper, so the
    * iterative loop in `repaginate` can call this multiple times with
@@ -368,6 +293,11 @@ export class PaperStack {
       if (block.parentElement !== firstContent) firstContent.appendChild(block);
     }
     mergeConsecutiveFragments(firstContent);
+    // Unequal-column sections (CSS can't lay them out) are flowed into
+    // explicit width tracks now that the body is laid out and heights are
+    // measurable. The wrapper stays one monolithic block to the paginator
+    // below — matching the equal-column path's single-page placement.
+    flowUnequalColumnSections(firstContent, budgetPx);
     const consolidatedBlocks = Array.from(firstContent.children).filter(
       (c): c is HTMLElement => c instanceof HTMLElement,
     );
@@ -446,24 +376,6 @@ export class PaperStack {
    * trailing entries equal to the baseline, so consumers can detect
    * "no per-page overrides needed" via `length === 0`.
    */
-  private computePageHeights(baselineBudgetPx: number): number[] {
-    const heights: number[] = [];
-    for (let i = 0; i < this.papers.length; i++) {
-      const paper = this.papers[i]!;
-      // Only footnotes share the page with body content; comments
-      // live in a sidebar outside the paper card.
-      const fnH = paper.footnotes.classList.contains("is-empty")
-        ? 0
-        : paper.footnotes.offsetHeight;
-      heights.push(baselineBudgetPx - fnH);
-    }
-    // Trim trailing baseline entries so two arrays that only differ by
-    // unrelated tail entries compare equal — keeps `arraysEqual` honest.
-    while (heights.length > 0 && heights[heights.length - 1] === baselineBudgetPx) {
-      heights.pop();
-    }
-    return heights;
-  }
 
   /**
    * Largest content overflow across all papers, in CSS px. Zero means
@@ -904,12 +816,6 @@ function mergeInto(head: HTMLElement, tail: HTMLElement): void {
 }
 
 /** Parse "sobree-footnote-7" → 7; returns null for anything else. */
-function footnoteIdFromAttr(attr: string): number | null {
-  const m = /^sobree-footnote-(\d+)$/.exec(attr);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? n : null;
-}
 
 /**
  * Walk the paginator's output back-to-front, collapsing trailing pages

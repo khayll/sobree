@@ -5,6 +5,7 @@ import { el, xmlDocument } from "../shared/xml";
 import type {
   Block,
   HeaderFooterRef,
+  SectionColumns,
   SectionProperties,
   SobreeDocument,
 } from "../../doc/types";
@@ -119,6 +120,11 @@ export function renderSectPr(
       "w:gutter": section.pageMargins.gutterTwips,
     }),
   );
+  // `<w:cols>` sits between pgMar and vAlign in CT_SectPr order
+  // (ECMA-376 §17.6.17). Emit only for multi-column sections; the
+  // single-column default is the absence of the element.
+  const cols = renderCols(section.columns);
+  if (cols) children.push(cols);
   // OOXML omits `<w:vAlign>` for the default `top` value; emit only the
   // distinguished cases. See ECMA-376 §17.6.21.
   if (section.vAlign && section.vAlign !== "top") {
@@ -126,6 +132,30 @@ export function renderSectPr(
   }
   if (section.titlePage) children.push(el("w:titlePg"));
   return el("w:sectPr", null, children);
+}
+
+/**
+ * `<w:cols>` for a multi-column section. Equal columns emit just
+ * `num` + `space`; unequal columns (`equalWidth=false` with per-column
+ * widths) emit `equalWidth="0"` plus one `<w:col w:w w:space>` per
+ * column — the inverse of the importer in `import/headers.ts`. Returns
+ * `null` for single-column (or absent) sections so the caller omits it.
+ */
+function renderCols(columns: SectionColumns | undefined): string | null {
+  if (!columns || columns.count <= 1) return null;
+  const attrs: Record<string, string | number | undefined> = { "w:num": columns.count };
+  if (columns.spaceTwips !== undefined) attrs["w:space"] = columns.spaceTwips;
+  if (columns.equalWidth === false && columns.columns?.length === columns.count) {
+    attrs["w:equalWidth"] = "0";
+    const colEls = columns.columns.map((c) =>
+      el("w:col", {
+        "w:w": c.widthTwips,
+        ...(c.spaceTwips !== undefined ? { "w:space": c.spaceTwips } : {}),
+      }),
+    );
+    return el("w:cols", attrs, colEls);
+  }
+  return el("w:cols", attrs);
 }
 
 function renderSectPrFallback(): string {

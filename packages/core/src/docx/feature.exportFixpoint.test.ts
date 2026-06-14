@@ -96,6 +96,7 @@ function expectedAfterExport(doc: SobreeDocument): {
       pageMargins: s.pageMargins,
       type: s.type ?? null,
       vAlign: s.vAlign ?? null,
+      columns: s.columns ?? null,
     })),
     listRefs: body
       .filter((b) => b.kind === "paragraph" && b.properties.numbering)
@@ -124,6 +125,7 @@ describe("export fixpoint — open → save preserves the document", () => {
           pageMargins: s.pageMargins,
           type: s.type ?? null,
           vAlign: s.vAlign ?? null,
+          columns: s.columns ?? null,
         })),
         "section geometry",
       ).toEqual(want.sectionGeometry);
