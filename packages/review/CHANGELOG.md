@@ -1,5 +1,15 @@
 # @sobree/review
 
+## 0.1.9
+
+### Patch Changes
+
+- bbbaef4: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+- Updated dependencies [bbbaef4]
+  - @sobree/core@0.1.9
+
 ## 0.1.8
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @sobree/collab-server
 
+## 0.1.9
+
+### Patch Changes
+
+- bbbaef4: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on the same version. No functional changes in this
+  package.
+
 ## 0.1.8
 
 ### Patch Changes
