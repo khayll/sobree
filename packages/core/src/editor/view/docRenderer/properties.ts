@@ -121,7 +121,19 @@ export function applyParagraphProps(
       const naturalLeading = naturalLeadingFor(runDefaults.fontFamily);
       el.style.lineHeight = String((effective.spacing.line / 240) * naturalLeading);
     }
+  } else if (effective.spacing?.line && effective.spacing.lineRule === "exact") {
+    // `exact`: a FIXED line height of `line` twips, independent of the
+    // font. Word clips content taller than the box; CSS does the same
+    // with an absolute `line-height`. Without this the line fell back to
+    // the font's natural leading — the stat fact-sheet's STAT (28pt font,
+    // line=640=32pt exact) and StatDescription paragraphs rendered ~40%
+    // tall, overrunning the column. `line` is twips → pt (20 twips = 1pt).
+    el.style.lineHeight = `${effective.spacing.line / 20}pt`;
   }
+  // `atLeast` is intentionally left to natural leading: it's a MINIMUM,
+  // and the font's natural line height already meets it in the common
+  // case (specified ≤ natural). A fixed line-height would wrongly CLIP a
+  // taller line, which `atLeast` must never do.
   // Spacing applies to LI just as it does to a free paragraph —
   // Word's per-paragraph `<w:spacing w:after>` is the gap BETWEEN
   // consecutive bullets, not just a wrapper concern. Dropping it on
