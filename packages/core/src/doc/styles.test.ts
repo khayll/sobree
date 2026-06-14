@@ -73,6 +73,50 @@ describe("resolveStyleCascade — chain semantics", () => {
     });
   });
 
+  it("a no-basedOn style inherits DocDefaults but NOT Normal (OOXML hierarchy)", () => {
+    const styles: NamedStyle[] = [
+      {
+        id: "DocDefaults",
+        type: "paragraph",
+        displayName: "DocDefaults",
+        paragraphDefaults: { spacing: { lineRule: "auto", line: 240 } },
+      },
+      {
+        id: "Normal",
+        type: "paragraph",
+        displayName: "Normal",
+        basedOn: "DocDefaults",
+        paragraphDefaults: { spacing: { afterTwips: 120 } },
+      },
+      {
+        // Stands alone (like a fact-sheet's StatContext) — no basedOn.
+        id: "StatContext",
+        type: "paragraph",
+        displayName: "Stat Context",
+        paragraphDefaults: { spacing: { beforeTwips: 60 } },
+      },
+    ];
+    const { paragraphDefaults } = resolveStyleCascade(styles, "StatContext");
+    // Gets its own before + DocDefaults' line, but NOT Normal's after=120.
+    expect(paragraphDefaults.spacing).toEqual({ beforeTwips: 60, lineRule: "auto", line: 240 });
+    expect(paragraphDefaults.spacing?.afterTwips).toBeUndefined();
+  });
+
+  it("an unstyled paragraph still picks up Normal (the default style)", () => {
+    const styles: NamedStyle[] = [
+      { id: "DocDefaults", type: "paragraph", displayName: "DocDefaults" },
+      {
+        id: "Normal",
+        type: "paragraph",
+        displayName: "Normal",
+        basedOn: "DocDefaults",
+        paragraphDefaults: { spacing: { afterTwips: 120 } },
+      },
+    ];
+    const { paragraphDefaults } = resolveStyleCascade(styles, undefined);
+    expect(paragraphDefaults.spacing?.afterTwips).toBe(120);
+  });
+
   it("tolerates basedOn cycles (de-duped)", () => {
     const styles: NamedStyle[] = [
       {

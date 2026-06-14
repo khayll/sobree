@@ -11,10 +11,11 @@ import type {
  * renderer should apply (block element inherits these to its runs)
  * and what the toolbar's font / mark dropdowns should reflect.
  *
- * Falls back to the document's `Normal` style at the end of the chain
- * so a paragraph with no explicit style still picks up the document's
- * baseline run / paragraph defaults (see `defaultStyles()` in
- * `./builders`).
+ * Anchors in `DocDefaults` (the document-wide base) for every style.
+ * The `Normal` default-paragraph style is added ONLY for a paragraph
+ * with no explicit style — a style that exists but declares no
+ * `basedOn` inherits DocDefaults alone, matching OOXML (Normal is
+ * threaded in only via an explicit `basedOn`).
  *
  * Cycles in `basedOn` are tolerated — we de-dupe by id and stop
  * walking. Missing styles are silently skipped.
@@ -101,38 +102,40 @@ function collectStyleChain(
 ): NamedStyle[] {
   const out: NamedStyle[] = [];
   const seen = new Set<string>();
-  let id = styleId;
-  while (id && !seen.has(id)) {
-    seen.add(id);
-    const s = styles.find((x) => x.id === id);
-    if (!s) break;
-    out.push(s);
-    id = s.basedOn;
+  const walk = (from: string | undefined): void => {
+    let id = from;
+    while (id && !seen.has(id)) {
+      seen.add(id);
+      const s = styles.find((x) => x.id === id);
+      if (!s) break;
+      out.push(s);
+      id = s.basedOn;
+    }
+  };
+
+  // 1. Walk the paragraph's own style up its `basedOn` chain.
+  walk(styleId);
+
+  // 2. The default paragraph style ("Normal") applies ONLY when the
+  //    paragraph references no style (or an unknown one). A style that
+  //    DOES exist but declares no `basedOn` inherits from DocDefaults
+  //    alone — NOT from Normal: OOXML threads Normal in only via an
+  //    explicit `basedOn`. Force-anchoring every style in Normal leaked
+  //    its pPr (e.g. `spacing after=120`) onto standalone styles like a
+  //    fact-sheet's `StatContext`, over-spacing them vs Word/LO. The
+  //    localised id varies ("Norml", "Standard", "Estilo Normal", …) —
+  //    `findNormalAnchor` resolves it by role.
+  if (out.length === 0) {
+    walk(findNormalAnchor(styles)?.id);
   }
-  // Always anchor the chain in the document's "Normal" style so a
-  // paragraph with no explicit styleId still picks up document
-  // baseline defaults (DocDefaults' spacing.afterTwips etc.). The
-  // style id varies by language: "Normal" (English), "Norml"
-  // (Hungarian, accent-stripped), "Standard" (German), "Estilo Normal"
-  // (Spanish), ... — Word stamps `displayName="Normal"` on whichever
-  // style serves the role. Find by that first, then fall back to the
-  // literal "Normal" id, then to whatever style is basedOn DocDefaults
-  // (Word's other convention for marking the anchor).
-  const normal = findNormalAnchor(styles);
-  // Continue the cascade walk from the Normal anchor through its
-  // basedOn chain (typically to DocDefaults). Without continuing the
-  // walk, paragraphs with no explicit style would skip DocDefaults
-  // entirely and lose every doc-level default — including the
-  // post-paragraph spacing that creates Word's characteristic
-  // breathing room between every paragraph.
-  let anchorId: string | undefined = normal?.id;
-  while (anchorId && !seen.has(anchorId)) {
-    seen.add(anchorId);
-    const s = styles.find((x) => x.id === anchorId);
-    if (!s) break;
-    out.push(s);
-    anchorId = s.basedOn;
-  }
+
+  // 3. DocDefaults is the document-wide base and applies to EVERYTHING.
+  //    The walks above reach it when a chain threads through Normal; a
+  //    standalone style doesn't, so ensure it's present (the importer
+  //    synthesises it from `<w:docDefaults>` under this id).
+  const docDefaults = styles.find((x) => x.id === "DocDefaults");
+  if (docDefaults && !seen.has(docDefaults.id)) out.push(docDefaults);
+
   return out;
 }
 
