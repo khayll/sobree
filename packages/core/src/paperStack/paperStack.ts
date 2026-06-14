@@ -6,6 +6,7 @@ import {
   zoneTemplateFor,
 } from "./pageSetup";
 import { paginateBlocks } from "./paginationAdapter";
+import { flowUnequalColumnSections } from "./paginationAdapter/columnFlow";
 import { Paper } from "./paper";
 import { renderBlocks } from "../editor/view/docRenderer/block";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
@@ -368,6 +369,11 @@ export class PaperStack {
       if (block.parentElement !== firstContent) firstContent.appendChild(block);
     }
     mergeConsecutiveFragments(firstContent);
+    // Unequal-column sections (CSS can't lay them out) are flowed into
+    // explicit width tracks now that the body is laid out and heights are
+    // measurable. The wrapper stays one monolithic block to the paginator
+    // below — matching the equal-column path's single-page placement.
+    flowUnequalColumnSections(firstContent, budgetPx);
     const consolidatedBlocks = Array.from(firstContent.children).filter(
       (c): c is HTMLElement => c instanceof HTMLElement,
     );

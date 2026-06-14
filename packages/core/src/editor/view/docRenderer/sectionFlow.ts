@@ -21,6 +21,25 @@ export function openColumnContainerIfNeeded(
 ): HTMLElement {
   const cols = section?.columns;
   if (!cols || cols.count <= 1) return host;
+
+  // Unequal columns: CSS multi-column can't express per-column widths, so
+  // we stamp the geometry and let PaperStack flow blocks across explicit
+  // width tracks after layout (`flowUnequalColumnSections`). The blocks
+  // go in flat here; the fill pass restructures them into column boxes.
+  if (cols.equalWidth === false && cols.columns && cols.columns.length === cols.count) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "sobree-cols-unequal";
+    wrapper.dataset.colWidthsMm = cols.columns.map((c) => twipsToMm(c.widthTwips)).join(",");
+    wrapper.dataset.colGapsMm = cols.columns
+      .slice(0, -1)
+      .map((c) => twipsToMm(c.spaceTwips ?? cols.spaceTwips ?? 0))
+      .join(",");
+    host.appendChild(wrapper);
+    return wrapper;
+  }
+
+  // Equal columns: native CSS multi-column. (All currently-clean column
+  // fixtures use this path — do not change its behaviour.)
   const wrapper = document.createElement("div");
   wrapper.className = "sobree-section-cols";
   wrapper.style.columnCount = String(cols.count);

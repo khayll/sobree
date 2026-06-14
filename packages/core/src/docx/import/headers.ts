@@ -2,7 +2,12 @@ import { parseRels } from "./rels";
 import { NS } from "../shared/namespaces";
 import { parseXml, wAll, wChildren, wFirst, wVal } from "../shared/xml";
 import type { PageZoneText } from "../../paperStack/pageSetup";
-import type { HeaderFooterRef, SectionProperties } from "../../doc/types";
+import type {
+  HeaderFooterRef,
+  SectionColumn,
+  SectionColumns,
+  SectionProperties,
+} from "../../doc/types";
 
 /** Zone text extracted from the docx, with `{page}`/`{pages}` placeholders. */
 export interface ImportedZones {
@@ -259,9 +264,29 @@ export function readSection(sectPr: Element, rels: Map<string, string>): Section
     const num =
       readTwipsAttr(cols, "num") ?? 1; // `num` reuses the same attribute reader; it's just an integer.
     if (num > 1) {
-      const sectionCols: { count: number; spaceTwips?: number } = { count: num };
+      const sectionCols: SectionColumns = { count: num };
       const space = readTwipsAttr(cols, "space");
       if (space !== null && space > 0) sectionCols.spaceTwips = space;
+      // Unequal columns: `w:equalWidth="0"` plus one `<w:col w:w w:space>`
+      // per column. Only take this path when BOTH the flag is explicitly
+      // off AND a full set of `<w:col>` widths is present — a stray
+      // partial set or `equalWidth="1"` stays on the equal (CSS) path.
+      const equalWidthAttr =
+        cols.getAttributeNS(NS.w, "equalWidth") ?? cols.getAttribute("w:equalWidth");
+      if (equalWidthAttr === "0" || equalWidthAttr === "false") {
+        const colEls = wChildren(cols, "col");
+        const perCol: SectionColumn[] = [];
+        for (const col of colEls) {
+          const w = readTwipsAttr(col, "w");
+          if (w === null || w <= 0) continue;
+          const colSpace = readTwipsAttr(col, "space");
+          perCol.push(colSpace !== null && colSpace > 0 ? { widthTwips: w, spaceTwips: colSpace } : { widthTwips: w });
+        }
+        if (perCol.length === num) {
+          sectionCols.equalWidth = false;
+          sectionCols.columns = perCol;
+        }
+      }
       section.columns = sectionCols;
     }
   }

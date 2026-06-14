@@ -36,6 +36,47 @@ describe("readSection — <w:cols>", () => {
     const section = readSection(sectPr, new Map());
     expect(section.columns).toEqual({ count: 3 });
   });
+
+  it("reads unequal per-column widths from <w:col> when equalWidth=0", () => {
+    const sectPr = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:sectPr xmlns:w="${NS_W}">
+        <w:cols w:num="2" w:space="720" w:equalWidth="0">
+          <w:col w:w="6576" w:space="720"/>
+          <w:col w:w="2928"/>
+        </w:cols>
+      </w:sectPr>`,
+      "application/xml",
+    ).documentElement;
+    const section = readSection(sectPr, new Map());
+    expect(section.columns).toEqual({
+      count: 2,
+      spaceTwips: 720,
+      equalWidth: false,
+      columns: [{ widthTwips: 6576, spaceTwips: 720 }, { widthTwips: 2928 }],
+    });
+  });
+
+  it("stays on the equal path when equalWidth is not 0 (stray <w:col> ignored)", () => {
+    const sectPr = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:sectPr xmlns:w="${NS_W}">
+        <w:cols w:num="2" w:space="708"><w:col w:w="4680"/></w:cols>
+      </w:sectPr>`,
+      "application/xml",
+    ).documentElement;
+    const section = readSection(sectPr, new Map());
+    expect(section.columns).toEqual({ count: 2, spaceTwips: 708 });
+  });
+
+  it("falls back to equal when the <w:col> count doesn't match num", () => {
+    const sectPr = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:sectPr xmlns:w="${NS_W}">
+        <w:cols w:num="3" w:equalWidth="0"><w:col w:w="4680"/><w:col w:w="4680"/></w:cols>
+      </w:sectPr>`,
+      "application/xml",
+    ).documentElement;
+    const section = readSection(sectPr, new Map());
+    expect(section.columns).toEqual({ count: 3 });
+  });
 });
 
 /**
