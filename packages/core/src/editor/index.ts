@@ -18,10 +18,10 @@ import type { Block, InlineRun, SobreeDocument } from "../doc/types";
 import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
 import { FontFaceRegistry } from "../fonts";
 import { History } from "../history";
-import { MARK_COMMAND_DEFS, isMarkActive, rangeAtSelection, toggleMark } from "../plugins/marks";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
 import { EditorCommands } from "./commands";
 import type { EditorContext } from "./context";
+import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
 import type { Mutation } from "./internal/mutations";
@@ -37,7 +37,7 @@ import { EditorSelection } from "./selection";
 import { EditorTable } from "./table";
 import { renderSobreeDocument } from "./view/docRenderer/index";
 import { serializeHostsToDocument } from "./view/docSerialize/index";
-import { attachImageResize } from "./view/imageResize";
+import { wireEditorDom } from "./wiring";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
 export { EditorCommands } from "./commands";
@@ -172,20 +172,15 @@ export class Editor {
    * in the Y.Doc.
    */
   private readonly pendingPartRefMigrations: Set<string> = new Set();
-  /** Listener that re-projects + re-renders on remote Y.Doc updates.
-   *  Removed on `destroy()`. */
-  private ydocUpdateListener: ((tr: Y.Transaction) => void) | null = null;
-  private doc: SobreeDocument;
+  /** Removes every DOM/document listener + the Y.Doc subscription wired
+   *  by `wireEditorDom`. Called once from `destroy()`. */
+  private domTeardown: (() => void) | null = null;
+  // Assigned by `initDocumentState` from the constructor (seed or adopt).
+  private doc!: SobreeDocument;
   private readonly registry: BlockRegistry;
   private readonly debounceMs: number;
   private readonly getContentHosts: () => HTMLElement[];
   private debounceHandle: number | null = null;
-  private detachImageResize: (() => void) | null = null;
-  private inputListener: ((e: Event) => void) | null = null;
-  private beforeInputListener: ((e: Event) => void) | null = null;
-  private pasteListener: ((e: ClipboardEvent) => void) | null = null;
-  private dragOverListener: ((e: DragEvent) => void) | null = null;
-  private dropListener: ((e: DragEvent) => void) | null = null;
   private revision = 0;
   /** The editor's observable event surface (change / selection / keydown
    *  / track-changes-change). See `./events.ts`. */
@@ -205,15 +200,6 @@ export class Editor {
    * `ops/trackedInput`.
    */
   private trackedInput!: TrackedInput;
-  private compositionStartListener: ((e: CompositionEvent) => void) | null = null;
-  private compositionEndListener: ((e: CompositionEvent) => void) | null = null;
-  /** Document-level `selectionchange` listener. Funnels every cursor
-   *  movement (typing, click, arrows, programmatic restore) into the
-   *  `selection` event so plugins don't each register their own. */
-  private selectionChangeListener: (() => void) | null = null;
-  /** Host-level `keydown` listener. Funnels every key press into the
-   *  `keydown` event for plugins (mark shortcuts, navigation, etc.). */
-  private keydownListener: ((e: KeyboardEvent) => void) | null = null;
   /** Cached last-seen per-block JSON strings, for diff-based version bumps. */
   private lastSerialisedBlocks: string[] = [];
   /** Tracks `@font-face` registrations for the document's embedded fonts. */
@@ -299,79 +285,11 @@ export class Editor {
 
     this.ctx = this.buildContext();
     this.trackedInput = createTrackedInput(this.ctx);
+    this.initDocumentState(options);
 
-    // Two construction paths (run after the context exists so the adopt
-    // path can resolve cached part refs through it):
-    //
-    //   A. The provided Y.Doc is empty (or none was provided): seed it
-    //      from `initialDocument` (or the empty doc). This is the v0.1
-    //      default — solo embedder, no provider yet.
-    //
-    //   B. The provided Y.Doc has body content already: adopt its
-    //      state instead of seeding. This is the "peer joined an
-    //      active room" scenario — Phase 2's providers populate the
-    //      Y.Doc *before* the Editor is constructed, and we trust
-    //      whatever's there.
-    const ydocBody = this.ydoc.getArray<Y.Map<unknown>>("body");
-    if (ydocBody.length === 0) {
-      // Path A: seed.
-      this.doc = options.initialDocument ?? emptyDocument();
-      this.registry.reset(this.doc.body.length);
-      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
-      seedYDoc(this.ydoc, this.doc, this.allBlockIds());
-      this.lastPartRefs = {};
-    } else {
-      // Path B: adopt.
-      const projected = projectYDoc(this.ydoc);
-      this.doc = projected.doc;
-      this.registry.adoptIds(projected.ids);
-      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
-      this.lastPartRefs = projected.partRefs;
-      parts.resolveCachedPartRefsInto(this.ctx, this.doc);
-    }
-
-    // `history.undo` / `history.redo` registered on the command bus
-    // here (NOT in the keyboard plugin) so a headless caller — agent,
-    // toolbar without keyboard mounted, MCP — can dispatch undo/redo
-    // through the same surface as Cmd+Z. The keyboard plugin only maps
-    // the keystroke → execute call.
-    this.commands.register({
-      name: "history.undo",
-      title: "Undo",
-      run: () => {
-        this.history.undo();
-      },
-      isActive: () => false,
-      isAvailable: () => this.history.canUndo(),
-    });
-    this.commands.register({
-      name: "history.redo",
-      title: "Redo",
-      run: () => {
-        this.history.redo();
-      },
-      isActive: () => false,
-      isAvailable: () => this.history.canRedo(),
-    });
-
-    // Mark toggles — same rationale as history commands. Registered in
-    // core (not in the keyboard plugin) so disabling keyboard doesn't
-    // wipe the toolbar's bold / italic / etc. dispatch path.
-    for (const { name, title, tag } of MARK_COMMAND_DEFS) {
-      this.commands.register({
-        name,
-        title,
-        run: () => {
-          const range = rangeAtSelection(this);
-          if (range) toggleMark(this, range, tag);
-        },
-        isActive: () => {
-          const range = rangeAtSelection(this);
-          return !!range && isMarkActive(this, range, tag);
-        },
-        isAvailable: () => this.getBlocks().length > 0,
-      });
-    }
+    // History + mark commands live on the bus (not the keyboard plugin)
+    // so headless callers and Cmd+Z share one dispatch surface.
+    registerCoreCommands(this.commands, this, this.history);
 
     host.classList.add("sobree-editor");
     host.contentEditable = "true";
@@ -383,106 +301,50 @@ export class Editor {
     this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
     renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
 
-    this.inputListener = () => {
-      // Mark DOM dirty + schedule a change; mirroring into the Y.Doc
-      // happens inside the debounced sync path. Y.UndoManager
-      // observes the resulting Y operations and creates stack items
-      // automatically (coalesced via `captureTimeout` — typing within
-      // ~1s merges into one undo step).
-      this.domDirty = true;
-      this.scheduleChange();
-    };
-    host.addEventListener("input", this.inputListener);
-    // beforeinput is the only place we get the chance to intercept
-    // the browser's native contentEditable undo/redo
-    // (`historyUndo` / `historyRedo`) and route them through our own
-    // history layer — otherwise the browser would mutate the DOM in a
-    // way that desyncs from the Y.Doc.
-    this.beforeInputListener = (e) => {
-      const ie = e as InputEvent;
-      if (ie.inputType === "historyUndo") {
-        e.preventDefault();
-        this.history.undo();
-        return;
-      }
-      if (ie.inputType === "historyRedo") {
-        e.preventDefault();
-        this.history.redo();
-        return;
-      }
-      // Track-changes authoring path: in tracked mode, the handful of
-      // edits we know how to convert into `insertRun` / `deleteRange`
-      // get routed through the typed API so the resulting runs carry
-      // revision markers. Unhandled inputTypes (Enter, paste, IME, …)
-      // fall through to the browser's native contenteditable behaviour
-      // — untracked, with a one-shot console warning so the dev sees
-      // the gap. See `handleTrackedInput` for the full menu.
-      //
-      // We *also* take over when tracked mode is OFF but the caret
-      // sits inside a revision wrapper (an `<ins>`/`<del>` left over
-      // from earlier tracked typing). Without this, the browser's
-      // contenteditable insert path puts the new character INSIDE the
-      // wrapper, the post-input DOM read sees text inside `<ins>`,
-      // and `syncFromDom` stamps the new run as `revision: ins` —
-      // tracking edits the user explicitly opted *out* of tracking.
-      // Routing through `handleTrackedInput` instead places the new
-      // run as a separate AST node next to the wrapper; differing
-      // `revision` properties block `mergeAdjacentTextRuns`, so the
-      // new plain run stays plain.
-      const inTracked = this.trackChanges.enabled;
-      const inRevisionWrapper = !inTracked && this.trackedInput.caretInsideRevisionWrapper();
-      if ((inTracked || inRevisionWrapper) && this.trackedInput.handleBeforeInput(ie)) {
-        e.preventDefault();
-        return;
-      }
-      // Any other inputType is a real edit; let the browser handle
-      // the DOM mutation. The input listener will catch the change
-      // afterwards.
-    };
-    host.addEventListener("beforeinput", this.beforeInputListener);
+    // All host/document listeners + image-resize + the remote-Y.Doc
+    // subscription live in `wireEditorDom`, which returns one teardown.
+    this.domTeardown = wireEditorDom({
+      host,
+      ctx: this.ctx,
+      ydoc: this.ydoc,
+      history: this.history,
+      trackedInput: this.trackedInput,
+      isTrackedEnabled: () => this.trackChanges.enabled,
+      onInput: () => {
+        this.domDirty = true;
+        this.scheduleChange();
+      },
+      fireSelection: () => this.fireSelection(),
+      fireKeyDown: (e) => this.fireKeyDown(e),
+      adoptYDocState: () => this.adoptYDocState(),
+    });
+  }
 
-    // IME composition — handled by the trackedInput module (it holds the
-    // composition snapshot). Listeners are unconditional but the work only
-    // happens when tracked mode was on at `compositionstart`.
-    this.compositionStartListener = (e) => this.trackedInput.handleCompositionStart(e);
-    this.compositionEndListener = (e) => this.trackedInput.handleCompositionEnd(e);
-    host.addEventListener("compositionstart", this.compositionStartListener);
-    host.addEventListener("compositionend", this.compositionEndListener);
-
-    // One global `selectionchange` listener funnels all cursor movement
-    // into the editor's `selection` event. Plugins subscribe to the
-    // editor instead of fighting over the document-level event.
-    this.selectionChangeListener = () => this.fireSelection();
-    document.addEventListener("selectionchange", this.selectionChangeListener);
-
-    // Host-scoped `keydown` listener — fires the editor's `keydown`
-    // event for plugins. The editor binds no shortcuts itself.
-    this.keydownListener = (e) => this.fireKeyDown(e);
-    host.addEventListener("keydown", this.keydownListener);
-
-    this.pasteListener = (e) => void this.trackedInput.onPaste(e);
-    host.addEventListener("paste", this.pasteListener);
-
-    this.dragOverListener = (e) => runs.onDragOver(this.ctx, e);
-    host.addEventListener("dragover", this.dragOverListener);
-
-    this.dropListener = (e) => void runs.onDrop(this.ctx, e);
-    host.addEventListener("drop", this.dropListener);
-
-    this.detachImageResize = attachImageResize(host);
-
-    // Subscribe to *remote*-origin Y.Doc updates — i.e., updates that
-    // came in from a provider (Phase 2: WebSocket peer, IndexedDB
-    // restore, WebRTC, …) rather than from this Editor's own
-    // mutations. Local mutations carry origin `"local"` (set by
-    // `mirrorToYDoc()`) and the seed pass carries `"seed"`; we skip
-    // both since the AST is already current. Anything else is remote
-    // and we re-project + re-render.
-    this.ydocUpdateListener = (tr: Y.Transaction) => {
-      if (tr.origin === "local" || tr.origin === "seed") return;
-      this.adoptYDocState();
-    };
-    this.ydoc.on("afterTransaction", this.ydocUpdateListener);
+  /**
+   * Initialise `this.doc` + registry from the Y.Doc. Two paths, run
+   * after the context exists so the adopt path can resolve cached part
+   * refs through it:
+   *   A. Empty Y.Doc (or none provided) → seed it from `initialDocument`
+   *      (solo embedder, the v0.1 default).
+   *   B. Y.Doc already has body content → adopt it (a provider populated
+   *      the doc before construction; trust what's there).
+   */
+  private initDocumentState(options: EditorOptions): void {
+    const ydocBody = this.ydoc.getArray<Y.Map<unknown>>("body");
+    if (ydocBody.length === 0) {
+      this.doc = options.initialDocument ?? emptyDocument();
+      this.registry.reset(this.doc.body.length);
+      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
+      seedYDoc(this.ydoc, this.doc, this.allBlockIds());
+      this.lastPartRefs = {};
+    } else {
+      const projected = projectYDoc(this.ydoc);
+      this.doc = projected.doc;
+      this.registry.adoptIds(projected.ids);
+      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
+      this.lastPartRefs = projected.partRefs;
+      parts.resolveCachedPartRefsInto(this.ctx, this.doc);
+    }
   }
 
   /**
@@ -1010,40 +872,10 @@ export class Editor {
       window.clearTimeout(this.debounceHandle);
       this.debounceHandle = null;
     }
-    for (const [evt, listener] of [
-      ["input", this.inputListener] as const,
-      ["beforeinput", this.beforeInputListener] as const,
-      ["paste", this.pasteListener] as const,
-      ["dragover", this.dragOverListener] as const,
-      ["drop", this.dropListener] as const,
-      ["compositionstart", this.compositionStartListener] as const,
-      ["compositionend", this.compositionEndListener] as const,
-    ]) {
-      if (listener) this.host.removeEventListener(evt, listener as EventListener);
-    }
-    this.inputListener =
-      this.beforeInputListener =
-      this.pasteListener =
-      this.dragOverListener =
-      this.dropListener =
-      this.compositionStartListener =
-      this.compositionEndListener =
-        null;
-    this.trackedInput.reset();
-    if (this.selectionChangeListener) {
-      document.removeEventListener("selectionchange", this.selectionChangeListener);
-      this.selectionChangeListener = null;
-    }
-    if (this.keydownListener) {
-      this.host.removeEventListener("keydown", this.keydownListener);
-      this.keydownListener = null;
-    }
-    this.detachImageResize?.();
-    this.detachImageResize = null;
-    if (this.ydocUpdateListener) {
-      this.ydoc.off("afterTransaction", this.ydocUpdateListener);
-      this.ydocUpdateListener = null;
-    }
+    // Removes all DOM/document listeners, image-resize handles, the
+    // Y.Doc subscription, and resets the tracked-input snapshot.
+    this.domTeardown?.();
+    this.domTeardown = null;
     this.fontFaces.destroy();
     this.history.destroy();
     for (const h of this.getContentHosts()) h.replaceChildren();
