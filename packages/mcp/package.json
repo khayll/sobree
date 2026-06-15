@@ -1,6 +1,6 @@
 {
   "name": "@sobree/mcp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -48,7 +48,11 @@
   "bin": {
     "sobree-mcp": "./dist/bin/sobree-mcp.js"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

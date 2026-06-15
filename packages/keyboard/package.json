@@ -1,6 +1,6 @@
 {
   "name": "@sobree/keyboard",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -12,7 +12,14 @@
     }
   },
   "description": "Default keyboard shortcuts plugin for @sobree/core — undo/redo, text formatting, section breaks. Mount via the `keyboard()` factory in `createSobree({ plugins: [...] })`.",
-  "keywords": ["sobree", "wysiwyg", "editor", "keyboard", "shortcuts", "hotkeys"],
+  "keywords": [
+    "sobree",
+    "wysiwyg",
+    "editor",
+    "keyboard",
+    "shortcuts",
+    "hotkeys"
+  ],
   "license": "MIT",
   "author": "sobree.dev",
   "homepage": "https://docs.sobree.dev/api/keyboard/",
@@ -35,7 +42,11 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

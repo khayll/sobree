@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.10
+
+### Patch Changes
+
+- d321700: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on a single version. No functional changes.
+- Updated dependencies [d321700]
+  - @sobree/core@0.1.10
+
 ## 0.1.9
 
 ### Patch Changes
