@@ -207,9 +207,16 @@ function paintGroup(
   frameHeightEmu: number,
   ctx: AnchorLayerContext,
 ): void {
-  // Children's offsets are in the group's local coordinate system
-  // (`childCoordSystemCx/Cy`); the group is rendered at the frame's
-  // actual size (`frameWidthEmu/Cy`). Scale ratio = frame / local.
+  // Children's offsets are in the group's local coordinate system,
+  // measured from its ORIGIN (`childCoordOffsetX/Y`, the `<a:chOff>`)
+  // and spanning its EXTENT (`childCoordSystemCx/Cy`, the `<a:chExt>`).
+  // The group is rendered at the frame's actual size (`frameWidthEmu/
+  // HeightEmu`), so a child at local point P maps to
+  // `(P − origin) × (size / extent)`: translate to the origin first,
+  // then scale. Skipping the translate shifts every child by
+  // `origin × scale` (the IOWA-letterhead displacement bug).
+  const originX = content.childCoordOffsetX ?? 0;
+  const originY = content.childCoordOffsetY ?? 0;
   const scaleX =
     content.childCoordSystemCx > 0 ? frameWidthEmu / content.childCoordSystemCx : 1;
   const scaleY =
@@ -218,8 +225,8 @@ function paintGroup(
     const childEl = renderFrame(
       {
         ...child,
-        offsetXEmu: child.offsetXEmu * scaleX,
-        offsetYEmu: child.offsetYEmu * scaleY,
+        offsetXEmu: (child.offsetXEmu - originX) * scaleX,
+        offsetYEmu: (child.offsetYEmu - originY) * scaleY,
         widthEmu: child.widthEmu * scaleX,
         heightEmu: child.heightEmu * scaleY,
       },

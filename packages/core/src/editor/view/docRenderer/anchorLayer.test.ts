@@ -176,6 +176,42 @@ describe("renderAnchorLayer", () => {
     expect(childEl.style.height).toBe("20mm");
   });
 
+  it("subtracts the group's child-coordinate origin (chOff) before scaling", () => {
+    // Children measured from a non-zero origin: a child sitting AT the
+    // origin must render at the group's top-left (0,0), not at
+    // origin × scale. (The IOWA-letterhead displacement bug.)
+    const frame: AnchoredFrame = pictureFrame({
+      widthEmu: EMU_PER_MM * 100, // rendered 100mm wide
+      heightEmu: EMU_PER_MM * 50, // rendered 50mm tall
+      content: {
+        kind: "group",
+        childCoordSystemCx: EMU_PER_MM * 200, // scale 0.5
+        childCoordSystemCy: EMU_PER_MM * 100, // scale 0.5
+        childCoordOffsetX: EMU_PER_MM * 30,
+        childCoordOffsetY: EMU_PER_MM * 10,
+        children: [
+          {
+            id: "g-0",
+            anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page" },
+            offsetXEmu: EMU_PER_MM * 30, // sits exactly on the origin
+            offsetYEmu: EMU_PER_MM * 10,
+            widthEmu: EMU_PER_MM * 80,
+            heightEmu: EMU_PER_MM * 40,
+            content: { kind: "shape", geometry: "rect", fill: "#aabbcc" },
+          },
+        ],
+      },
+    });
+    const layer = renderAnchorLayer([frame], ctx());
+    const childEl = (layer.children[0] as HTMLElement).children[0] as HTMLElement;
+    // (30−30)×0.5 = 0, (10−10)×0.5 = 0 → top-left.
+    expect(childEl.style.left).toBe("0mm");
+    expect(childEl.style.top).toBe("0mm");
+    // Size still scaled 0.5, unaffected by the origin.
+    expect(childEl.style.width).toBe("40mm");
+    expect(childEl.style.height).toBe("20mm");
+  });
+
   it("does NOT express behindText via z-index (layer routing owns it)", () => {
     // The overlay layers are isolated stacking contexts ABOVE the body,
     // so an in-layer z-index can never drop a frame below the text —

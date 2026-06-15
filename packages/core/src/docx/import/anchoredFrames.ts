@@ -244,15 +244,19 @@ function parseGroup(
   ctx: AnchoredFramesContext,
   nextId: () => string,
 ): AnchoredContent {
-  // The group's own coordinate-system extent lives on
-  // `<wpg:grpSpPr><a:xfrm><a:chExt cx cy>`. Children's offsets are
-  // expressed in this space, then the group itself can be drawn at
-  // any size — the renderer scales.
+  // The group's own coordinate system lives on
+  // `<wpg:grpSpPr><a:xfrm>`: `<a:chExt cx cy>` is its extent and
+  // `<a:chOff x y>` its ORIGIN. Children's offsets are expressed in
+  // this space measured from `chOff`, then the group itself can be
+  // drawn at any size — the renderer subtracts the origin and scales.
   const grpSpPr = firstChildNS(wpg, NS.wpg, "grpSpPr");
   const xfrm = grpSpPr ? grpSpPr.getElementsByTagNameNS(NS.a, "xfrm")[0] : undefined;
   const chExt = xfrm ? xfrm.getElementsByTagNameNS(NS.a, "chExt")[0] : undefined;
+  const chOff = xfrm ? xfrm.getElementsByTagNameNS(NS.a, "chOff")[0] : undefined;
   const childCoordSystemCx = chExt ? numAttr(chExt, "cx") : 0;
   const childCoordSystemCy = chExt ? numAttr(chExt, "cy") : 0;
+  const childCoordOffsetX = chOff ? numAttr(chOff, "x") : 0;
+  const childCoordOffsetY = chOff ? numAttr(chOff, "y") : 0;
 
   const children: AnchoredFrame[] = [];
   for (const child of Array.from(wpg.children)) {
@@ -275,6 +279,10 @@ function parseGroup(
     children,
     childCoordSystemCx,
     childCoordSystemCy,
+    // Omit zero origins so the common case stays JSON-minimal (and the
+    // field reads as "absent ⇒ (0,0)" in the AST / Y.Doc).
+    ...(childCoordOffsetX !== 0 ? { childCoordOffsetX } : {}),
+    ...(childCoordOffsetY !== 0 ? { childCoordOffsetY } : {}),
   };
 }
 
