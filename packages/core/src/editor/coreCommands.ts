@@ -10,11 +10,20 @@
 
 import type { History } from "../history";
 import { MARK_COMMAND_DEFS, isMarkActive, rangeAtSelection, toggleMark } from "../plugins/marks";
-import type { Editor } from "./index";
+import type { CommandBus, EditorLike } from "./types";
 
-/** Register history + mark commands on `editor.commands`. */
-export function registerCoreCommands(editor: Editor, history: History): void {
-  editor.commands.register({
+/**
+ * Register history + mark commands on the bus. `editor` is the
+ * structural {@link EditorLike} the mark helpers operate on — typing it
+ * that way (not the concrete `Editor` from ./index) keeps this module a
+ * leaf and avoids an index ↔ coreCommands import cycle.
+ */
+export function registerCoreCommands(
+  commands: CommandBus,
+  editor: EditorLike,
+  history: History,
+): void {
+  commands.register({
     name: "history.undo",
     title: "Undo",
     run: () => {
@@ -23,7 +32,7 @@ export function registerCoreCommands(editor: Editor, history: History): void {
     isActive: () => false,
     isAvailable: () => history.canUndo(),
   });
-  editor.commands.register({
+  commands.register({
     name: "history.redo",
     title: "Redo",
     run: () => {
@@ -34,7 +43,7 @@ export function registerCoreCommands(editor: Editor, history: History): void {
   });
 
   for (const { name, title, tag } of MARK_COMMAND_DEFS) {
-    editor.commands.register({
+    commands.register({
       name,
       title,
       run: () => {

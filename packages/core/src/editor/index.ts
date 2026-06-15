@@ -289,7 +289,7 @@ export class Editor {
 
     // History + mark commands live on the bus (not the keyboard plugin)
     // so headless callers and Cmd+Z share one dispatch surface.
-    registerCoreCommands(this, this.history);
+    registerCoreCommands(this.commands, this, this.history);
 
     host.classList.add("sobree-editor");
     host.contentEditable = "true";
