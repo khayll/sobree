@@ -7,17 +7,31 @@
  * `.sobree-cols-unequal` wrapper stamped with the column geometry; this
  * pass — run after layout, when heights are measurable — restructures it
  * into explicit-width column tracks and flows the section's blocks across
- * them: fill column 1 to the page height, spill the overflow into column
- * 2, and so on.
+ * them.
+ *
+ * Fill model: BALANCE, not fill-to-page. Word balances a multi-column
+ * section that has no explicit column break and fits one page — it
+ * equalises the column heights rather than packing the first column to
+ * the page bottom and spilling the remainder. (CSS `column-count` does
+ * the same for the equal-width path; this is the unequal-width analogue.)
+ * A naive "fill column 1 to the page height, then spill" instead packs
+ * the wide column nearly full before the narrow one starts, and — worse —
+ * the page-height threshold sits far above the actual content, so a few
+ * pixels of font-metric drift between renders (web fonts loaded vs not)
+ * flip blocks across the boundary. Balancing both matches Word and is
+ * stable: the split lands at the block boundary that minimises the
+ * tallest column, which block granularity pins in place.
  *
  * Scope: single-page column sections (a section whose content fits one
  * page), which matches the equal-column path's current capability — that
  * wraps a section's content in one monolithic block the paginator places
  * on a single page. Blocks are moved whole (a paragraph is not split
  * across a column boundary); that's faithful for the templates this
- * targets, where columns break at block boundaries. The `colHeightPx`
- * budget is the page content height. Idempotent: re-running re-flattens
- * and re-fills, so the iterative paginate loop can call it each pass.
+ * targets, where columns break at block boundaries. `colHeightPx` is the
+ * page content height — a hard ceiling no column may exceed (content
+ * taller than that genuinely overflows the page, out of this scope).
+ * Idempotent: re-running re-flattens and re-fills, so the iterative
+ * paginate loop can call it each pass.
  */
 
 /** Re-flatten a wrapper to its blocks in document order, whether it's
@@ -63,17 +77,42 @@ function layoutOne(wrapper: HTMLElement, colHeightPx: number): void {
   });
   wrapper.replaceChildren(...tracks);
 
-  // Fill: all blocks into track 0, then spill the overflow forward one
-  // block at a time. Moving the LAST block of a full track to the FRONT
-  // of the next preserves document order. A block re-measures at the new
-  // track's width automatically (its container width changed), so the
-  // height check is always against the column the block actually lives in.
+  // Fill: all blocks into track 0, then balance each track against the
+  // next by moving trailing blocks forward. Moving the LAST block of a
+  // track to the FRONT of the next preserves document order. A block
+  // re-measures at the new track's width automatically (its container
+  // width changed), so every height read is against the column the block
+  // actually lives in.
   tracks[0]!.append(...blocks);
   for (let i = 0; i < tracks.length - 1; i++) {
-    const here = tracks[i]!;
-    const next = tracks[i + 1]!;
-    while (here.offsetHeight > colHeightPx && here.childElementCount > 1) {
-      next.insertBefore(here.lastElementChild!, next.firstChild);
+    balanceForward(tracks[i]!, tracks[i + 1]!, colHeightPx);
+  }
+}
+
+/**
+ * Move trailing blocks from `here` to the front of `next` until the two
+ * are balanced — i.e. until moving one more would not lower the taller
+ * of the two columns. `budgetPx` is a hard ceiling: while `here` exceeds
+ * it the block MUST move regardless of balance (it doesn't fit the page).
+ * Always leaves at least one block in `here` so a column is never empty.
+ */
+function balanceForward(here: HTMLElement, next: HTMLElement, budgetPx: number): void {
+  while (here.childElementCount > 1) {
+    const hBefore = here.offsetHeight;
+    const overBudget = hBefore > budgetPx;
+    // Balanced and within budget — nothing more to move.
+    if (!overBudget && hBefore <= next.offsetHeight) break;
+
+    const moved = here.lastElementChild!;
+    next.insertBefore(moved, next.firstChild);
+
+    // A balancing move is kept only if it lowered the tallest column;
+    // otherwise it overshot (the block was big enough to make `next`
+    // the new tall one) — put it back and stop. Over-budget moves are
+    // unconditional: `here` has to shed height to fit the page.
+    if (!overBudget && Math.max(here.offsetHeight, next.offsetHeight) >= hBefore) {
+      here.appendChild(moved);
+      break;
     }
   }
 }
