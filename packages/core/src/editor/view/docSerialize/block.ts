@@ -1,6 +1,11 @@
+import type {
+  Block,
+  NumberingDefinition,
+  Paragraph,
+  ParagraphProperties,
+} from "../../../doc/types";
 import { serializeInlineChildren } from "./inline";
 import { tableFromElement } from "./table";
-import type { Block, NumberingDefinition, Paragraph, ParagraphProperties } from "../../../doc/types";
 
 export interface BlockSerializeContext {
   /** Accumulated numbering definitions, one per encountered list. */
@@ -12,10 +17,7 @@ export interface BlockSerializeContext {
   currentList: { numId: number; ordered: boolean } | null;
 }
 
-export function blocksFromNodes(
-  nodes: readonly Node[],
-  ctx: BlockSerializeContext,
-): Block[] {
+export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeContext): Block[] {
   const out: Block[] = [];
   for (const node of nodes) {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -104,10 +106,7 @@ export function blocksFromNodes(
   return out;
 }
 
-function paragraphFromElement(
-  el: HTMLElement,
-  forcedStyleId?: string,
-): Paragraph | null {
+function paragraphFromElement(el: HTMLElement, forcedStyleId?: string): Paragraph | null {
   const tag = el.tagName.toLowerCase();
   const properties: ParagraphProperties = {};
 

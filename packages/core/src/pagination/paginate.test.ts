@@ -1,6 +1,6 @@
+import { describe, expect, it, vi } from "vitest";
 import { paginate } from "./paginate";
 import type { Box, Glue, Item, Penalty } from "./types";
-import { describe, expect, it, vi } from "vitest";
 
 // ---------- helpers ----------
 

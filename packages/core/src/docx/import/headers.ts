@@ -1,13 +1,13 @@
-import { parseRels } from "./rels";
-import { NS } from "../shared/namespaces";
-import { parseXml, wAll, wChildren, wFirst, wVal } from "../shared/xml";
-import type { PageZoneText } from "../../paperStack/pageSetup";
 import type {
   HeaderFooterRef,
   SectionColumn,
   SectionColumns,
   SectionProperties,
 } from "../../doc/types";
+import type { PageZoneText } from "../../paperStack/pageSetup";
+import { NS } from "../shared/namespaces";
+import { parseXml, wAll, wChildren, wFirst, wVal } from "../shared/xml";
+import { parseRels } from "./rels";
 
 /** Zone text extracted from the docx, with `{page}`/`{pages}` placeholders. */
 export interface ImportedZones {
@@ -115,7 +115,10 @@ export function flattenZone(xml: string): string {
   for (const p of paragraphs) {
     lines.push(flattenParagraphText(p));
   }
-  return lines.filter((line, i) => i === 0 || line.length > 0).join("\n").trim();
+  return lines
+    .filter((line, i) => i === 0 || line.length > 0)
+    .join("\n")
+    .trim();
 }
 
 /**
@@ -177,8 +180,7 @@ function flattenParagraphText(p: Element): string {
         }
       }
     } else if (child.localName === "fldSimple") {
-      const instr =
-        child.getAttributeNS(NS.w, "instr") ?? child.getAttribute("w:instr") ?? "";
+      const instr = child.getAttributeNS(NS.w, "instr") ?? child.getAttribute("w:instr") ?? "";
       out += fieldToToken(instr);
     }
   }
@@ -248,11 +250,21 @@ export function readSection(sectPr: Element, rels: Map<string, string>): Section
     footerRefs: collectHeaderFooterRefs(sectPr, "footerReference", rels),
   };
 
-  if (vAlignVal === "top" || vAlignVal === "center" || vAlignVal === "bottom" || vAlignVal === "both") {
+  if (
+    vAlignVal === "top" ||
+    vAlignVal === "center" ||
+    vAlignVal === "bottom" ||
+    vAlignVal === "both"
+  ) {
     section.vAlign = vAlignVal;
   }
   if (wFirst(sectPr, "titlePg")) section.titlePage = true;
-  if (typeVal === "continuous" || typeVal === "nextPage" || typeVal === "evenPage" || typeVal === "oddPage") {
+  if (
+    typeVal === "continuous" ||
+    typeVal === "nextPage" ||
+    typeVal === "evenPage" ||
+    typeVal === "oddPage"
+  ) {
     section.type = typeVal;
   }
 
@@ -261,8 +273,7 @@ export function readSection(sectPr: Element, rels: Map<string, string>): Section
   // represented by `columns` being absent.
   const cols = wFirst(sectPr, "cols");
   if (cols) {
-    const num =
-      readTwipsAttr(cols, "num") ?? 1; // `num` reuses the same attribute reader; it's just an integer.
+    const num = readTwipsAttr(cols, "num") ?? 1; // `num` reuses the same attribute reader; it's just an integer.
     if (num > 1) {
       const sectionCols: SectionColumns = { count: num };
       const space = readTwipsAttr(cols, "space");
@@ -280,7 +291,11 @@ export function readSection(sectPr: Element, rels: Map<string, string>): Section
           const w = readTwipsAttr(col, "w");
           if (w === null || w <= 0) continue;
           const colSpace = readTwipsAttr(col, "space");
-          perCol.push(colSpace !== null && colSpace > 0 ? { widthTwips: w, spaceTwips: colSpace } : { widthTwips: w });
+          perCol.push(
+            colSpace !== null && colSpace > 0
+              ? { widthTwips: w, spaceTwips: colSpace }
+              : { widthTwips: w },
+          );
         }
         if (perCol.length === num) {
           sectionCols.equalWidth = false;

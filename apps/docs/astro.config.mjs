@@ -15,9 +15,7 @@ export default defineConfig({
     starlight({
       title: "Sobree",
       logo: { src: "./src/assets/logo-mark.svg", replacesTitle: false },
-      social: [
-        { icon: "github", label: "GitHub", href: "https://github.com/khayll/sobree" },
-      ],
+      social: [{ icon: "github", label: "GitHub", href: "https://github.com/khayll/sobree" }],
       customCss: ["./src/styles/sobree-tokens.css"],
       sidebar: [
         {

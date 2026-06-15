@@ -1,18 +1,9 @@
-import {
-  type PageSetup,
-  type VerticalAlign,
-  resolvedDimensions,
-} from "./pageSetup";
+import type { AnchoredFrame, SectionProperties } from "../doc/types";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { resolveAnchorPosition } from "../editor/view/docRenderer/anchorPosition";
 import { EMU_PER_PX } from "../editor/view/docRenderer/units";
-import {
-  type ZoneRenderContext,
-  paintZoneFrames,
-  renderZone,
-  setZoneText,
-} from "./paperZone";
-import type { AnchoredFrame, SectionProperties } from "../doc/types";
+import { type PageSetup, type VerticalAlign, resolvedDimensions } from "./pageSetup";
+import { type ZoneRenderContext, paintZoneFrames, renderZone, setZoneText } from "./paperZone";
 
 export type { ZoneRenderContext } from "./paperZone";
 
@@ -219,14 +210,30 @@ export class Paper {
    */
   setHeaderFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
     const resolved = this.resolveFrames(frames, this.header);
-    paintZoneFrames(this.headerAnchorsBehind, resolved.filter((f) => f.behindText), ctx);
-    paintZoneFrames(this.headerAnchors, resolved.filter((f) => !f.behindText), ctx);
+    paintZoneFrames(
+      this.headerAnchorsBehind,
+      resolved.filter((f) => f.behindText),
+      ctx,
+    );
+    paintZoneFrames(
+      this.headerAnchors,
+      resolved.filter((f) => !f.behindText),
+      ctx,
+    );
   }
 
   setFooterFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
     const resolved = this.resolveFrames(frames, this.footer);
-    paintZoneFrames(this.footerAnchorsBehind, resolved.filter((f) => f.behindText), ctx);
-    paintZoneFrames(this.footerAnchors, resolved.filter((f) => !f.behindText), ctx);
+    paintZoneFrames(
+      this.footerAnchorsBehind,
+      resolved.filter((f) => f.behindText),
+      ctx,
+    );
+    paintZoneFrames(
+      this.footerAnchors,
+      resolved.filter((f) => !f.behindText),
+      ctx,
+    );
   }
 
   /**
@@ -240,16 +247,15 @@ export class Paper {
    * stamps. `offsetTop` is zoom-invariant in Chromium, so the measurement
    * stays logical at any render tier.
    */
-  private resolveFrames(
-    frames: readonly AnchoredFrame[],
-    zoneFlow: HTMLElement,
-  ): AnchoredFrame[] {
+  private resolveFrames(frames: readonly AnchoredFrame[], zoneFlow: HTMLElement): AnchoredFrame[] {
     // Margins come from the page-geometry CSS vars (the pgMar values),
     // NOT the overflow-adjusted `padding-top` — a `margin`-relative frame
     // anchors to the page margin, which a tall header doesn't move. px →
     // EMU keeps it consistent with the `offsetTop` measurements below.
-    const marginTopEmu = parsePxFromMm(this.root.style.getPropertyValue("--margin-top")) * EMU_PER_PX;
-    const marginLeftEmu = parsePxFromMm(this.root.style.getPropertyValue("--margin-left")) * EMU_PER_PX;
+    const marginTopEmu =
+      parsePxFromMm(this.root.style.getPropertyValue("--margin-top")) * EMU_PER_PX;
+    const marginLeftEmu =
+      parsePxFromMm(this.root.style.getPropertyValue("--margin-left")) * EMU_PER_PX;
     return frames.map((f) => {
       let anchorParaTopEmu: number | null = null;
       if (f.anchor.verticalFrom === "paragraph" && f.anchor.paragraphIndex !== undefined) {
@@ -341,13 +347,18 @@ export class Paper {
    * one. Pass `frames=[]` to clear the layer (sets `is-empty` so the
    * pointer-events-blocking overlay collapses out of the way).
    */
-  setAnchoredFrames(
-    frames: readonly AnchoredFrame[],
-    ctx: AnchorLayerContext,
-  ): void {
+  setAnchoredFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
     const resolved = this.resolveFrames(frames, this.content);
-    paintZoneFrames(this.anchorsBehind, resolved.filter((f) => f.behindText), ctx);
-    paintZoneFrames(this.anchors, resolved.filter((f) => !f.behindText), ctx);
+    paintZoneFrames(
+      this.anchorsBehind,
+      resolved.filter((f) => f.behindText),
+      ctx,
+    );
+    paintZoneFrames(
+      this.anchors,
+      resolved.filter((f) => !f.behindText),
+      ctx,
+    );
   }
 
   destroy(): void {
@@ -425,7 +436,6 @@ function justifyContentFor(v: VerticalAlign | undefined): string {
       return "flex-end";
     case "both":
       return "space-between";
-    case "top":
     default:
       return "flex-start";
   }

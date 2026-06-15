@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultSection, emptyDocument, paragraph, text } from "./doc/builders";
 import type { SobreeDocument } from "./doc/types";
 import { Sobree } from "./sobree";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Minimal multi-section fixture used to exercise section-aware paths
@@ -48,7 +48,8 @@ describe("Sobree façade: mode", () => {
 
   it("setMode('read') flips contentEditable on every content host", () => {
     sobree.setMode("read");
-    for (const host of (sobree as unknown as { stack: { contentHosts: HTMLElement[] } }).stack.contentHosts) {
+    for (const host of (sobree as unknown as { stack: { contentHosts: HTMLElement[] } }).stack
+      .contentHosts) {
       expect(host.contentEditable).toBe("false");
     }
   });

@@ -1,6 +1,6 @@
+import { afterEach, describe, expect, it } from "vitest";
 import { buildChangeTypeButton, openChangeTypePopover } from "./tools/changeType";
 import { buildTextToolsHtml } from "./tools/text";
-import { afterEach, describe, expect, it } from "vitest";
 
 describe("ARIA: text tools markup", () => {
   it("toolbar mark buttons carry aria-label and aria-pressed", () => {
@@ -44,7 +44,7 @@ describe("ARIA: change-block trigger", () => {
 });
 
 describe("ARIA: change-type popover", () => {
-  let cleanup: (() => void)[] = [];
+  const cleanup: (() => void)[] = [];
 
   afterEach(() => {
     for (const c of cleanup.splice(0)) c();
@@ -60,8 +60,12 @@ describe("ARIA: change-type popover", () => {
       // Minimal context — change-type's popover only inspects `refs.length`
       // and `editor` for command dispatch. The buttons it renders are
       // pure markup, which is what these tests check.
-      // biome-ignore lint/suspicious/noExplicitAny: minimal stub
-      { editor: { commands: { execute: () => {} } } as any, target: {} as never, refs: [{ id: "x", version: 0 }] },
+      {
+        // biome-ignore lint/suspicious/noExplicitAny: minimal stub
+        editor: { commands: { execute: () => {} } } as any,
+        target: {} as never,
+        refs: [{ id: "x", version: 0 }],
+      },
       () => {},
     );
     cleanup.push(close);
@@ -76,7 +80,7 @@ describe("ARIA: change-type popover", () => {
 
   it("every action button has a menu role", () => {
     const popover = openMenu();
-    const items = popover.querySelectorAll('button[data-target-kind]');
+    const items = popover.querySelectorAll("button[data-target-kind]");
     expect(items.length).toBeGreaterThan(0);
     // Convert/list items use `menuitemradio` (so the current kind can be
     // checked); structural ops (table, section break) stay `menuitem`.

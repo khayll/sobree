@@ -1,10 +1,7 @@
-import { measureParagraphLines } from "./paragraphLines";
-import {
-  snapToWordBoundary,
-  splitElementAtCharOffset,
-} from "./splitParagraph";
-import type { DomBox } from "./types";
 import type { Page } from "../../pagination/types";
+import { measureParagraphLines } from "./paragraphLines";
+import { snapToWordBoundary, splitElementAtCharOffset } from "./splitParagraph";
+import type { DomBox } from "./types";
 
 /**
  * Turn the paginator's `Page[]` into a per-page array of DOM elements.
@@ -185,8 +182,7 @@ export function distributePages(pages: Page[]): HTMLElement[][] {
         }
 
         if (sourceList !== openContainerSource) {
-          const startNum =
-            liLogicalNumber.get(el) ?? readStartAttr(sourceList);
+          const startNum = liLogicalNumber.get(el) ?? readStartAttr(sourceList);
           openContainerClone = cloneListContainer(sourceList, startNum);
           pageElements.push(openContainerClone);
           openContainerSource = sourceList;
@@ -263,8 +259,8 @@ export function distributePages(pages: Page[]): HTMLElement[][] {
   // to per-page clones). Must precede source-list / source-table
   // cleanup so the now-empty source table is correctly detected.
   for (const tr of sourceTrsTouched) {
-    const allEmpty = Array.from(tr.children).every(
-      (cell) => cell.tagName !== "TD" && cell.tagName !== "TH"
+    const allEmpty = Array.from(tr.children).every((cell) =>
+      cell.tagName !== "TD" && cell.tagName !== "TH"
         ? true
         : cell.children.length === 0 && (cell.textContent ?? "").trim() === "",
     );
@@ -278,8 +274,9 @@ export function distributePages(pages: Page[]): HTMLElement[][] {
       const sections = Array.from(source.children).filter(
         (c) => c.tagName === "THEAD" || c.tagName === "TBODY",
       );
-      const hasAnyRow = sections.some((s) => s.children.length > 0)
-        || (sections.length === 0 && source.children.length > 0);
+      const hasAnyRow =
+        sections.some((s) => s.children.length > 0) ||
+        (sections.length === 0 && source.children.length > 0);
       if (!hasAnyRow && source.parentElement) {
         source.parentElement.removeChild(source);
       }
@@ -300,9 +297,7 @@ export function distributePages(pages: Page[]): HTMLElement[][] {
  * last line of intermediate fragments (the actual-last-line-of-source
  * left-aligns as normal).
  */
-function markContinuedFragments(
-  fragments: Map<HTMLElement, Map<number, HTMLElement>>,
-): void {
+function markContinuedFragments(fragments: Map<HTMLElement, Map<number, HTMLElement>>): void {
   for (const [, pageMap] of fragments) {
     const orderedPages = Array.from(pageMap.keys()).sort((a, b) => a - b);
     // Every fragment except the one on the highest page is "continued".
@@ -387,10 +382,7 @@ function readStartAttr(list: Element): number {
  * `data-pag-pid` with their preceding sibling) get the SAME number as
  * the head; new heads bump the counter.
  */
-function indexLogicalNumbers(
-  sourceList: HTMLElement,
-  out: Map<HTMLElement, number>,
-): void {
+function indexLogicalNumbers(sourceList: HTMLElement, out: Map<HTMLElement, number>): void {
   let logical = readStartAttr(sourceList);
   let lastPid: string | undefined;
   let firstSeen = false;

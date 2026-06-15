@@ -20,20 +20,15 @@
  *      with the bytes in its own `doc.rawParts`.
  */
 
-import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
-import { HeadlessSobree } from "../headless";
-import { Editor } from "../editor";
-import {
-  appendBlock,
-  emptyDocument,
-  paragraph,
-  text,
-} from "../doc/builders";
+import * as Y from "yjs";
 import { inlineAt } from "../doc/api";
+import { appendBlock, emptyDocument, paragraph, text } from "../doc/builders";
 import type { Block } from "../doc/types";
-import { inMemoryBlobStore } from "./memory";
+import { Editor } from "../editor";
+import { HeadlessSobree } from "../headless";
 import { sha256Hex } from "./hash";
+import { inMemoryBlobStore } from "./memory";
 
 const IMG_BYTES = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
@@ -106,10 +101,9 @@ describe("Phase 3.2 — BlobStore integration", () => {
     // renderer doesn't crash. Real browsers have this; the editor's
     // image path needs it to point an <img> at the bytes.
     if (typeof URL.createObjectURL !== "function") {
-      (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL =
-        () => "blob:test";
-      (URL as unknown as { revokeObjectURL: (url: string) => void }).revokeObjectURL =
-        () => {};
+      (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = () =>
+        "blob:test";
+      (URL as unknown as { revokeObjectURL: (url: string) => void }).revokeObjectURL = () => {};
     }
     const store = inMemoryBlobStore();
     document.body.innerHTML = "";
@@ -133,9 +127,7 @@ describe("Phase 3.2 — BlobStore integration", () => {
       expect(result.ok).toBe(true);
 
       // Local doc.rawParts has the bytes immediately — renderer is happy.
-      const partPath = Object.keys(editor.getDocument().rawParts).find((p) =>
-        p.includes("media"),
-      );
+      const partPath = Object.keys(editor.getDocument().rawParts).find((p) => p.includes("media"));
       expect(partPath).toBeDefined();
       expect(editor.getDocument().rawParts[partPath!]).toEqual(IMG_BYTES);
 
@@ -222,11 +214,7 @@ function docWithBody(...blocks: Block[]): import("../doc/types").SobreeDocument 
   return d;
 }
 
-async function waitFor(
-  pred: () => boolean,
-  timeoutMs: number,
-  pollMs = 10,
-): Promise<void> {
+async function waitFor(pred: () => boolean, timeoutMs: number, pollMs = 10): Promise<void> {
   const start = Date.now();
   while (!pred()) {
     if (Date.now() - start > timeoutMs) {

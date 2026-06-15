@@ -1,9 +1,4 @@
-import type {
-  NamedStyle,
-  ParagraphProperties,
-  RunProperties,
-  SobreeDocument,
-} from "./types";
+import type { NamedStyle, ParagraphProperties, RunProperties, SobreeDocument } from "./types";
 
 /**
  * Style-cascade resolver — walks `styleId` up its `basedOn` chain and
@@ -60,10 +55,7 @@ export function resolveStyleCascade(
  * style must not drag Times/12pt onto a Helvetica/10pt contact line). So
  * we walk only the explicit `basedOn` chain and stop — no Normal anchor.
  */
-export function resolveRunStyle(
-  styles: readonly NamedStyle[],
-  styleId: string,
-): RunProperties {
+export function resolveRunStyle(styles: readonly NamedStyle[], styleId: string): RunProperties {
   const chain: NamedStyle[] = [];
   const seen = new Set<string>();
   let id: string | undefined = styleId;
@@ -145,15 +137,11 @@ function findNormalAnchor(styles: readonly NamedStyle[]): NamedStyle | undefined
   if (byId) return byId;
   // 2. displayName = "Normal" (localized id, Word stamps the canonical
   //    English display name).
-  const byDisplay = styles.find(
-    (s) => s.type === "paragraph" && s.displayName === "Normal",
-  );
+  const byDisplay = styles.find((s) => s.type === "paragraph" && s.displayName === "Normal");
   if (byDisplay) return byDisplay;
   // 3. Paragraph style based directly on DocDefaults (Word's other
   //    anchor convention — the "Normal" style is the first one based
   //    on DocDefaults).
-  const byBase = styles.find(
-    (s) => s.type === "paragraph" && s.basedOn === "DocDefaults",
-  );
+  const byBase = styles.find((s) => s.type === "paragraph" && s.basedOn === "DocDefaults");
   return byBase;
 }

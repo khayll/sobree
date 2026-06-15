@@ -23,9 +23,9 @@
  * splits keeps working) through a per-format CSS rule.
  */
 
-import { twipsToMm } from "./units";
-import { resolveFontFace } from "./fontFallback";
 import type { Block, NumberingDefinition } from "../../../doc/types";
+import { resolveFontFace } from "./fontFallback";
+import { twipsToMm } from "./units";
 
 export interface ListInfo {
   numId: number;
@@ -104,10 +104,7 @@ export function paragraphListInfo(
  * marker-box width, and the marker content (glyph or counter format) the
  * CSS `::before` rules consume.
  */
-export function createListContainer(
-  info: ListInfo,
-  sectionIndex: number,
-): HTMLElement {
+export function createListContainer(info: ListInfo, sectionIndex: number): HTMLElement {
   const listEl = document.createElement(info.ordered ? "ol" : "ul");
   listEl.dataset.sectionIndex = String(sectionIndex);
   listEl.classList.add("sobree-hang");
@@ -163,14 +160,10 @@ export function applyListItemLevel(
   const lvl = def?.abstractFormat.levels[num.level];
   const lvl0 = def?.abstractFormat.levels[0];
   if (!lvl) return;
-  const dLeft =
-    (lvl.paragraphIndent?.leftTwips ?? 0) - (lvl0?.paragraphIndent?.leftTwips ?? 0);
+  const dLeft = (lvl.paragraphIndent?.leftTwips ?? 0) - (lvl0?.paragraphIndent?.leftTwips ?? 0);
   if (dLeft > 0) li.style.marginLeft = `${twipsToMm(dLeft)}mm`;
   if (lvl.paragraphIndent?.hangingTwips !== undefined) {
-    li.style.setProperty(
-      "--sobree-list-hang",
-      `${twipsToMm(lvl.paragraphIndent.hangingTwips)}mm`,
-    );
+    li.style.setProperty("--sobree-list-hang", `${twipsToMm(lvl.paragraphIndent.hangingTwips)}mm`);
   }
   if (lvl.format === "bullet" && lvl.text) {
     li.style.setProperty("--sobree-bullet", cssString(lvl.text));

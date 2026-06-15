@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { renderNumberingXml } from "./numbering";
-import { parseNumberingXml } from "../import/numbering";
 import type { NumberingDefinition } from "../../doc/types";
+import { parseNumberingXml } from "../import/numbering";
+import { renderNumberingXml } from "./numbering";
 
 describe("renderNumberingXml", () => {
   it("returns null for no definitions (part omitted from the package)", () => {

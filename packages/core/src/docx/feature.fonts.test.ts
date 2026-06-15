@@ -1,3 +1,4 @@
+import { unzipSync, zipSync } from "fflate";
 /**
  * End-to-end font tests:
  *   - import: fontTable.xml + obfuscated font part → FontDeclaration
@@ -8,12 +9,11 @@
  *     the font declaration shape.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { unzipSync, zipSync } from "fflate";
 import { emptyDocument } from "../doc/builders";
 import type { FontDeclaration } from "../doc/types";
+import { obfuscate } from "../fonts/odttf";
 import { exportDocx } from "./export/index";
 import { importDocx } from "./import/index";
-import { obfuscate } from "../fonts/odttf";
 
 const TEXT = new TextEncoder();
 
@@ -135,9 +135,7 @@ describe("export — fontTable emission", () => {
     expect(fontTableXml).toContain("w:embedRegular");
     expect(fontTableXml).toContain(SAMPLE_KEY);
 
-    const fontTableRelsXml = new TextDecoder().decode(
-      files["word/_rels/fontTable.xml.rels"]!,
-    );
+    const fontTableRelsXml = new TextDecoder().decode(files["word/_rels/fontTable.xml.rels"]!);
     expect(fontTableRelsXml).toContain('Target="fonts/font1.odttf"');
 
     expect(files["word/fonts/font1.odttf"]).toEqual(doc.rawParts[fontPath]);
@@ -147,9 +145,7 @@ describe("export — fontTable emission", () => {
     expect(contentTypesXml).toContain("obfuscatedFont");
     expect(contentTypesXml).toContain('Extension="odttf"');
 
-    const documentRelsXml = new TextDecoder().decode(
-      files["word/_rels/document.xml.rels"]!,
-    );
+    const documentRelsXml = new TextDecoder().decode(files["word/_rels/document.xml.rels"]!);
     expect(documentRelsXml).toContain("fontTable.xml");
     expect(documentRelsXml).toContain("/relationships/fontTable");
   });
@@ -170,14 +166,12 @@ describe("round-trip — import then export preserves fonts", () => {
     const { bytes } = exportDocx(doc);
     const files = unzipSync(bytes);
     expect(files["word/fontTable.xml"]).toBeDefined();
-    expect(files["word/fonts/font1.odttf"]).toEqual(
-      doc.rawParts["word/fonts/font1.odttf"],
-    );
+    expect(files["word/fonts/font1.odttf"]).toEqual(doc.rawParts["word/fonts/font1.odttf"]);
   });
 });
 
 describe("Editor.embedFont", () => {
-  let cleanup: (() => void)[] = [];
+  const cleanup: (() => void)[] = [];
   afterEach(() => {
     for (const c of cleanup.splice(0)) c();
   });

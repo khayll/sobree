@@ -69,10 +69,7 @@ export function defaultMargins(): PageMargins {
 }
 
 /** A paragraph with no runs and no properties beyond the defaults. */
-export function paragraph(
-  runs: InlineRun[] = [],
-  properties: ParagraphProperties = {},
-): Paragraph {
+export function paragraph(runs: InlineRun[] = [], properties: ParagraphProperties = {}): Paragraph {
   return { kind: "paragraph", properties, runs };
 }
 

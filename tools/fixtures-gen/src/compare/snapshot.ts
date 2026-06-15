@@ -148,16 +148,7 @@ function flatten(block: RawBlock, out: SnapshotBlock[]): void {
   for (const child of block.children ?? []) flatten(child, out);
 }
 
-const CONTAINER_TAGS = new Set([
-  "OL",
-  "UL",
-  "TABLE",
-  "TBODY",
-  "THEAD",
-  "TR",
-  "TD",
-  "TH",
-]);
+const CONTAINER_TAGS = new Set(["OL", "UL", "TABLE", "TBODY", "THEAD", "TR", "TD", "TH"]);
 
 function parseBlock(block: RawBlock, index: number): SnapshotBlock {
   const style = block.style ?? "";

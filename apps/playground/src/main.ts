@@ -6,28 +6,25 @@
  * hot-reloads via the workspace symlinks + Vite HMR.
  */
 
-import * as Y from "yjs";
 import {
+  type SobreeDocument,
+  type Table,
   appendBlock,
   createSobree,
   defaultMargins,
   defaultStyles,
   heading,
-  parseMarkdown,
   paragraph,
+  parseMarkdown,
   text,
-  type SobreeDocument,
-  type Table,
 } from "@sobree/core";
+import * as Y from "yjs";
 import "@sobree/core/tokens.css";
-import { keyboard } from "@sobree/keyboard";
 import { blockTools } from "@sobree/block-tools";
-import { zoomControls } from "@sobree/zoom-controls";
+import { attachIndexedDBProvider, attachWebsocketProvider } from "@sobree/collab-providers";
+import { keyboard } from "@sobree/keyboard";
 import { review } from "@sobree/review";
-import {
-  attachIndexedDBProvider,
-  attachWebsocketProvider,
-} from "@sobree/collab-providers";
+import { zoomControls } from "@sobree/zoom-controls";
 
 import "./playground.css";
 
@@ -67,10 +64,7 @@ if (mode === "collab") {
     await handle.synced;
     providerLabel = `collab: ${wsUrl}/${room}`;
   } catch (err) {
-    console.error(
-      "[playground] collab provider failed — is the server running?",
-      err,
-    );
+    console.error("[playground] collab provider failed — is the server running?", err);
     providerLabel = `collab: connection failed (${String(err)})`;
   }
 } else if (!params.has("fresh")) {
@@ -131,8 +125,7 @@ if (import.meta.env.DEV) {
   // remote eval). Implements the loop documented in
   // tests/corpus/CONVERGENCE.md. See `extractSobreeLines` and
   // `convergenceReport` below.
-  (window as unknown as { convergenceReport: unknown }).convergenceReport =
-    convergenceReport;
+  (window as unknown as { convergenceReport: unknown }).convergenceReport = convergenceReport;
   (window as unknown as { ooxmlBlame: unknown }).ooxmlBlame = ooxmlBlame;
 }
 
@@ -211,8 +204,7 @@ function extractSobreeLines(): ExtractedLine[] {
     const paperHeightPt = paper.offsetHeight * PT_PER_PX;
     // Per-paper viewport zoom scale — `getBoundingClientRect()`
     // returns scaled pixels but we want layout pixels for the diff.
-    const zoomScale =
-      paper.offsetHeight > 0 ? paperRect.height / paper.offsetHeight : 1;
+    const zoomScale = paper.offsetHeight > 0 ? paperRect.height / paper.offsetHeight : 1;
     const safeScale = zoomScale > 0 ? zoomScale : 1;
     const walker = document.createTreeWalker(paper, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
@@ -221,14 +213,11 @@ function extractSobreeLines(): ExtractedLine[] {
           : NodeFilter.FILTER_REJECT;
       },
     });
-    let n: Node | null;
-    while ((n = walker.nextNode())) {
+    for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
       const text = n as Text;
       const range = document.createRange();
       range.selectNodeContents(text);
-      const rects = Array.from(range.getClientRects()).filter(
-        (r) => r.width > 0 && r.height > 0,
-      );
+      const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
       // Reconstruct text per visual line by chunking the text node's
       // characters into ranges that share a clientRect top.
       if (rects.length === 0) continue;
@@ -245,8 +234,7 @@ function extractSobreeLines(): ExtractedLine[] {
         // Unscale the viewport-pixel offsets so they're in layout
         // CSS pixels, then convert to pt.
         const xPt = ((r.left - paperRect.left) / safeScale) * PT_PER_PX;
-        const yPt =
-          paperHeightPt - ((r.top + r.height - paperRect.top) / safeScale) * PT_PER_PX;
+        const yPt = paperHeightPt - ((r.top + r.height - paperRect.top) / safeScale) * PT_PER_PX;
         const blockIndex = findTopLevelBlockIndex(text, paper);
         out.push({
           text: fullText.replace(/\s+/g, " ").trim(),
@@ -274,8 +262,7 @@ function extractSobreeLines(): ExtractedLine[] {
             const lineText = fullText.slice(charStart, charEnd).replace(/\s+/g, " ").trim();
             if (lineText) {
               const xPt = (rect.left - paperRect.left) * PT_PER_PX;
-              const yPt =
-                paperHeightPt - (rect.top + rect.height - paperRect.top) * PT_PER_PX;
+              const yPt = paperHeightPt - (rect.top + rect.height - paperRect.top) * PT_PER_PX;
               const blockEl = (text.parentElement?.closest("[data-block-index]") ??
                 null) as HTMLElement | null;
               const blockIndex = blockEl?.dataset.blockIndex
@@ -327,7 +314,7 @@ function findTopLevelBlockIndex(text: Text, paper: HTMLElement): number | undefi
   // the way up — that's the outermost. Confirm by ensuring it sits
   // directly inside .paper-content.
   let top: Element | null = candidate;
-  while (top && top.parentElement && top.parentElement !== paperContent) {
+  while (top?.parentElement && top.parentElement !== paperContent) {
     top = top.parentElement;
   }
   if (!(top instanceof HTMLElement) || top.dataset.blockIndex === undefined) {
@@ -411,13 +398,12 @@ function computeReport(
     const ys = matches.map((m) => m.dy).sort((a, b) => a - b);
     const xs = matches.map((m) => m.dx).sort((a, b) => a - b);
     const median = (arr: number[]) =>
-      arr.length === 0 ? 0 : arr[Math.floor(arr.length / 2)] ?? 0;
+      arr.length === 0 ? 0 : (arr[Math.floor(arr.length / 2)] ?? 0);
     const p95 = (arr: number[]) => {
       const abs = arr.map(Math.abs).sort((a, b) => a - b);
-      return abs.length === 0 ? 0 : abs[Math.floor(abs.length * 0.95)] ?? 0;
+      return abs.length === 0 ? 0 : (abs[Math.floor(abs.length * 0.95)] ?? 0);
     };
-    const maxAbs = (arr: number[]) =>
-      arr.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    const maxAbs = (arr: number[]) => arr.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
     const worst = matches
       .slice()
       .sort((a, b) => Math.abs(b.dy) - Math.abs(a.dy))
@@ -556,9 +542,7 @@ function resolveHost(): HTMLElement {
 function paperAtViewportCenter(): HTMLElement {
   const vp = host.getBoundingClientRect();
   const cy = vp.top + vp.height / 2;
-  const papers = Array.from(
-    editor.sobree.stackRoot.querySelectorAll(".paper"),
-  ) as HTMLElement[];
+  const papers = Array.from(editor.sobree.stackRoot.querySelectorAll(".paper")) as HTMLElement[];
   if (papers.length === 0) return editor.sobree.firstPaper;
   let best = papers[0];
   let bestDist = Number.POSITIVE_INFINITY;
@@ -662,9 +646,7 @@ if (
     const cur = editor.editor.getTrackChanges();
     const author = tcAuthorInput.value.trim();
     editor.editor.setTrackChanges(
-      author === ""
-        ? { enabled: cur.enabled }
-        : { enabled: cur.enabled, author },
+      author === "" ? { enabled: cur.enabled } : { enabled: cur.enabled, author },
     );
   });
 
@@ -675,7 +657,7 @@ if (
 
 // === actions ===
 
-document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((btn) => {
+for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.dataset.action;
     switch (action) {
@@ -699,7 +681,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((btn) => {
         break;
     }
   });
-});
+}
 
 const fileInput = document.getElementById("file-input");
 if (fileInput instanceof HTMLInputElement) {
@@ -762,10 +744,7 @@ The table below tracks delivery against the goals above.`);
   // ~A4 content width (9000) split roughly 40 / 30 / 30.
   appendBlock(doc, demoTable());
 
-  appendBlock(
-    doc,
-    paragraph([text("Two-space hard breaks work like the rest of Sobree.")]),
-  );
+  appendBlock(doc, paragraph([text("Two-space hard breaks work like the rest of Sobree.")]));
 
   return doc;
 }

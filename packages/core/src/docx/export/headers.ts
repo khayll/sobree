@@ -1,7 +1,3 @@
-import type { ExportContext } from "./context";
-import { renderBlocks } from "./document";
-import { NS } from "../shared/namespaces";
-import { el, xmlDocument } from "../shared/xml";
 import type {
   Block,
   HeaderFooterRef,
@@ -9,11 +5,13 @@ import type {
   SectionProperties,
   SobreeDocument,
 } from "../../doc/types";
+import { NS } from "../shared/namespaces";
+import { el, xmlDocument } from "../shared/xml";
+import type { ExportContext } from "./context";
+import { renderBlocks } from "./document";
 
-const HEADER_CT =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
-const FOOTER_CT =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml";
+const HEADER_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
+const FOOTER_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml";
 
 /**
  * Build the OOXML scaffolding for every section in `doc`: header/footer

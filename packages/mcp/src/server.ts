@@ -24,15 +24,8 @@
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
-import {
-  HeadlessSobree,
-  type HeadlessSobreeOptions,
-  type SobreeDocument,
-} from "@sobree/core";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { HeadlessSobree, type HeadlessSobreeOptions, type SobreeDocument } from "@sobree/core";
 import * as Y from "yjs";
 import { ALL_TOOLS, findTool } from "./tools";
 
@@ -65,10 +58,7 @@ export interface CreateSobreeMcpServerOptions {
    * Pass-through to `HeadlessSobree`'s constructor. Use this for
    * the rare option not exposed at the top level.
    */
-  headlessOptions?: Omit<
-    HeadlessSobreeOptions,
-    "initialDocument" | "origin"
-  >;
+  headlessOptions?: Omit<HeadlessSobreeOptions, "initialDocument" | "origin">;
 }
 
 export interface SobreeMcpServer {
@@ -86,9 +76,7 @@ export interface SobreeMcpServer {
 const DEFAULT_NAME = "sobree";
 const DEFAULT_VERSION = "0.1.0";
 
-export function createSobreeMcpServer(
-  opts: CreateSobreeMcpServerOptions = {},
-): SobreeMcpServer {
+export function createSobreeMcpServer(opts: CreateSobreeMcpServerOptions = {}): SobreeMcpServer {
   const ydoc = opts.ydoc ?? new Y.Doc();
   const sobree = new HeadlessSobree(ydoc, {
     origin: opts.origin ?? "mcp",

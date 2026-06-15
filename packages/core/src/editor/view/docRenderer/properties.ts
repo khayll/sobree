@@ -12,10 +12,10 @@
  * there are no CSS-only typography fallbacks.
  */
 
-import { resolveFontFace } from "./fontFallback";
-import { twipsToMm } from "./units";
 import { resolveStyleCascade } from "../../../doc/styles";
 import type { NamedStyle, ParagraphProperties } from "../../../doc/types";
+import { resolveFontFace } from "./fontFallback";
+import { twipsToMm } from "./units";
 
 export function applyParagraphProps(
   el: HTMLElement,
@@ -30,9 +30,10 @@ export function applyParagraphProps(
   // walks `Normal → docDefaults` (when present) under the hood; a
   // missing "Normal" style returns empty defaults safely.
   const effectiveStyleId = props.styleId ?? "Normal";
-  const { runDefaults: cascadeRunDefaults, paragraphDefaults } = styles.length > 0
-    ? resolveStyleCascade(styles, effectiveStyleId)
-    : { runDefaults: {}, paragraphDefaults: {} };
+  const { runDefaults: cascadeRunDefaults, paragraphDefaults } =
+    styles.length > 0
+      ? resolveStyleCascade(styles, effectiveStyleId)
+      : { runDefaults: {}, paragraphDefaults: {} };
   const effective: ParagraphProperties = mergeParagraphProperties(paragraphDefaults, props);
   // Overlay the paragraph's OWN `runDefaults` on top of the style
   // cascade. `pPr/rPr` carries the paragraph-mark font (e.g. an
@@ -94,8 +95,7 @@ export function applyParagraphProps(
     el.setAttribute("data-style-id", props.styleId);
   }
   if (effective.alignment) {
-    el.style.textAlign =
-      effective.alignment === "both" ? "justify" : effective.alignment;
+    el.style.textAlign = effective.alignment === "both" ? "justify" : effective.alignment;
   }
   if (effective.spacing?.line && effective.spacing.lineRule === "auto") {
     // OOXML's `auto` lineRule means "1 = single line spacing as Word

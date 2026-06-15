@@ -32,11 +32,7 @@ export interface FsTypeReport {
 /** Walk the table directory and return `OS/2.fsType`, or null on failure. */
 export function readFsType(font: Uint8Array): number | null {
   if (font.length < 12) return null;
-  const view = new DataView(
-    font.buffer,
-    font.byteOffset,
-    font.byteLength,
-  );
+  const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
   // Offset 0: sfnt version (uint32). Valid: 0x00010000 (TrueType),
   // 0x4F54544F = "OTTO" (CFF/OpenType). Reject anything else.
   const sfnt = view.getUint32(0);

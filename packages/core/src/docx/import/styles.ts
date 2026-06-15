@@ -22,20 +22,20 @@
  * (`hAnsi`, `cs`, `eastAsia`), runs without a recognised property.
  */
 
+import { resolveStyleCascade } from "../../doc/styles";
 import type {
   NamedStyle,
-  ParagraphProperties,
   ParagraphAlignment,
-  ParagraphSpacing,
   ParagraphIndent,
+  ParagraphProperties,
+  ParagraphSpacing,
   RunProperties,
 } from "../../doc/types";
+import { NS } from "../shared/namespaces";
+import { readShading } from "../shared/shading";
 import { parseXml, wAll, wFirst, wOnOff, wVal } from "../shared/xml";
 import { readParagraphBorders } from "./borders";
-import { readShading } from "../shared/shading";
-import { NS } from "../shared/namespaces";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
-import { resolveStyleCascade } from "../../doc/styles";
 
 /**
  * Canonicalise a heading style id to `HeadingN`.
@@ -91,17 +91,14 @@ export function parseStylesXml(
 
   // 2. Walk every <w:style> element. Each becomes a NamedStyle.
   for (const styleEl of wAll(doc, "style")) {
-    const rawStyleId =
-      styleEl.getAttributeNS(NS.w, "styleId") ??
-      styleEl.getAttribute("w:styleId");
+    const rawStyleId = styleEl.getAttributeNS(NS.w, "styleId") ?? styleEl.getAttribute("w:styleId");
     if (!rawStyleId) continue;
     // Canonicalise heading ids (`Heading 2` / `heading 2` → `Heading2`).
     // The paragraph importer canonicalises a heading PARAGRAPH's styleId
     // the same way; the STYLE definition must match or the cascade can't
     // resolve it and the heading's colour / caps are silently dropped.
     const styleId = canonicalStyleId(rawStyleId);
-    const typeAttr =
-      styleEl.getAttributeNS(NS.w, "type") ?? styleEl.getAttribute("w:type");
+    const typeAttr = styleEl.getAttributeNS(NS.w, "type") ?? styleEl.getAttribute("w:type");
     const type = mapStyleType(typeAttr);
     if (!type) continue; // skip unknown style types silently
 
@@ -176,26 +173,17 @@ export function parseStylesXml(
  * way of marking "the default style for this type") OR, failing that,
  * the style id `Normal`.
  */
-function ensureWordBaseline(
-  styles: NamedStyle[],
-  doc: Document,
-  applyAutoSpacing: boolean,
-): void {
+function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacing: boolean): void {
   // Find the explicit default-paragraph-style id from styles.xml
   // attribute markers.
   let defaultStyleId: string | undefined;
   for (const styleEl of wAll(doc, "style")) {
-    const type =
-      styleEl.getAttributeNS(NS.w, "type") ?? styleEl.getAttribute("w:type");
+    const type = styleEl.getAttributeNS(NS.w, "type") ?? styleEl.getAttribute("w:type");
     if (type !== "paragraph") continue;
-    const isDefault =
-      styleEl.getAttributeNS(NS.w, "default") ??
-      styleEl.getAttribute("w:default");
+    const isDefault = styleEl.getAttributeNS(NS.w, "default") ?? styleEl.getAttribute("w:default");
     if (isDefault === "1" || isDefault === "true") {
       defaultStyleId =
-        styleEl.getAttributeNS(NS.w, "styleId") ??
-        styleEl.getAttribute("w:styleId") ??
-        undefined;
+        styleEl.getAttributeNS(NS.w, "styleId") ?? styleEl.getAttribute("w:styleId") ?? undefined;
       break;
     }
   }
@@ -340,8 +328,7 @@ function readRunProperties(rPr: Element): RunProperties | undefined {
   // visible runs.
   const rFonts = wFirst(rPr, "rFonts");
   if (rFonts) {
-    const ascii =
-      rFonts.getAttributeNS(NS.w, "ascii") ?? rFonts.getAttribute("w:ascii");
+    const ascii = rFonts.getAttributeNS(NS.w, "ascii") ?? rFonts.getAttribute("w:ascii");
     if (ascii) out.fontFamily = ascii;
   }
   // <w:sz w:val="22"/> — value is in HALF-POINTS, so 22 = 11pt.
@@ -463,8 +450,7 @@ function toggleOn(el: Element | null): boolean {
 }
 
 function readNumAttr(el: Element, name: string): number | null {
-  const v =
-    el.getAttributeNS(NS.w, name) ?? el.getAttribute(`w:${name}`);
+  const v = el.getAttributeNS(NS.w, name) ?? el.getAttribute(`w:${name}`);
   if (v === null) return null;
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : null;

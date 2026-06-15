@@ -145,11 +145,7 @@ describe("collapseUnderfilledPages", () => {
   });
 
   it("absorbs middle widow into its previous page", () => {
-    const pages = [
-      [sized("page1", 500)],
-      [sized("widow", 80)],
-      [sized("page3", 600)],
-    ];
+    const pages = [[sized("page1", 500)], [sized("widow", 80)], [sized("page3", 600)]];
     const out = collapseUnderfilledPages(pages, BUDGET);
     expect(out).toHaveLength(2);
     expect(out[0]?.map((e) => e.textContent)).toEqual(["page1", "widow"]);

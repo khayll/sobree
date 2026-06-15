@@ -18,8 +18,8 @@
  *   - `tint`  — scale toward white (val/100000).
  */
 
-import { parseXml } from "./xml";
 import { NS } from "./namespaces";
+import { parseXml } from "./xml";
 
 /** Theme slot → `#RRGGBB`. Slots: dk1/lt1/dk2/lt2/accent1-6/hlink/folHlink. */
 export type ThemePalette = Record<string, string>;
@@ -52,10 +52,7 @@ export function parseThemeXml(xml: string | undefined): ThemePalette | undefined
  * style container): literal `srgbClr` or theme `schemeClr`, transforms
  * applied. Returns `#RRGGBB` or undefined when no resolvable colour.
  */
-export function readDrawingColor(
-  parent: Element,
-  theme?: ThemePalette,
-): string | undefined {
+export function readDrawingColor(parent: Element, theme?: ThemePalette): string | undefined {
   const srgb = firstA(parent, "srgbClr");
   if (srgb) {
     const val = srgb.getAttribute("val");

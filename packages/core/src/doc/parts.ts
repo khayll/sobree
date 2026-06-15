@@ -18,9 +18,9 @@
  *     orphans drop on round-trip without an explicit prune.
  */
 
+import { fontLivenessPaths } from "../fonts/liveness";
 import type { AnchoredFrame, Block, InlineRun, SobreeDocument } from "./types";
 import { walkBlock } from "./walk";
-import { fontLivenessPaths } from "../fonts/liveness";
 
 /**
  * Walk the document and return the set of `rawParts` keys that

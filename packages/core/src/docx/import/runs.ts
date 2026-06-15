@@ -69,14 +69,9 @@ export function readRun(r: Element): ImportedRun {
   // pair as table rows).
   const brEl = wFirst(r, "br");
   if (brEl) {
-    const typeAttr =
-      brEl.getAttributeNS(NS.w, "type") ?? brEl.getAttribute("w:type");
+    const typeAttr = brEl.getAttributeNS(NS.w, "type") ?? brEl.getAttribute("w:type");
     const breakType: "line" | "page" | "column" =
-      typeAttr === "page"
-        ? "page"
-        : typeAttr === "column"
-          ? "column"
-          : "line";
+      typeAttr === "page" ? "page" : typeAttr === "column" ? "column" : "line";
     return { text: "", format: {}, isHardBreak: true, breakType };
   }
 
@@ -116,8 +111,7 @@ export function readRun(r: Element): ImportedRun {
   // separately into `SobreeDocument.footnotes[N]`.
   const footnoteRef = wFirst(r, "footnoteReference");
   if (footnoteRef) {
-    const idAttr =
-      footnoteRef.getAttributeNS(NS.w, "id") ?? footnoteRef.getAttribute("w:id");
+    const idAttr = footnoteRef.getAttributeNS(NS.w, "id") ?? footnoteRef.getAttribute("w:id");
     const id = Number(idAttr);
     if (Number.isFinite(id) && id >= 1) {
       return { text: "", format: {}, isHardBreak: false, footnoteRefId: id };
@@ -129,8 +123,7 @@ export function readRun(r: Element): ImportedRun {
   // span. The actual comment text lives in `SobreeDocument.comments[N]`.
   const commentRef = wFirst(r, "commentReference");
   if (commentRef) {
-    const idAttr =
-      commentRef.getAttributeNS(NS.w, "id") ?? commentRef.getAttribute("w:id");
+    const idAttr = commentRef.getAttributeNS(NS.w, "id") ?? commentRef.getAttribute("w:id");
     const id = Number(idAttr);
     if (Number.isFinite(id) && id >= 0) {
       return { text: "", format: {}, isHardBreak: false, commentRefId: id };
@@ -174,13 +167,9 @@ export function readRun(r: Element): ImportedRun {
       const innerRPr = wFirst(rPrChange, "rPr");
       const before = innerRPr ? readRunFormat(innerRPr) : {};
       const author =
-        rPrChange.getAttributeNS(NS.w, "author") ??
-        rPrChange.getAttribute("w:author") ??
-        undefined;
+        rPrChange.getAttributeNS(NS.w, "author") ?? rPrChange.getAttribute("w:author") ?? undefined;
       const date =
-        rPrChange.getAttributeNS(NS.w, "date") ??
-        rPrChange.getAttribute("w:date") ??
-        undefined;
+        rPrChange.getAttributeNS(NS.w, "date") ?? rPrChange.getAttribute("w:date") ?? undefined;
       format.revisionFormat = {
         before,
         ...(author !== undefined ? { author } : {}),
@@ -304,8 +293,7 @@ function readVmlImage(container: Element): ImportedDrawing | null {
   const V_NS = "urn:schemas-microsoft-com:vml";
   const imagedata = container.getElementsByTagNameNS(V_NS, "imagedata")[0];
   if (!imagedata) return null;
-  const rId =
-    imagedata.getAttributeNS(NS.r, "id") ?? imagedata.getAttribute("r:id");
+  const rId = imagedata.getAttributeNS(NS.r, "id") ?? imagedata.getAttribute("r:id");
   if (!rId) return null;
   const out: ImportedDrawing = { embedRelId: rId };
   // VML size lives in the `<v:shape style="...">` attribute. Parse
@@ -327,12 +315,18 @@ function parseVmlDimension(match: RegExpMatchArray | null): number {
   if (!Number.isFinite(v) || v <= 0) return 0;
   const unit = (match[2] ?? "pt").toLowerCase();
   switch (unit) {
-    case "pt": return v;
-    case "in": return v * 72;
-    case "px": return v * 0.75;
-    case "mm": return (v / 25.4) * 72;
-    case "cm": return (v / 2.54) * 72;
-    default: return v; // assume pt for unitless
+    case "pt":
+      return v;
+    case "in":
+      return v * 72;
+    case "px":
+      return v * 0.75;
+    case "mm":
+      return (v / 25.4) * 72;
+    case "cm":
+      return (v / 2.54) * 72;
+    default:
+      return v; // assume pt for unitless
   }
 }
 
@@ -343,8 +337,7 @@ function readDrawing(drawing: Element): ImportedDrawing {
   const wpRoot = inlineEl ?? anchorEl;
   const blip = drawing.getElementsByTagNameNS(NS.a, "blip")[0];
   if (blip) {
-    const rId =
-      blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
+    const rId = blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
     if (rId) out.embedRelId = rId;
   }
   const extent = wpRoot?.getElementsByTagNameNS(NS.wp, "extent")[0];
@@ -380,12 +373,8 @@ function readAnchor(anchor: Element): ImportedAnchor {
   const out: ImportedAnchor = {
     offsetXEmu: readPosOffset(posH),
     offsetYEmu: readPosOffset(posV),
-    relativeFromH: normaliseRelativeFromH(
-      posH?.getAttribute("relativeFrom") ?? "column",
-    ),
-    relativeFromV: normaliseRelativeFromV(
-      posV?.getAttribute("relativeFrom") ?? "paragraph",
-    ),
+    relativeFromH: normaliseRelativeFromH(posH?.getAttribute("relativeFrom") ?? "column"),
+    relativeFromV: normaliseRelativeFromV(posV?.getAttribute("relativeFrom") ?? "paragraph"),
   };
   if (behindDoc) out.behindDoc = true;
   return out;

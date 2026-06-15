@@ -1,11 +1,7 @@
 import "./zoomControls.css";
-import { getFloatingCorner, type Viewport } from "@sobree/core";
+import { type Viewport, getFloatingCorner } from "@sobree/core";
 
-export type ZoomControlsPlacement =
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
+export type ZoomControlsPlacement = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface ZoomControlsOptions {
   /**
@@ -138,8 +134,6 @@ export class ZoomControls {
   }
 }
 
-function resolveTarget(
-  source: HTMLElement | (() => HTMLElement),
-): () => HTMLElement {
+function resolveTarget(source: HTMLElement | (() => HTMLElement)): () => HTMLElement {
   return typeof source === "function" ? source : () => source;
 }

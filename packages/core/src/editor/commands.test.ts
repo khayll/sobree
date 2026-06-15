@@ -1,5 +1,5 @@
-import { Editor } from "./";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Editor } from "./";
 
 function setupEditor(): { ed: Editor } {
   const host = document.createElement("div");

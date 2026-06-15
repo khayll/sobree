@@ -19,7 +19,7 @@
  * locking against a doc that moved since the last paginate.
  */
 
-import type { Editor, RevisionSpan } from "@sobree/core";
+import type { EditResult, Editor, RevisionSpan } from "@sobree/core";
 import { ICON_ACCEPT, ICON_REJECT } from "./icons";
 
 /** How long to keep the popover alive after the pointer leaves the
@@ -70,11 +70,7 @@ export class RevisionActions {
     return pop;
   }
 
-  private actionButton(
-    label: string,
-    svg: string,
-    kind: "accept" | "reject",
-  ): HTMLElement {
+  private actionButton(label: string, svg: string, kind: "accept" | "reject"): HTMLElement {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `sobree-review-actions__btn is-${kind}`;
@@ -165,11 +161,7 @@ export class RevisionActions {
       noun = span.kinds[0] === "del" ? "paragraph deletion" : "paragraph insertion";
     } else {
       noun =
-        span.kinds.length > 1
-          ? "replacement"
-          : span.kinds[0] === "del"
-            ? "deletion"
-            : "insertion";
+        span.kinds.length > 1 ? "replacement" : span.kinds[0] === "del" ? "deletion" : "insertion";
     }
     const [accept, reject] = Array.from(
       this.popover.querySelectorAll<HTMLElement>(".sobree-review-actions__btn"),
@@ -213,7 +205,7 @@ export class RevisionActions {
   private run(kind: "accept" | "reject"): void {
     const span = this.target;
     if (!span) return;
-    let result;
+    let result: EditResult<void>;
     if (span.level === "paragraph") {
       const blockRef = span.range.from.block;
       result =

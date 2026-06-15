@@ -11,8 +11,8 @@ import {
   type Item,
   type Page,
   type ResolvedConfig,
-  resolveConfig,
   pageHeightAt,
+  resolveConfig,
 } from "./types";
 
 /**

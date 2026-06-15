@@ -16,17 +16,17 @@
  * renderer as `renderBody`.
  */
 
-import { emuToMm } from "./units";
-import { partPathToUrl } from "./inline";
-import { applyParagraphProps } from "./properties";
 import type {
   Block,
   DrawingRun,
   InlineFrame,
-  Paragraph,
   NamedStyle,
   NumberingDefinition,
+  Paragraph,
 } from "../../../doc/types";
+import { partPathToUrl } from "./inline";
+import { applyParagraphProps } from "./properties";
+import { emuToMm } from "./units";
 
 /** The recursive block renderer, injected to break the import cycle. */
 export type RenderBody = (
@@ -103,9 +103,7 @@ export function renderInlineFrameBlock(
   // keep the absolute fixed-height overlay (the textbox sits on top).
   const prose =
     frame.textboxes.length > 1 ||
-    (frame.textboxes.length === 1 &&
-      frame.pictures.length === 0 &&
-      frame.shapes.length === 0);
+    (frame.textboxes.length === 1 && frame.pictures.length === 0 && frame.shapes.length === 0);
 
   // Decorative pictures paint as absolute overlays (a pill's rounded-rect
   // background). For prose the same pictures become leading inline images
@@ -146,16 +144,18 @@ export function renderInlineFrameBlock(
   const sx = frame.groupExtentEmu.wEmu > 0 ? frame.sizeEmu.wEmu / frame.groupExtentEmu.wEmu : 1;
   const sy = frame.groupExtentEmu.hEmu > 0 ? frame.sizeEmu.hEmu / frame.groupExtentEmu.hEmu : 1;
   const leadingImages: DrawingRun[] = prose
-    ? frame.pictures.map((pic): DrawingRun => ({
-        kind: "drawing",
-        partPath: pic.partPath,
-        widthEmu: Math.round(pic.sizeEmu.wEmu * sx),
-        heightEmu: Math.round(pic.sizeEmu.hEmu * sy),
-        placement: "inline",
-        // Centre the arrow on the title line (it's taller than the text).
-        verticalAlign: "middle",
-        ...(pic.altText !== undefined ? { altText: pic.altText } : {}),
-      }))
+    ? frame.pictures.map(
+        (pic): DrawingRun => ({
+          kind: "drawing",
+          partPath: pic.partPath,
+          widthEmu: Math.round(pic.sizeEmu.wEmu * sx),
+          heightEmu: Math.round(pic.sizeEmu.hEmu * sy),
+          placement: "inline",
+          // Centre the arrow on the title line (it's taller than the text).
+          verticalAlign: "middle",
+          ...(pic.altText !== undefined ? { altText: pic.altText } : {}),
+        }),
+      )
     : [];
 
   frame.textboxes.forEach((tb, i) => {
@@ -180,11 +180,7 @@ export function renderInlineFrameBlock(
     region.style.display = "flex";
     region.style.flexDirection = "column";
     region.style.justifyContent =
-      tb.vAlign === "center"
-        ? "center"
-        : tb.vAlign === "bottom"
-          ? "flex-end"
-          : "flex-start";
+      tb.vAlign === "center" ? "center" : tb.vAlign === "bottom" ? "flex-end" : "flex-start";
     if (tb.fill) region.style.background = tb.fill;
     if (tb.padding) {
       const p = tb.padding;
@@ -204,9 +200,7 @@ export function renderInlineFrameBlock(
     // Prepend the arrow(s) to the first prose textbox's first paragraph
     // so the ► sits inline before the title (cloned — don't mutate the AST).
     const body =
-      i === 0 && leadingImages.length > 0
-        ? prependLeadingImages(trimmed, leadingImages)
-        : trimmed;
+      i === 0 && leadingImages.length > 0 ? prependLeadingImages(trimmed, leadingImages) : trimmed;
     renderBody(body, region, numbering, styles, rawParts);
     wrapper.appendChild(region);
   });

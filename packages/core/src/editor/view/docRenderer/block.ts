@@ -1,14 +1,3 @@
-import { appendInlineRuns } from "./inline";
-import { renderTable } from "./table";
-import { applyParagraphProps } from "./properties";
-import { applyListItemLevel, createListContainer, paragraphListInfo } from "./lists";
-import { renderInlineFrameBlock } from "./inlineFrame";
-import { renderParagraph } from "./paragraph";
-import {
-  collapseSectionTrailerEmpty,
-  evictTrailingEmptyParagraphs,
-  openColumnContainerIfNeeded,
-} from "./sectionFlow";
 import type {
   Block,
   NamedStyle,
@@ -17,6 +6,17 @@ import type {
   ParagraphProperties,
   SectionProperties,
 } from "../../../doc/types";
+import { appendInlineRuns } from "./inline";
+import { renderInlineFrameBlock } from "./inlineFrame";
+import { applyListItemLevel, createListContainer, paragraphListInfo } from "./lists";
+import { renderParagraph } from "./paragraph";
+import { applyParagraphProps } from "./properties";
+import {
+  collapseSectionTrailerEmpty,
+  evictTrailingEmptyParagraphs,
+  openColumnContainerIfNeeded,
+} from "./sectionFlow";
+import { renderTable } from "./table";
 
 /**
  * Render a `Block[]` stream into `host`, grouping consecutive paragraphs
@@ -137,16 +137,8 @@ export function renderBlocks(
     // or a flow-through ("continuous"). Pulled here so renderBlock
     // stays section-array-agnostic.
     const nextSectionForBreak =
-      block.kind === "section_break"
-        ? sections[block.toSectionIndex]
-        : undefined;
-    const rendered = renderBlock(
-      block,
-      numbering,
-      styles,
-      rawParts,
-      nextSectionForBreak,
-    );
+      block.kind === "section_break" ? sections[block.toSectionIndex] : undefined;
+    const rendered = renderBlock(block, numbering, styles, rawParts, nextSectionForBreak);
     if (rendered) {
       if (id) rendered.dataset.blockId = id;
       rendered.dataset.sectionIndex = String(sectionIndex);
@@ -264,10 +256,7 @@ function renderSectionBreak(nextSection?: SectionProperties): HTMLElement {
  * produce). Core renders no visual itself — neutral by default; the
  * plugin layers the author colour.
  */
-function stampBlockRevision(
-  el: HTMLElement,
-  props: ParagraphProperties,
-): void {
+function stampBlockRevision(el: HTMLElement, props: ParagraphProperties): void {
   const rev = props.revision;
   if (!rev) return;
   el.dataset.blockRevision = rev.type;

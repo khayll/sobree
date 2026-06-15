@@ -15,24 +15,15 @@
  * attach to — no separate wire-adapter plugin needed.
  */
 
-import { Sobree } from "./sobree";
-import type {
-  SobreeEvent,
-  SobreeEventPayload,
-  SobreeOptions,
-  SobreeUnsubscribe,
-} from "./sobree";
-import { Editor, type CommandBus } from "./editor";
-import { Viewport } from "./embed/viewport";
-import type {
-  PluginContext,
-  SobreePlugin,
-  SobreePluginInstance,
-} from "./plugin";
+import type { SobreeDocument } from "./doc/types";
 import { exportDocx } from "./docx/export/index";
+import type { CommandBus, Editor } from "./editor";
+import { Viewport } from "./embed/viewport";
 import { parseMarkdown } from "./markdown/parse";
 import type { PageSetup } from "./paperStack/pageSetup";
-import type { SobreeDocument } from "./doc/types";
+import type { PluginContext, SobreePlugin, SobreePluginInstance } from "./plugin";
+import { Sobree } from "./sobree";
+import type { SobreeEvent, SobreeEventPayload, SobreeOptions, SobreeUnsubscribe } from "./sobree";
 
 /**
  * Initial content. Type detection is automatic:
@@ -47,12 +38,7 @@ import type { SobreeDocument } from "./doc/types";
  * other source types, `.ready` is already resolved when the factory
  * returns.
  */
-export type SobreeContent =
-  | string
-  | Blob
-  | ArrayBuffer
-  | Uint8Array
-  | SobreeDocument;
+export type SobreeContent = string | Blob | ArrayBuffer | Uint8Array | SobreeDocument;
 
 /**
  * How the viewport is fitted on initial mount.
@@ -220,10 +206,7 @@ export function createSobree(
       const instance = plugin.setup(ctx);
       pluginInstances.push({ name: plugin.name, instance });
     } catch (err) {
-      console.error(
-        `[sobree] plugin "${plugin.name ?? "?"}" setup failed:`,
-        err,
-      );
+      console.error(`[sobree] plugin "${plugin.name ?? "?"}" setup failed:`, err);
     }
   }
 
@@ -233,9 +216,7 @@ export function createSobree(
   let ready: Promise<{ warnings: string[] }>;
   if (deferredDocx) {
     const sink = installWarningSink(sobree);
-    ready = sobree
-      .openDocx(deferredDocx)
-      .then(() => ({ warnings: sink.warnings }));
+    ready = sobree.openDocx(deferredDocx).then(() => ({ warnings: sink.warnings }));
   } else {
     ready = Promise.resolve({ warnings: [] });
   }
@@ -308,10 +289,7 @@ export function createSobree(
         try {
           entry.instance.destroy();
         } catch (err) {
-          console.error(
-            `[sobree] plugin "${entry.name ?? "?"}" destroy failed:`,
-            err,
-          );
+          console.error(`[sobree] plugin "${entry.name ?? "?"}" destroy failed:`, err);
         }
       }
       sobree.destroy();
@@ -328,9 +306,7 @@ function resolveHost(target: string | HTMLElement): HTMLElement {
   if (typeof target === "string") {
     const el = document.querySelector(target);
     if (!(el instanceof HTMLElement)) {
-      throw new Error(
-        `[sobree] createSobree: selector "${target}" did not match an HTMLElement.`,
-      );
+      throw new Error(`[sobree] createSobree: selector "${target}" did not match an HTMLElement.`);
     }
     return el;
   }
@@ -356,9 +332,7 @@ function resolveInitialContent(content: SobreeContent | undefined): ResolvedCont
   return { initialDocument: content, deferredDocx: undefined };
 }
 
-function isDocxSource(
-  v: unknown,
-): v is Blob | ArrayBuffer | Uint8Array {
+function isDocxSource(v: unknown): v is Blob | ArrayBuffer | Uint8Array {
   if (typeof Blob !== "undefined" && v instanceof Blob) return true;
   if (v instanceof ArrayBuffer) return true;
   if (v instanceof Uint8Array) return true;

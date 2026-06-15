@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveAnchorPosition } from "./anchorPosition";
 import type { AnchoredFrame } from "../../../doc/types";
+import { resolveAnchorPosition } from "./anchorPosition";
 
 const MARGIN_TOP = 360000; // 10mm
 const MARGIN_LEFT = 720000; // 20mm

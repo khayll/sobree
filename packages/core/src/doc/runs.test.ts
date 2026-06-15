@@ -1,4 +1,4 @@
-import type { HyperlinkRun, InlineRun, TextRun } from "./types";
+import { describe, expect, it } from "vitest";
 import {
   applyRunPropertiesToRuns,
   mergeAdjacentTextRuns,
@@ -7,7 +7,7 @@ import {
   sliceRuns,
   splitRunsAt,
 } from "./runs";
-import { describe, expect, it } from "vitest";
+import type { HyperlinkRun, InlineRun, TextRun } from "./types";
 
 const t = (text: string, props: TextRun["properties"] = {}): TextRun => ({
   kind: "text",
@@ -29,9 +29,7 @@ describe("runLength / runsLength", () => {
         placement: "inline",
       }),
     ).toBe(1);
-    expect(
-      runLength({ kind: "field", instruction: "PAGE", cached: "42" }),
-    ).toBe(2);
+    expect(runLength({ kind: "field", instruction: "PAGE", cached: "42" })).toBe(2);
     const link: HyperlinkRun = {
       kind: "hyperlink",
       href: "x",

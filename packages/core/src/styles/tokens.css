@@ -37,15 +37,15 @@
 
 :root {
   /* Primary — Sobree Amber. */
-  --sobree-50:  #fdf6ee;
+  --sobree-50: #fdf6ee;
   --sobree-100: #f9e6d0;
   --sobree-500: #c96f22;
   --sobree-600: #b2591a;
 
   /* Neutrals — warm ink, not gray. */
-  --ink-0:   #ffffff;
-  --ink-25:  #fbfaf7;
-  --ink-50:  #f6f4ef;
+  --ink-0: #ffffff;
+  --ink-25: #fbfaf7;
+  --ink-50: #f6f4ef;
   --ink-100: #eceae3;
   --ink-200: #dedbd0;
   --ink-300: #c4bfaf;
@@ -57,20 +57,20 @@
   --ink-900: #14130f;
 
   /* Semantic tokens — what components reference. */
-  --bg:            var(--ink-25);
-  --bg-elevated:   var(--ink-0);
-  --bg-subtle:     var(--ink-50);
-  --bg-hover:      var(--ink-100);
-  --fg:            var(--ink-800);
-  --fg-strong:     var(--ink-900);
-  --fg-muted:      var(--ink-600);
-  --fg-subtle:     var(--ink-500);
+  --bg: var(--ink-25);
+  --bg-elevated: var(--ink-0);
+  --bg-subtle: var(--ink-50);
+  --bg-hover: var(--ink-100);
+  --fg: var(--ink-800);
+  --fg-strong: var(--ink-900);
+  --fg-muted: var(--ink-600);
+  --fg-subtle: var(--ink-500);
   --fg-on-primary: var(--ink-0);
-  --border:        var(--ink-200);
+  --border: var(--ink-200);
   --border-strong: var(--ink-300);
-  --primary:       var(--sobree-500);
+  --primary: var(--sobree-500);
   --primary-hover: var(--sobree-600);
-  --primary-soft:  var(--sobree-50);
+  --primary-soft: var(--sobree-50);
 
   /* Radii. */
   --radius-xs: 2px;
@@ -89,9 +89,9 @@
 
   /* Motion. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --dur-fast:   120ms;
-  --dur-base:   180ms;
-  --dur-slow:   280ms;
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
 
   /* Spacing — 4px base. */
   --space-1: 4px;
@@ -136,9 +136,8 @@
   --sobree-revision-tint: 8%;
 
   /* Comment styling. */
-  --sobree-comment-range-bg:     rgba(255, 217, 0, 0.25);
+  --sobree-comment-range-bg: rgba(255, 217, 0, 0.25);
   --sobree-comment-range-border: rgba(180, 130, 0, 0.5);
-  --sobree-comment-accent:       #f59e0b; /* card rule when author colour absent */
-  --sobree-comment-resolved:     #16a34a; /* resolved-thread green */
+  --sobree-comment-accent: #f59e0b; /* card rule when author colour absent */
+  --sobree-comment-resolved: #16a34a; /* resolved-thread green */
 }
-

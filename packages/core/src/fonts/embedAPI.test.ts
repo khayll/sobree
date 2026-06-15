@@ -5,8 +5,8 @@
  * path, all without mounting an Editor.
  */
 import { describe, expect, it } from "vitest";
-import { embedFontIntoDoc, removeFontFromDoc } from "./embedAPI";
 import { emptyDocument } from "../doc/builders";
+import { embedFontIntoDoc, removeFontFromDoc } from "./embedAPI";
 
 /**
  * Build a minimal 40-byte TTF/OTF with a valid sfnt header and an

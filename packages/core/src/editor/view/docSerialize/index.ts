@@ -1,6 +1,6 @@
-import { type BlockSerializeContext, blocksFromNodes } from "./block";
 import { defaultStyles } from "../../../doc/builders";
 import type { SobreeDocument } from "../../../doc/types";
+import { type BlockSerializeContext, blocksFromNodes } from "./block";
 
 /**
  * Serialise DOM content across one or more host elements (in document

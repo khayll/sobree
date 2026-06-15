@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createSobree } from "./createSobree";
-import { emptyDocument, paragraph, text } from "./doc/builders";
 import type { SobreeHandle } from "./createSobree";
+import { emptyDocument, paragraph, text } from "./doc/builders";
 
 const handles: SobreeHandle[] = [];
 
@@ -45,9 +45,7 @@ describe("createSobree", () => {
   });
 
   it("throws on a selector that doesn't match an HTMLElement", () => {
-    expect(() => createSobree("#does-not-exist-xyz")).toThrow(
-      /did not match an HTMLElement/,
-    );
+    expect(() => createSobree("#does-not-exist-xyz")).toThrow(/did not match an HTMLElement/);
   });
 
   it("seeds an AST literal as initial content", () => {
@@ -61,9 +59,7 @@ describe("createSobree", () => {
 
   it("seeds a markdown string as initial content", () => {
     const host = mount();
-    const editor = track(
-      createSobree(host, { content: "# Title\n\nBody paragraph." }),
-    );
+    const editor = track(createSobree(host, { content: "# Title\n\nBody paragraph." }));
     const live = editor.getDocument();
     expect(live.body.length).toBe(2);
     const first = live.body[0];
@@ -135,9 +131,7 @@ describe("createSobree", () => {
 
   it("toDocx returns a Blob and warnings array", () => {
     const host = mount();
-    const editor = track(
-      createSobree(host, { content: "# Saveable\n\nContent." }),
-    );
+    const editor = track(createSobree(host, { content: "# Saveable\n\nContent." }));
     const out = editor.toDocx();
     expect(out.blob).toBeInstanceOf(Blob);
     expect(Array.isArray(out.warnings)).toBe(true);

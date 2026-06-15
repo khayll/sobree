@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type {
+  AnchoredFrame,
+  Block,
+  DrawingRun,
+  Paragraph,
+  SectionProperties,
+} from "../../doc/types";
 import { floatWrappingImages } from "./floatFrames";
-import type { AnchoredFrame, Block, DrawingRun, Paragraph, SectionProperties } from "../../doc/types";
 
 function para(text: string): Paragraph {
   return { kind: "paragraph", runs: [{ kind: "text", text, properties: {} }], properties: {} };
@@ -8,7 +14,12 @@ function para(text: string): Paragraph {
 
 const picFrame = (over: Partial<AnchoredFrame> = {}): AnchoredFrame => ({
   id: "f1",
-  anchor: { sectionIndex: 0, paragraphIndex: 0, horizontalFrom: "margin", verticalFrom: "paragraph" },
+  anchor: {
+    sectionIndex: 0,
+    paragraphIndex: 0,
+    horizontalFrom: "margin",
+    verticalFrom: "paragraph",
+  },
   offsetXEmu: 0,
   offsetYEmu: 0,
   widthEmu: 914400,
@@ -53,20 +64,38 @@ describe("floatWrappingImages", () => {
   });
 
   it("maps wrapText: right→floatLeft, left→floatRight", () => {
-    expect(firstRun(floatWrappingImages([para("a")], [picFrame({ wrapText: "right" })], sections).body).placement).toBe("floatLeft");
-    expect(firstRun(floatWrappingImages([para("a")], [picFrame({ wrapText: "left" })], sections).body).placement).toBe("floatRight");
+    expect(
+      firstRun(floatWrappingImages([para("a")], [picFrame({ wrapText: "right" })], sections).body)
+        .placement,
+    ).toBe("floatLeft");
+    expect(
+      firstRun(floatWrappingImages([para("a")], [picFrame({ wrapText: "left" })], sections).body)
+        .placement,
+    ).toBe("floatRight");
   });
 
   it("bothSides floats to whichever margin the image sits nearer", () => {
-    const right = floatWrappingImages([para("a")], [picFrame({ wrapText: "bothSides", offsetXEmu: 5_000_000 })], sections);
+    const right = floatWrappingImages(
+      [para("a")],
+      [picFrame({ wrapText: "bothSides", offsetXEmu: 5_000_000 })],
+      sections,
+    );
     expect(firstRun(right.body).placement).toBe("floatRight");
-    const left = floatWrappingImages([para("a")], [picFrame({ wrapText: "bothSides", offsetXEmu: 0 })], sections);
+    const left = floatWrappingImages(
+      [para("a")],
+      [picFrame({ wrapText: "bothSides", offsetXEmu: 0 })],
+      sections,
+    );
     expect(firstRun(left.body).placement).toBe("floatLeft");
   });
 
   it("carries distT/B/L/R clearance as float margins", () => {
     const dist = { topEmu: 1, rightEmu: 2, bottomEmu: 3, leftEmu: 4 };
-    expect(firstRun(floatWrappingImages([para("a")], [picFrame({ textDistancesEmu: dist })], sections).body).floatMarginsEmu).toEqual(dist);
+    expect(
+      firstRun(
+        floatWrappingImages([para("a")], [picFrame({ textDistancesEmu: dist })], sections).body,
+      ).floatMarginsEmu,
+    ).toEqual(dist);
   });
 
   it("leaves non-floatable frames as overlays (behind-text / wrapNone / textbox)", () => {

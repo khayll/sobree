@@ -8,6 +8,7 @@
  * land in the Y.Doc with identical semantics to a browser peer's.
  */
 
+import type { RunPropertiesPatch } from "../../doc/runs";
 import type {
   Block,
   ParagraphProperties,
@@ -16,7 +17,6 @@ import type {
   SobreeDocument,
 } from "../../doc/types";
 import type { ParagraphPropertiesPatch, WrapTag } from "../types";
-import type { RunPropertiesPatch } from "../../doc/runs";
 
 /**
  * One registry-level operation produced by a mutation. The caller
@@ -41,10 +41,7 @@ export type Mutation =
  *   breakIndex = 2 → 0 (the first break ends section 0)
  *   breakIndex = 4 → 1 (the second break ends section 1)
  */
-export function removedSectionIndex(
-  body: readonly Block[],
-  breakIndex: number,
-): number {
+export function removedSectionIndex(body: readonly Block[], breakIndex: number): number {
   let count = 0;
   for (let i = 0; i < breakIndex; i++) {
     if (body[i]?.kind === "section_break") count++;

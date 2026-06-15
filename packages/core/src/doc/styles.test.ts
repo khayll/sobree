@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveRunStyle, resolveStyleCascade } from "./styles";
 import { defaultStyles } from "./builders";
+import { resolveRunStyle, resolveStyleCascade } from "./styles";
 import type { NamedStyle } from "./types";
 
 describe("resolveStyleCascade — built-in defaults", () => {
@@ -170,15 +170,29 @@ describe("resolveStyleCascade — chain semantics", () => {
 
 describe("resolveRunStyle — character (rStyle) resolution", () => {
   const styles: NamedStyle[] = [
-    { id: "DocDefaults", type: "paragraph", displayName: "Document defaults",
-      runDefaults: { fontFamily: "Times New Roman", fontSizePt: 12 } },
+    {
+      id: "DocDefaults",
+      type: "paragraph",
+      displayName: "Document defaults",
+      runDefaults: { fontFamily: "Times New Roman", fontSizePt: 12 },
+    },
     { id: "Normal", type: "paragraph", displayName: "Normal", basedOn: "DocDefaults" },
-    { id: "Hyperlink", type: "character", displayName: "Hyperlink", runDefaults: { underline: "single" } },
+    {
+      id: "Hyperlink",
+      type: "character",
+      displayName: "Hyperlink",
+      runDefaults: { underline: "single" },
+    },
     // colour-only char style — the contact-line "Blue" case
     { id: "Blue", type: "character", displayName: "Blue", runDefaults: { color: "#357CA2" } },
     // basedOn another character style: inherits + overrides
-    { id: "BlueLink", type: "character", displayName: "BlueLink", basedOn: "Hyperlink",
-      runDefaults: { color: "#357CA2" } },
+    {
+      id: "BlueLink",
+      type: "character",
+      displayName: "BlueLink",
+      basedOn: "Hyperlink",
+      runDefaults: { color: "#357CA2" },
+    },
   ];
 
   it("returns only the char style's own props — NOT the Normal/DocDefaults anchor", () => {

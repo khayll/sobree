@@ -4,8 +4,7 @@ import { zipSync } from "fflate";
 export type DocxParts = Record<string, string | Uint8Array>;
 
 const encoder = new TextEncoder();
-const DOCX_MIME =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export interface DocxPackage {
   blob: Blob;

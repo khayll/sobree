@@ -2,21 +2,21 @@
  * Phase 3.3 — read-only peers and leader-election session signaling.
  */
 
+import * as decoding from "lib0/decoding";
+import * as encoding from "lib0/encoding";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
-import * as Y from "yjs";
-import * as encoding from "lib0/encoding";
-import * as decoding from "lib0/decoding";
 import * as syncProtocol from "y-protocols/sync";
-import { SobreeCollabServer } from "./server";
+import * as Y from "yjs";
 import { memoryPersistence } from "./persistence";
 import {
   MESSAGE_AWARENESS,
   MESSAGE_SESSION,
   MESSAGE_SYNC,
-  decodeSessionMessage,
   type SessionPayload,
+  decodeSessionMessage,
 } from "./protocol";
+import { SobreeCollabServer } from "./server";
 
 describe("Phase 3.3 — session message + read-only peers", () => {
   let server: SobreeCollabServer;
@@ -137,9 +137,7 @@ describe("Phase 3.3 — session message + read-only peers", () => {
         // "editor" in this test. Not real auth.
         const u = new URL(req.url ?? "", "http://x");
         const role = u.searchParams.get("role");
-        return role === "viewer"
-          ? { allow: true, write: false }
-          : { allow: true, write: true };
+        return role === "viewer" ? { allow: true, write: false } : { allow: true, write: true };
       },
     });
     await server.listen();
@@ -157,10 +155,7 @@ describe("Phase 3.3 — session message + read-only peers", () => {
         editorPeer.ydoc.getArray("body").insert(0, ["from-editor"]);
 
         // Viewer receives via Y sync push.
-        await waitFor(
-          () => viewerPeer.ydoc.getArray("body").length > 0,
-          1000,
-        );
+        await waitFor(() => viewerPeer.ydoc.getArray("body").length > 0, 1000);
         expect(viewerPeer.ydoc.getArray("body").get(0)).toBe("from-editor");
       } finally {
         viewerPeer.close();
@@ -237,8 +232,7 @@ async function wrapConnection(ws: WebSocket): Promise<TestPeer> {
   // the session message) arrive before the handler is wired and
   // get dropped by ws.
   ws.on("message", (data) => {
-    const buf =
-      data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
+    const buf = data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
     const decoder = decoding.createDecoder(buf);
     const type = decoding.readVarUint(decoder);
     if (type === MESSAGE_SESSION) {
@@ -320,19 +314,14 @@ async function findFreePort(): Promise<number> {
     const srv = createServer();
     srv.listen(0, () => {
       const addr = srv.address();
-      const port =
-        typeof addr === "object" && addr ? (addr as { port: number }).port : 0;
+      const port = typeof addr === "object" && addr ? (addr as { port: number }).port : 0;
       srv.close(() => resolve(port));
     });
     srv.on("error", reject);
   });
 }
 
-async function waitFor(
-  pred: () => boolean,
-  timeoutMs: number,
-  pollMs = 10,
-): Promise<void> {
+async function waitFor(pred: () => boolean, timeoutMs: number, pollMs = 10): Promise<void> {
   const start = Date.now();
   while (!pred()) {
     if (Date.now() - start > timeoutMs) {

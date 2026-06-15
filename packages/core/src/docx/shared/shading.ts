@@ -12,14 +12,13 @@
  * background to apply).
  */
 
-import { wFirst, wVal } from "./xml";
 import type { Shading } from "../../doc/types";
+import { wFirst, wVal } from "./xml";
 
 export function readShading(parent: Element): Shading | undefined {
   const shdEl = wFirst(parent, "shd");
   if (!shdEl) return undefined;
-  const fillRaw =
-    shdEl.getAttributeNS(shdEl.namespaceURI, "fill") ?? shdEl.getAttribute("w:fill");
+  const fillRaw = shdEl.getAttributeNS(shdEl.namespaceURI, "fill") ?? shdEl.getAttribute("w:fill");
   if (!fillRaw || fillRaw === "auto") return undefined;
   const pattern = wVal(shdEl) ?? "clear";
   const fill = fillRaw.startsWith("#") ? fillRaw : `#${fillRaw}`;

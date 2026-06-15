@@ -34,7 +34,9 @@ let hasHead = false;
 try {
   execSync("git rev-parse --verify HEAD", { stdio: "pipe" });
   hasHead = true;
-} catch { /* no HEAD yet */ }
+} catch {
+  /* no HEAD yet */
+}
 
 let diffCmd;
 if (base) {

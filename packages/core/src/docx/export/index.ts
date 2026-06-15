@@ -1,18 +1,14 @@
+import { collectLivePartPaths } from "../../doc/parts";
+import type { SobreeDocument } from "../../doc/types";
+import { mountFontTableArtifacts } from "../../fonts";
+import type { DocxExportResult } from "../types";
+import { renderContentTypesXml, renderDocumentRelsXml, renderRootRelsXml } from "./contentTypes";
 import { makeExportContext } from "./context";
-import {
-  renderContentTypesXml,
-  renderDocumentRelsXml,
-  renderRootRelsXml,
-} from "./contentTypes";
 import { renderDocumentXml } from "./document";
-import { renderNumberingXml } from "./numbering";
 import { emitHeadersAndFooters } from "./headers";
+import { renderNumberingXml } from "./numbering";
 import { renderStylesXml } from "./styles";
 import { type DocxParts, packageDocx } from "./zip";
-import { collectLivePartPaths } from "../../doc/parts";
-import { mountFontTableArtifacts } from "../../fonts";
-import type { SobreeDocument } from "../../doc/types";
-import type { DocxExportResult } from "../types";
 
 /**
  * Export a SobreeDocument as a .docx Blob + raw bytes.
@@ -50,8 +46,7 @@ export function exportDocx(doc: SobreeDocument): DocxExportResult {
     ctx.parts["word/numbering.xml"] = numberingXml;
     ctx.contentTypeOverrides.push({
       partName: "/word/numbering.xml",
-      contentType:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml",
     });
     ctx.relationships.push({
       id: `rId${ctx.nextRid++}`,

@@ -1,9 +1,9 @@
+import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { InlineRun, Paragraph, SobreeDocument, TextRun } from "../doc/types";
 import { Editor, type TrackChangesState } from "./";
 import type { EditorContext } from "./context";
 import * as review from "./ops/review";
-import { describe, expect, it } from "vitest";
 
 function setupEditor(doc: SobreeDocument): Editor {
   const host = document.createElement("div");
@@ -13,15 +13,12 @@ function setupEditor(doc: SobreeDocument): Editor {
 
 /** Doc with one paragraph: "Keep <rev>X</rev> end" — `rev` describes
  *  the middle run's tracked change. */
-function revisionDoc(rev: { type: "ins" | "del"; author?: string }, middle = "CHANGED"): SobreeDocument {
+function revisionDoc(
+  rev: { type: "ins" | "del"; author?: string },
+  middle = "CHANGED",
+): SobreeDocument {
   const d = emptyDocument();
-  d.body = [
-    paragraph([
-      text("Keep "),
-      text(middle, { revision: rev }),
-      text(" end"),
-    ]),
-  ];
+  d.body = [paragraph([text("Keep "), text(middle, { revision: rev }), text(" end")])];
   return d;
 }
 
@@ -32,9 +29,7 @@ function bodyText(ed: Editor): string {
 
 function middleRun(ed: Editor): TextRun | undefined {
   const p = ed.getDocument().body[0] as Paragraph;
-  return p.runs.find(
-    (r): r is TextRun => r.kind === "text" && r.text.includes("CHANGED"),
-  );
+  return p.runs.find((r): r is TextRun => r.kind === "text" && r.text.includes("CHANGED"));
 }
 
 /** Whole-paragraph range. */
@@ -152,14 +147,8 @@ describe("acceptAllRevisions / rejectAllRevisions", () => {
   function mixedDoc(): SobreeDocument {
     const d = emptyDocument();
     d.body = [
-      paragraph([
-        text("p1 "),
-        text("ins-A", { revision: { type: "ins", author: "Alice" } }),
-      ]),
-      paragraph([
-        text("p2 "),
-        text("del-B", { revision: { type: "del", author: "Bob" } }),
-      ]),
+      paragraph([text("p1 "), text("ins-A", { revision: { type: "ins", author: "Alice" } })]),
+      paragraph([text("p2 "), text("del-B", { revision: { type: "del", author: "Bob" } })]),
     ];
     return d;
   }
@@ -216,10 +205,7 @@ describe("track-changes mode (authoring)", () => {
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     ed.setTrackChanges({ enabled: false });
     off();
-    expect(seen).toEqual([
-      { enabled: true, author: "Alice" },
-      { enabled: false },
-    ]);
+    expect(seen).toEqual([{ enabled: true, author: "Alice" }, { enabled: false }]);
     ed.destroy();
   });
 
@@ -250,15 +236,10 @@ describe("track-changes mode (authoring)", () => {
     const ed = setupEditor(plainDoc());
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     const block = ed.getBlock(0);
-    ed.insertRun(
-      { block, offset: 5 },
-      { kind: "text", text: " brave", properties: {} },
-    );
+    ed.insertRun({ block, offset: 5 }, { kind: "text", text: " brave", properties: {} });
     const r = (ed.getDocument().body[0] as Paragraph).runs;
     // Middle inserted run picks up the marker; existing text untouched.
-    const inserted = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === " brave",
-    );
+    const inserted = r.find((x): x is TextRun => x.kind === "text" && x.text === " brave");
     expect(inserted?.properties.revision).toEqual({
       type: "ins",
       author: "Alice",
@@ -271,13 +252,8 @@ describe("track-changes mode (authoring)", () => {
   it("insertRun without mode leaves the run plain", () => {
     const ed = setupEditor(plainDoc());
     const block = ed.getBlock(0);
-    ed.insertRun(
-      { block, offset: 5 },
-      { kind: "text", text: " brave", properties: {} },
-    );
-    const inserted = runs(ed).find(
-      (x): x is TextRun => x.kind === "text" && x.text === " brave",
-    );
+    ed.insertRun({ block, offset: 5 }, { kind: "text", text: " brave", properties: {} });
+    const inserted = runs(ed).find((x): x is TextRun => x.kind === "text" && x.text === " brave");
     expect(inserted?.properties.revision).toBeUndefined();
     ed.destroy();
   });
@@ -294,9 +270,7 @@ describe("track-changes mode (authoring)", () => {
         properties: { revision: { type: "ins", author: "Bob" } },
       },
     );
-    const inserted = runs(ed).find(
-      (x): x is TextRun => x.kind === "text" && x.text === " brave",
-    );
+    const inserted = runs(ed).find((x): x is TextRun => x.kind === "text" && x.text === " brave");
     // Bob — not Alice — survives. Authoring never overwrites an
     // already-marked revision (e.g. an import replaying a peer's change).
     expect(inserted?.properties.revision?.author).toBe("Bob");
@@ -316,9 +290,7 @@ describe("track-changes mode (authoring)", () => {
     // Text is preserved; the "world" run carries a del marker.
     const joined = r.map((x) => (x.kind === "text" ? x.text : "")).join("");
     expect(joined).toBe("Hello world");
-    const del = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === "world",
-    );
+    const del = r.find((x): x is TextRun => x.kind === "text" && x.text === "world");
     expect(del?.properties.revision).toEqual({
       type: "del",
       author: "Alice",
@@ -370,9 +342,7 @@ describe("track-changes mode (authoring)", () => {
       from: { block, offset: 2 },
       to: { block, offset: 5 },
     });
-    const peer = runs(ed).find(
-      (x): x is TextRun => x.kind === "text" && x.text === "BOB",
-    );
+    const peer = runs(ed).find((x): x is TextRun => x.kind === "text" && x.text === "BOB");
     // Bob's revision survives — Alice must accept/reject it first.
     expect(peer?.properties.revision).toEqual({ type: "ins", author: "Bob" });
     ed.destroy();
@@ -405,10 +375,7 @@ describe("track-changes mode (authoring)", () => {
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     // 1. Tracked typing puts "_X_" in an ins wrapper.
     const block1 = ed.getBlock(0);
-    ed.insertRun(
-      { block: block1, offset: 5 },
-      { kind: "text", text: "_X_", properties: {} },
-    );
+    ed.insertRun({ block: block1, offset: 5 }, { kind: "text", text: "_X_", properties: {} });
     // 2. Mode off, but caret/insertion point is "inside" the ins
     //    region — simulate that via insertRun at offset 6 (between
     //    "_" and "X"). Routes through the API which already does the
@@ -417,14 +384,9 @@ describe("track-changes mode (authoring)", () => {
     //    with the surrounding revision runs.
     ed.setTrackChanges({ enabled: false });
     const block2 = ed.getBlock(0);
-    ed.insertRun(
-      { block: block2, offset: 6 },
-      { kind: "text", text: "Y", properties: {} },
-    );
+    ed.insertRun({ block: block2, offset: 6 }, { kind: "text", text: "Y", properties: {} });
     const r = runs(ed);
-    const plainY = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === "Y",
-    );
+    const plainY = r.find((x): x is TextRun => x.kind === "text" && x.text === "Y");
     // The Y run exists and has NO revision marker — the wrapper-
     // inheritance bug would manifest as `plainY.properties.revision`
     // being set to ins.
@@ -442,23 +404,13 @@ describe("track-changes mode (authoring)", () => {
     const ed = setupEditor(plainDoc());
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     const block1 = ed.getBlock(0);
-    ed.insertRun(
-      { block: block1, offset: 5 },
-      { kind: "text", text: "_T_", properties: {} },
-    );
+    ed.insertRun({ block: block1, offset: 5 }, { kind: "text", text: "_T_", properties: {} });
     ed.setTrackChanges({ enabled: false });
     const block2 = ed.getBlock(0);
-    ed.insertRun(
-      { block: block2, offset: 0 },
-      { kind: "text", text: "P_", properties: {} },
-    );
+    ed.insertRun({ block: block2, offset: 0 }, { kind: "text", text: "P_", properties: {} });
     const r = (ed.getDocument().body[0] as Paragraph).runs;
-    const tracked = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === "_T_",
-    );
-    const plain = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === "P_",
-    );
+    const tracked = r.find((x): x is TextRun => x.kind === "text" && x.text === "_T_");
+    const plain = r.find((x): x is TextRun => x.kind === "text" && x.text === "P_");
     expect(tracked?.properties.revision?.type).toBe("ins");
     expect(plain?.properties.revision).toBeUndefined();
     ed.destroy();
@@ -510,9 +462,7 @@ describe("track-changes mode (authoring)", () => {
 
   it("splitBlock inherits the source paragraph's properties on the new block", () => {
     const d = emptyDocument();
-    d.body = [
-      paragraph([text("Heading text")], { styleId: "Heading1", alignment: "center" }),
-    ];
+    d.body = [paragraph([text("Heading text")], { styleId: "Heading1", alignment: "center" })];
     const ed = setupEditor(d);
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     const block = ed.getBlock(0);
@@ -554,9 +504,7 @@ describe("track-changes mode (authoring)", () => {
     });
     (ed as unknown as PasteAccess).trackedInput.pasteTrackedText(" THERE");
     const r = (ed.getDocument().body[0] as Paragraph).runs;
-    const inserted = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === " THERE",
-    );
+    const inserted = r.find((x): x is TextRun => x.kind === "text" && x.text === " THERE");
     expect(inserted?.properties.revision).toEqual({
       type: "ins",
       author: "Alice",
@@ -577,7 +525,9 @@ describe("track-changes mode (authoring)", () => {
     (ed as unknown as PasteAccess).trackedInput.pasteTrackedText("\nLine two\nLine three");
     const body = ed.getDocument().body as Paragraph[];
     expect(body).toHaveLength(3);
-    expect(body[0]?.runs.map((r) => (r.kind === "text" ? r.text : "")).join("")).toBe("Hello world");
+    expect(body[0]?.runs.map((r) => (r.kind === "text" ? r.text : "")).join("")).toBe(
+      "Hello world",
+    );
     expect(body[1]?.properties.revision).toEqual({ type: "ins", author: "Alice" });
     expect(body[2]?.properties.revision).toEqual({ type: "ins", author: "Alice" });
     expect(body[1]?.runs.map((r) => (r.kind === "text" ? r.text : "")).join("")).toBe("Line two");
@@ -608,10 +558,7 @@ describe("track-changes mode (authoring)", () => {
     const ed = setupEditor(plainDoc());
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     const block = ed.getBlock(0);
-    ed.insertRun(
-      { block, offset: 5 },
-      { kind: "text", text: " brave", properties: {} },
-    );
+    ed.insertRun({ block, offset: 5 }, { kind: "text", text: " brave", properties: {} });
     const [span] = ed.getRevisions();
     expect(span?.author).toBe("Alice");
     const r = ed.acceptRevision(span!.range);
@@ -706,7 +653,8 @@ describe("block-level revisions (paragraph mark)", () => {
     const body = ed.getDocument().body as Paragraph[];
     expect(body).toHaveLength(2);
     expect(body.map((b) => b.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""))).toEqual([
-      "Keep", "After",
+      "Keep",
+      "After",
     ]);
     ed.destroy();
   });
@@ -765,7 +713,9 @@ describe("block-level revisions (paragraph mark)", () => {
     const body = ed.getDocument().body as Paragraph[];
     // Merged back into First — split cancelled, no trace.
     expect(body).toHaveLength(1);
-    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("FirstSecond");
+    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "FirstSecond",
+    );
     expect(body[0]?.properties.revision).toBeUndefined();
     ed.destroy();
   });
@@ -811,18 +761,24 @@ describe("block-level revisions (paragraph mark)", () => {
     const b0Runs = body[0]!.runs;
     const firstHead = b0Runs.find((r): r is TextRun => r.kind === "text" && r.text === "First ");
     expect(firstHead?.properties.revision).toBeUndefined();
-    const firstTail = b0Runs.find((r): r is TextRun => r.kind === "text" && r.text === "paragraph.");
+    const firstTail = b0Runs.find(
+      (r): r is TextRun => r.kind === "text" && r.text === "paragraph.",
+    );
     expect(firstTail?.properties.revision?.type).toBe("del");
     // Block 0's paragraph mark untouched.
     expect(body[0]?.properties.revision).toBeUndefined();
     // Block 1: entirely del, paragraph mark del too.
     expect(body[1]?.properties.revision).toEqual({ type: "del", author: "Alice" });
-    expect(body[1]!.runs.every((r) => r.kind === "text" && r.properties.revision?.type === "del")).toBe(true);
+    expect(
+      body[1]!.runs.every((r) => r.kind === "text" && r.properties.revision?.type === "del"),
+    ).toBe(true);
     // Block 2: "Last" (del) + " paragraph." (plain), paragraph mark del.
     expect(body[2]?.properties.revision).toEqual({ type: "del", author: "Alice" });
     const lastDel = body[2]!.runs.find((r): r is TextRun => r.kind === "text" && r.text === "Last");
     expect(lastDel?.properties.revision?.type).toBe("del");
-    const lastTail = body[2]!.runs.find((r): r is TextRun => r.kind === "text" && r.text === " paragraph.");
+    const lastTail = body[2]!.runs.find(
+      (r): r is TextRun => r.kind === "text" && r.text === " paragraph.",
+    );
     expect(lastTail?.properties.revision).toBeUndefined();
     ed.destroy();
   });
@@ -848,7 +804,9 @@ describe("block-level revisions (paragraph mark)", () => {
     const body = ed.getDocument().body as Paragraph[];
     // After accept: blocks merged into one, deleted text removed.
     expect(body).toHaveLength(1);
-    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("First  paragraph.");
+    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "First  paragraph.",
+    );
     ed.destroy();
   });
 
@@ -871,7 +829,9 @@ describe("block-level revisions (paragraph mark)", () => {
     const body = ed.getDocument().body as Paragraph[];
     // Three blocks collapsed to one — first + last's tail.
     expect(body).toHaveLength(1);
-    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("First  paragraph.");
+    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "First  paragraph.",
+    );
     ed.destroy();
   });
 
@@ -947,9 +907,11 @@ describe("block-level revisions (paragraph mark)", () => {
     const table = ed.getDocument().body[0];
     if (table?.kind !== "table") throw new Error("expected table");
     const cell0Text = (table.rows[0]?.cells[0]?.content[0] as Paragraph).runs
-      .map((r) => (r.kind === "text" ? r.text : "")).join("");
+      .map((r) => (r.kind === "text" ? r.text : ""))
+      .join("");
     const cell1Text = (table.rows[0]?.cells[1]?.content[0] as Paragraph).runs
-      .map((r) => (r.kind === "text" ? r.text : "")).join("");
+      .map((r) => (r.kind === "text" ? r.text : ""))
+      .join("");
     expect(cell0Text).toBe("Cell ins"); // ins accepted → text kept, marker stripped
     expect(cell1Text).toBe(" cell"); // del accepted → text removed
     ed.destroy();
@@ -1024,7 +986,9 @@ describe("block-level revisions (paragraph mark)", () => {
     expect(r.ok).toBe(true);
     const body = ed.getDocument().body as Paragraph[];
     expect(body).toHaveLength(1);
-    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("First Second");
+    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "First Second",
+    );
     ed.destroy();
   });
 
@@ -1065,10 +1029,7 @@ describe("block-level revisions (paragraph mark)", () => {
     d.body = [
       paragraph([text("First")]),
       paragraph([text("Second")], { revision: { type: "ins", author: "Alice" } }),
-      paragraph([
-        text("plain "),
-        text("ins", { revision: { type: "ins", author: "Bob" } }),
-      ]),
+      paragraph([text("plain "), text("ins", { revision: { type: "ins", author: "Bob" } })]),
     ];
     const ed = setupEditor(d);
     const spans = ed.getRevisions();
@@ -1085,10 +1046,7 @@ describe("block-level revisions (paragraph mark)", () => {
   it("acceptAllRevisions handles paragraph-mark revisions too", () => {
     const d = emptyDocument();
     d.body = [
-      paragraph([
-        text("Keep "),
-        text("ins-text", { revision: { type: "ins", author: "Alice" } }),
-      ]),
+      paragraph([text("Keep "), text("ins-text", { revision: { type: "ins", author: "Alice" } })]),
       paragraph([text("Second")], { revision: { type: "ins", author: "Alice" } }),
       paragraph([text(" gone")], { revision: { type: "del", author: "Alice" } }),
     ];
@@ -1100,8 +1058,12 @@ describe("block-level revisions (paragraph mark)", () => {
     // paragraph-del on block 2 merges block 2 into block 1.
     // Result: ["Keep ins-text", "Second gone"]
     expect(body).toHaveLength(2);
-    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("Keep ins-text");
-    expect(body[1]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("Second gone");
+    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "Keep ins-text",
+    );
+    expect(body[1]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "Second gone",
+    );
     expect(body[1]?.properties.revision).toBeUndefined();
     ed.destroy();
   });
@@ -1120,7 +1082,9 @@ describe("block-level revisions (paragraph mark)", () => {
     // Reject ins on B → merge B into A. Reject del on C → strip marker.
     // Result: ["Para A Para B", "Para C"]
     expect(body).toHaveLength(2);
-    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("Para A Para B");
+    expect(body[0]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe(
+      "Para A Para B",
+    );
     expect(body[1]?.runs.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("Para C");
     expect(body[1]?.properties.revision).toBeUndefined();
     ed.destroy();
@@ -1242,18 +1206,20 @@ describe("format-change revisions (w:rPrChange)", () => {
 
   it("a run can carry both an ins revision and a format revision independently", () => {
     const d = emptyDocument();
-    d.body = [paragraph([
-      text("plain "),
-      text("inserted", { revision: { type: "ins", author: "Alice" } }),
-    ])];
+    d.body = [
+      paragraph([text("plain "), text("inserted", { revision: { type: "ins", author: "Alice" } })]),
+    ];
     const ed = setupEditor(d);
     ed.setTrackChanges({ enabled: true, author: "Alice" });
     const ref = ed.getBlock(0);
     // Apply bold ONLY to the "inserted" run (offsets 6-14).
-    ed.applyRunProperties({
-      from: { block: ref, offset: 6 },
-      to: { block: ref, offset: 14 },
-    }, { bold: true });
+    ed.applyRunProperties(
+      {
+        from: { block: ref, offset: 6 },
+        to: { block: ref, offset: 14 },
+      },
+      { bold: true },
+    );
     const r = (ed.getDocument().body[0] as Paragraph).runs.find(
       (x): x is TextRun => x.kind === "text" && x.text === "inserted",
     );
@@ -1292,9 +1258,7 @@ describe("IME composition (insertCompositionText)", () => {
     fireComposition(host, "compositionstart");
     fireComposition(host, "compositionend", "字");
     const r = (ed.getDocument().body[0] as Paragraph).runs;
-    const inserted = r.find(
-      (x): x is TextRun => x.kind === "text" && x.text === "字",
-    );
+    const inserted = r.find((x): x is TextRun => x.kind === "text" && x.text === "字");
     expect(inserted?.properties.revision).toEqual({ type: "ins", author: "Alice" });
     const joined = r.map((x) => (x.kind === "text" ? x.text : "")).join("");
     expect(joined).toBe("A字B");
@@ -1336,9 +1300,7 @@ describe("IME composition (insertCompositionText)", () => {
     // No mutation, no revision marker, original text intact.
     const r = (ed.getDocument().body[0] as Paragraph).runs;
     expect(r.map((x) => (x.kind === "text" ? x.text : "")).join("")).toBe("AB");
-    expect(
-      r.every((x) => x.kind !== "text" || x.properties.revision === undefined),
-    ).toBe(true);
+    expect(r.every((x) => x.kind !== "text" || x.properties.revision === undefined)).toBe(true);
     ed.destroy();
   });
 

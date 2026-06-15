@@ -25,9 +25,9 @@
  * that lets one Node process host thousands of rooms.
  */
 
-import * as Y from "yjs";
 import type { WebSocket } from "ws";
 import { Awareness, removeAwarenessStates } from "y-protocols/awareness";
+import * as Y from "yjs";
 import type { Persistence } from "./persistence";
 
 export interface RoomOptions {

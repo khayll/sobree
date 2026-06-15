@@ -25,17 +25,17 @@ import "./review.css";
 import type {
   Block,
   Comment,
+  Editor,
   FloatingCornerPlacement,
   InlineRun,
   PluginContext,
   SobreePlugin,
   SobreeUnsubscribe,
-  Editor,
 } from "@sobree/core";
-import { colorForAuthor } from "./authorColor";
 import { RevisionActions } from "./actions";
+import { colorForAuthor } from "./authorColor";
 import { ReviewDock } from "./dock";
-import { ICON_RESOLVE, ICON_REOPEN } from "./icons";
+import { ICON_REOPEN, ICON_RESOLVE } from "./icons";
 
 export { colorForAuthor, authorSlot } from "./authorColor";
 
@@ -104,9 +104,7 @@ class ReviewController {
             host: ctx.host,
             editor: this.editor,
             stackRoot: this.stackRoot,
-            ...(opts.dockPlacement !== undefined
-              ? { placement: opts.dockPlacement }
-              : {}),
+            ...(opts.dockPlacement !== undefined ? { placement: opts.dockPlacement } : {}),
           })
         : null;
     // `paginate` is the "DOM re-laid-out" signal — it fires after every
@@ -173,7 +171,9 @@ class ReviewController {
     this.dock?.destroy();
     // Leave core's neutral marks intact; just clear what we added.
     for (const el of Array.from(
-      this.stackRoot.querySelectorAll<HTMLElement>("ins[data-revision-author], del[data-revision-author]"),
+      this.stackRoot.querySelectorAll<HTMLElement>(
+        "ins[data-revision-author], del[data-revision-author]",
+      ),
     )) {
       el.style.removeProperty("--author-color");
     }
@@ -205,17 +205,12 @@ function colourMarks(root: HTMLElement): void {
     "ins[data-revision-author], del[data-revision-author]",
   );
   for (const mark of Array.from(marks)) {
-    mark.style.setProperty(
-      "--author-color",
-      colorForAuthor(mark.dataset.revisionAuthor),
-    );
+    mark.style.setProperty("--author-color", colorForAuthor(mark.dataset.revisionAuthor));
   }
   // Paragraph-mark revisions — `data-block-revision="ins"|"del"` lives
   // on the paragraph element; the `::after` pseudo in core reads
   // `--sobree-block-revision-color`, which we set per-author here.
-  const blockMarks = root.querySelectorAll<HTMLElement>(
-    "[data-block-revision]",
-  );
+  const blockMarks = root.querySelectorAll<HTMLElement>("[data-block-revision]");
   for (const mark of Array.from(blockMarks)) {
     mark.style.setProperty(
       "--sobree-block-revision-color",
@@ -225,9 +220,7 @@ function colourMarks(root: HTMLElement): void {
   // Format-change revisions — the wrapping `<span.sobree-revision-format>`
   // reads `--sobree-format-revision-color` to colour the dashed
   // underline core ships as the neutral visual hint.
-  const formatMarks = root.querySelectorAll<HTMLElement>(
-    "span.sobree-revision-format",
-  );
+  const formatMarks = root.querySelectorAll<HTMLElement>("span.sobree-revision-format");
   for (const mark of Array.from(formatMarks)) {
     mark.style.setProperty(
       "--sobree-format-revision-color",
@@ -360,9 +353,7 @@ function buildCommentEl(c: Comment, depth: number, editor: Editor): HTMLElement 
   toggle.setAttribute("aria-label", toggle.title);
   toggle.innerHTML = reopening ? ICON_REOPEN : ICON_RESOLVE;
   toggle.addEventListener("click", () => {
-    const result = reopening
-      ? editor.reopenComment(c.id)
-      : editor.resolveComment(c.id);
+    const result = reopening ? editor.reopenComment(c.id) : editor.resolveComment(c.id);
     if (!result.ok) {
       console.warn("[review] resolve/reopen failed:", result.error);
     }

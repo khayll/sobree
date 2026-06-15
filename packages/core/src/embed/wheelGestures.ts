@@ -75,9 +75,7 @@ export class WheelGestures {
     const isWheelZoom = e.shiftKey || e.metaKey;
     if (isPinch || isWheelZoom) {
       e.preventDefault();
-      const sensitivity = isPinch
-        ? this.opts.pinchZoomSensitivity
-        : this.opts.wheelZoomSensitivity;
+      const sensitivity = isPinch ? this.opts.pinchZoomSensitivity : this.opts.wheelZoomSensitivity;
       const factor = Math.exp(-e.deltaY * sensitivity);
       this.host.zoomTo(this.host.getScale() * factor, e.clientX, e.clientY);
       return;

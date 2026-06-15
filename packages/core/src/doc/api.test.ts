@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import {
   type BlockRef,
   type EditResult,
@@ -11,7 +12,6 @@ import {
   ok,
   sameBlock,
 } from "./api";
-import { describe, expect, it } from "vitest";
 
 const b1: BlockRef = { id: "b1", version: 0 };
 const b2: BlockRef = { id: "b2", version: 5 };
@@ -52,12 +52,12 @@ describe("Range / Selection helpers", () => {
 
   it("isCaret recognises both caret selections and collapsed ranges", () => {
     expect(isCaret(caretAt(inlineAt(b1, 0)))).toBe(true);
-    expect(
-      isCaret({ kind: "range", range: makeRange(inlineAt(b1, 3), inlineAt(b1, 3)) }),
-    ).toBe(true);
-    expect(
-      isCaret({ kind: "range", range: makeRange(inlineAt(b1, 0), inlineAt(b1, 5)) }),
-    ).toBe(false);
+    expect(isCaret({ kind: "range", range: makeRange(inlineAt(b1, 3), inlineAt(b1, 3)) })).toBe(
+      true,
+    );
+    expect(isCaret({ kind: "range", range: makeRange(inlineAt(b1, 0), inlineAt(b1, 5)) })).toBe(
+      false,
+    );
     expect(isCaret(null)).toBe(false);
   });
 });

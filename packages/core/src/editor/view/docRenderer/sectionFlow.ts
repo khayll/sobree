@@ -7,8 +7,8 @@
  * and visual collapsing of pre-break empty paragraphs.
  */
 
-import { twipsToMm } from "./units";
 import type { SectionProperties } from "../../../doc/types";
+import { twipsToMm } from "./units";
 
 /**
  * If `section.columns.count > 1`, append a column container to `host`
@@ -56,10 +56,7 @@ export function openColumnContainerIfNeeded(
  * Word's column balancing semantics: empties between content count,
  * trailing empties do not.
  */
-export function evictTrailingEmptyParagraphs(
-  container: HTMLElement,
-  host: HTMLElement,
-): void {
+export function evictTrailingEmptyParagraphs(container: HTMLElement, host: HTMLElement): void {
   if (!container.classList.contains("sobree-section-cols")) return;
   // Collect the trailing empties first, then re-append in DOCUMENT order.
   // Popping `lastElementChild` and appending as we go would reverse them —

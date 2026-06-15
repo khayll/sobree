@@ -12,15 +12,9 @@
  * create stack items.
  */
 
+import { appendBlock, createSobree, emptyDocument, paragraph, text } from "@sobree/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import {
-  appendBlock,
-  createSobree,
-  emptyDocument,
-  paragraph,
-  text,
-} from "@sobree/core";
 
 describe("Phase 1b.6 — per-peer undo", () => {
   let aHost: HTMLElement;

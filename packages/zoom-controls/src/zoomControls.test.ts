@@ -1,6 +1,6 @@
+import type { Viewport } from "@sobree/core";
 import { describe, expect, it, vi } from "vitest";
 import { ZoomControls } from "./zoomControls";
-import type { Viewport } from "@sobree/core";
 
 interface FakeViewport {
   container: HTMLElement;
@@ -67,14 +67,10 @@ describe("ZoomControls", () => {
       zoomFactor: 2,
     });
 
-    dock.root
-      .querySelector<HTMLButtonElement>('button[data-zc-action="zoom-in"]')!
-      .click();
+    dock.root.querySelector<HTMLButtonElement>('button[data-zc-action="zoom-in"]')!.click();
     expect(vp.zoomTo).toHaveBeenLastCalledWith(2, 100, 50);
 
-    dock.root
-      .querySelector<HTMLButtonElement>('button[data-zc-action="zoom-out"]')!
-      .click();
+    dock.root.querySelector<HTMLButtonElement>('button[data-zc-action="zoom-out"]')!.click();
     expect(vp.zoomTo).toHaveBeenLastCalledWith(0.5, 100, 50);
     dock.destroy();
   });
@@ -96,15 +92,11 @@ describe("ZoomControls", () => {
       fitPageTarget: pageResolver,
     });
 
-    dock.root
-      .querySelector<HTMLButtonElement>('button[data-zc-action="fit-width"]')!
-      .click();
+    dock.root.querySelector<HTMLButtonElement>('button[data-zc-action="fit-width"]')!.click();
     expect(widthResolver).toHaveBeenCalledOnce();
     expect(vp.fitTo).toHaveBeenLastCalledWith(widthTarget, "width", true);
 
-    dock.root
-      .querySelector<HTMLButtonElement>('button[data-zc-action="fit-page"]')!
-      .click();
+    dock.root.querySelector<HTMLButtonElement>('button[data-zc-action="fit-page"]')!.click();
     expect(pageResolver).toHaveBeenCalledOnce();
     expect(vp.fitTo).toHaveBeenLastCalledWith(pageTarget, "contain", true);
     dock.destroy();

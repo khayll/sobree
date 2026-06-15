@@ -399,8 +399,6 @@
   padding: 0 4px;
 }
 
-
-
 /* Unequal multi-column sections (Word `<w:cols w:equalWidth="0">`). CSS
  * multi-column can't size columns individually, so the column tracks are
  * laid side by side with explicit per-column widths (set inline in mm by

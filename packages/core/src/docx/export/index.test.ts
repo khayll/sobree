@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { exportDocx } from "./index";
 import { appendBlock, emptyDocument, heading, paragraph, strong, text } from "../../doc/builders";
 import type { SobreeDocument } from "../../doc/types";
+import { exportDocx } from "./index";
 
 function buildSample(): SobreeDocument {
   const doc = emptyDocument();

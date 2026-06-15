@@ -1,8 +1,8 @@
-import * as Y from "yjs";
-import type { WebSocket } from "ws";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Room } from "./room";
+import type { WebSocket } from "ws";
+import * as Y from "yjs";
 import { memoryPersistence } from "./persistence";
+import { Room } from "./room";
 
 describe("Room", () => {
   let room: Room;

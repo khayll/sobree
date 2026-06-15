@@ -24,7 +24,8 @@ ${source}
 function stubParseBlockBody(txbxContent: Element): Block[] {
   const out: Block[] = [];
   for (const child of Array.from(txbxContent.children)) {
-    if (child.namespaceURI !== "http://schemas.openxmlformats.org/wordprocessingml/2006/main") continue;
+    if (child.namespaceURI !== "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+      continue;
     if (child.localName === "p") {
       const text = (child.textContent ?? "").trim();
       out.push({
@@ -41,7 +42,7 @@ const emptyCtx = { rels: new Map<string, string>(), parseBlockBody: stubParseBlo
 
 describe("parseInlineFrames", () => {
   it("returns [] when there are no <w:drawing> elements", () => {
-    const doc = xml(`<w:body><w:p/></w:body>`);
+    const doc = xml("<w:body><w:p/></w:body>");
     expect(parseInlineFrames(doc, emptyCtx)).toEqual([]);
   });
 
@@ -132,7 +133,11 @@ describe("parseInlineFrames", () => {
       offsetEmu: { xEmu: 500000, yEmu: 100000 },
       sizeEmu: { wEmu: 4000000, hEmu: 300000 },
       body: [
-        { kind: "paragraph", runs: [{ kind: "text", text: "Objective", properties: {} }], properties: {} },
+        {
+          kind: "paragraph",
+          runs: [{ kind: "text", text: "Objective", properties: {} }],
+          properties: {},
+        },
       ],
     });
   });
@@ -284,7 +289,9 @@ describe("parseInlineFrames", () => {
     expect(frames).toHaveLength(1);
     const f = frames[0]!.frame;
     expect(f.textboxes).toHaveLength(2);
-    expect(f.textboxes[0]!.body[0]).toMatchObject({ runs: [{ text: "Project: HRB Mobile Banking" }] });
+    expect(f.textboxes[0]!.body[0]).toMatchObject({
+      runs: [{ text: "Project: HRB Mobile Banking" }],
+    });
     expect(f.textboxes[1]!.body[0]).toMatchObject({ runs: [{ text: "Client: H & R Block" }] });
     // The arrow picture is captured too.
     expect(f.pictures).toHaveLength(1);

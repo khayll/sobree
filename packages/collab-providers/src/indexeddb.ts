@@ -1,5 +1,5 @@
-import type { CollabHandle } from "./types";
 import type * as Y from "yjs";
+import type { CollabHandle } from "./types";
 
 export interface IndexedDBProviderOptions {
   /** Database name. Each name is a separate IndexedDB store. Use one

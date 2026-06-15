@@ -1,3 +1,11 @@
+import { defaultStyles } from "@sobree/core";
+import type {
+  Range as ApiRange,
+  Editor,
+  InlinePosition,
+  Paragraph,
+  SobreeDocument,
+} from "@sobree/core";
 /**
  * Tests `readSelectionState` against a fixture document, exercising:
  *   - cascade-resolved fontFamily / fontSizePt / bold for headings
@@ -12,14 +20,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { readSelectionState } from "./selectionState";
-import { defaultStyles } from "@sobree/core";
-import type {
-  Editor,
-  Paragraph,
-  SobreeDocument,
-  Range as ApiRange,
-  InlinePosition,
-} from "@sobree/core";
 
 function makeStub(opts: {
   doc: SobreeDocument;
@@ -37,9 +37,7 @@ function makeStub(opts: {
       if (block.kind !== "paragraph") {
         return { index: idx, id, version: 1, kind: block.kind, text: "", length: 0 };
       }
-      const text = block.runs
-        .map((r) => (r.kind === "text" ? r.text : ""))
-        .join("");
+      const text = block.runs.map((r) => (r.kind === "text" ? r.text : "")).join("");
       return {
         index: idx,
         id,
@@ -120,9 +118,7 @@ describe("readSelectionState — cascade resolution", () => {
     const p: Paragraph = {
       kind: "paragraph",
       properties: {},
-      runs: [
-        { kind: "text", text: "big", properties: { fontSizePt: 24, italic: true } },
-      ],
+      runs: [{ kind: "text", text: "big", properties: { fontSizePt: 24, italic: true } }],
     };
     const doc = makeDoc([p]);
     const state = readSelectionState(makeStub({ doc, caretAt: { blockIndex: 0, offset: 1 } }));

@@ -1,7 +1,7 @@
-import { defineConfig, type Plugin } from "vite";
-import { readdir, readFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
+import { readFile, readdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { type Plugin, defineConfig } from "vite";
 
 /**
  * Dev playground for Sobree contributors.

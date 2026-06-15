@@ -4,8 +4,8 @@
  * undo/redo round-trip.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Editor } from "./index";
 import { emptyDocument, paragraph, text } from "../doc/builders";
+import { Editor } from "./index";
 
 let host: HTMLElement;
 let editor: Editor;
@@ -58,11 +58,11 @@ describe("History — AST mutations", () => {
     expect(editor.history.redo()).toBe(true);
     const head = editor.getDocument().body[0];
     expect(head?.kind).toBe("paragraph");
-    expect(
-      head?.kind === "paragraph"
-        ? head.runs[0]
-        : null,
-    ).toEqual({ kind: "text", text: "after-undo-redo", properties: {} });
+    expect(head?.kind === "paragraph" ? head.runs[0] : null).toEqual({
+      kind: "text",
+      text: "after-undo-redo",
+      properties: {},
+    });
   });
 
   it("a new commit clears the redo stack", () => {

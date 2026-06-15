@@ -13,29 +13,19 @@
  * per definition plus the `<w:num>` instance binding its `numId`.
  */
 
-import { el, xmlDocument } from "../shared/xml";
-import { NS } from "../shared/namespaces";
 import type { NumberingDefinition, NumberingLevel } from "../../doc/types";
+import { NS } from "../shared/namespaces";
+import { el, xmlDocument } from "../shared/xml";
 
-export function renderNumberingXml(
-  numbering: readonly NumberingDefinition[],
-): string | null {
+export function renderNumberingXml(numbering: readonly NumberingDefinition[]): string | null {
   if (numbering.length === 0) return null;
   const abstracts = numbering.map((def, i) =>
-    el(
-      "w:abstractNum",
-      { "w:abstractNumId": i },
-      def.abstractFormat.levels.map(renderLevel),
-    ),
+    el("w:abstractNum", { "w:abstractNumId": i }, def.abstractFormat.levels.map(renderLevel)),
   );
   const nums = numbering.map((def, i) =>
-    el("w:num", { "w:numId": def.numId }, [
-      el("w:abstractNumId", { "w:val": i }),
-    ]),
+    el("w:num", { "w:numId": def.numId }, [el("w:abstractNumId", { "w:val": i })]),
   );
-  return xmlDocument(
-    el("w:numbering", { "xmlns:w": NS.w }, [...abstracts, ...nums]),
-  );
+  return xmlDocument(el("w:numbering", { "xmlns:w": NS.w }, [...abstracts, ...nums]));
 }
 
 function renderLevel(lvl: NumberingLevel): string {

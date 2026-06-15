@@ -89,10 +89,7 @@ export function summariseBlock(ctx: EditorContext, block: Block, index: number):
 }
 
 /** Refresh a position's block ref to the live version (id stays stable). */
-export function refreshedPosition(
-  ctx: EditorContext,
-  at: InlinePosition,
-): InlinePosition | null {
+export function refreshedPosition(ctx: EditorContext, at: InlinePosition): InlinePosition | null {
   const info = getBlockById(ctx, at.block.id);
   if (!info) return null;
   return { block: { id: info.id, version: info.version }, offset: at.offset };

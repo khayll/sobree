@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { paginateMeasurements } from "./engine";
-import type {
-  BlockMeasurement,
-  PaginationConstraints,
-} from "./types";
+import type { BlockMeasurement, PaginationConstraints } from "./types";
 
 function constraints(over: Partial<PaginationConstraints> = {}): PaginationConstraints {
   return {
@@ -180,10 +177,7 @@ describe("paginateMeasurements — grewPageArray flag", () => {
 
 describe("paginateMeasurements — totalCost is the sum of per-page costs", () => {
   it("matches sum of pages[].cost from engine output", () => {
-    const ms = [
-      block({ blockId: "b0", height: 60 }),
-      block({ blockId: "b1", height: 60 }),
-    ];
+    const ms = [block({ blockId: "b0", height: 60 }), block({ blockId: "b1", height: 60 })];
     const out = paginateMeasurements(ms, constraints({ defaultPageHeight: 100 }));
     // Sum of two pages' costs — accept any non-negative finite number,
     // the engine's underfull-weight discipline isn't part of this

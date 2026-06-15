@@ -25,12 +25,12 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
-import { importDocx } from "../docx/import";
-import { seedYDoc } from "./seed";
-import { projectYDoc } from "./project";
+import * as Y from "yjs";
 import type { Block, InlineRun, SobreeDocument } from "../doc/types";
+import { importDocx } from "../docx/import";
+import { projectYDoc } from "./project";
+import { seedYDoc } from "./seed";
 
 const CORPUS_DIR = join(__dirname, "..", "..", "..", "..", "tests", "corpus");
 
@@ -96,7 +96,11 @@ describe("Y.Doc parity — import → seed → project is lossless", () => {
     it(slug, async () => {
       const { document: doc } = await importDocx(new Uint8Array(readFileSync(path)));
       const ydoc = new Y.Doc();
-      seedYDoc(ydoc, doc, doc.body.map((_, i) => `b${i}`));
+      seedYDoc(
+        ydoc,
+        doc,
+        doc.body.map((_, i) => `b${i}`),
+      );
       const { doc: out } = projectYDoc(ydoc);
 
       expect(j(normalizeBlocks(out.body))).toEqual(j(normalizeBlocks(doc.body)));

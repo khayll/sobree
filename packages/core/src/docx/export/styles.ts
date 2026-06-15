@@ -1,7 +1,7 @@
-import { ptToHalfPt } from "../shared/units";
-import { NS } from "../shared/namespaces";
-import { el, xmlDocument } from "../shared/xml";
 import type { NamedStyle, RunProperties } from "../../doc/types";
+import { NS } from "../shared/namespaces";
+import { ptToHalfPt } from "../shared/units";
+import { el, xmlDocument } from "../shared/xml";
 
 /**
  * Render the document's named styles into `word/styles.xml`. Word needs a
@@ -14,11 +14,10 @@ export function renderStylesXml(styles: readonly NamedStyle[]): string {
 
   // Document-wide defaults.
   children.push(
-    el(
-      "w:docDefaults",
-      null,
-      [el("w:rPrDefault", null, el("w:rPr", null, "")), el("w:pPrDefault", null, el("w:pPr", null, ""))],
-    ),
+    el("w:docDefaults", null, [
+      el("w:rPrDefault", null, el("w:rPr", null, "")),
+      el("w:pPrDefault", null, el("w:pPr", null, "")),
+    ]),
   );
 
   const hasNormal = styles.some((s) => s.id === "Normal");

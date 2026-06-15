@@ -22,11 +22,7 @@ const execFileAsync = promisify(execFile);
  * binary is checked explicitly. Linux distros put `soffice` /
  * `libreoffice` on PATH by default.
  */
-const SEARCH = [
-  "soffice",
-  "libreoffice",
-  "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-];
+const SEARCH = ["soffice", "libreoffice", "/Applications/LibreOffice.app/Contents/MacOS/soffice"];
 
 export async function findSoffice(): Promise<string> {
   for (const candidate of SEARCH) {
@@ -39,9 +35,7 @@ export async function findSoffice(): Promise<string> {
     }
   }
   throw new Error(
-    `LibreOffice (soffice) not found. Searched: ${SEARCH.join(", ")}. ` +
-      `Install with \`brew install --cask libreoffice\` on macOS, ` +
-      `or your distro's libreoffice package on Linux.`,
+    `LibreOffice (soffice) not found. Searched: ${SEARCH.join(", ")}. Install with \`brew install --cask libreoffice\` on macOS, or your distro's libreoffice package on Linux.`,
   );
 }
 
@@ -63,12 +57,13 @@ export async function convertDocxToPdf(
     ["--headless", "--convert-to", "pdf", "--outdir", outDir, docxPath],
     { timeout: 60_000 },
   );
-  const basename = docxPath.split("/").pop()!.replace(/\.docx$/i, ".pdf");
+  const basename = docxPath
+    .split("/")
+    .pop()!
+    .replace(/\.docx$/i, ".pdf");
   const pdfPath = join(outDir, basename);
   if (!existsSync(pdfPath)) {
-    throw new Error(
-      `soffice exited 0 but expected PDF at ${pdfPath} was not produced.`,
-    );
+    throw new Error(`soffice exited 0 but expected PDF at ${pdfPath} was not produced.`);
   }
   return pdfPath;
 }

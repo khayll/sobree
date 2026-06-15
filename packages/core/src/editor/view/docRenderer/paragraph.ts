@@ -5,11 +5,11 @@
  * and single-tab "label \t value" right-spread.
  */
 
-import { applyParagraphProps } from "./properties";
-import { appendInlineRuns } from "./inline";
-import { resolveFontFace } from "./fontFallback";
-import { headingLevelOf } from "../../../doc/walk";
 import type { NamedStyle, Paragraph } from "../../../doc/types";
+import { headingLevelOf } from "../../../doc/walk";
+import { resolveFontFace } from "./fontFallback";
+import { appendInlineRuns } from "./inline";
+import { applyParagraphProps } from "./properties";
 
 export function renderParagraph(
   p: Paragraph,
@@ -25,8 +25,7 @@ export function renderParagraph(
   // its first bullet on google-modern.docx. The original heading
   // semantics never matter for an empty paragraph — there's no
   // outline entry to lose.
-  const isEmpty = p.runs.length === 0
-    || p.runs.every((r) => (r.kind === "text" ? !r.text : false));
+  const isEmpty = p.runs.length === 0 || p.runs.every((r) => (r.kind === "text" ? !r.text : false));
   const tag = level && !isEmpty ? `h${level}` : "p";
   const el = document.createElement(tag);
   applyParagraphProps(el, p.properties, styles);

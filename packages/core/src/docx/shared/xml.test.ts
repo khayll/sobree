@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NS } from "./namespaces";
 import {
   el,
   escapeXmlText,
@@ -10,7 +11,6 @@ import {
   wVal,
   xmlDocument,
 } from "./xml";
-import { NS } from "./namespaces";
 
 const sample = `<?xml version="1.0"?>
 <w:p xmlns:w="${NS.w}">
@@ -124,8 +124,6 @@ describe("escapeXmlText", () => {
 describe("xmlDocument", () => {
   it("prepends the XML declaration to the root markup", () => {
     const out = xmlDocument("<w:document/>");
-    expect(out).toBe(
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document/>',
-    );
+    expect(out).toBe('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document/>');
   });
 });

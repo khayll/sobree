@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { BlockRegistry } from "./blockRegistry";
 import {
   blockElementAtIndex,
@@ -7,7 +8,6 @@ import {
   positionFromDomPoint,
   rangeFromDomRange,
 } from "./positionMap";
-import { describe, expect, it } from "vitest";
 
 function setupHost(html: string): { host: HTMLElement; registry: BlockRegistry } {
   const host = document.createElement("div");
@@ -27,12 +27,12 @@ function firstText(el: Element): Text {
 
 describe("countBlocks + blockElementAtIndex", () => {
   it("counts paragraphs and headings as single blocks", () => {
-    const { host } = setupHost(`<p>one</p><h1>two</h1><p>three</p>`);
+    const { host } = setupHost("<p>one</p><h1>two</h1><p>three</p>");
     expect(countBlocks([host])).toBe(3);
   });
 
   it("expands <ul>/<ol> into one block per <li>", () => {
-    const { host } = setupHost(`<p>a</p><ul><li>x</li><li>y</li></ul><p>b</p>`);
+    const { host } = setupHost("<p>a</p><ul><li>x</li><li>y</li></ul><p>b</p>");
     expect(countBlocks([host])).toBe(4);
     expect(blockElementAtIndex([host], 0)?.tagName).toBe("P");
     expect(blockElementAtIndex([host], 1)?.tagName).toBe("LI");
@@ -43,31 +43,31 @@ describe("countBlocks + blockElementAtIndex", () => {
 
 describe("blockLength", () => {
   it("counts characters in a plain text paragraph", () => {
-    const { host } = setupHost(`<p>hello</p>`);
+    const { host } = setupHost("<p>hello</p>");
     const p = host.querySelector("p")!;
     expect(blockLength(p)).toBe(5);
   });
 
   it("treats wrapper elements (<strong>, <em>, <span>) as transparent", () => {
-    const { host } = setupHost(`<p>hi <strong>bold</strong> now</p>`);
+    const { host } = setupHost("<p>hi <strong>bold</strong> now</p>");
     const p = host.querySelector("p")!;
     expect(blockLength(p)).toBe("hi bold now".length);
   });
 
   it("counts <br>, <img>, <hr> as 1 each", () => {
-    const { host } = setupHost(`<p>a<br>b<img/>c</p>`);
+    const { host } = setupHost("<p>a<br>b<img/>c</p>");
     expect(blockLength(host.querySelector("p")!)).toBe(5);
   });
 
   it("counts a mix of text and atoms", () => {
-    const { host } = setupHost(`<p>foo<br>bar<span>baz</span></p>`);
+    const { host } = setupHost("<p>foo<br>bar<span>baz</span></p>");
     expect(blockLength(host.querySelector("p")!)).toBe(10); // 3 + 1 + 3 + 3
   });
 });
 
 describe("positionFromDomPoint", () => {
   it("returns block ref + offset for a point inside a text node", () => {
-    const { host, registry } = setupHost(`<p>hello</p>`);
+    const { host, registry } = setupHost("<p>hello</p>");
     const p = host.querySelector("p")!;
     const t = firstText(p);
     const pos = positionFromDomPoint([host], registry, t, 3);
@@ -76,7 +76,7 @@ describe("positionFromDomPoint", () => {
   });
 
   it("accounts for wrapper ancestors when measuring offset", () => {
-    const { host, registry } = setupHost(`<p>hi <strong>bold</strong> now</p>`);
+    const { host, registry } = setupHost("<p>hi <strong>bold</strong> now</p>");
     const p = host.querySelector("p")!;
     const strongText = p.querySelector("strong")!.firstChild as Text;
     // Caret between 'b' and 'o' of "bold": "hi " (3) + 1 = 4
@@ -85,7 +85,7 @@ describe("positionFromDomPoint", () => {
   });
 
   it("counts atoms preceding the point", () => {
-    const { host, registry } = setupHost(`<p>a<br>b<br>c</p>`);
+    const { host, registry } = setupHost("<p>a<br>b<br>c</p>");
     const p = host.querySelector("p")!;
     const lastText = Array.from(p.childNodes).find(
       (n) => n.nodeType === Node.TEXT_NODE && n.textContent === "c",
@@ -95,7 +95,7 @@ describe("positionFromDomPoint", () => {
   });
 
   it("returns the correct block ref for items inside <ul>", () => {
-    const { host, registry } = setupHost(`<p>a</p><ul><li>one</li><li>two</li></ul>`);
+    const { host, registry } = setupHost("<p>a</p><ul><li>one</li><li>two</li></ul>");
     const li2 = host.querySelectorAll("li")[1]!;
     const pos = positionFromDomPoint([host], registry, firstText(li2), 2);
     expect(pos?.block.id).toBe("b3");
@@ -103,7 +103,7 @@ describe("positionFromDomPoint", () => {
   });
 
   it("returns null for a point outside the host", () => {
-    const { host, registry } = setupHost(`<p>hi</p>`);
+    const { host, registry } = setupHost("<p>hi</p>");
     const outside = document.createElement("div");
     outside.textContent = "elsewhere";
     document.body.appendChild(outside);
@@ -114,7 +114,7 @@ describe("positionFromDomPoint", () => {
 
 describe("domPointFromPosition round-trip", () => {
   it("finds a (node, offset) equivalent to the requested char offset", () => {
-    const { host, registry } = setupHost(`<p>hello</p>`);
+    const { host, registry } = setupHost("<p>hello</p>");
     const pos = { block: registry.refAt(0), offset: 3 };
     const pt = domPointFromPosition([host], registry, pos);
     expect(pt?.node.nodeType).toBe(Node.TEXT_NODE);
@@ -123,7 +123,7 @@ describe("domPointFromPosition round-trip", () => {
   });
 
   it("walks past wrappers to reach the right text node", () => {
-    const { host, registry } = setupHost(`<p>hi <strong>bold</strong> now</p>`);
+    const { host, registry } = setupHost("<p>hi <strong>bold</strong> now</p>");
     const pos = { block: registry.refAt(0), offset: 5 };
     const pt = domPointFromPosition([host], registry, pos);
     expect(pt?.node.nodeType).toBe(Node.TEXT_NODE);
@@ -132,7 +132,7 @@ describe("domPointFromPosition round-trip", () => {
   });
 
   it("places the caret beside an atom for edge offsets", () => {
-    const { host, registry } = setupHost(`<p>a<br>b</p>`);
+    const { host, registry } = setupHost("<p>a<br>b</p>");
     // offset=1 → the caret is between 'a' and '<br>'.
     const pt = domPointFromPosition([host], registry, { block: registry.refAt(0), offset: 1 });
     expect(pt?.node.nodeType).toBe(Node.TEXT_NODE);
@@ -151,7 +151,7 @@ describe("domPointFromPosition round-trip", () => {
   });
 
   it("returns a (block, childCount) point for offset past the end", () => {
-    const { host, registry } = setupHost(`<p>hi</p>`);
+    const { host, registry } = setupHost("<p>hi</p>");
     const pt = domPointFromPosition([host], registry, { block: registry.refAt(0), offset: 10 });
     expect(pt?.node).toBe(host.querySelector("p"));
     expect(pt?.offset).toBe(host.querySelector("p")!.childNodes.length);
@@ -160,7 +160,7 @@ describe("domPointFromPosition round-trip", () => {
 
 describe("rangeFromDomRange", () => {
   it("round-trips a DOM range into an API range", () => {
-    const { host, registry } = setupHost(`<p>hello world</p>`);
+    const { host, registry } = setupHost("<p>hello world</p>");
     const p = host.querySelector("p")!;
     const t = firstText(p);
     const domRange = document.createRange();
@@ -173,7 +173,7 @@ describe("rangeFromDomRange", () => {
   });
 
   it("handles ranges that span two blocks", () => {
-    const { host, registry } = setupHost(`<p>foo</p><p>bar</p>`);
+    const { host, registry } = setupHost("<p>foo</p><p>bar</p>");
     const [p1, p2] = host.querySelectorAll("p");
     const domRange = document.createRange();
     domRange.setStart(firstText(p1!), 1);

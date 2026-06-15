@@ -22,11 +22,7 @@
  * calls produce equivalent DOM — safe to swap out wholesale.
  */
 
-import type {
-  AnchoredFrame,
-  AnchoredContent,
-  Block,
-} from "../../../doc/types";
+import type { AnchoredContent, AnchoredFrame, Block } from "../../../doc/types";
 import { emuToMm, emuToPx } from "./units";
 
 export interface AnchorLayerContext {
@@ -99,21 +95,21 @@ function renderFrame(frame: AnchoredFrame, ctx: AnchorLayerContext): HTMLElement
   return el;
 }
 
-function paintContent(
-  host: HTMLElement,
-  frame: AnchoredFrame,
-  ctx: AnchorLayerContext,
-): void {
+function paintContent(host: HTMLElement, frame: AnchoredFrame, ctx: AnchorLayerContext): void {
   const c = frame.content;
   switch (c.kind) {
     case "picture":
-      return paintPicture(host, c, ctx);
+      paintPicture(host, c, ctx);
+      break;
     case "shape":
-      return paintShape(host, c);
+      paintShape(host, c);
+      break;
     case "textbox":
-      return paintTextbox(host, c, ctx);
+      paintTextbox(host, c, ctx);
+      break;
     case "group":
-      return paintGroup(host, c, frame.widthEmu, frame.heightEmu, ctx);
+      paintGroup(host, c, frame.widthEmu, frame.heightEmu, ctx);
+      break;
   }
 }
 
@@ -136,10 +132,7 @@ function paintPicture(
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-function paintShape(
-  host: HTMLElement,
-  content: Extract<AnchoredContent, { kind: "shape" }>,
-): void {
+function paintShape(host: HTMLElement, content: Extract<AnchoredContent, { kind: "shape" }>): void {
   // Custom geometry paints as an SVG path filling the host box — not a
   // CSS background, which only does rectangles. Handle it first and
   // return so the preset-fill/border path below never touches it.
@@ -165,7 +158,6 @@ function paintShape(
       // rule centered vertically; for a vertical line the EMU dims
       // would naturally make it tall+thin so this still reads right.
       break;
-    case "rect":
     default:
       break;
   }
@@ -228,9 +220,7 @@ function paintTextbox(
       if (block.kind !== "paragraph") continue;
       const p = document.createElement("p");
       p.style.margin = "0";
-      p.textContent = block.runs
-        .map((r) => (r.kind === "text" ? r.text : ""))
-        .join("");
+      p.textContent = block.runs.map((r) => (r.kind === "text" ? r.text : "")).join("");
       host.appendChild(p);
     }
   }
@@ -253,10 +243,8 @@ function paintGroup(
   // `origin × scale` (the IOWA-letterhead displacement bug).
   const originX = content.childCoordOffsetX ?? 0;
   const originY = content.childCoordOffsetY ?? 0;
-  const scaleX =
-    content.childCoordSystemCx > 0 ? frameWidthEmu / content.childCoordSystemCx : 1;
-  const scaleY =
-    content.childCoordSystemCy > 0 ? frameHeightEmu / content.childCoordSystemCy : 1;
+  const scaleX = content.childCoordSystemCx > 0 ? frameWidthEmu / content.childCoordSystemCx : 1;
+  const scaleY = content.childCoordSystemCy > 0 ? frameHeightEmu / content.childCoordSystemCy : 1;
   for (const child of content.children) {
     const childEl = renderFrame(
       {
@@ -280,10 +268,7 @@ function applyBorder(
   host.style.border = `${widthPx}px ${border.style} ${border.color}`;
 }
 
-function resolvePictureUrl(
-  partPath: string,
-  ctx: AnchorLayerContext,
-): string | null {
+function resolvePictureUrl(partPath: string, ctx: AnchorLayerContext): string | null {
   const cached = ctx.pictureUrlCache.get(partPath);
   if (cached) return cached;
   const bytes = ctx.rawParts[partPath];

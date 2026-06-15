@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BlockInfo, BlockRef, Editor, Paragraph, Table } from "@sobree/core";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BlockTarget } from "../blockKinds";
 
 // We need to access the popover's click handler to drive applyConversion,
@@ -17,15 +17,13 @@ function makeEditorStub(initialDoc: { body: Array<Paragraph | Table>; numbering:
     ...initialDoc,
     body: initialDoc.body.slice(),
   };
-  const replaceBlock = vi.fn(
-    (target: BlockRef, block: Paragraph | Table) => {
-      const idx = Number(target.id.slice(1)) - 1;
-      const next = doc.body.slice();
-      next[idx] = block;
-      doc = { ...doc, body: next };
-      return { ok: true } as const;
-    },
-  );
+  const replaceBlock = vi.fn((target: BlockRef, block: Paragraph | Table) => {
+    const idx = Number(target.id.slice(1)) - 1;
+    const next = doc.body.slice();
+    next[idx] = block;
+    doc = { ...doc, body: next };
+    return { ok: true } as const;
+  });
   const applyBlockProperties = vi.fn();
   const setDocument = vi.fn();
   const getDocument = () => doc;
@@ -82,7 +80,11 @@ function makeTableBlock(text: string): Table {
         cells: [
           {
             content: [
-              { kind: "paragraph", properties: {}, runs: [{ kind: "text", text: "row2", properties: {} }] },
+              {
+                kind: "paragraph",
+                properties: {},
+                runs: [{ kind: "text", text: "row2", properties: {} }],
+              },
             ],
           },
           { content: [{ kind: "paragraph", properties: {}, runs: [] }] },
@@ -136,9 +138,7 @@ describe("changeType: table → paragraph regression", () => {
     const replacement = stub.spies.replaceBlock.mock.calls[0]?.[1] as Paragraph;
     expect(replacement.kind).toBe("paragraph");
     // The text from cell (0,0) and (1,0) is concatenated with a space.
-    const txt = replacement.runs
-      .map((r) => (r.kind === "text" ? r.text : ""))
-      .join("");
+    const txt = replacement.runs.map((r) => (r.kind === "text" ? r.text : "")).join("");
     expect(txt).toContain("Sobree dev playground");
     expect(txt).toContain("row2");
     // After the flatten, applyBlockProperties is called to apply the
@@ -162,11 +162,7 @@ describe("changeType: table → paragraph regression", () => {
     const trigger = document.createElement("button");
     document.body.appendChild(trigger);
 
-    openChangeTypePopover(
-      trigger,
-      { editor: stub.editor, target, refs: [ref] },
-      () => {},
-    );
+    openChangeTypePopover(trigger, { editor: stub.editor, target, refs: [ref] }, () => {});
 
     const popover = document.querySelector(".sobree-change-popover");
     const paragraphBtn = popover!.querySelector<HTMLButtonElement>(

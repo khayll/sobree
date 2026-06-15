@@ -101,10 +101,7 @@ export function embedFontIntoDoc(
  * `pruneOrphanParts(doc)` (or just rely on export-side filtering) to
  * GC them.
  */
-export function removeFontFromDoc(
-  doc: SobreeDocument,
-  name: string,
-): SobreeDocument {
+export function removeFontFromDoc(doc: SobreeDocument, name: string): SobreeDocument {
   const next = doc.fonts.filter((f) => f.name !== name);
   if (next.length === doc.fonts.length) return doc;
   return { ...doc, fonts: next };

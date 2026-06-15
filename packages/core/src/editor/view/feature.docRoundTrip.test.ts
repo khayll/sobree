@@ -1,8 +1,8 @@
+import { describe, expect, it } from "vitest";
 import { appendBlock, emptyDocument, heading, paragraph, text } from "../../doc/builders";
 import type { Paragraph, SobreeDocument, Table, TextRun } from "../../doc/types";
 import { renderSobreeDocument } from "./docRenderer/index";
 import { serializeHostsToDocument } from "./docSerialize/index";
-import { describe, expect, it } from "vitest";
 
 function roundTrip(doc: SobreeDocument): SobreeDocument {
   const host = document.createElement("div");

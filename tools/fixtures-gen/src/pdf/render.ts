@@ -12,7 +12,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { createCanvas, type SKRSContext2D } from "@napi-rs/canvas";
+import { type SKRSContext2D, createCanvas } from "@napi-rs/canvas";
 
 export async function renderPdfPages(
   pdfPath: string,
@@ -30,10 +30,7 @@ export async function renderPdfPages(
   for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
     const page = await doc.getPage(pageNum);
     const viewport = page.getViewport({ scale });
-    const canvas = createCanvas(
-      Math.ceil(viewport.width),
-      Math.ceil(viewport.height),
-    );
+    const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
     const ctx = canvas.getContext("2d") as unknown as CanvasRenderingContext2D;
     // pdfjs writes into the canvas via `canvasContext`. `@napi-rs/canvas`
     // implements the same 2D context API so this works headless.

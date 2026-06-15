@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  EMU_PER_MM,
-  EMU_PER_PX,
-  emuToMm,
-  emuToPx,
-  twipsToMm,
-  twipsToMmExact,
-} from "./units";
+import { EMU_PER_MM, EMU_PER_PX, emuToMm, emuToPx, twipsToMm, twipsToMmExact } from "./units";
 
 describe("units", () => {
   it("pins EMU_PER_MM to the integer literal 36000 (no float drift)", () => {

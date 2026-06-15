@@ -1,7 +1,7 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appendBlock, defaultSection, emptyDocument, paragraph, text } from "../doc/builders";
 import type { SectionBreak, SectionProperties, SobreeDocument } from "../doc/types";
 import { Editor } from "./";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 function twoSectionDoc(): SobreeDocument {
   // Body: P, P, SectionBreak, P, P

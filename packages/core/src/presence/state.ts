@@ -52,9 +52,7 @@ export interface PresenceSelection {
 
 /** Convenience view: the editor's live `Selection` collapsed to a
  *  `PresenceSelection` referencing the focused block by id. */
-export function presenceSelectionFromEditor(
-  sel: EditorSelection,
-): PresenceSelection | null {
+export function presenceSelectionFromEditor(sel: EditorSelection): PresenceSelection | null {
   if (!sel) return null;
   if (sel.kind === "caret") {
     return {

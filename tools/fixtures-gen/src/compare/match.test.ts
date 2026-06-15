@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { LineMetric } from "../pdf/types";
 import { matchBlocksToLines } from "./match";
 import type { SnapshotBlock } from "./snapshot";
-import type { LineMetric } from "../pdf/types";
 
 const block = (index: number, text: string): SnapshotBlock => ({
   index,

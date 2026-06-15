@@ -1,4 +1,4 @@
-import type { InlinePosition, Range as ApiRange, Selection } from "../../doc/api";
+import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api";
 import type { BlockRegistry } from "./blockRegistry";
 
 /**
@@ -45,18 +45,7 @@ const WRAPPER_TAGS = new Set([
 
 const ATOM_TAGS = new Set(["br", "img", "hr"]);
 
-const BLOCK_TAGS = new Set([
-  "p",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "blockquote",
-  "pre",
-  "dl",
-]);
+const BLOCK_TAGS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "dl"]);
 
 const LIST_TAGS = new Set(["ul", "ol"]);
 
@@ -217,9 +206,7 @@ export function blockElementAtIndex(
 function blocksInTopChild(el: Element): number {
   const tag = el.tagName.toLowerCase();
   if (LIST_TAGS.has(tag)) {
-    return Array.from(el.children).filter(
-      (c) => c.tagName.toLowerCase() === "li",
-    ).length;
+    return Array.from(el.children).filter((c) => c.tagName.toLowerCase() === "li").length;
   }
   return 1;
 }
@@ -236,12 +223,19 @@ function findBlockElement(
     if (cur instanceof HTMLElement) {
       const tag = cur.tagName.toLowerCase();
       const parent = cur.parentElement;
-      if (parent && hosts.includes(parent) && (BLOCK_TAGS.has(tag) || LIST_TAGS.has(tag) || tag === "table" || tag === "div")) {
+      if (
+        parent &&
+        hosts.includes(parent) &&
+        (BLOCK_TAGS.has(tag) || LIST_TAGS.has(tag) || tag === "table" || tag === "div")
+      ) {
         // Top-level (non-list) block.
         if (LIST_TAGS.has(tag)) {
           // Caret landed on the `<ul>` itself somehow — degenerate case.
           // Resolve to the first list-item index.
-          return { blockEl: cur.children[0] instanceof HTMLElement ? cur.children[0] : null, blockIndex: indexOfElement(cur, hosts) };
+          return {
+            blockEl: cur.children[0] instanceof HTMLElement ? cur.children[0] : null,
+            blockIndex: indexOfElement(cur, hosts),
+          };
         }
         return { blockEl: cur, blockIndex: indexOfElement(cur, hosts) };
       }
@@ -263,7 +257,8 @@ function indexOfElement(target: Element, hosts: readonly HTMLElement[]): number 
         const items = Array.from(child.children).filter(
           (c): c is HTMLElement => c instanceof HTMLElement && c.tagName.toLowerCase() === "li",
         );
-        if (items.includes(target as HTMLElement)) return index + items.indexOf(target as HTMLElement);
+        if (items.includes(target as HTMLElement))
+          return index + items.indexOf(target as HTMLElement);
         index += items.length;
         continue;
       }
@@ -292,11 +287,7 @@ function isWrapperElement(el: Element): boolean {
  * Walk `blockEl`'s subtree in document order until `(targetNode,
  * targetOffset)` is reached; return the number of atoms seen so far.
  */
-function charOffsetToPoint(
-  blockEl: Element,
-  targetNode: Node,
-  targetOffset: number,
-): number {
+function charOffsetToPoint(blockEl: Element, targetNode: Node, targetOffset: number): number {
   let count = 0;
   let found = false;
 
@@ -367,10 +358,7 @@ function charOffsetToPoint(
  * Reverse of `charOffsetToPoint`: find a DOM `(node, offset)` tuple
  * that corresponds to `targetOffset` characters into `blockEl`.
  */
-function findPointAtOffset(
-  blockEl: Element,
-  targetOffset: number,
-): { node: Node; offset: number } {
+function findPointAtOffset(blockEl: Element, targetOffset: number): { node: Node; offset: number } {
   let count = 0;
   let result: { node: Node; offset: number } | null = null;
 

@@ -1,5 +1,5 @@
-import type { Editor } from "../editor";
 import type { SectionBreak } from "../doc/types";
+import type { Editor } from "../editor";
 
 /**
  * Section commands plugin.

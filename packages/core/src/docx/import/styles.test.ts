@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseStylesXml } from "./styles";
 import { resolveStyleCascade } from "../../doc/styles";
+import { parseStylesXml } from "./styles";
 
 const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 

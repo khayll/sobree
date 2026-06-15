@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { renderStylesXml } from "./styles";
 import { defaultStyles } from "../../doc/builders";
+import type { NamedStyle } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { parseXml, wVal } from "../shared/xml";
-import type { NamedStyle } from "../../doc/types";
+import { renderStylesXml } from "./styles";
 
 function styleById(doc: Document, id: string): Element | undefined {
   return Array.from(doc.getElementsByTagNameNS(NS.w, "style")).find(

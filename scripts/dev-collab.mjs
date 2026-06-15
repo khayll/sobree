@@ -10,13 +10,10 @@
  * Storage lives under ./.dev-collab-data/<room>.ydoc — gitignored.
  */
 
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
-import {
-  SobreeCollabServer,
-  filesystemPersistence,
-} from "@sobree/collab-server";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { SobreeCollabServer, filesystemPersistence } from "@sobree/collab-server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -42,15 +39,11 @@ console.log(`   persistence     ${DATA_DIR}`);
 // Spawn the playground. Vite reads the port from --port; we override
 // the default if PLAYGROUND_PORT is set.
 const playgroundDir = join(repoRoot, "apps", "playground");
-const vite = spawn(
-  "pnpm",
-  ["exec", "vite", "--port", String(PLAYGROUND_PORT)],
-  {
-    stdio: "inherit",
-    cwd: playgroundDir,
-    env: { ...process.env, FORCE_COLOR: "1" },
-  },
-);
+const vite = spawn("pnpm", ["exec", "vite", "--port", String(PLAYGROUND_PORT)], {
+  stdio: "inherit",
+  cwd: playgroundDir,
+  env: { ...process.env, FORCE_COLOR: "1" },
+});
 
 console.log(`   playground      http://localhost:${PLAYGROUND_PORT}`);
 console.log("");

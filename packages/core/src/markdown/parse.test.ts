@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { HyperlinkRun, Paragraph, TextRun } from "../doc/types";
 import { parseMarkdown } from "./parse";
-import type {
-  HyperlinkRun,
-  Paragraph,
-  TextRun,
-} from "../doc/types";
 
 function paraAt(doc: ReturnType<typeof parseMarkdown>, i: number): Paragraph {
   const block = doc.body[i];
@@ -19,9 +15,7 @@ function plainText(p: Paragraph): string {
     .map((r) => {
       if (r.kind === "text") return r.text;
       if (r.kind === "hyperlink") {
-        return r.children
-          .map((c) => (c.kind === "text" ? c.text : ""))
-          .join("");
+        return r.children.map((c) => (c.kind === "text" ? c.text : "")).join("");
       }
       return "";
     })
@@ -70,12 +64,10 @@ describe("parseMarkdown", () => {
   it("parses bold and italic markers", () => {
     const doc = parseMarkdown("This is **bold** and *italic* and _also italic_.");
     const p = paraAt(doc, 0);
-    const bold = p.runs.find(
-      (r) => r.kind === "text" && (r as TextRun).properties.bold,
-    ) as TextRun | undefined;
-    const italics = p.runs.filter(
-      (r) => r.kind === "text" && (r as TextRun).properties.italic,
-    );
+    const bold = p.runs.find((r) => r.kind === "text" && (r as TextRun).properties.bold) as
+      | TextRun
+      | undefined;
+    const italics = p.runs.filter((r) => r.kind === "text" && (r as TextRun).properties.italic);
     expect(bold?.text).toBe("bold");
     expect(italics).toHaveLength(2);
     expect((italics[0] as TextRun).text).toBe("italic");
@@ -85,22 +77,18 @@ describe("parseMarkdown", () => {
   it("parses inline code with monospace fontFamily", () => {
     const doc = parseMarkdown("Run `npm install` to start.");
     const p = paraAt(doc, 0);
-    const code = p.runs.find(
-      (r) => r.kind === "text" && (r as TextRun).properties.fontFamily,
-    ) as TextRun | undefined;
+    const code = p.runs.find((r) => r.kind === "text" && (r as TextRun).properties.fontFamily) as
+      | TextRun
+      | undefined;
     expect(code?.text).toBe("npm install");
   });
 
   it("parses inline links", () => {
     const doc = parseMarkdown("Visit [Sobree](https://sobree.dev) today.");
     const p = paraAt(doc, 0);
-    const link = p.runs.find((r) => r.kind === "hyperlink") as
-      | HyperlinkRun
-      | undefined;
+    const link = p.runs.find((r) => r.kind === "hyperlink") as HyperlinkRun | undefined;
     expect(link?.href).toBe("https://sobree.dev");
-    const linkText = link?.children
-      .map((c) => (c.kind === "text" ? c.text : ""))
-      .join("");
+    const linkText = link?.children.map((c) => (c.kind === "text" ? c.text : "")).join("");
     expect(linkText).toBe("Sobree");
   });
 
@@ -155,7 +143,7 @@ Body paragraph with **bold** and a [link](https://example.com).
 2. Ship`;
     const doc = parseMarkdown(md);
     const kinds = doc.body.map((b) =>
-      b.kind === "paragraph" ? b.properties.styleId ?? "para" : b.kind,
+      b.kind === "paragraph" ? (b.properties.styleId ?? "para") : b.kind,
     );
     expect(kinds[0]).toBe("Heading1");
     expect(kinds[1]).toBe("para");

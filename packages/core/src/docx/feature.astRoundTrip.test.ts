@@ -1,15 +1,8 @@
-import {
-  appendBlock,
-  emptyDocument,
-  heading,
-  paragraph,
-  strong,
-  text,
-} from "../doc/builders";
+import { describe, expect, it } from "vitest";
+import { appendBlock, emptyDocument, heading, paragraph, strong, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument } from "../doc/types";
 import { exportDocx } from "./export/index";
 import { importDocx } from "./import/index";
-import { describe, expect, it } from "vitest";
 
 async function roundTrip(doc: SobreeDocument): Promise<SobreeDocument> {
   const { bytes } = exportDocx(doc);
@@ -22,10 +15,7 @@ function buildSample(): SobreeDocument {
   doc.body = [];
   appendBlock(doc, heading(1, [text("Chapter")]));
   appendBlock(doc, paragraph([text("Hello "), strong("world"), text(".")]));
-  appendBlock(
-    doc,
-    paragraph([text("Colourful", { color: "#ff0000", bold: true })]),
-  );
+  appendBlock(doc, paragraph([text("Colourful", { color: "#ff0000", bold: true })]));
   return doc;
 }
 
@@ -116,9 +106,7 @@ describe("AST-native DOCX round-trip (Phase N2)", () => {
       ];
       const result = await roundTrip(doc);
       const runs = (result.body[0] as Paragraph).runs;
-      const ins = runs.find(
-        (r) => r.kind === "text" && r.text === "inserted",
-      );
+      const ins = runs.find((r) => r.kind === "text" && r.text === "inserted");
       expect(ins?.kind === "text" ? ins.properties.revision?.type : null).toBe("ins");
       expect(ins?.kind === "text" ? ins.properties.revision?.author : null).toBe("Alice");
     });
@@ -183,9 +171,9 @@ describe("AST-native DOCX round-trip (Phase N2)", () => {
       const runs = (result.body[0] as Paragraph).runs;
       const bolded = runs.find((r) => r.kind === "text" && r.text === "bolded");
       expect(bolded?.kind === "text" ? bolded.properties.bold : null).toBe(true);
-      expect(
-        bolded?.kind === "text" ? bolded.properties.revisionFormat?.author : null,
-      ).toBe("Alice");
+      expect(bolded?.kind === "text" ? bolded.properties.revisionFormat?.author : null).toBe(
+        "Alice",
+      );
       expect(
         bolded?.kind === "text" ? bolded.properties.revisionFormat?.before.bold : null,
       ).toBeUndefined();

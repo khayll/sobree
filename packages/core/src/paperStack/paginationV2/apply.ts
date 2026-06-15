@@ -25,10 +25,7 @@
  */
 
 import { measureParagraphLines } from "../paginationAdapter/paragraphLines";
-import {
-  snapToWordBoundary,
-  splitElementAtCharOffset,
-} from "../paginationAdapter/splitParagraph";
+import { snapToWordBoundary, splitElementAtCharOffset } from "../paginationAdapter/splitParagraph";
 import type { PaginatedDoc, SegmentRange } from "./types";
 
 /**
@@ -113,12 +110,7 @@ export function applyPaginatedDoc(
 
       if (sourceEl.tagName === "TABLE") {
         const trs = childSnapshots.get(sourceEl) ?? [];
-        appendTableContents(
-          sourceEl,
-          trs,
-          seg.range,
-          pageElements,
-        );
+        appendTableContents(sourceEl, trs, seg.range, pageElements);
         sourceListsTouched.add(sourceEl);
         openContainerSource = null;
         openContainerClone = null;
@@ -339,7 +331,7 @@ function resolveListRange(
   const endIdx =
     range.endSegmentId === "_END"
       ? totalLis - 1
-      : parseListIndex(range.endSegmentId) ?? (totalLis - 1);
+      : (parseListIndex(range.endSegmentId) ?? totalLis - 1);
   return { startIdx, endIdx };
 }
 
@@ -405,7 +397,7 @@ function resolveTableRange(
   const endIdx =
     range.endSegmentId === "_END"
       ? totalTrs - 1
-      : parseRowIndex(range.endSegmentId) ?? (totalTrs - 1);
+      : (parseRowIndex(range.endSegmentId) ?? totalTrs - 1);
   return { startIdx, endIdx };
 }
 
@@ -476,8 +468,8 @@ function removeIfEmptyTable(src: HTMLElement): void {
   const sections = Array.from(src.children).filter(
     (c) => c.tagName === "THEAD" || c.tagName === "TBODY",
   );
-  const hasAnyRow = sections.some((s) => s.children.length > 0)
-    || (sections.length === 0 && src.children.length > 0);
+  const hasAnyRow =
+    sections.some((s) => s.children.length > 0) ||
+    (sections.length === 0 && src.children.length > 0);
   if (!hasAnyRow) src.parentElement?.removeChild(src);
 }
-

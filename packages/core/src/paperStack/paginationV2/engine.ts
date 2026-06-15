@@ -18,9 +18,9 @@ import { paginate } from "../../pagination";
 import type { Box, Config as EngineConfig, Item, Page } from "../../pagination/types";
 import type {
   BlockMeasurement,
+  PageSegment,
   PaginatedDoc,
   PaginatedPage,
-  PageSegment,
   PaginationConstraints,
   SegmentRange,
   SplitPoint,

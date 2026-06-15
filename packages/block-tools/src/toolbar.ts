@@ -1,5 +1,5 @@
-import type { BlockTarget } from "./blockKinds";
 import type { Viewport } from "@sobree/core";
+import type { BlockTarget } from "./blockKinds";
 
 export interface FloatingToolbarOptions {
   /**
@@ -187,10 +187,7 @@ export class FloatingToolbar {
     }
 
     // Clamp to window horizontally as a final safety net.
-    left = Math.max(
-      0,
-      Math.min(left, window.innerWidth - this.root.offsetWidth),
-    );
+    left = Math.max(0, Math.min(left, window.innerWidth - this.root.offsetWidth));
 
     this.root.style.top = `${top}px`;
     this.root.style.left = `${left}px`;

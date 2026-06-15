@@ -98,10 +98,7 @@ export function distributeFootnotes(papers: readonly Paper[]): void {
  * baseline are trimmed so two arrays differing only by an unrelated tail
  * compare equal (keeps the repaginate loop's `arraysEqual` honest).
  */
-export function footnotePageHeights(
-  papers: readonly Paper[],
-  baselineBudgetPx: number,
-): number[] {
+export function footnotePageHeights(papers: readonly Paper[], baselineBudgetPx: number): number[] {
   const heights: number[] = [];
   for (const paper of papers) {
     // Only footnotes share the page with body content; comments live in a

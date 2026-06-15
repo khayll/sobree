@@ -1,5 +1,5 @@
-import type { CollabHandle, IdentityOptions } from "./types";
 import type * as Y from "yjs";
+import type { CollabHandle, IdentityOptions } from "./types";
 
 export interface WebsocketProviderOptions extends IdentityOptions {
   /** WebSocket server URL (e.g. `wss://collab.example.com`). The room

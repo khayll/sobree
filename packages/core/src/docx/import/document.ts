@@ -1,7 +1,7 @@
+import type { Block } from "../../doc/types";
+import { wFirst } from "../shared/xml";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 import { convertTable } from "./tables";
-import { wFirst } from "../shared/xml";
-import type { Block } from "../../doc/types";
 
 // Re-export so existing callers (and the import barrel) keep their
 // `import { ConvertContext, convertParagraph } from "./document"` paths.

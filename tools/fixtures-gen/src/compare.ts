@@ -19,17 +19,17 @@ import { readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadSnapshot } from "./compare/snapshot";
-import { matchBlocksToLines, flattenLines } from "./compare/match";
+import { readFileSync } from "node:fs";
 import { buildDrift } from "./compare/drift";
+import { flattenLines, matchBlocksToLines } from "./compare/match";
 import { summarisePages } from "./compare/pages";
 import {
   formatFixtureSummary,
   formatFixtureVerbose,
   formatPageAllocations,
 } from "./compare/report";
+import { loadSnapshot } from "./compare/snapshot";
 import type { FixtureMetrics } from "./pdf/types";
-import { readFileSync } from "node:fs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = join(
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   process.stderr.write(
-    `fixtures-gen compare failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
+    `fixtures-gen compare failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
   );
   process.exit(1);
 });

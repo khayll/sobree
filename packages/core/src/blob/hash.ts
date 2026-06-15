@@ -33,7 +33,7 @@ export async function sha256Hex(bytes: Uint8Array): Promise<BlobHash> {
 }
 
 async function webCryptoSha256Hex(bytes: Uint8Array): Promise<BlobHash> {
-  const subtle = (globalThis.crypto ?? {}).subtle;
+  const subtle = globalThis.crypto?.subtle;
   if (!subtle) {
     throw new Error(
       "sha256Hex: WebCrypto unavailable. Sobree requires Node 18+ or a modern browser.",

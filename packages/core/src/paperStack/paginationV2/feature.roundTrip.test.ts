@@ -58,10 +58,16 @@ describe("round-trip: measure → engine → apply", () => {
   });
 
   it("a forced page break (data-page-break-before) splits the doc", () => {
-    const a = doc.createElement("p"); a.textContent = "a"; stubHeight(a, 0, 30);
-    const b = doc.createElement("p"); b.textContent = "b"; stubHeight(b, 30, 30);
+    const a = doc.createElement("p");
+    a.textContent = "a";
+    stubHeight(a, 0, 30);
+    const b = doc.createElement("p");
+    b.textContent = "b";
+    stubHeight(b, 30, 30);
     b.setAttribute("data-page-break-before", "");
-    const c = doc.createElement("p"); c.textContent = "c"; stubHeight(c, 60, 30);
+    const c = doc.createElement("p");
+    c.textContent = "c";
+    stubHeight(c, 60, 30);
     host.append(a, b, c);
     const blocks = [a, b, c];
 
@@ -117,12 +123,16 @@ describe("round-trip: measure → engine → apply", () => {
   });
 
   it("an out-of-flow block doesn't compete for budget", () => {
-    const a = doc.createElement("p"); a.textContent = "a"; stubHeight(a, 0, 40);
+    const a = doc.createElement("p");
+    a.textContent = "a";
+    stubHeight(a, 0, 40);
     const floater = doc.createElement("p");
     floater.textContent = "anchored";
     floater.style.position = "absolute";
     stubHeight(floater, 100, 200); // would be way over budget if counted
-    const b = doc.createElement("p"); b.textContent = "b"; stubHeight(b, 40, 40);
+    const b = doc.createElement("p");
+    b.textContent = "b";
+    stubHeight(b, 40, 40);
     host.append(a, floater, b);
     const blocks = [a, floater, b];
 

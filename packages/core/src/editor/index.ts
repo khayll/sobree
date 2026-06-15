@@ -491,7 +491,6 @@ export class Editor {
    * stay private to the class while modules get a curated surface.
    */
   private buildContext(): EditorContext {
-    // biome-ignore lint/complexity/noThisInStatic: closure over the instance.
     const self = this;
     return {
       host: self.host,
@@ -1112,7 +1111,6 @@ export class Editor {
     return this.checkRefs(refs);
   }
 
-
   /**
    * Apply a mutation to `this.doc`, update the registry, re-render, fire
    * change. Returns the affected refs (post-bump).
@@ -1283,7 +1281,6 @@ export class Editor {
   private fireKeyDown(e: KeyboardEvent): void {
     this.events.emitKeyDown(e);
   }
-
 }
 
 // === helpers ===

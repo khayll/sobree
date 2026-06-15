@@ -1,12 +1,6 @@
-import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
-import {
-  appendBlock,
-  emptyDocument,
-  heading,
-  paragraph,
-  text,
-} from "../doc/builders";
+import * as Y from "yjs";
+import { appendBlock, emptyDocument, heading, paragraph, text } from "../doc/builders";
 import type { AnchoredFrame, SobreeDocument } from "../doc/types";
 import { applyDocumentToYDoc } from "./apply";
 import { projectYDoc } from "./project";
@@ -40,8 +34,16 @@ describe("ydoc helpers", () => {
     const doc = seedDoc();
     const shape = (id: string): AnchoredFrame => ({
       id,
-      anchor: { sectionIndex: 0, verticalFrom: "paragraph", horizontalFrom: "column", paragraphIndex: 0 },
-      offsetXEmu: 100, offsetYEmu: 200, widthEmu: 300, heightEmu: 400,
+      anchor: {
+        sectionIndex: 0,
+        verticalFrom: "paragraph",
+        horizontalFrom: "column",
+        paragraphIndex: 0,
+      },
+      offsetXEmu: 100,
+      offsetYEmu: 200,
+      widthEmu: 300,
+      heightEmu: 400,
       content: { kind: "shape", geometry: "rect" },
     });
     doc.anchoredFrames = [shape("body-1")];
@@ -150,12 +152,7 @@ describe("ydoc helpers", () => {
       seenOrigins.push(tr.origin);
     });
     seedYDoc(ydoc, doc, ids(doc.body.length));
-    applyDocumentToYDoc(
-      ydoc,
-      { ...doc, body: [doc.body[0]!] },
-      ["b1"],
-      "test-origin",
-    );
+    applyDocumentToYDoc(ydoc, { ...doc, body: [doc.body[0]!] }, ["b1"], "test-origin");
     expect(seenOrigins).toContain("seed");
     expect(seenOrigins).toContain("test-origin");
   });

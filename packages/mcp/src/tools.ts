@@ -24,13 +24,7 @@
  *      a typed `runs` payload (next iteration).
  */
 
-import {
-  type BlockInfo,
-  type BlockRef,
-  type HeadlessSobree,
-  paragraph,
-  text,
-} from "@sobree/core";
+import { type BlockInfo, type BlockRef, type HeadlessSobree, paragraph, text } from "@sobree/core";
 
 /**
  * Common JSON Schema for input validation. We use a minimal subset —
@@ -46,10 +40,7 @@ export interface ToolDefinition<I = unknown, O = unknown> {
 
 // === reads ===
 
-export const getDocumentTool: ToolDefinition<
-  Record<string, never>,
-  { blocks: BlockInfo[] }
-> = {
+export const getDocumentTool: ToolDefinition<Record<string, never>, { blocks: BlockInfo[] }> = {
   name: "get_document",
   description:
     "Read the document as an array of block summaries. Each block has an id (use for subsequent mutations), kind (paragraph / section_break / table), a plain-text preview, and a character length. Call this first to understand the document's structure.",
@@ -107,10 +98,7 @@ export const insertParagraphAfterTool: ToolDefinition<
   },
   handler: (sobree, input) => {
     const ref = lookupRef(sobree, input.afterBlockId, "afterBlockId");
-    const result = sobree.insertBlockAfter(
-      ref,
-      paragraph([text(input.text)]),
-    );
+    const result = sobree.insertBlockAfter(ref, paragraph([text(input.text)]));
     if (!result.ok) throw new Error(formatEditError(result.error));
     const newRef = result.affected?.[0];
     if (!newRef) throw new Error("insertBlockAfter returned no new ref");
@@ -141,10 +129,7 @@ export const insertParagraphBeforeTool: ToolDefinition<
   },
   handler: (sobree, input) => {
     const ref = lookupRef(sobree, input.beforeBlockId, "beforeBlockId");
-    const result = sobree.insertBlockBefore(
-      ref,
-      paragraph([text(input.text)]),
-    );
+    const result = sobree.insertBlockBefore(ref, paragraph([text(input.text)]));
     if (!result.ok) throw new Error(formatEditError(result.error));
     const newRef = result.affected?.[0];
     if (!newRef) throw new Error("insertBlockBefore returned no new ref");
@@ -175,10 +160,7 @@ export const replaceParagraphTool: ToolDefinition<
   },
 };
 
-export const deleteBlockTool: ToolDefinition<
-  { blockId: string },
-  { deleted: string }
-> = {
+export const deleteBlockTool: ToolDefinition<{ blockId: string }, { deleted: string }> = {
   name: "delete_block",
   description:
     "Delete the block with the given id. If this would empty the document, an empty paragraph is left in its place.",
@@ -269,16 +251,11 @@ export function findTool(name: string): ToolDefinition | undefined {
  * editor's optimistic-lock check. Throws a user-facing error if the
  * id doesn't exist — the LLM may have referenced a deleted block.
  */
-function lookupRef(
-  sobree: HeadlessSobree,
-  blockId: string,
-  field: string,
-): BlockRef {
+function lookupRef(sobree: HeadlessSobree, blockId: string, field: string): BlockRef {
   const info = sobree.getBlockById(blockId);
   if (!info) {
     throw new Error(
-      `${field}: block ${JSON.stringify(blockId)} not found. ` +
-        "Call get_document to refresh block ids — the document may have changed.",
+      `${field}: block ${JSON.stringify(blockId)} not found. Call get_document to refresh block ids — the document may have changed.`,
     );
   }
   return { id: info.id, version: info.version };
@@ -291,7 +268,7 @@ function formatEditError(err: unknown): string {
     if (e.code === "optimistic-lock") {
       return (
         "optimistic-lock: another peer modified this block between your read and write. " +
-          "Call get_document to refresh and try again."
+        "Call get_document to refresh and try again."
       );
     }
     return `${e.code}${e.details ? `: ${e.details}` : ""}`;

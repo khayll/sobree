@@ -1,7 +1,7 @@
-import { type ConvertContext, convertParagraph } from "./paragraph";
-import { wChildren, wFirst, wVal } from "../shared/xml";
-import { readShading } from "../shared/shading";
 import type { Block, Table, TableCell, TableRow } from "../../doc/types";
+import { readShading } from "../shared/shading";
+import { wChildren, wFirst, wVal } from "../shared/xml";
+import { type ConvertContext, convertParagraph } from "./paragraph";
 
 /**
  * Convert a `<w:tbl>` element into a native Table block. Handles:
@@ -56,8 +56,15 @@ function readTableBorders(el: Element): NonNullable<Table["properties"]["borders
     if (val === "none" || val === "nil") continue;
     const sz = child.getAttribute("w:sz");
     const color = child.getAttribute("w:color");
-    const style = (val === "single" || val === "double" || val === "dashed"
-      || val === "dotted" || val === "thick" || val === "none") ? val : "single";
+    const style =
+      val === "single" ||
+      val === "double" ||
+      val === "dashed" ||
+      val === "dotted" ||
+      val === "thick" ||
+      val === "none"
+        ? val
+        : "single";
     out[side] = {
       style,
       sizeEighthsOfPt: sz ? Number(sz) : 4,

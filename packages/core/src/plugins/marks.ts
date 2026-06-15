@@ -63,11 +63,7 @@ export const MARK_COMMAND_DEFS: readonly MarkCommandDef[] = [
  * `mark` (highlight) is delegated straight to `wrapRange` — it's not a
  * toggle since highlight is a colour, not a boolean.
  */
-export function toggleMark(
-  editor: EditorLike,
-  range: ApiRange,
-  tag: WrapTag,
-): void {
+export function toggleMark(editor: EditorLike, range: ApiRange, tag: WrapTag): void {
   if (tag === "mark") {
     editor.wrapRange(range, tag);
     return;

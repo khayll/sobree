@@ -30,11 +30,11 @@
  * process exits.
  */
 
-import { WebSocketServer, type WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
+import * as decoding from "lib0/decoding";
 import * as encoding from "lib0/encoding";
+import { type WebSocket, WebSocketServer } from "ws";
 import { encodeAwarenessUpdate } from "y-protocols/awareness";
-import { Room, type RoomOptions } from "./room";
 import type { Persistence } from "./persistence";
 import {
   MESSAGE_AWARENESS,
@@ -45,7 +45,7 @@ import {
   encodeSyncStep1,
   readSyncMessage,
 } from "./protocol";
-import * as decoding from "lib0/decoding";
+import { Room, type RoomOptions } from "./room";
 
 export interface PeerInfo {
   /** The WebSocket connection. */
@@ -97,9 +97,7 @@ export interface CollabServerOptions {
    * code 1008. Return `{ allow: true, write: false }` to accept the
    * peer as read-only.
    */
-  onConnection?: (
-    peer: PeerInfo,
-  ) => ConnectionDecision | Promise<ConnectionDecision>;
+  onConnection?: (peer: PeerInfo) => ConnectionDecision | Promise<ConnectionDecision>;
   /**
    * Per-room overrides (forwarded to `Room`). Useful for adjusting
    * the empty-room TTL.
@@ -181,10 +179,7 @@ export class SobreeCollabServer {
 
   // === connection handling ===
 
-  private async handleConnection(
-    ws: WebSocket,
-    req: IncomingMessage,
-  ): Promise<void> {
+  private async handleConnection(ws: WebSocket, req: IncomingMessage): Promise<void> {
     const roomId = (this.opts.resolveRoomId ?? defaultResolveRoomId)(req);
     if (!roomId) {
       ws.close(1003, "missing room id");
@@ -194,8 +189,7 @@ export class SobreeCollabServer {
     let writable = true;
     if (this.opts.onConnection) {
       const decision = await this.opts.onConnection({ ws, req, roomId });
-      const accept =
-        typeof decision === "boolean" ? decision : decision.allow;
+      const accept = typeof decision === "boolean" ? decision : decision.allow;
       if (!accept) {
         ws.close(1008, "rejected by onConnection");
         return;
@@ -288,10 +282,7 @@ export class SobreeCollabServer {
       });
       room.awareness.on(
         "update",
-        (
-          changes: { added: number[]; updated: number[]; removed: number[] },
-          origin: unknown,
-        ) => {
+        (changes: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
           const changed = [...changes.added, ...changes.updated, ...changes.removed];
           if (changed.length === 0) return;
           const aw = encodeAwarenessUpdate(room!.awareness, changed);
@@ -325,9 +316,7 @@ export class SobreeCollabServer {
       if (!writable) {
         // Clone the decoder so the peek doesn't consume the byte
         // for the downstream readSyncMessage call.
-        const peekDecoder = decoding.createDecoder(
-          header.decoder.arr.slice(header.decoder.pos),
-        );
+        const peekDecoder = decoding.createDecoder(header.decoder.arr.slice(header.decoder.pos));
         const subType = decoding.readVarUint(peekDecoder);
         if (subType === 2) {
           // Sync-update from a read-only peer — drop silently. The
@@ -349,9 +338,7 @@ export class SobreeCollabServer {
     }
     // Unknown message type — log and drop. Reserved type 3 lands in
     // Phase 3.2 (assets).
-    console.warn(
-      `[collab-server] unknown message type ${header.type} (room=${room.id})`,
-    );
+    console.warn(`[collab-server] unknown message type ${header.type} (room=${room.id})`);
   }
 
   // === persistence + reaping ===
@@ -377,12 +364,15 @@ export class SobreeCollabServer {
   private scheduleRoomReap(id: string): void {
     // After the Room's own empty TTL, drop our map entry. We use the
     // Room's destroy event indirectly: poll briefly.
-    setTimeout(() => {
-      const room = this.rooms.get(id);
-      if (room && room.peers.size === 0) {
-        this.rooms.delete(id);
-      }
-    }, (this.opts.roomOptions?.emptyTtlMs ?? 30000) + 1000).unref?.();
+    setTimeout(
+      () => {
+        const room = this.rooms.get(id);
+        if (room && room.peers.size === 0) {
+          this.rooms.delete(id);
+        }
+      },
+      (this.opts.roomOptions?.emptyTtlMs ?? 30000) + 1000,
+    ).unref?.();
   }
 }
 
@@ -409,18 +399,12 @@ function toUint8(data: unknown): Uint8Array {
   if (data instanceof ArrayBuffer) return new Uint8Array(data);
   if (Array.isArray(data)) {
     // Multi-frame messages from ws come as Buffer[].
-    const len = data.reduce(
-      (acc, buf) => acc + (buf as ArrayBufferView).byteLength,
-      0,
-    );
+    const len = data.reduce((acc, buf) => acc + (buf as ArrayBufferView).byteLength, 0);
     const out = new Uint8Array(len);
     let off = 0;
     for (const buf of data) {
       const view = buf as ArrayBufferView;
-      out.set(
-        new Uint8Array(view.buffer, view.byteOffset, view.byteLength),
-        off,
-      );
+      out.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength), off);
       off += view.byteLength;
     }
     return out;

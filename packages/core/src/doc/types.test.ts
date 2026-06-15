@@ -1,14 +1,7 @@
-import {
-  appendBlock,
-  emptyDocument,
-  heading,
-  paragraph,
-  strong,
-  text,
-} from "./builders";
+import { describe, expect, it } from "vitest";
+import { appendBlock, emptyDocument, heading, paragraph, strong, text } from "./builders";
 import type { Paragraph } from "./types";
 import { headingLevelOf, plainText, walk } from "./walk";
-import { describe, expect, it } from "vitest";
 
 describe("AST builders", () => {
   it("emptyDocument has one blank paragraph and a single section", () => {
@@ -99,10 +92,7 @@ describe("AST is JSON-clean", () => {
   it("survives JSON.stringify -> JSON.parse round-trip", () => {
     const doc = emptyDocument();
     appendBlock(doc, heading(2, [text("Section")]));
-    appendBlock(
-      doc,
-      paragraph([text("Hello "), strong("world"), text("!"), { kind: "tab" }]),
-    );
+    appendBlock(doc, paragraph([text("Hello "), strong("world"), text("!"), { kind: "tab" }]));
     const json = JSON.stringify(doc);
     const back = JSON.parse(json);
     expect(back).toEqual(doc);

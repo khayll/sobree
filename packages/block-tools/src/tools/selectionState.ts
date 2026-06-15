@@ -10,12 +10,12 @@
 import type {
   Block,
   Editor,
+  InlineRun,
+  Paragraph,
   ParagraphProperties,
   RunProperties,
   SobreeDocument,
   TextRun,
-  InlineRun,
-  Paragraph,
 } from "@sobree/core";
 import { resolveStyleCascade } from "@sobree/core";
 
@@ -103,11 +103,7 @@ function resolveRunProps(editor: Editor, p: Paragraph): RunProperties {
 
 /** Walk a paragraph's runs and return every TextRun whose extent
  *  overlaps `[lo, hi)`. Hyperlink children are flattened. */
-function textRunsInRange(
-  runs: readonly InlineRun[],
-  lo: number,
-  hi: number,
-): TextRun[] {
+function textRunsInRange(runs: readonly InlineRun[], lo: number, hi: number): TextRun[] {
   const out: TextRun[] = [];
   let cursor = 0;
   walk(runs);
@@ -134,10 +130,7 @@ function textRunsInRange(
   }
 }
 
-function runPropsAtOffset(
-  runs: readonly InlineRun[],
-  offset: number,
-): RunProperties {
+function runPropsAtOffset(runs: readonly InlineRun[], offset: number): RunProperties {
   let cursor = 0;
   let lastTextProps: RunProperties = {};
   for (const r of runs) {

@@ -5,19 +5,16 @@
  * the server to other peers in the same room.
  */
 
+import * as decoding from "lib0/decoding";
+import * as encoding from "lib0/encoding";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
-import * as Y from "yjs";
-import * as encoding from "lib0/encoding";
-import * as decoding from "lib0/decoding";
-import * as syncProtocol from "y-protocols/sync";
 import { Awareness, applyAwarenessUpdate } from "y-protocols/awareness";
-import { SobreeCollabServer } from "./server";
+import * as syncProtocol from "y-protocols/sync";
+import * as Y from "yjs";
 import { memoryPersistence } from "./persistence";
-import {
-  MESSAGE_AWARENESS,
-  MESSAGE_SYNC,
-} from "./protocol";
+import { MESSAGE_AWARENESS, MESSAGE_SYNC } from "./protocol";
+import { SobreeCollabServer } from "./server";
 
 describe("SobreeCollabServer — e2e via WebSocket clients", () => {
   let server: SobreeCollabServer;
@@ -74,13 +71,10 @@ describe("SobreeCollabServer — e2e via WebSocket clients", () => {
     await waitFor(() => server.getRoom("persistent-room") !== undefined, 1000);
     peer1.ydoc.getArray("body").insert(0, ["persisted"]);
     // Wait for the server-side observer to receive the update.
-    await waitFor(
-      () => {
-        const room = server.getRoom("persistent-room");
-        return room ? room.ydoc.getArray("body").length > 0 : false;
-      },
-      1000,
-    );
+    await waitFor(() => {
+      const room = server.getRoom("persistent-room");
+      return room ? room.ydoc.getArray("body").length > 0 : false;
+    }, 1000);
     // Force a persist (don't wait for the debounce).
     const room = server.getRoom("persistent-room");
     if (room) await room.persist();
@@ -98,10 +92,7 @@ describe("SobreeCollabServer — e2e via WebSocket clients", () => {
     const peer2 = await connectAndSync(url);
     try {
       // Peer 2 should see the persisted state immediately.
-      await waitFor(
-        () => peer2.ydoc.getArray("body").length > 0,
-        1000,
-      );
+      await waitFor(() => peer2.ydoc.getArray("body").length > 0, 1000);
       expect(peer2.ydoc.getArray("body").get(0)).toBe("persisted");
     } finally {
       peer2.close();
@@ -128,17 +119,14 @@ describe("SobreeCollabServer — e2e via WebSocket clients", () => {
     const peerB = await connectAndSync(url);
     try {
       peerA.awareness.setLocalStateField("user", { name: "Alice" });
-      await waitFor(
-        () => {
-          for (const state of peerB.awareness.getStates().values()) {
-            if ((state as { user?: { name?: string } }).user?.name === "Alice") {
-              return true;
-            }
+      await waitFor(() => {
+        for (const state of peerB.awareness.getStates().values()) {
+          if ((state as { user?: { name?: string } }).user?.name === "Alice") {
+            return true;
           }
-          return false;
-        },
-        1000,
-      );
+        }
+        return false;
+      }, 1000);
     } finally {
       peerA.close();
       peerB.close();
@@ -231,10 +219,7 @@ async function connectAndSync(url: string): Promise<TestPeer> {
 
   awareness.on(
     "update",
-    (
-      changes: { added: number[]; updated: number[]; removed: number[] },
-      origin: unknown,
-    ) => {
+    (changes: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
       if (origin === "server") return;
       const changed = [...changes.added, ...changes.updated, ...changes.removed];
       if (changed.length === 0) return;
@@ -279,11 +264,7 @@ async function findFreePort(): Promise<number> {
   });
 }
 
-async function waitFor(
-  pred: () => boolean,
-  timeoutMs: number,
-  pollMs = 10,
-): Promise<void> {
+async function waitFor(pred: () => boolean, timeoutMs: number, pollMs = 10): Promise<void> {
   const start = Date.now();
   while (!pred()) {
     if (Date.now() - start > timeoutMs) {

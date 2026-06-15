@@ -1,13 +1,7 @@
-import * as Y from "yjs";
 import { beforeEach, describe, expect, it } from "vitest";
+import * as Y from "yjs";
+import { appendBlock, emptyDocument, heading, paragraph, text } from "./doc/builders";
 import { HeadlessSobree } from "./headless";
-import {
-  appendBlock,
-  emptyDocument,
-  heading,
-  paragraph,
-  text,
-} from "./doc/builders";
 
 describe("HeadlessSobree — construction", () => {
   it("seeds an empty Y.Doc from initialDocument", () => {
@@ -40,9 +34,7 @@ describe("HeadlessSobree — construction", () => {
     const peerB = new HeadlessSobree(ydocB);
     try {
       // B adopted A's state — no re-seed.
-      expect(peerB.getDocument().body.length).toBe(
-        peerA.getDocument().body.length,
-      );
+      expect(peerB.getDocument().body.length).toBe(peerA.getDocument().body.length);
       // Same block ids on both sides.
       const aIds = peerA.getBlocks().map((b) => b.id);
       const bIds = peerB.getBlocks().map((b) => b.id);
@@ -135,10 +127,7 @@ describe("HeadlessSobree — mutations", () => {
 
   it("replaceBlock rejects stale version (optimistic lock)", () => {
     const target = peer.getBlock(1);
-    peer.replaceBlock(
-      { id: target.id, version: target.version },
-      paragraph([text("first edit")]),
-    );
+    peer.replaceBlock({ id: target.id, version: target.version }, paragraph([text("first edit")]));
     // Re-using the original version is now stale.
     const result = peer.replaceBlock(
       { id: target.id, version: target.version },
@@ -149,14 +138,8 @@ describe("HeadlessSobree — mutations", () => {
 
   it("insertBlockBefore + insertBlockAfter put new blocks at correct positions", () => {
     const anchor = peer.getBlock(1);
-    peer.insertBlockBefore(
-      { id: anchor.id, version: anchor.version },
-      paragraph([text("before")]),
-    );
-    peer.insertBlockAfter(
-      { id: anchor.id, version: anchor.version },
-      paragraph([text("after")]),
-    );
+    peer.insertBlockBefore({ id: anchor.id, version: anchor.version }, paragraph([text("before")]));
+    peer.insertBlockAfter({ id: anchor.id, version: anchor.version }, paragraph([text("after")]));
     const blocks = peer.getBlocks();
     // before-the-anchor, anchor, after-the-anchor
     expect(blocks[1]?.text).toBe("before");
@@ -174,10 +157,9 @@ describe("HeadlessSobree — mutations", () => {
 
   it("applyBlockProperties merges a paragraph properties patch", () => {
     const target = peer.getBlock(1);
-    const result = peer.applyBlockProperties(
-      [{ id: target.id, version: target.version }],
-      { alignment: "center" },
-    );
+    const result = peer.applyBlockProperties([{ id: target.id, version: target.version }], {
+      alignment: "center",
+    });
     expect(result.ok).toBe(true);
     const block = peer.getDocument().body[1];
     if (block?.kind === "paragraph") {
@@ -203,10 +185,7 @@ describe("HeadlessSobree — events", () => {
       const events: boolean[] = [];
       peer.on("change", (p) => events.push(p.local));
       const target = peer.getBlock(0);
-      peer.replaceBlock(
-        { id: target.id, version: target.version },
-        paragraph([text("changed")]),
-      );
+      peer.replaceBlock({ id: target.id, version: target.version }, paragraph([text("changed")]));
       expect(events.length).toBeGreaterThan(0);
       expect(events.every((local) => local === true)).toBe(true);
     } finally {
@@ -227,10 +206,7 @@ describe("HeadlessSobree — events", () => {
 
       // A mutates.
       const target = peerA.getBlock(0);
-      peerA.replaceBlock(
-        { id: target.id, version: target.version },
-        paragraph([text("from A")]),
-      );
+      peerA.replaceBlock({ id: target.id, version: target.version }, paragraph([text("from A")]));
 
       // Propagate to B.
       Y.applyUpdate(ydocB, Y.encodeStateAsUpdate(ydocA), "from-A");
@@ -250,10 +226,7 @@ describe("HeadlessSobree — history", () => {
     try {
       expect(peer.history.canUndo()).toBe(false);
       const target = peer.getBlock(0);
-      peer.replaceBlock(
-        { id: target.id, version: target.version },
-        paragraph([text("edit 1")]),
-      );
+      peer.replaceBlock({ id: target.id, version: target.version }, paragraph([text("edit 1")]));
       expect(peer.history.canUndo()).toBe(true);
     } finally {
       peer.destroy();
@@ -266,10 +239,7 @@ describe("HeadlessSobree — history", () => {
     const peer = new HeadlessSobree(new Y.Doc(), { initialDocument: initial });
     try {
       const target = peer.getBlock(1);
-      peer.replaceBlock(
-        { id: target.id, version: target.version },
-        paragraph([text("modified")]),
-      );
+      peer.replaceBlock({ id: target.id, version: target.version }, paragraph([text("modified")]));
       expect(peer.getBlock(1).text).toBe("modified");
       const undid = peer.history.undo();
       expect(undid).toBe(true);

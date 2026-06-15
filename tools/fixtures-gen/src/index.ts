@@ -184,7 +184,11 @@ const FIXTURES: Fixture[] = [
               }),
               new Paragraph({
                 numbering: { reference: "numList", level: 0 },
-                children: [new TextRun("Third item — a longer one with enough text to wrap, demonstrating that wrapped lines align with the body text and not the marker.")],
+                children: [
+                  new TextRun(
+                    "Third item — a longer one with enough text to wrap, demonstrating that wrapped lines align with the body text and not the marker.",
+                  ),
+                ],
               }),
               new Paragraph({
                 numbering: { reference: "numList", level: 0 },
@@ -235,11 +239,26 @@ const FIXTURES: Fixture[] = [
           {
             properties: {},
             children: [
-              new Paragraph({ numbering: { reference: "bullets", level: 0 }, children: [new TextRun("Top-level bullet A")] }),
-              new Paragraph({ numbering: { reference: "bullets", level: 1 }, children: [new TextRun("Nested under A")] }),
-              new Paragraph({ numbering: { reference: "bullets", level: 1 }, children: [new TextRun("Also nested under A")] }),
-              new Paragraph({ numbering: { reference: "bullets", level: 0 }, children: [new TextRun("Top-level bullet B")] }),
-              new Paragraph({ numbering: { reference: "bullets", level: 0 }, children: [new TextRun("Top-level bullet C")] }),
+              new Paragraph({
+                numbering: { reference: "bullets", level: 0 },
+                children: [new TextRun("Top-level bullet A")],
+              }),
+              new Paragraph({
+                numbering: { reference: "bullets", level: 1 },
+                children: [new TextRun("Nested under A")],
+              }),
+              new Paragraph({
+                numbering: { reference: "bullets", level: 1 },
+                children: [new TextRun("Also nested under A")],
+              }),
+              new Paragraph({
+                numbering: { reference: "bullets", level: 0 },
+                children: [new TextRun("Top-level bullet B")],
+              }),
+              new Paragraph({
+                numbering: { reference: "bullets", level: 0 },
+                children: [new TextRun("Top-level bullet C")],
+              }),
             ],
           },
         ],
@@ -300,9 +319,7 @@ const FIXTURES: Fixture[] = [
                   : undefined,
                 children: [
                   new Paragraph({
-                    children: [
-                      new TextRun({ text, bold: header }),
-                    ],
+                    children: [new TextRun({ text, bold: header })],
                   }),
                 ],
               }),
@@ -385,8 +402,7 @@ const FIXTURES: Fixture[] = [
     description:
       "Service-agreement layout: centred title, parties + form-fields table with shaded cells, numbered clauses (some multi-line), signature block. Mirrors a real legal contract — exercises Heading → BodyText → tight form-paragraph → table → numbered list → loose-paragraph transitions in one doc.",
     build: () => {
-      const tight = (text: string): Paragraph =>
-        new Paragraph({ children: [new TextRun(text)] });
+      const tight = (text: string): Paragraph => new Paragraph({ children: [new TextRun(text)] });
       const labelValueRow = (label: string, value: string): TableRow =>
         new TableRow({
           children: [
@@ -499,10 +515,20 @@ const FIXTURES: Fixture[] = [
                 ],
               }),
               new Paragraph({ children: [new TextRun("")] }),
-              new Paragraph({ children: [new TextRun("Signed for and on behalf of the Parties:")] }),
+              new Paragraph({
+                children: [new TextRun("Signed for and on behalf of the Parties:")],
+              }),
               new Paragraph({ children: [new TextRun("")] }),
-              new Paragraph({ children: [new TextRun("……………………………………                      ……………………………………")] }),
-              new Paragraph({ children: [new TextRun("Provider                                                                Client")] }),
+              new Paragraph({
+                children: [new TextRun("……………………………………                      ……………………………………")],
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun(
+                    "Provider                                                                Client",
+                  ),
+                ],
+              }),
             ],
           },
         ],
@@ -560,7 +586,11 @@ const FIXTURES: Fixture[] = [
             properties: {},
             children: [
               new Paragraph({
-                children: [new TextRun("Quarterly status report — exercises merged cells and colour-coded backgrounds.")],
+                children: [
+                  new TextRun(
+                    "Quarterly status report — exercises merged cells and colour-coded backgrounds.",
+                  ),
+                ],
               }),
               new Table({
                 width: { size: 9000, type: WidthType.DXA },
@@ -606,11 +636,14 @@ const FIXTURES: Fixture[] = [
                   // Row 5 — horizontal merge across all 4 columns for a footer-style note
                   new TableRow({
                     children: [
-                      cell("Note: figures revised against the previous quarter; see Schedule C for methodology.", {
-                        colSpan: 4,
-                        fill: "F2F2F2",
-                        align: AlignmentType.CENTER,
-                      }),
+                      cell(
+                        "Note: figures revised against the previous quarter; see Schedule C for methodology.",
+                        {
+                          colSpan: 4,
+                          fill: "F2F2F2",
+                          align: AlignmentType.CENTER,
+                        },
+                      ),
                     ],
                   }),
                 ],
@@ -727,24 +760,36 @@ const FIXTURES: Fixture[] = [
                     children: [
                       new TableCell({
                         shading: { type: ShadingType.CLEAR, fill: "DDEBF7", color: "auto" },
-                        children: [new Paragraph({ children: [new TextRun({ text: "Key", bold: true })] })],
+                        children: [
+                          new Paragraph({ children: [new TextRun({ text: "Key", bold: true })] }),
+                        ],
                       }),
                       new TableCell({
                         shading: { type: ShadingType.CLEAR, fill: "DDEBF7", color: "auto" },
-                        children: [new Paragraph({ children: [new TextRun({ text: "Value", bold: true })] })],
+                        children: [
+                          new Paragraph({ children: [new TextRun({ text: "Value", bold: true })] }),
+                        ],
                       }),
                     ],
                   }),
                   new TableRow({
                     children: [
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun("alpha")] })] }),
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun("1")] })] }),
+                      new TableCell({
+                        children: [new Paragraph({ children: [new TextRun("alpha")] })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({ children: [new TextRun("1")] })],
+                      }),
                     ],
                   }),
                   new TableRow({
                     children: [
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun("beta")] })] }),
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun("2")] })] }),
+                      new TableCell({
+                        children: [new Paragraph({ children: [new TextRun("beta")] })],
+                      }),
+                      new TableCell({
+                        children: [new Paragraph({ children: [new TextRun("2")] })],
+                      }),
                     ],
                   }),
                 ],
@@ -790,7 +835,8 @@ const FIXTURES: Fixture[] = [
       const longBlob = (label: string): string => {
         let out = `${label} `;
         for (let i = 0; i < 25; i++) {
-          out += "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ";
+          out +=
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ";
         }
         return out;
       };
@@ -841,13 +887,22 @@ const FIXTURES: Fixture[] = [
         ],
       };
       children.push(
-        new Paragraph({ numbering: { reference: "longList", level: 0 }, children: [new TextRun("Short item one.")] }),
-        new Paragraph({ numbering: { reference: "longList", level: 0 }, children: [new TextRun("Short item two.")] }),
+        new Paragraph({
+          numbering: { reference: "longList", level: 0 },
+          children: [new TextRun("Short item one.")],
+        }),
+        new Paragraph({
+          numbering: { reference: "longList", level: 0 },
+          children: [new TextRun("Short item two.")],
+        }),
         new Paragraph({
           numbering: { reference: "longList", level: 0 },
           children: [new TextRun(longBlob("Oversized item three —"))],
         }),
-        new Paragraph({ numbering: { reference: "longList", level: 0 }, children: [new TextRun("Short item four.")] }),
+        new Paragraph({
+          numbering: { reference: "longList", level: 0 },
+          children: [new TextRun("Short item four.")],
+        }),
       );
       return new Document({
         numbering: { config: [config] },
@@ -870,12 +925,12 @@ async function main(): Promise<void> {
     );
   }
 
-  process.stdout.write(
-    `\nGenerated ${FIXTURES.length} fixtures under ${CORPUS_ROOT}\n`,
-  );
+  process.stdout.write(`\nGenerated ${FIXTURES.length} fixtures under ${CORPUS_ROOT}\n`);
 }
 
 main().catch((err) => {
-  process.stderr.write(`fixtures-gen failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.stderr.write(
+    `fixtures-gen failed: ${err instanceof Error ? err.message : String(err)}\n`,
+  );
   process.exit(1);
 });

@@ -1,5 +1,5 @@
 import type { Editor } from "../editor";
-import type { AwarenessLike, AwarenessChanges } from "./awareness";
+import type { AwarenessChanges, AwarenessLike } from "./awareness";
 import {
   type PresenceState,
   type PresenceUser,
@@ -62,9 +62,7 @@ export function attachPresence(
 
   const initialState: PresenceState = {
     user: opts.user,
-    selection: publishOwn
-      ? presenceSelectionFromEditor(editor.selection.get())
-      : null,
+    selection: publishOwn ? presenceSelectionFromEditor(editor.selection.get()) : null,
   };
   awareness.setLocalState(initialState as unknown as Record<string, unknown>);
 
@@ -100,10 +98,7 @@ export function attachPresence(
     getPeers: peers,
     setLocalState(patch: Partial<PresenceState>): void {
       if (patch.user !== undefined) {
-        awareness.setLocalStateField(
-          "user",
-          patch.user as unknown as Record<string, unknown>,
-        );
+        awareness.setLocalStateField("user", patch.user as unknown as Record<string, unknown>);
       }
       if ("selection" in patch) {
         awareness.setLocalStateField(

@@ -26,10 +26,7 @@ function p(text = ""): HTMLElement {
 
 describe("applyPaginatedDoc — empty + trivial", () => {
   it("returns [] for an empty PaginatedDoc", () => {
-    const out = applyPaginatedDoc(
-      { pages: [], totalCost: 0, grewPageArray: false },
-      [],
-    );
+    const out = applyPaginatedDoc({ pages: [], totalCost: 0, grewPageArray: false }, []);
     expect(out).toEqual([]);
   });
 
@@ -53,9 +50,7 @@ describe("applyPaginatedDoc — empty + trivial", () => {
     const blocks = place(p("a"));
     const out = applyPaginatedDoc(
       {
-        pages: [
-          { segments: [{ blockId: "missing" }, { blockId: "m0" }], usedHeight: 20 },
-        ],
+        pages: [{ segments: [{ blockId: "missing" }, { blockId: "m0" }], usedHeight: 20 }],
         totalCost: 0,
         grewPageArray: false,
       },
@@ -100,15 +95,11 @@ describe("applyPaginatedDoc — list (<ol>/<ul>) distribution", () => {
     const docPart: PaginatedDoc = {
       pages: [
         {
-          segments: [
-            { blockId: "m0", range: { startSegmentId: "LI0", endSegmentId: "LI1" } },
-          ],
+          segments: [{ blockId: "m0", range: { startSegmentId: "LI0", endSegmentId: "LI1" } }],
           usedHeight: 40,
         },
         {
-          segments: [
-            { blockId: "m0", range: { startSegmentId: "LI2", endSegmentId: "_END" } },
-          ],
+          segments: [{ blockId: "m0", range: { startSegmentId: "LI2", endSegmentId: "_END" } }],
           usedHeight: 40,
         },
       ],
@@ -138,15 +129,11 @@ describe("applyPaginatedDoc — list (<ol>/<ul>) distribution", () => {
       {
         pages: [
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "LI0", endSegmentId: "LI1" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "LI0", endSegmentId: "LI1" } }],
             usedHeight: 40,
           },
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "LI2", endSegmentId: "_END" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "LI2", endSegmentId: "_END" } }],
             usedHeight: 40,
           },
         ],
@@ -167,15 +154,11 @@ describe("applyPaginatedDoc — list (<ol>/<ul>) distribution", () => {
       {
         pages: [
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "LI0", endSegmentId: "LI0" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "LI0", endSegmentId: "LI0" } }],
             usedHeight: 20,
           },
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "LI1", endSegmentId: "_END" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "LI1", endSegmentId: "_END" } }],
             usedHeight: 40,
           },
         ],
@@ -238,15 +221,11 @@ describe("applyPaginatedDoc — table distribution", () => {
       {
         pages: [
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "R0", endSegmentId: "R1" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "R0", endSegmentId: "R1" } }],
             usedHeight: 40,
           },
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "R2", endSegmentId: "_END" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "R2", endSegmentId: "_END" } }],
             usedHeight: 40,
           },
         ],
@@ -272,15 +251,11 @@ describe("applyPaginatedDoc — table distribution", () => {
       {
         pages: [
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "R0", endSegmentId: "R0" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "R0", endSegmentId: "R0" } }],
             usedHeight: 20,
           },
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "R1", endSegmentId: "_END" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "R1", endSegmentId: "_END" } }],
             usedHeight: 20,
           },
         ],
@@ -313,15 +288,11 @@ describe("applyPaginatedDoc — paragraph character split", () => {
       {
         pages: [
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "L0", endSegmentId: "L0" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "L0", endSegmentId: "L0" } }],
             usedHeight: 10,
           },
           {
-            segments: [
-              { blockId: "m0", range: { startSegmentId: "L1", endSegmentId: "_END" } },
-            ],
+            segments: [{ blockId: "m0", range: { startSegmentId: "L1", endSegmentId: "_END" } }],
             usedHeight: 10,
           },
         ],

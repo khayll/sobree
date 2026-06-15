@@ -82,11 +82,7 @@ export function splitRunsAt(
  * exclusive `to`). Used by `applyRunProperties` / `wrapRange` to isolate
  * the affected middle section.
  */
-export function sliceRuns(
-  runs: readonly InlineRun[],
-  from: number,
-  to: number,
-): InlineRun[] {
+export function sliceRuns(runs: readonly InlineRun[], from: number, to: number): InlineRun[] {
   if (to <= from) return [];
   const head = splitRunsAt(runs, from);
   const tail = splitRunsAt(head.after, to - from);

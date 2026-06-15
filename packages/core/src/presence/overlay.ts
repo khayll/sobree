@@ -14,8 +14,8 @@
  */
 
 import type { Editor } from "../editor";
+import { type AttachPresenceOptions, type PresenceHandle, attachPresence } from "./attach";
 import type { AwarenessLike } from "./awareness";
-import { attachPresence, type PresenceHandle, type AttachPresenceOptions } from "./attach";
 import type { PresenceState } from "./state";
 
 export interface AttachPresenceOverlayOptions extends AttachPresenceOptions {
@@ -61,8 +61,7 @@ export function attachPresenceOverlay(
   // Mount overlay root.
   const overlay = document.createElement("div");
   overlay.className = OVERLAY_CLASS;
-  overlay.style.cssText =
-    "position:absolute; inset:0; pointer-events:none; z-index:2;";
+  overlay.style.cssText = "position:absolute; inset:0; pointer-events:none; z-index:2;";
   container.appendChild(overlay);
 
   let lastPeers: Map<number, PresenceState> = new Map();
@@ -91,10 +90,7 @@ export function attachPresenceOverlay(
       const label = document.createElement("span");
       label.className = "sobree-caret-label";
       label.textContent = state.user.name;
-      label.style.cssText =
-        `position:absolute; top:-1.4em; left:0; padding:0 4px; ` +
-        `background:${state.user.color}; color:#fff; font:11px/1.4 system-ui, sans-serif; ` +
-        `border-radius:3px 3px 3px 0; white-space:nowrap;`;
+      label.style.cssText = `position:absolute; top:-1.4em; left:0; padding:0 4px; background:${state.user.color}; color:#fff; font:11px/1.4 system-ui, sans-serif; border-radius:3px 3px 3px 0; white-space:nowrap;`;
       caret.appendChild(label);
       overlay.appendChild(caret);
     }

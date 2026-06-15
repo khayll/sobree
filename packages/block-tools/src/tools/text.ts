@@ -1,8 +1,8 @@
-import type { BlockTarget } from "../blockKinds";
 import { MARK_ON, MARK_PROP, toggleMark } from "@sobree/core";
-import { icon } from "./icons";
 import type { Range as ApiRange, BlockRef, RunProperties } from "@sobree/core";
 import type { Editor } from "@sobree/core";
+import type { BlockTarget } from "../blockKinds";
+import { icon } from "./icons";
 import { readSelectionState } from "./selectionState";
 
 export interface ToolContext {
@@ -60,10 +60,7 @@ export function buildTextToolsHtml(): string {
 }
 
 /** Install click + input listeners for the text tool block. */
-export function wireTextTools(
-  root: HTMLElement,
-  ctx: ToolContext,
-): () => void {
+export function wireTextTools(root: HTMLElement, ctx: ToolContext): () => void {
   const onClick = (e: Event) => {
     const btn = (e.target as HTMLElement).closest("button[data-action]");
     if (!btn) return;
@@ -161,9 +158,7 @@ export function wireTextTools(
  */
 function syncActive(root: HTMLElement, ctx: ToolContext): void {
   const state = readSelectionState(ctx.editor);
-  const btns = root.querySelectorAll<HTMLButtonElement>(
-    'button[data-action="wrap"][data-tag]',
-  );
+  const btns = root.querySelectorAll<HTMLButtonElement>('button[data-action="wrap"][data-tag]');
   for (const btn of btns) {
     const tag = btn.getAttribute("data-tag");
     if (!tag || tag === "mark") continue;
@@ -178,28 +173,20 @@ function syncActive(root: HTMLElement, ctx: ToolContext): void {
   // For mixed selections, dropdowns go to their placeholder ("Font" /
   // "Size") and colour inputs hold their last-set value (no native
   // way to render "indeterminate" on <input type=color>).
-  const fontFamily = root.querySelector<HTMLSelectElement>(
-    'select[data-role="font-family"]',
-  );
+  const fontFamily = root.querySelector<HTMLSelectElement>('select[data-role="font-family"]');
   if (fontFamily) {
     const v = state.runProps.fontFamily ?? "";
     fontFamily.value = optionMatch(fontFamily, v) ? v : "";
   }
-  const fontSize = root.querySelector<HTMLSelectElement>(
-    'select[data-role="font-size"]',
-  );
+  const fontSize = root.querySelector<HTMLSelectElement>('select[data-role="font-size"]');
   if (fontSize) {
     const sz = state.runProps.fontSizePt;
     const v = sz === undefined ? "" : String(sz);
     fontSize.value = optionMatch(fontSize, v) ? v : "";
   }
-  const color = root.querySelector<HTMLInputElement>(
-    'input[data-role="color"]',
-  );
+  const color = root.querySelector<HTMLInputElement>('input[data-role="color"]');
   if (color && state.runProps.color) color.value = state.runProps.color;
-  const highlight = root.querySelector<HTMLInputElement>(
-    'input[data-role="highlight"]',
-  );
+  const highlight = root.querySelector<HTMLInputElement>('input[data-role="highlight"]');
   if (highlight && state.runProps.highlight) {
     highlight.value = state.runProps.highlight;
   }

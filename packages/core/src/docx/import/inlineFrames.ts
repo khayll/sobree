@@ -37,8 +37,8 @@
  */
 
 import type { Block, FrameBorder, InlineFrame, InlineFrameTextbox } from "../../doc/types";
+import { type ThemePalette, readDrawingColor } from "../shared/drawingColor";
 import { NS } from "../shared/namespaces";
-import { readDrawingColor, type ThemePalette } from "../shared/drawingColor";
 
 export interface InlineFramesContext {
   /** RelationshipId → part path lookup. */
@@ -183,26 +183,20 @@ function buildInlineFrame(
   // RENDERED size — usually the same as chExt for inline drawings
   // but kept separate per the OOXML model.
   const grpSpPr = firstChildNS(wpg, NS.wpg, "grpSpPr");
-  const groupXfrm = grpSpPr
-    ? firstNS(grpSpPr, NS.a, "xfrm")
-    : undefined;
+  const groupXfrm = grpSpPr ? firstNS(grpSpPr, NS.a, "xfrm") : undefined;
   const chExt = groupXfrm ? firstNS(groupXfrm, NS.a, "chExt") : undefined;
   const ext = groupXfrm ? firstNS(groupXfrm, NS.a, "ext") : undefined;
   const groupExtentEmu = chExt
     ? { wEmu: numAttr(chExt, "cx"), hEmu: numAttr(chExt, "cy") }
     : { wEmu: numAttr(ext, "cx"), hEmu: numAttr(ext, "cy") };
-  const sizeEmu = ext
-    ? { wEmu: numAttr(ext, "cx"), hEmu: numAttr(ext, "cy") }
-    : groupExtentEmu;
+  const sizeEmu = ext ? { wEmu: numAttr(ext, "cx"), hEmu: numAttr(ext, "cy") } : groupExtentEmu;
   if (groupExtentEmu.wEmu <= 0 || groupExtentEmu.hEmu <= 0) return null;
 
   // Read break / keep-next directives from the CONTAINING paragraph's
   // pPr. The directive semantically belongs to the frame block, not
   // to the inner content paragraph.
   const pPr = firstChildNS(hostP, NS.w, "pPr");
-  let pageBreakBefore = pPr
-    ? firstChildNS(pPr, NS.w, "pageBreakBefore") !== null
-    : false;
+  let pageBreakBefore = pPr ? firstChildNS(pPr, NS.w, "pageBreakBefore") !== null : false;
   const keepNext = pPr ? firstChildNS(pPr, NS.w, "keepNext") !== null : false;
 
   // When the caller opted into LRPB-as-directive, a `<w:lastRenderedPageBreak/>`
@@ -226,84 +220,83 @@ function buildInlineFrame(
   const shapes: Array<InlineFrame["shapes"][number]> = [];
 
   const collectFromGroup = (group: Element): void => {
-  for (const child of Array.from(group.children)) {
-    if (child.namespaceURI === NS.wpg && child.localName === "grpSp") {
-      collectFromGroup(child);
-    } else if (child.namespaceURI === NS.wps && child.localName === "wsp") {
-      const txbx = firstChildNS(child, NS.wps, "txbx");
-      if (txbx) {
-        // Textbox-bearing shape → contributes a body region. A group can
-        // hold several (a "Project: X" entry has a title textbox AND a
-        // details textbox); capture ALL of them in document order so the
-        // renderer can show every one.
-        const txbxContent = firstChildNS(txbx, NS.w, "txbxContent");
-        if (!txbxContent) continue;
-        const { off, ext: shapeExt } = readShapeXfrm(child);
-        const textbox: InlineFrameTextbox = {
-          offsetEmu: { xEmu: off.x, yEmu: off.y },
-          sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
-          body: ctx.parseBlockBody(txbxContent),
-        };
-        const fill = readSolidFill(child, ctx.theme);
-        if (fill !== undefined) textbox.fill = fill;
-        const border = readBorder(child, ctx.theme);
-        if (border !== undefined) textbox.border = border;
-        // `<wps:bodyPr>` carries the text insets + vertical anchor. Word
-        // centers a single heading line by top-anchoring it inside a
-        // short textbox whose insets + centered placement land the line
-        // at the pill's middle; dropping the insets floats it too high.
-        const bodyPr = firstChildNS(child, NS.wps, "bodyPr");
-        if (bodyPr) {
-          textbox.padding = {
-            leftEmu: numAttrOr(bodyPr, "lIns", 91440),
-            topEmu: numAttrOr(bodyPr, "tIns", 45720),
-            rightEmu: numAttrOr(bodyPr, "rIns", 91440),
-            bottomEmu: numAttrOr(bodyPr, "bIns", 45720),
+    for (const child of Array.from(group.children)) {
+      if (child.namespaceURI === NS.wpg && child.localName === "grpSp") {
+        collectFromGroup(child);
+      } else if (child.namespaceURI === NS.wps && child.localName === "wsp") {
+        const txbx = firstChildNS(child, NS.wps, "txbx");
+        if (txbx) {
+          // Textbox-bearing shape → contributes a body region. A group can
+          // hold several (a "Project: X" entry has a title textbox AND a
+          // details textbox); capture ALL of them in document order so the
+          // renderer can show every one.
+          const txbxContent = firstChildNS(txbx, NS.w, "txbxContent");
+          if (!txbxContent) continue;
+          const { off, ext: shapeExt } = readShapeXfrm(child);
+          const textbox: InlineFrameTextbox = {
+            offsetEmu: { xEmu: off.x, yEmu: off.y },
+            sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
+            body: ctx.parseBlockBody(txbxContent),
           };
-          const anchor = bodyPr.getAttribute("anchor");
-          if (anchor === "ctr") textbox.vAlign = "center";
-          else if (anchor === "b") textbox.vAlign = "bottom";
-          else textbox.vAlign = "top";
+          const fill = readSolidFill(child, ctx.theme);
+          if (fill !== undefined) textbox.fill = fill;
+          const border = readBorder(child, ctx.theme);
+          if (border !== undefined) textbox.border = border;
+          // `<wps:bodyPr>` carries the text insets + vertical anchor. Word
+          // centers a single heading line by top-anchoring it inside a
+          // short textbox whose insets + centered placement land the line
+          // at the pill's middle; dropping the insets floats it too high.
+          const bodyPr = firstChildNS(child, NS.wps, "bodyPr");
+          if (bodyPr) {
+            textbox.padding = {
+              leftEmu: numAttrOr(bodyPr, "lIns", 91440),
+              topEmu: numAttrOr(bodyPr, "tIns", 45720),
+              rightEmu: numAttrOr(bodyPr, "rIns", 91440),
+              bottomEmu: numAttrOr(bodyPr, "bIns", 45720),
+            };
+            const anchor = bodyPr.getAttribute("anchor");
+            if (anchor === "ctr") textbox.vAlign = "center";
+            else if (anchor === "b") textbox.vAlign = "bottom";
+            else textbox.vAlign = "top";
+          }
+          textboxes.push(textbox);
+        } else {
+          // Shape-without-textbox → decoration.
+          const { off, ext: shapeExt } = readShapeXfrm(child);
+          if (shapeExt.cx <= 0 || shapeExt.cy <= 0) continue;
+          const geom = readGeometry(child);
+          const fill = readSolidFill(child, ctx.theme);
+          const border = readBorder(child, ctx.theme);
+          const decoration: InlineFrame["shapes"][number] = {
+            geometry: geom,
+            offsetEmu: { xEmu: off.x, yEmu: off.y },
+            sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
+          };
+          if (fill !== undefined) decoration.fill = fill;
+          if (border !== undefined) decoration.border = border;
+          shapes.push(decoration);
         }
-        textboxes.push(textbox);
-      } else {
-        // Shape-without-textbox → decoration.
-        const { off, ext: shapeExt } = readShapeXfrm(child);
-        if (shapeExt.cx <= 0 || shapeExt.cy <= 0) continue;
-        const geom = readGeometry(child);
-        const fill = readSolidFill(child, ctx.theme);
-        const border = readBorder(child, ctx.theme);
-        const decoration: InlineFrame["shapes"][number] = {
-          geometry: geom,
+      } else if (child.namespaceURI === NS.pic && child.localName === "pic") {
+        const blip = child.getElementsByTagNameNS(NS.a, "blip")[0];
+        if (!blip) continue;
+        const rId = blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
+        if (!rId) continue;
+        const target = ctx.rels.get(rId);
+        if (!target) continue;
+        const partPath = normalizePartPath(target);
+        const { off, ext: picExt } = readShapeXfrm(child);
+        if (picExt.cx <= 0 || picExt.cy <= 0) continue;
+        const cNvPr = child.getElementsByTagNameNS(NS.pic, "cNvPr")[0];
+        const altText = cNvPr?.getAttribute("descr");
+        const picture: InlineFrame["pictures"][number] = {
+          partPath,
           offsetEmu: { xEmu: off.x, yEmu: off.y },
-          sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
+          sizeEmu: { wEmu: picExt.cx, hEmu: picExt.cy },
         };
-        if (fill !== undefined) decoration.fill = fill;
-        if (border !== undefined) decoration.border = border;
-        shapes.push(decoration);
+        if (altText) picture.altText = altText;
+        pictures.push(picture);
       }
-    } else if (child.namespaceURI === NS.pic && child.localName === "pic") {
-      const blip = child.getElementsByTagNameNS(NS.a, "blip")[0];
-      if (!blip) continue;
-      const rId =
-        blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
-      if (!rId) continue;
-      const target = ctx.rels.get(rId);
-      if (!target) continue;
-      const partPath = normalizePartPath(target);
-      const { off, ext: picExt } = readShapeXfrm(child);
-      if (picExt.cx <= 0 || picExt.cy <= 0) continue;
-      const cNvPr = child.getElementsByTagNameNS(NS.pic, "cNvPr")[0];
-      const altText = cNvPr?.getAttribute("descr");
-      const picture: InlineFrame["pictures"][number] = {
-        partPath,
-        offsetEmu: { xEmu: off.x, yEmu: off.y },
-        sizeEmu: { wEmu: picExt.cx, hEmu: picExt.cy },
-      };
-      if (altText) picture.altText = altText;
-      pictures.push(picture);
     }
-  }
   };
   collectFromGroup(wpg);
 
@@ -371,8 +364,7 @@ function readShapeXfrm(shape: Element): {
 } {
   // Shape's own offset/extent live on `*:spPr > a:xfrm`. wps:spPr for
   // shapes, pic:spPr for pictures.
-  const spPr =
-    firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
+  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return { off: { x: 0, y: 0 }, ext: { cx: 0, cy: 0 } };
   const xfrm = firstNS(spPr, NS.a, "xfrm");
   if (!xfrm) return { off: { x: 0, y: 0 }, ext: { cx: 0, cy: 0 } };
@@ -384,9 +376,7 @@ function readShapeXfrm(shape: Element): {
   };
 }
 
-function readGeometry(
-  wsp: Element,
-): "rect" | "ellipse" | "roundedRect" | "line" {
+function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" | "line" {
   const prstGeom = wsp.getElementsByTagNameNS(NS.a, "prstGeom")[0];
   const prst = prstGeom?.getAttribute("prst");
   switch (prst) {
@@ -397,15 +387,13 @@ function readGeometry(
     case "line":
     case "straightConnector1":
       return "line";
-    case "rect":
     default:
       return "rect";
   }
 }
 
 function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
-  const spPr =
-    firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
+  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return undefined;
   for (const fill of Array.from(spPr.children)) {
     if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
@@ -416,8 +404,7 @@ function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined
 }
 
 function readBorder(shape: Element, theme?: ThemePalette): FrameBorder | undefined {
-  const spPr =
-    firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
+  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return undefined;
   const ln = firstChildNS(spPr, NS.a, "ln");
   if (!ln) return undefined;
@@ -430,9 +417,7 @@ function readBorder(shape: Element, theme?: ThemePalette): FrameBorder | undefin
   return { color, widthEmu: widthEmu || 0, style };
 }
 
-function coerceBorderStyle(
-  v: string | null | undefined,
-): "solid" | "dashed" | "dotted" | "double" {
+function coerceBorderStyle(v: string | null | undefined): "solid" | "dashed" | "dotted" | "double" {
   switch (v) {
     case "dash":
     case "lgDash":
@@ -457,10 +442,7 @@ function hasLastRenderedPageBreakSkippingTxbx(root: Element): boolean {
     const el = stack.pop()!;
     for (const child of Array.from(el.children)) {
       if (child.localName === "txbxContent") continue;
-      if (
-        child.localName === "lastRenderedPageBreak" &&
-        child.namespaceURI === NS.w
-      ) {
+      if (child.localName === "lastRenderedPageBreak" && child.namespaceURI === NS.w) {
         return true;
       }
       stack.push(child);

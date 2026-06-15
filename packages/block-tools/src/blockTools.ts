@@ -1,6 +1,10 @@
 import "./blockTools.css";
-import { type BlockTarget } from "./blockKinds";
 import type { BlockRef } from "@sobree/core";
+import { enterZoneEdit } from "@sobree/core";
+import type { PageSetup } from "@sobree/core";
+import type { Editor } from "@sobree/core";
+import type { Viewport } from "@sobree/core";
+import type { BlockTarget } from "./blockKinds";
 import { BlockIndicator } from "./indicator";
 import { FloatingToolbar } from "./toolbar";
 import {
@@ -8,6 +12,8 @@ import {
   buildChangeTypeButton,
   openChangeTypePopover,
 } from "./tools/changeType";
+import { icon } from "./tools/icons";
+import { openPageSetupPopover } from "./tools/pageSetup";
 import { buildPerKindHtml, wirePerKindTools } from "./tools/perKind";
 import {
   type CellLocation,
@@ -17,12 +23,6 @@ import {
   wireTableTools,
 } from "./tools/table";
 import { buildTextToolsHtml, wireTextTools } from "./tools/text";
-import { icon } from "./tools/icons";
-import { openPageSetupPopover } from "./tools/pageSetup";
-import { enterZoneEdit } from "@sobree/core";
-import type { PageSetup } from "@sobree/core";
-import type { Editor } from "@sobree/core";
-import type { Viewport } from "@sobree/core";
 
 export interface BlockToolsOptions {
   stackRoot: HTMLElement;
@@ -337,9 +337,7 @@ export class BlockTools {
     // Writes through `editor.setTrackChanges` keeping `enabled: true`
     // so the pill stays lit. The placeholder ("Anonymous") matches
     // Word's behaviour for an unset author.
-    const authorValue = tc.author !== undefined
-      ? escapeHtmlAttr(tc.author)
-      : "";
+    const authorValue = tc.author !== undefined ? escapeHtmlAttr(tc.author) : "";
     const authorInput = tc.enabled
       ? `<input type="text" class="tb-author-input" data-role="track-changes-author" value="${authorValue}" placeholder="Anonymous" title="Track changes author" aria-label="Track changes author" maxlength="60" />`
       : "";
@@ -422,10 +420,7 @@ export class BlockTools {
         }
       }
     };
-    const detachTrackChanges = this.editor.on(
-      "track-changes-change",
-      syncTrackChangesBtn,
-    );
+    const detachTrackChanges = this.editor.on("track-changes-change", syncTrackChangesBtn);
     // Also re-sync on every doc `change` so the unresolved-count
     // badge tracks revisions being authored, accepted, or rejected
     // from anywhere — not just from this toolbar's pill.
@@ -443,9 +438,7 @@ export class BlockTools {
       const raw = (el as HTMLInputElement).value.trim();
       const cur = this.editor.getTrackChanges();
       this.editor.setTrackChanges(
-        raw === ""
-          ? { enabled: cur.enabled }
-          : { enabled: cur.enabled, author: raw },
+        raw === "" ? { enabled: cur.enabled } : { enabled: cur.enabled, author: raw },
       );
     };
     this.toolbar.root.addEventListener("input", onAuthorInput);

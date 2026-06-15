@@ -214,10 +214,7 @@ function applyPrefixSuffixDiff(
   while (
     suffix < oldCells.length - prefix &&
     suffix < newCells.length - prefix &&
-    cellEqual(
-      oldCells[oldCells.length - 1 - suffix]!,
-      newCells[newCells.length - 1 - suffix]!,
-    )
+    cellEqual(oldCells[oldCells.length - 1 - suffix]!, newCells[newCells.length - 1 - suffix]!)
   ) {
     suffix++;
   }
@@ -248,11 +245,7 @@ function insertCellsAt(
     const cell = cells[i]!;
     if (cell.kind === "embed") {
       // y-text insertEmbed: 1 position, optional attributes.
-      yText.insertEmbed(
-        cursor,
-        cell.embed as Record<string, unknown>,
-        cell.attrs,
-      );
+      yText.insertEmbed(cursor, cell.embed as Record<string, unknown>, cell.attrs);
       cursor++;
       i++;
       continue;

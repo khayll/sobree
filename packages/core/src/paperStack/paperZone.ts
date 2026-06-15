@@ -1,14 +1,6 @@
+import type { AnchoredFrame, Block, NamedStyle, NumberingDefinition } from "../doc/types";
+import { type AnchorLayerContext, renderAnchorLayer } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
-import {
-  type AnchorLayerContext,
-  renderAnchorLayer,
-} from "../editor/view/docRenderer/anchorLayer";
-import type {
-  AnchoredFrame,
-  Block,
-  NamedStyle,
-  NumberingDefinition,
-} from "../doc/types";
 
 /**
  * Everything a header/footer zone needs to render its FLOW content. The
@@ -80,11 +72,7 @@ export function setZoneText(zone: HTMLElement, text: string): void {
  * is this paragraph on") and the zone pipeline keeps the substitution
  * concern in one place.
  */
-function substituteFieldNodes(
-  zone: HTMLElement,
-  pageNumber: number,
-  totalPages: number,
-): void {
+function substituteFieldNodes(zone: HTMLElement, pageNumber: number, totalPages: number): void {
   const fields = zone.querySelectorAll<HTMLElement>("span.sobree-field");
   for (const field of Array.from(fields)) {
     const instr = (field.dataset.field ?? "").trim().toUpperCase();

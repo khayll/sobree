@@ -2,11 +2,6 @@ import * as Y from "yjs";
 import type { Block, Paragraph, SobreeDocument } from "../doc/types";
 import { runsToDelta } from "./runs";
 import {
-  buildSkeletonBlockYMap,
-  populateBlockContent,
-  populateParagraphContent,
-} from "./seed";
-import {
   Y_BLOCK_AST_KEY,
   Y_BLOCK_ID_KEY,
   Y_BLOCK_KIND_KEY,
@@ -18,6 +13,7 @@ import {
   Y_PARTREFS_KEY,
   Y_PARTS_KEY,
 } from "./schema";
+import { buildSkeletonBlockYMap, populateBlockContent, populateParagraphContent } from "./seed";
 import { diffApplyText } from "./textDiff";
 
 /**
@@ -126,9 +122,7 @@ function diffBody(
     if (!desiredBlock) continue;
 
     const current = i < body.length ? body.get(i) : undefined;
-    const currentId = current
-      ? ((current.get(Y_BLOCK_ID_KEY) as string | undefined) ?? "")
-      : "";
+    const currentId = current ? ((current.get(Y_BLOCK_ID_KEY) as string | undefined) ?? "") : "";
 
     if (current && currentId === desiredId) {
       updateBlockInPlace(current, desiredBlock);
@@ -251,11 +245,7 @@ function insertFreshBlock(
   populateBlockContent(skeleton, block);
 }
 
-function findIdAtOrAfter(
-  body: Y.Array<Y.Map<unknown>>,
-  id: string,
-  startIdx: number,
-): number {
+function findIdAtOrAfter(body: Y.Array<Y.Map<unknown>>, id: string, startIdx: number): number {
   for (let i = startIdx; i < body.length; i++) {
     const m = body.get(i);
     if ((m.get(Y_BLOCK_ID_KEY) as string | undefined) === id) return i;
@@ -267,16 +257,8 @@ function findIdAtOrAfter(
 
 function diffMeta(meta: Y.Map<string>, doc: SobreeDocument): void {
   setIfChanged(meta, Y_META_FIELDS.sections, JSON.stringify(doc.sections));
-  setIfChanged(
-    meta,
-    Y_META_FIELDS.headerFooterBodies,
-    JSON.stringify(doc.headerFooterBodies),
-  );
-  setIfChanged(
-    meta,
-    Y_META_FIELDS.anchoredFrames,
-    JSON.stringify(doc.anchoredFrames ?? []),
-  );
+  setIfChanged(meta, Y_META_FIELDS.headerFooterBodies, JSON.stringify(doc.headerFooterBodies));
+  setIfChanged(meta, Y_META_FIELDS.anchoredFrames, JSON.stringify(doc.anchoredFrames ?? []));
   setIfChanged(
     meta,
     Y_META_FIELDS.headerFooterFrames,

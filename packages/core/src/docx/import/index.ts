@@ -1,23 +1,5 @@
-import { convertBlocksFromContainer, convertDocumentXml } from "./document";
-import { convertParagraph } from "./paragraph";
-import { readSection } from "./headers";
-import { parseRels } from "./rels";
-import { unzipDocx } from "./unzip";
-import { parseFootnotesXml } from "./footnotes";
-import { parseCommentsXml } from "./comments";
-import { templateToBlocks } from "../../doc/pageSetupBridge";
-import { parseXml } from "../shared/xml";
-import { parseThemeXml, type ThemePalette } from "../shared/drawingColor";
-import type { DocxImportResult } from "../types";
 import { defaultStyles, emptyDocument } from "../../doc/builders";
-import { parseStylesXml } from "./styles";
-import { parseNumberingXml } from "./numbering";
-import { parseSettingsXml } from "./settings";
-import { mountFontTableFromZip } from "../../fonts";
-import { parseAnchoredFrames } from "./anchoredFrames";
-import { flowDisplacingTextboxes } from "./flowFrames";
-import { floatWrappingImages } from "./floatFrames";
-import { parseInlineFrames } from "./inlineFrames";
+import { templateToBlocks } from "../../doc/pageSetupBridge";
 import type {
   AnchoredFrame,
   Block,
@@ -25,6 +7,24 @@ import type {
   SectionProperties,
   SobreeDocument,
 } from "../../doc/types";
+import { mountFontTableFromZip } from "../../fonts";
+import { type ThemePalette, parseThemeXml } from "../shared/drawingColor";
+import { parseXml } from "../shared/xml";
+import type { DocxImportResult } from "../types";
+import { parseAnchoredFrames } from "./anchoredFrames";
+import { parseCommentsXml } from "./comments";
+import { convertBlocksFromContainer, convertDocumentXml } from "./document";
+import { floatWrappingImages } from "./floatFrames";
+import { flowDisplacingTextboxes } from "./flowFrames";
+import { parseFootnotesXml } from "./footnotes";
+import { readSection } from "./headers";
+import { parseInlineFrames } from "./inlineFrames";
+import { parseNumberingXml } from "./numbering";
+import { convertParagraph } from "./paragraph";
+import { parseRels } from "./rels";
+import { parseSettingsXml } from "./settings";
+import { parseStylesXml } from "./styles";
+import { unzipDocx } from "./unzip";
 
 /**
  * Top-level entry point for importing a .docx file. Returns a native
@@ -67,8 +67,7 @@ export async function importDocx(
     // paragraph spacing / formatting survives — critical for frames
     // that flow into the body (see flowDisplacingTextboxes), whose
     // pagination depends on honest line heights.
-    parseBlockBody: (txbxContent) =>
-      convertBlocksFromContainer(txbxContent, { rels }).body,
+    parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     ...(theme ? { theme } : {}),
   });
   // Parse inline-drawing frames (`<w:drawing><wp:inline>` with
@@ -96,8 +95,7 @@ export async function importDocx(
   const honorLastRenderedPageBreaks = lrpbCount >= 10;
   const parsedInlineFrames = parseInlineFrames(xml, {
     rels,
-    parseBlockBody: (txbxContent) =>
-      convertBlocksFromContainer(txbxContent, { rels }).body,
+    parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     honorLastRenderedPageBreaks,
     ...(theme ? { theme } : {}),
   });
@@ -120,9 +118,17 @@ export async function importDocx(
     replaceParagraphs.set(hostParagraphEl, frame);
   }
 
-  const { body: rawBody, warnings, sectPrEls } = convertDocumentXml(xml, { rels }, {
-    replaceParagraphs,
-  });
+  const {
+    body: rawBody,
+    warnings,
+    sectPrEls,
+  } = convertDocumentXml(
+    xml,
+    { rels },
+    {
+      replaceParagraphs,
+    },
+  );
 
   // Displacing anchored textboxes (wrapping, paragraph-anchored,
   // content-only boxes) are really framed body content — splice them
@@ -152,8 +158,12 @@ export async function importDocx(
     sections,
   );
 
-  const { bodies: headerFooterBodies, frames: headerFooterFrames } =
-    loadHeaderFooterParts(sections, unzipped.text, rels, theme);
+  const { bodies: headerFooterBodies, frames: headerFooterFrames } = loadHeaderFooterParts(
+    sections,
+    unzipped.text,
+    rels,
+    theme,
+  );
 
   // Thread `word/*` media and other embedded binary parts through the AST
   // so the export path can round-trip them. Keyed by ZIP-level path so
@@ -263,9 +273,7 @@ function loadHeaderFooterParts(
       // dedicated rels file (rare but valid for header parts with no
       // external references).
       const headerRelsXml = textParts[`word/_rels/${ref.partId}.rels`];
-      const headerRels = headerRelsXml
-        ? mergeRels(parseRels(headerRelsXml), rels)
-        : rels;
+      const headerRels = headerRelsXml ? mergeRels(parseRels(headerRelsXml), rels) : rels;
       // Extract floating frames FIRST: `parseAnchoredFrames` claims
       // (removes) each anchored `<w:drawing>` from the XML so the flow
       // walker below doesn't also render it (double-render). Map the part's

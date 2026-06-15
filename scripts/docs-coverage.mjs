@@ -100,4 +100,6 @@ if (staleAllow.length) {
   for (const k of staleAllow.sort()) console.error(`    ${k}`);
 }
 if (failed) process.exit(1);
-console.log(`✓ docs coverage: ${allExports.size} public exports, ${allow.size} allowlisted (debt), 0 new gaps`);
+console.log(
+  `✓ docs coverage: ${allExports.size} public exports, ${allow.size} allowlisted (debt), 0 new gaps`,
+);
