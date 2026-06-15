@@ -210,9 +210,13 @@ export type AnchoredContent =
     }
   | {
       kind: "shape";
-      geometry: "rect" | "ellipse" | "roundedRect" | "line";
+      geometry: "rect" | "ellipse" | "roundedRect" | "line" | "custom";
       fill?: string;
       border?: { color: string; widthEmu: number; style: "solid" | "dashed" | "dotted" | "double" };
+      /** Present when `geometry === "custom"`: a DrawingML `<a:custGeom>`
+       *  outline as an SVG path in its own `widthEmu × heightEmu` box,
+       *  rendered as a scaled `<svg><path>`. Absent for preset geometry. */
+      path?: { widthEmu: number; heightEmu: number; d: string };
     }
   | {
       kind: "group";

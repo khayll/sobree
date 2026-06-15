@@ -84,6 +84,28 @@ describe("renderAnchorLayer", () => {
     expect(el.style.border).toBe("1px dashed rgb(0, 0, 0)");
   });
 
+  it("renders a custom-geometry shape as a filled, stretched SVG path", () => {
+    const frame: AnchoredFrame = pictureFrame({
+      content: {
+        kind: "shape",
+        geometry: "custom",
+        fill: "#fed600",
+        path: { widthEmu: 100, heightEmu: 200, d: "M 0 0 L 100 0 Z" },
+      },
+    });
+    const layer = renderAnchorLayer([frame], ctx());
+    const svg = layer.querySelector("svg")!;
+    expect(svg).toBeTruthy();
+    expect(svg.getAttribute("viewBox")).toBe("0 0 100 200");
+    expect(svg.getAttribute("preserveAspectRatio")).toBe("none");
+    const path = svg.querySelector("path")!;
+    expect(path.getAttribute("d")).toBe("M 0 0 L 100 0 Z");
+    expect(path.getAttribute("fill")).toBe("#fed600");
+    expect(path.getAttribute("fill-rule")).toBe("evenodd");
+    // The custom path must NOT also paint a CSS background rectangle.
+    expect((layer.children[0] as HTMLElement).style.background).toBe("");
+  });
+
   it("renders ellipse shapes with border-radius 50%", () => {
     const frame: AnchoredFrame = pictureFrame({
       content: { kind: "shape", geometry: "ellipse", fill: "#ff0000" },

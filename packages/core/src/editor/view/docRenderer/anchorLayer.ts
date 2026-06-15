@@ -134,10 +134,19 @@ function paintPicture(
   host.appendChild(img);
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 function paintShape(
   host: HTMLElement,
   content: Extract<AnchoredContent, { kind: "shape" }>,
 ): void {
+  // Custom geometry paints as an SVG path filling the host box — not a
+  // CSS background, which only does rectangles. Handle it first and
+  // return so the preset-fill/border path below never touches it.
+  if (content.geometry === "custom" && content.path) {
+    paintCustomPath(host, content.path, content.fill);
+    return;
+  }
   if (content.fill) host.style.background = content.fill;
   if (content.border) applyBorder(host, content.border);
   switch (content.geometry) {
@@ -160,6 +169,33 @@ function paintShape(
     default:
       break;
   }
+}
+
+/**
+ * Paint a custom-geometry outline. The path lives in its own
+ * `widthEmu × heightEmu` box; an `<svg>` with that viewBox and
+ * `preserveAspectRatio="none"` stretches it to fill the frame, so the
+ * mark tracks the shape's size wherever the group scales it.
+ * `fill-rule: evenodd` lets a glyph's counter (e.g. the hole in an "O")
+ * read as a hole rather than a filled blob.
+ */
+function paintCustomPath(
+  host: HTMLElement,
+  path: NonNullable<Extract<AnchoredContent, { kind: "shape" }>["path"]>,
+  fill: string | undefined,
+): void {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${path.widthEmu} ${path.heightEmu}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.width = "100%";
+  svg.style.height = "100%";
+  svg.style.display = "block";
+  const el = document.createElementNS(SVG_NS, "path");
+  el.setAttribute("d", path.d);
+  el.setAttribute("fill", fill ?? "currentColor");
+  el.setAttribute("fill-rule", "evenodd");
+  svg.appendChild(el);
+  host.appendChild(svg);
 }
 
 function paintTextbox(

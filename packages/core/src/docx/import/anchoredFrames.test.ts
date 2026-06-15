@@ -196,6 +196,38 @@ describe("parseAnchoredFrames", () => {
     });
   });
 
+  it("parses a <a:custGeom> shape into geometry 'custom' with an SVG path", () => {
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:anchor>
+        <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>
+        <wp:extent cx="133350" cy="304800"/>
+        <a:graphic><a:graphicData>
+          <wps:wsp>
+            <wps:spPr>
+              <a:xfrm><a:off x="0" y="0"/><a:ext cx="133350" cy="304800"/></a:xfrm>
+              <a:custGeom><a:pathLst>
+                <a:path w="133350" h="304800">
+                  <a:moveTo><a:pt x="10" y="20"/></a:moveTo>
+                  <a:lnTo><a:pt x="100" y="20"/></a:lnTo>
+                  <a:close/>
+                </a:path>
+              </a:pathLst></a:custGeom>
+              <a:solidFill><a:srgbClr val="FED600"/></a:solidFill>
+            </wps:spPr>
+          </wps:wsp>
+        </a:graphicData></a:graphic>
+      </wp:anchor>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseAnchoredFrames(doc, emptyCtx);
+    expect(frames[0]!.content).toMatchObject({
+      kind: "shape",
+      geometry: "custom",
+      fill: "#FED600",
+      path: { widthEmu: 133350, heightEmu: 304800, d: "M 10 20 L 100 20 Z" },
+    });
+  });
+
   it("reads the group's <a:chOff> child-coordinate origin", () => {
     const doc = xml(`<w:body><w:p><w:r><w:drawing>
       <wp:anchor>
