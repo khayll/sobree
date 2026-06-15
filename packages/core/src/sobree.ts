@@ -88,6 +88,9 @@ export class Sobree {
   private readonly stack: PaperStack;
   private setup: PageSetup;
   private mode: SobreeMode = "edit";
+  /** Guards a single in-flight `document.fonts.ready` repagination so
+   *  repeated triggers while fonts load coalesce into one re-run. */
+  private fontSettleScheduled = false;
   private readonly listeners: {
     change: Set<(p: SobreeEventPayload["change"]) => void>;
     paginate: Set<(p: SobreeEventPayload["paginate"]) => void>;
@@ -150,11 +153,7 @@ export class Sobree {
     // the user typed something. Defer one rAF so the host has laid out
     // the paper element and `offsetHeight` measurements are valid.
     if (typeof requestAnimationFrame !== "undefined") {
-      requestAnimationFrame(() => {
-        if (!this.stack.root.classList.contains("is-zone-editing")) {
-          this.stack.repaginate();
-        }
-      });
+      requestAnimationFrame(() => this.paginateUnlessZoneEditing());
     }
 
     this.detachChange = this.editor.on("change", (payload) => {
@@ -168,9 +167,7 @@ export class Sobree {
       // properties); pull the latest so per-page vAlign stays correct.
       this.syncStackSections();
       // Don't repaginate while a header/footer zone is being edited in place.
-      if (!this.stack.root.classList.contains("is-zone-editing")) {
-        this.stack.repaginate();
-      }
+      this.paginateUnlessZoneEditing();
       for (const cb of this.listeners.change) {
         try {
           cb(payload);
@@ -351,6 +348,40 @@ export class Sobree {
    */
   repaginate(): void {
     this.stack.repaginate();
+  }
+
+  /**
+   * Repaginate, unless a header/footer zone is being edited in place
+   * (live zone edits manage their own reflow). Also schedules a re-run
+   * once any still-loading document fonts settle.
+   */
+  private paginateUnlessZoneEditing(): void {
+    if (this.stack.root.classList.contains("is-zone-editing")) return;
+    this.stack.repaginate();
+    this.repaginateWhenFontsSettle();
+  }
+
+  /**
+   * Pagination and column balancing measure laid-out text, so they depend
+   * on the actual font glyph metrics. A document's embedded fonts load
+   * asynchronously — a pass that runs before they arrive (notably on a
+   * cold reload, or right after `loadDocx` registers new faces) measures
+   * with FALLBACK metrics, which can mis-balance columns or mis-place page
+   * breaks. When fonts are still loading, re-run once they settle so the
+   * final layout reflects real glyphs. No-op when nothing is pending
+   * (the common warm-cache / steady-editing case), and a single in-flight
+   * re-run is coalesced so rapid changes during a load don't pile up.
+   */
+  private repaginateWhenFontsSettle(): void {
+    const fonts = typeof document !== "undefined" ? document.fonts : undefined;
+    if (!fonts || fonts.status !== "loading" || this.fontSettleScheduled) return;
+    this.fontSettleScheduled = true;
+    void fonts.ready.then(() => {
+      this.fontSettleScheduled = false;
+      if (!this.stack.root.classList.contains("is-zone-editing")) {
+        this.stack.repaginate();
+      }
+    });
   }
 
   /** Delegate to `editor.getOutline()`. */
