@@ -1,6 +1,6 @@
 {
   "name": "@sobree/review",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -12,7 +12,14 @@
     }
   },
   "description": "Tracked-changes & comments review surface for @sobree/core — post-it comment threads, per-author colours, accept/reject/resolve actions.",
-  "keywords": ["sobree", "wysiwyg", "editor", "track-changes", "comments", "review"],
+  "keywords": [
+    "sobree",
+    "wysiwyg",
+    "editor",
+    "track-changes",
+    "comments",
+    "review"
+  ],
   "license": "MIT",
   "author": "sobree.dev",
   "homepage": "https://docs.sobree.dev/api/review/",
@@ -35,7 +42,11 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

@@ -1,6 +1,6 @@
 {
   "name": "@sobree/block-tools",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -12,7 +12,15 @@
     }
   },
   "description": "Floating toolbar + gutter indicator + zone editor for @sobree/core. Mount via the `blockTools()` factory in `createSobree({ plugins: [...] })`.",
-  "keywords": ["sobree", "wysiwyg", "editor", "toolbar", "ui", "floating", "block"],
+  "keywords": [
+    "sobree",
+    "wysiwyg",
+    "editor",
+    "toolbar",
+    "ui",
+    "floating",
+    "block"
+  ],
   "license": "MIT",
   "author": "sobree.dev",
   "homepage": "https://docs.sobree.dev/api/block-tools/",
@@ -35,7 +43,11 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
