@@ -6,7 +6,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["dist", "node_modules", "coverage", "tests/corpus", "**/__snapshots__", "**/*.snap"]
+    "ignore": [
+      "dist",
+      "node_modules",
+      "coverage",
+      "tests/corpus",
+      "**/__snapshots__",
+      "**/*.snap",
+      "**/package.json"
+    ]
   },
   "organizeImports": {
     "enabled": true
