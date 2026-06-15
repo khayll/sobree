@@ -36,6 +36,7 @@ import type {
 } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { readDrawingColor, type ThemePalette } from "../shared/drawingColor";
+import { parseCustomGeometry } from "./customGeometry";
 
 export interface AnchoredFramesContext {
   /** RelationshipId → part path lookup, e.g. `"rId4" → "media/image1.png"`. */
@@ -412,6 +413,17 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
     kind: "shape",
     geometry: readGeometry(wsp),
   };
+  // Custom geometry (`<a:custGeom>`, e.g. a wordmark or logo cut) overrides
+  // the preset: capture its outline as an SVG path so the renderer draws
+  // the real shape instead of the fallback rectangle `readGeometry` returns.
+  const custGeom = wsp.getElementsByTagNameNS(NS.a, "custGeom")[0];
+  if (custGeom) {
+    const path = parseCustomGeometry(custGeom);
+    if (path) {
+      out.geometry = "custom";
+      out.path = path;
+    }
+  }
   const fill = readSolidFill(wsp, ctx.theme);
   if (fill !== undefined) out.fill = fill;
   const border = readBorder(wsp, ctx.theme);
