@@ -127,3 +127,82 @@ describe("Sobree façade: vAlign through PageSetup", () => {
     sobree.destroy();
   });
 });
+
+describe("Sobree façade: re-paginate when fonts settle", () => {
+  const originalFonts = Object.getOwnPropertyDescriptor(document, "fonts");
+
+  /** Replace `document.fonts` with a controllable stub. `resolveReady`
+   *  fires the `ready` promise so the test can drive the async re-run. */
+  function installFonts(status: "loading" | "loaded"): { resolveReady: () => void } {
+    let resolveReady: () => void = () => {};
+    const ready = new Promise<void>((res) => {
+      resolveReady = res;
+    });
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: { status, ready },
+    });
+    return { resolveReady };
+  }
+
+  beforeEach(() => {
+    // Suppress the construction-time rAF pagination so each test counts
+    // only its own explicit `paginateUnlessZoneEditing()` calls.
+    vi.stubGlobal("requestAnimationFrame", () => 0);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (originalFonts) Object.defineProperty(document, "fonts", originalFonts);
+    else delete (document as { fonts?: unknown }).fonts;
+  });
+
+  type WithInternals = { stack: { repaginate: () => void }; paginateUnlessZoneEditing: () => void };
+
+  it("re-runs pagination once still-loading fonts finish", async () => {
+    installFonts("loaded"); // construction: nothing pending
+    const { sobree } = setupSobree();
+    const internals = sobree as unknown as WithInternals;
+    const spy = vi.spyOn(internals.stack, "repaginate");
+
+    const fonts = installFonts("loading"); // now fonts are arriving
+    internals.paginateUnlessZoneEditing();
+    expect(spy).toHaveBeenCalledTimes(1); // the synchronous pass (fallback metrics)
+
+    fonts.resolveReady();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(spy).toHaveBeenCalledTimes(2); // re-run once real glyphs are ready
+    sobree.destroy();
+  });
+
+  it("does not schedule a re-run when fonts are already loaded", async () => {
+    installFonts("loaded");
+    const { sobree } = setupSobree();
+    const internals = sobree as unknown as WithInternals;
+    const spy = vi.spyOn(internals.stack, "repaginate");
+
+    internals.paginateUnlessZoneEditing();
+    await Promise.resolve();
+    expect(spy).toHaveBeenCalledTimes(1);
+    sobree.destroy();
+  });
+
+  it("coalesces repeated triggers during loading into a single re-run", async () => {
+    installFonts("loaded");
+    const { sobree } = setupSobree();
+    const internals = sobree as unknown as WithInternals;
+    const spy = vi.spyOn(internals.stack, "repaginate");
+
+    const fonts = installFonts("loading");
+    internals.paginateUnlessZoneEditing();
+    internals.paginateUnlessZoneEditing();
+    internals.paginateUnlessZoneEditing();
+    expect(spy).toHaveBeenCalledTimes(3); // three synchronous passes
+
+    fonts.resolveReady();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(spy).toHaveBeenCalledTimes(4); // exactly ONE extra re-run
+    sobree.destroy();
+  });
+});
