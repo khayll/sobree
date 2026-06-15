@@ -55,6 +55,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Biome (format + import-order + lint). Fails on error-severity
+      # diagnostics only; the codebase's deliberate `warn` rules
+      # (noNonNullAssertion, noDelete, …) don't block. Generated data
+      # (tests/corpus, snapshots) is ignored in biome.json.
+      - name: Lint (Biome)
+        run: pnpm check
+
       - name: Docs coverage ratchet
         run: pnpm docs:coverage
 
