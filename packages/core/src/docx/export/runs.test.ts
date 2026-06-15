@@ -1,19 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { inlinesToRuns } from "./runs";
-import { makeExportContext } from "./context";
 import { emptyDocument } from "../../doc/builders";
+import type { InlineRun, SobreeDocument } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { parseXml, wVal } from "../shared/xml";
-import type { InlineRun, SobreeDocument } from "../../doc/types";
+import { makeExportContext } from "./context";
+import { inlinesToRuns } from "./runs";
 
 /**
  * `inlinesToRuns` emits a bare XML fragment (no root). Wrap it in a
  * namespaced root so it can be parsed and queried with the w: namespace.
  */
 function parseRuns(fragment: string): Document {
-  return parseXml(
-    `<w:root xmlns:w="${NS.w}" xmlns:r="${NS.r}">${fragment}</w:root>`,
-  );
+  return parseXml(`<w:root xmlns:w="${NS.w}" xmlns:r="${NS.r}">${fragment}</w:root>`);
 }
 
 function render(inlines: InlineRun[], doc: SobreeDocument = emptyDocument()): Document {

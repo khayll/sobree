@@ -1,9 +1,9 @@
-import { DEFAULT_PAGE_SETUP, type PageSetup } from "../paperStack/pageSetup";
+import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, text } from "../doc/builders";
 import { pageSetupToSection, sectionToPageSetup } from "../doc/pageSetupBridge";
+import { DEFAULT_PAGE_SETUP, type PageSetup } from "../paperStack/pageSetup";
 import { exportDocx } from "./export/index";
 import { importDocx } from "./import/index";
-import { describe, expect, it } from "vitest";
 
 async function roundTripSetup(setup: PageSetup) {
   const doc = emptyDocument();

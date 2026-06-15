@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { GestureHost } from "./gestureHost";
 import { TouchGestures } from "./touchGestures";
 import { WheelGestures } from "./wheelGestures";
-import type { GestureHost } from "./gestureHost";
 
 /** Recording host stub — the controllers' entire output surface. */
 function makeHost(scale = 1) {

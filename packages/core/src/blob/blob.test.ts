@@ -52,15 +52,23 @@ describe("sha256Hex", () => {
 
 describe("isBlobHash", () => {
   it("accepts valid hashes", () => {
-    expect(isBlobHash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")).toBe(true);
+    expect(isBlobHash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")).toBe(
+      true,
+    );
   });
   it("rejects wrong length", () => {
     expect(isBlobHash("abc")).toBe(false);
-    expect(isBlobHash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85")).toBe(false);
+    expect(isBlobHash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85")).toBe(
+      false,
+    );
   });
   it("rejects uppercase / non-hex", () => {
-    expect(isBlobHash("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855")).toBe(false);
-    expect(isBlobHash("z3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")).toBe(false);
+    expect(isBlobHash("E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855")).toBe(
+      false,
+    );
+    expect(isBlobHash("z3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")).toBe(
+      false,
+    );
   });
 });
 
@@ -128,18 +136,14 @@ describe("fetchBlobStore", () => {
     });
     const bytes = new TextEncoder().encode("abc");
     const hash = await store.put(bytes);
-    expect(hash).toBe(
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-    );
+    expect(hash).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     expect(calls.length).toBe(1);
     expect(calls[0]?.url).toBe(`https://blob.example.com/${hash}`);
     expect(calls[0]?.init.method).toBe("PUT");
   });
 
   it("GET returns null on 404", async () => {
-    const fakeFetch = vi.fn(
-      async () => new Response(null, { status: 404 }) as Response,
-    );
+    const fakeFetch = vi.fn(async () => new Response(null, { status: 404 }) as Response);
     const store = fetchBlobStore({
       baseUrl: "https://blob.example.com",
       fetch: fakeFetch as unknown as typeof fetch,
@@ -150,9 +154,7 @@ describe("fetchBlobStore", () => {
 
   it("GET returns bytes on 200", async () => {
     const payload = new Uint8Array([1, 2, 3, 4]);
-    const fakeFetch = vi.fn(
-      async () => new Response(payload, { status: 200 }) as Response,
-    );
+    const fakeFetch = vi.fn(async () => new Response(payload, { status: 200 }) as Response);
     const store = fetchBlobStore({
       baseUrl: "https://blob.example.com",
       fetch: fakeFetch as unknown as typeof fetch,
@@ -163,8 +165,7 @@ describe("fetchBlobStore", () => {
 
   it("non-2xx (non-404) throws BlobStoreError", async () => {
     const fakeFetch = vi.fn(
-      async () =>
-        new Response(null, { status: 500, statusText: "internal" }) as Response,
+      async () => new Response(null, { status: 500, statusText: "internal" }) as Response,
     );
     const store = fetchBlobStore({
       baseUrl: "https://blob.example.com",
@@ -175,9 +176,7 @@ describe("fetchBlobStore", () => {
 
   it("calls headers factory on each request", async () => {
     let calls = 0;
-    const fakeFetch = vi.fn(
-      async () => new Response(null, { status: 200 }) as Response,
-    );
+    const fakeFetch = vi.fn(async () => new Response(null, { status: 200 }) as Response);
     const store = fetchBlobStore({
       baseUrl: "https://blob.example.com",
       fetch: fakeFetch as unknown as typeof fetch,

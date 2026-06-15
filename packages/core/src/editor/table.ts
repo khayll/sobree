@@ -210,8 +210,7 @@ export class EditorTable {
         const hit = cellAtVisual(table, r, c);
         if (!hit) continue;
         const isTopLeft = r === opts.row && c === opts.col;
-        const ownsOnlyThis =
-          (hit.cell.gridSpan ?? 1) === 1 && !hit.cell.vMerge;
+        const ownsOnlyThis = (hit.cell.gridSpan ?? 1) === 1 && !hit.cell.vMerge;
         if (!isTopLeft && !ownsOnlyThis) {
           return fail({
             code: "invalid-state",
@@ -320,10 +319,7 @@ export class EditorTable {
     return block;
   }
 
-  private updateCell(
-    cell: CellRef,
-    transform: (c: TableCell) => TableCell,
-  ): EditResult<BlockRef> {
+  private updateCell(cell: CellRef, transform: (c: TableCell) => TableCell): EditResult<BlockRef> {
     const table = this.getTable(cell.table);
     if (!table) return fail({ code: "invalid-state", details: "target is not a table" });
     const rows = table.rows.slice();
@@ -426,8 +422,7 @@ function patchVMergeAcrossInsertedRow(rows: TableRow[], insertAt: number): void 
   let aboveCol = 0;
   for (const aCell of above.cells) {
     const span = aCell.gridSpan ?? 1;
-    const isRestartOrContinue =
-      aCell.vMerge === "restart" || aCell.vMerge === "continue";
+    const isRestartOrContinue = aCell.vMerge === "restart" || aCell.vMerge === "continue";
     const belowCell = cellAtVisual({ rows, grid: [], properties: {}, kind: "table" }, 1, aboveCol);
     const belowContinues = belowCell?.cell.vMerge === "continue";
     if (isRestartOrContinue && belowContinues) {
@@ -437,11 +432,7 @@ function patchVMergeAcrossInsertedRow(rows: TableRow[], insertAt: number): void 
   }
 }
 
-function insertContinueInRowAtVisual(
-  row: TableRow,
-  startCol: number,
-  gridSpan: number,
-): void {
+function insertContinueInRowAtVisual(row: TableRow, startCol: number, gridSpan: number): void {
   let c = 0;
   let insertAtIndex = row.cells.length;
   for (let i = 0; i < row.cells.length; i++) {
@@ -481,7 +472,11 @@ function promoteVMergeContinuations(
       });
       if (successorRowIndex >= 0) {
         const r = rows[successorRowIndex];
-        const hit = cellAtVisual({ rows, grid: [], properties: {}, kind: "table" }, successorRowIndex, col);
+        const hit = cellAtVisual(
+          { rows, grid: [], properties: {}, kind: "table" },
+          successorRowIndex,
+          col,
+        );
         if (r && hit) {
           const newCells = r.cells.slice();
           const promoted: TableCell = { ...hit.cell };

@@ -1,8 +1,8 @@
+import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { HyperlinkRun, Paragraph, Table, TableCell } from "../doc/types";
 import { exportDocx } from "./export/index";
 import { importDocx } from "./import/index";
-import { describe, expect, it } from "vitest";
 
 describe("Hyperlinks round-trip", () => {
   it("preserves a hyperlink's URL through docx export → import", async () => {
@@ -34,10 +34,7 @@ describe("Multi-paragraph table cells", () => {
     const { serializeHostsToDocument } = await import("../editor/view/docSerialize/index");
 
     const cell: TableCell = {
-      content: [
-        paragraph([text("first")]),
-        paragraph([text("second")]),
-      ],
+      content: [paragraph([text("first")]), paragraph([text("second")])],
     };
     const table: Table = {
       kind: "table",
@@ -74,7 +71,7 @@ describe("Multi-paragraph table cells", () => {
     // splitter. Hand-crafted DOM here mirrors the old render output.
     const { serializeHostsToDocument } = await import("../editor/view/docSerialize/index");
     const host = document.createElement("div");
-    host.innerHTML = `<table><tbody><tr><td>first<br>second</td></tr></tbody></table>`;
+    host.innerHTML = "<table><tbody><tr><td>first<br>second</td></tr></tbody></table>";
     const back = serializeHostsToDocument([host]);
     const importedTable = back.body.find((b): b is Table => b.kind === "table");
     const cellContent = importedTable?.rows[0]?.cells[0]?.content;

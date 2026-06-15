@@ -1,5 +1,5 @@
-import type { CollabHandle, IdentityOptions } from "./types";
 import type * as Y from "yjs";
+import type { CollabHandle, IdentityOptions } from "./types";
 
 export interface WebRTCProviderOptions extends IdentityOptions {
   /** Room name. Each room is one Y.Doc shared across peers. */

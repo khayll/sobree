@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
 import { zipSync } from "fflate";
-import { importDocx } from "./import/index";
-import { walkBlock } from "../doc/walk";
+import { describe, expect, it } from "vitest";
 import type { Block, InlineRun } from "../doc/types";
+import { walkBlock } from "../doc/walk";
+import { importDocx } from "./import/index";
 
 const TEXT = new TextEncoder();
 

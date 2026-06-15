@@ -1,6 +1,6 @@
+import { paginate } from "../../pagination";
 import { buildItems } from "./buildItems";
 import { distributePages } from "./distribute";
-import { paginate } from "../../pagination";
 
 /**
  * DOM → pagination-engine adapter for PaperStack.

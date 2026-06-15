@@ -67,10 +67,7 @@ export function keyboard(opts?: KeyboardOptions): SobreePlugin {
  * const detach = attachKeyboard(sobree.editor);
  * ```
  */
-export function attachKeyboard(
-  editor: Editor,
-  opts: KeyboardOptions = {},
-): () => void {
+export function attachKeyboard(editor: Editor, opts: KeyboardOptions = {}): () => void {
   const all = [...DEFAULT_BINDINGS, ...(opts.bindings ?? [])];
   return editor.on("keydown", (e) => {
     // Reverse order so user-supplied overrides shadow defaults.
@@ -93,29 +90,22 @@ export function attachKeyboard(
 export const DEFAULT_BINDINGS: readonly KeyBinding[] = [
   // Section break — Word uses Ctrl/Cmd+Shift+Enter for the same op.
   {
-    match: (e) =>
-      cmd(e) &&
-      e.shift &&
-      !e.alt &&
-      (e.key === "Enter" || e.code === "Enter"),
+    match: (e) => cmd(e) && e.shift && !e.alt && (e.key === "Enter" || e.code === "Enter"),
     command: "section.insertBreakAfter",
   },
   // Undo / Redo. Cmd+Z is undo on every platform; Cmd+Shift+Z is the
   // macOS-native redo combo, Cmd+Y is the Windows-native one. Bind
   // both so muscle memory works either way.
   {
-    match: (e) =>
-      cmd(e) && !e.shift && !e.alt && (e.key === "z" || e.key === "Z"),
+    match: (e) => cmd(e) && !e.shift && !e.alt && (e.key === "z" || e.key === "Z"),
     command: "history.undo",
   },
   {
-    match: (e) =>
-      cmd(e) && e.shift && !e.alt && (e.key === "z" || e.key === "Z"),
+    match: (e) => cmd(e) && e.shift && !e.alt && (e.key === "z" || e.key === "Z"),
     command: "history.redo",
   },
   {
-    match: (e) =>
-      cmd(e) && !e.shift && !e.alt && (e.key === "y" || e.key === "Y"),
+    match: (e) => cmd(e) && !e.shift && !e.alt && (e.key === "y" || e.key === "Y"),
     command: "history.redo",
   },
   // Marks — single-letter combos, no shift (except Strike).
@@ -125,8 +115,7 @@ export const DEFAULT_BINDINGS: readonly KeyBinding[] = [
   { match: plain("."), command: "mark.toggle.superscript" },
   { match: plain(","), command: "mark.toggle.subscript" },
   {
-    match: (e) =>
-      cmd(e) && e.shift && !e.alt && (e.key === "s" || e.key === "S"),
+    match: (e) => cmd(e) && e.shift && !e.alt && (e.key === "s" || e.key === "S"),
     command: "mark.toggle.strike",
   },
 ];
@@ -136,6 +125,5 @@ function cmd(e: KeyDownPayload): boolean {
 }
 
 function plain(key: string): (e: KeyDownPayload) => boolean {
-  return (e) =>
-    cmd(e) && !e.shift && !e.alt && e.key === key;
+  return (e) => cmd(e) && !e.shift && !e.alt && e.key === key;
 }

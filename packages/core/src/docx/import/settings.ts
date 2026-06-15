@@ -22,8 +22,8 @@
  * depending on the source.
  */
 
-import { parseXml, wAll, wFirst } from "../shared/xml";
 import { NS } from "../shared/namespaces";
+import { parseXml, wAll, wFirst } from "../shared/xml";
 
 export interface DocSettings {
   /** Numeric compatibility mode from `<w:compatibilityMode>`. Undefined
@@ -62,8 +62,7 @@ export function parseSettingsXml(xml: string | undefined): DocSettings {
   if (out.compatibilityMode === undefined) {
     const legacy = wFirst(doc, "compatibilityMode");
     if (legacy) {
-      const val =
-        legacy.getAttributeNS(NS.w, "val") ?? legacy.getAttribute("w:val");
+      const val = legacy.getAttributeNS(NS.w, "val") ?? legacy.getAttribute("w:val");
       if (val) {
         const n = Number.parseInt(val, 10);
         if (Number.isFinite(n)) out.compatibilityMode = n;
@@ -83,9 +82,7 @@ export function parseSettingsXml(xml: string | undefined): DocSettings {
   // (jellap.docx's header tabs come out ~3x too tight).
   const defaultTabStop = wFirst(doc, "defaultTabStop");
   if (defaultTabStop) {
-    const val =
-      defaultTabStop.getAttributeNS(NS.w, "val") ??
-      defaultTabStop.getAttribute("w:val");
+    const val = defaultTabStop.getAttributeNS(NS.w, "val") ?? defaultTabStop.getAttribute("w:val");
     if (val) {
       const n = Number.parseInt(val, 10);
       if (Number.isFinite(n) && n > 0) out.defaultTabStopTwips = n;

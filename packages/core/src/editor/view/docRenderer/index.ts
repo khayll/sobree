@@ -1,5 +1,5 @@
-import { renderBlocks } from "./block";
 import type { SobreeDocument } from "../../../doc/types";
+import { renderBlocks } from "./block";
 
 /**
  * Walk a SobreeDocument's body into `host`, replacing its existing

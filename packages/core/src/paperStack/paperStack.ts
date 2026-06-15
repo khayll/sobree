@@ -1,4 +1,15 @@
 import "./paperStack.css";
+import type {
+  AnchoredFrame,
+  Block,
+  NamedStyle,
+  NumberingDefinition,
+  SectionProperties,
+} from "../doc/types";
+import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
+import { renderBlocks } from "../editor/view/docRenderer/block";
+import { restoreSelection, saveSelection } from "../util/selection";
+import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
 import {
   type PageSetup,
   resolvedDimensions,
@@ -7,18 +18,7 @@ import {
 } from "./pageSetup";
 import { paginateBlocks } from "./paginationAdapter";
 import { flowUnequalColumnSections } from "./paginationAdapter/columnFlow";
-import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
 import { Paper } from "./paper";
-import { renderBlocks } from "../editor/view/docRenderer/block";
-import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
-import { restoreSelection, saveSelection } from "../util/selection";
-import type {
-  AnchoredFrame,
-  Block,
-  NamedStyle,
-  NumberingDefinition,
-  SectionProperties,
-} from "../doc/types";
 
 /**
  * Sourced from `SobreeDocument`: the rich AST + the dependencies
@@ -684,9 +684,10 @@ export class PaperStack {
     if (refs.length === 0) return null;
     // Type preference: titlePage + first-of-section → `first`,
     // otherwise → `default`. Even-page support is a future addition.
-    const preferred = isFirstOfSection && section.titlePage === true
-      ? refs.find((r) => r.type === "first") ?? refs.find((r) => r.type === "default")
-      : refs.find((r) => r.type === "default") ?? refs[0];
+    const preferred =
+      isFirstOfSection && section.titlePage === true
+        ? (refs.find((r) => r.type === "first") ?? refs.find((r) => r.type === "default"))
+        : (refs.find((r) => r.type === "default") ?? refs[0]);
     if (!preferred) return null;
     const body = this.richZones.headerFooterBodies[preferred.partId];
     if (body === undefined) return null;
@@ -767,9 +768,7 @@ function canMergeFragments(a: HTMLElement, b: HTMLElement): boolean {
  * `tableRowBoxes` only walks the FIRST TBODY's TRs.
  */
 function mergeTableBodyFragments(table: HTMLElement): void {
-  const tbodies = Array.from(table.children).filter(
-    (c): c is HTMLElement => c.tagName === "TBODY",
-  );
+  const tbodies = Array.from(table.children).filter((c): c is HTMLElement => c.tagName === "TBODY");
   if (tbodies.length <= 1) return;
   const head = tbodies[0]!;
   for (let i = 1; i < tbodies.length; i++) {
@@ -893,8 +892,7 @@ export function collapseUnderfilledPages(
     // Refuse outright if cur is already over budget — absorbing more
     // would just compound the overflow.
     if (curH > budgetPx) continue;
-    if (nextH > 0 && nextH <= widowThresholdPx
-        && curH + nextH <= budgetPx + overflowPx) {
+    if (nextH > 0 && nextH <= widowThresholdPx && curH + nextH <= budgetPx + overflowPx) {
       cur.push(...next);
       out.splice(i + 1, 1);
       // Don't decrement i — we want to advance past the absorbed-into
@@ -913,9 +911,7 @@ function measureBlocksHeight(blocks: readonly HTMLElement[]): number {
   return total;
 }
 
-export function collapseTrailingEmptyPages(
-  pages: readonly HTMLElement[][],
-): HTMLElement[][] {
+export function collapseTrailingEmptyPages(pages: readonly HTMLElement[][]): HTMLElement[][] {
   const out: HTMLElement[][] = pages.map((page) => page.slice());
   // Walk from the last page back. While the last page is fully empty
   // and we have a previous page to absorb into, merge it down.
@@ -950,8 +946,16 @@ function isVisuallyEmptyBlock(el: HTMLElement): boolean {
   const tag = el.tagName;
   // Only collapse paragraph / list-item blocks. Tables, drawings,
   // section breaks etc. always justify a page even when "empty".
-  if (tag !== "P" && tag !== "LI" && tag !== "H1" && tag !== "H2" &&
-      tag !== "H3" && tag !== "H4" && tag !== "H5" && tag !== "H6") {
+  if (
+    tag !== "P" &&
+    tag !== "LI" &&
+    tag !== "H1" &&
+    tag !== "H2" &&
+    tag !== "H3" &&
+    tag !== "H4" &&
+    tag !== "H5" &&
+    tag !== "H6"
+  ) {
     return false;
   }
   // Any text content (after trim) means non-empty.
@@ -962,9 +966,11 @@ function isVisuallyEmptyBlock(el: HTMLElement): boolean {
   // textually empty but carries a poster-sized background drawing
   // — like the project pages of complex-multipage.docx where each
   // "Project:" page is a textbox-only layout — never gets absorbed.
-  if (el.querySelector(
-    "img, svg, table, canvas, iframe, video, [class*='sobree-section-frame'], [data-sobree-drawing]",
-  ) !== null) {
+  if (
+    el.querySelector(
+      "img, svg, table, canvas, iframe, video, [class*='sobree-section-frame'], [data-sobree-drawing]",
+    ) !== null
+  ) {
     return false;
   }
   return true;

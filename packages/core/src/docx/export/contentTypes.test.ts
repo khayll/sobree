@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  renderContentTypesXml,
-  renderDocumentRelsXml,
-  renderRootRelsXml,
-} from "./contentTypes";
 import { NS } from "../shared/namespaces";
 import { parseXml } from "../shared/xml";
+import { renderContentTypesXml, renderDocumentRelsXml, renderRootRelsXml } from "./contentTypes";
 
 const CT_DOCUMENT_MAIN =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
-const CT_STYLES =
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
+const CT_STYLES = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
 
 function defaults(doc: Document): Map<string, string> {
   const out = new Map<string, string>();
@@ -37,9 +32,7 @@ describe("renderContentTypesXml", () => {
 
   it("declares the baseline rels + xml defaults", () => {
     const def = defaults(parseXml(renderContentTypesXml()));
-    expect(def.get("rels")).toBe(
-      "application/vnd.openxmlformats-package.relationships+xml",
-    );
+    expect(def.get("rels")).toBe("application/vnd.openxmlformats-package.relationships+xml");
     expect(def.get("xml")).toBe("application/xml");
   });
 
@@ -73,9 +66,9 @@ describe("renderContentTypesXml", () => {
 
   it("deduplicates repeated image extensions", () => {
     const xml = renderContentTypesXml([], ["png", "png", "png"]);
-    const pngCount = Array.from(
-      parseXml(xml).getElementsByTagNameNS(NS.ct, "Default"),
-    ).filter((e) => e.getAttribute("Extension") === "png").length;
+    const pngCount = Array.from(parseXml(xml).getElementsByTagNameNS(NS.ct, "Default")).filter(
+      (e) => e.getAttribute("Extension") === "png",
+    ).length;
     expect(pngCount).toBe(1);
   });
 });
@@ -112,9 +105,7 @@ describe("renderDocumentRelsXml", () => {
   });
 
   it("appends extra relationships with the right resolved type URI", () => {
-    const xml = renderDocumentRelsXml([
-      { id: "rId2", type: "image", target: "media/image1.png" },
-    ]);
+    const xml = renderDocumentRelsXml([{ id: "rId2", type: "image", target: "media/image1.png" }]);
     const doc = parseXml(xml);
     const rels = Array.from(doc.getElementsByTagNameNS(NS.rel, "Relationship"));
     expect(rels).toHaveLength(2);

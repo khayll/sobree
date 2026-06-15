@@ -9,8 +9,8 @@
  * it created, so destroy() cleans up after itself.
  */
 
-import type { FontDeclaration } from "./types";
 import { deobfuscate, isUnobfuscated } from "./odttf";
+import type { FontDeclaration } from "./types";
 
 export class FontFaceRegistry {
   private readonly styleEl: HTMLStyleElement;
@@ -56,7 +56,9 @@ export class FontFaceRegistry {
     const rules: string[] = [];
     for (const decl of fontList) {
       if (!decl.embed) continue;
-      const slots: Array<["regular" | "bold" | "italic" | "boldItalic", { weight: 400 | 700; italic: boolean }]> = [
+      const slots: Array<
+        ["regular" | "bold" | "italic" | "boldItalic", { weight: 400 | 700; italic: boolean }]
+      > = [
         ["regular", { weight: 400, italic: false }],
         ["bold", { weight: 700, italic: false }],
         ["italic", { weight: 400, italic: true }],

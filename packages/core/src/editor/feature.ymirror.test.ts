@@ -1,6 +1,6 @@
-import * as Y from "yjs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { paragraph, text, heading, appendBlock, emptyDocument } from "../doc/builders";
+import * as Y from "yjs";
+import { appendBlock, emptyDocument, heading, paragraph, text } from "../doc/builders";
 import type { Block } from "../doc/types";
 import { projectYDoc } from "../ydoc";
 import { Editor } from "./index";

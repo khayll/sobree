@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Paper } from "./paper";
-import { DEFAULT_PAGE_SETUP } from "./pageSetup";
 import type { SectionProperties } from "../doc/types";
+import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
+import { DEFAULT_PAGE_SETUP } from "./pageSetup";
+import { Paper } from "./paper";
 
 function makePaper(): Paper {
   return new Paper(document.createElement("div"), DEFAULT_PAGE_SETUP);
@@ -50,7 +51,7 @@ describe("Paper behind-text frame routing", () => {
     ...(behindText ? { behindText: true } : {}),
     content: { kind: "shape", geometry: "rect", fill: "#FFFFFF" },
   });
-  const ctx = { rawParts: {} } as import("../editor/view/docRenderer/anchorLayer").AnchorLayerContext;
+  const ctx = { rawParts: {} } as AnchorLayerContext;
 
   it("routes behindText frames into the behind layer, others into the overlay", () => {
     const p = makePaper();

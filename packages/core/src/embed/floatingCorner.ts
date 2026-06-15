@@ -28,11 +28,7 @@
  * positioning — that's the host owner's responsibility.
  */
 
-export type FloatingCornerPlacement =
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
+export type FloatingCornerPlacement = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 /** Margin from the corner edge, in px. Shared so docks line up. */
 const CORNER_MARGIN = 12;

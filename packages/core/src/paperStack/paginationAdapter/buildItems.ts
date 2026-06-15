@@ -288,9 +288,7 @@ function cellParagraphs(cell: HTMLElement): HTMLElement[] {
  */
 function listItemBoxes(list: HTMLElement, lid: string): DomItem[] {
   void lid; // ensureListId is called by the parent for the data-pag-lid stamp
-  const lis = Array.from(list.children).filter(
-    (c): c is HTMLElement => c.tagName === "LI",
-  );
+  const lis = Array.from(list.children).filter((c): c is HTMLElement => c.tagName === "LI");
   if (lis.length === 0) {
     // Empty list — nothing to paginate. Emit a zero-height placeholder
     // pointing at the OL itself so it survives distribution.

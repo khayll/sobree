@@ -1,6 +1,6 @@
 import {
-  PAGE_SIZES,
   type Editor,
+  PAGE_SIZES,
   type PageSetup,
   type PageSizeKey,
   type VerticalAlign,
@@ -31,15 +31,7 @@ export interface PageSetupContext {
   setSectionSetup: (index: number, partial: Partial<PageSetup>) => void;
 }
 
-const PAGE_SIZE_KEYS: PageSizeKey[] = [
-  "A3",
-  "A4",
-  "A5",
-  "B5",
-  "Letter",
-  "Legal",
-  "Tabloid",
-];
+const PAGE_SIZE_KEYS: PageSizeKey[] = ["A3", "A4", "A5", "B5", "Letter", "Legal", "Tabloid"];
 
 const MARGIN_FIELDS = ["top", "right", "bottom", "left"] as const;
 
@@ -91,10 +83,7 @@ export function openPageSetupPopover(
   // Position below the trigger, clamped to the viewport.
   const triggerRect = trigger.getBoundingClientRect();
   const POPOVER_WIDTH = 320;
-  const left = Math.max(
-    8,
-    Math.min(window.innerWidth - POPOVER_WIDTH - 8, triggerRect.left),
-  );
+  const left = Math.max(8, Math.min(window.innerWidth - POPOVER_WIDTH - 8, triggerRect.left));
   popover.style.top = `${triggerRect.bottom + 6}px`;
   popover.style.left = `${left}px`;
   // Trigger the .is-open transition (mirrors sobree-change-popover) on
@@ -127,8 +116,7 @@ export function openPageSetupPopover(
 
   // Focus the section picker (or the first form field) for keyboard nav.
   queueMicrotask(() => {
-    const first =
-      popover.querySelector<HTMLElement>("select, input") ?? popover;
+    const first = popover.querySelector<HTMLElement>("select, input") ?? popover;
     first.focus();
   });
 
@@ -258,9 +246,7 @@ function wire(
   savedSelection: ReturnType<Editor["selection"]["get"]>,
 ): void {
   // Section picker — switching sections re-renders the form.
-  const sectionEl = root.querySelector<HTMLSelectElement>(
-    'select[data-field="section"]',
-  );
+  const sectionEl = root.querySelector<HTMLSelectElement>('select[data-field="section"]');
   if (sectionEl) {
     sectionEl.addEventListener("change", () => {
       const next = Number(sectionEl.value);
@@ -269,16 +255,12 @@ function wire(
   }
 
   // Size + orientation — apply on change.
-  const sizeEl = root.querySelector<HTMLSelectElement>(
-    'select[data-field="size"]',
-  );
+  const sizeEl = root.querySelector<HTMLSelectElement>('select[data-field="size"]');
   sizeEl?.addEventListener("change", () => {
     ctx.setSectionSetup(getActive(), { size: sizeEl.value as PageSizeKey });
   });
 
-  const orientationEl = root.querySelector<HTMLSelectElement>(
-    'select[data-field="orientation"]',
-  );
+  const orientationEl = root.querySelector<HTMLSelectElement>('select[data-field="orientation"]');
   orientationEl?.addEventListener("change", () => {
     ctx.setSectionSetup(getActive(), {
       orientation: orientationEl.value as PageSetup["orientation"],
@@ -292,9 +274,7 @@ function wire(
   // on `change` (blur / Enter / spinner click) so explicit commits feel
   // snappy.
   for (const side of MARGIN_FIELDS) {
-    const input = root.querySelector<HTMLInputElement>(
-      `input[data-field="margin-${side}"]`,
-    );
+    const input = root.querySelector<HTMLInputElement>(`input[data-field="margin-${side}"]`);
     if (!input) continue;
     const apply = () => {
       const value = Number(input.value);
@@ -338,9 +318,7 @@ function wire(
   }
 
   // Vertical alignment — apply on change.
-  const vAlignEl = root.querySelector<HTMLSelectElement>(
-    'select[data-field="vertical-align"]',
-  );
+  const vAlignEl = root.querySelector<HTMLSelectElement>('select[data-field="vertical-align"]');
   vAlignEl?.addEventListener("change", () => {
     ctx.setSectionSetup(getActive(), {
       verticalAlign: vAlignEl.value as VerticalAlign,
@@ -362,9 +340,7 @@ function wire(
     });
   });
 
-  const differentLast = root.querySelector<HTMLInputElement>(
-    'input[data-field="different-last"]',
-  );
+  const differentLast = root.querySelector<HTMLInputElement>('input[data-field="different-last"]');
   differentLast?.addEventListener("change", () => {
     const current = ctx.getSectionSetup(getActive());
     const checked = differentLast.checked;

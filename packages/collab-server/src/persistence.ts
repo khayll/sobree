@@ -31,9 +31,7 @@ export interface FilesystemPersistenceOptions {
  * (e.g. `org/team/doc-1`), forward slashes become directory
  * separators so the on-disk layout matches the logical hierarchy.
  */
-export function filesystemPersistence(
-  opts: FilesystemPersistenceOptions,
-): Persistence {
+export function filesystemPersistence(opts: FilesystemPersistenceOptions): Persistence {
   const root = opts.dir;
   return {
     async load(roomId) {
@@ -87,6 +85,7 @@ function filePath(root: string, roomId: string): string {
     .split("/")
     .map((s) =>
       s
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally strips control chars from untrusted room ids before they become path segments.
         .replace(/[\x00-\x1f]/g, "_")
         .replace(/^\.+$/, "_")
         .replace(/[<>:"\\|?*]/g, "_"),

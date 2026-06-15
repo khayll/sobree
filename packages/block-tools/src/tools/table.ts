@@ -1,7 +1,7 @@
-import type { BlockTarget } from "../blockKinds";
-import { icon } from "./icons";
 import type { BlockRef } from "@sobree/core";
 import type { Editor } from "@sobree/core";
+import type { BlockTarget } from "../blockKinds";
+import { icon } from "./icons";
 
 export type TableMode = "cell" | "table";
 
@@ -156,8 +156,7 @@ function handleAction(
   switch (action) {
     case "cell-align": {
       if (!cell) return;
-      const a =
-        arg === "left" || arg === "center" || arg === "right" ? arg : "left";
+      const a = arg === "left" || arg === "center" || arg === "right" ? arg : "left";
       // Set alignment on the FIRST paragraph in the cell via setCellContent.
       const info = ed.getBlockById(tableRef.id);
       if (!info) return;
@@ -168,7 +167,9 @@ function handleAction(
       const cellObj = rowObj?.cells[cellIndexAt(table, cell.row, cell.col)];
       if (!cellObj) return;
       const newContent = cellObj.content.map((b) =>
-        b.kind === "paragraph" ? { ...b, properties: { ...b.properties, alignment: a as "left" | "center" | "right" } } : b,
+        b.kind === "paragraph"
+          ? { ...b, properties: { ...b.properties, alignment: a as "left" | "center" | "right" } }
+          : b,
       );
       ed.table.setCellContent({ table: tableRef, row: cell.row, col: cell.col }, newContent);
       return;
@@ -236,11 +237,7 @@ function tableRefFor(ctx: TableContext): BlockRef | null {
 }
 
 /** Index into `row.cells` for a given visual column. */
-function cellIndexAt(
-  table: import("@sobree/core").Table,
-  row: number,
-  col: number,
-): number {
+function cellIndexAt(table: import("@sobree/core").Table, row: number, col: number): number {
   const r = table.rows[row];
   if (!r) return -1;
   let c = 0;
@@ -257,16 +254,14 @@ function cellIndexAt(
  * `{row, col, element}` of the cell under the caret, or `null` if the
  * caret isn't inside a cell in that table.
  */
-export function locateCellFromSelection(
-  tableEl: HTMLTableElement,
-): CellLocation | null {
+export function locateCellFromSelection(tableEl: HTMLTableElement): CellLocation | null {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
   const anchor = sel.anchorNode;
   if (!anchor) return null;
-  const cell = (anchor.nodeType === Node.TEXT_NODE ? anchor.parentElement : (anchor as HTMLElement))?.closest(
-    "td, th",
-  ) as HTMLTableCellElement | null;
+  const cell = (
+    anchor.nodeType === Node.TEXT_NODE ? anchor.parentElement : (anchor as HTMLElement)
+  )?.closest("td, th") as HTMLTableCellElement | null;
   if (!cell || !tableEl.contains(cell)) return null;
   const tr = cell.parentElement as HTMLTableRowElement | null;
   if (!tr) return null;

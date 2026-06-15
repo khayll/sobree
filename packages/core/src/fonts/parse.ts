@@ -36,9 +36,7 @@ export function mountFontTableFromZip(
   const fontTableXml = textParts["word/fontTable.xml"];
   if (!fontTableXml) return [];
   const fontTableRelsXml = textParts["word/_rels/fontTable.xml.rels"];
-  const rels = fontTableRelsXml
-    ? parseRels(fontTableRelsXml)
-    : new Map<string, string>();
+  const rels = fontTableRelsXml ? parseRels(fontTableRelsXml) : new Map<string, string>();
   return parseFontTable(fontTableXml, rels).declarations;
 }
 
@@ -47,18 +45,14 @@ export function mountFontTableFromZip(
  * unzipped binary map should retain. `fontTableRels` resolves `r:id`
  * references inside `<w:embed*>` elements to their target paths.
  */
-export function parseFontTable(
-  fontTableXml: string,
-  fontTableRels: Map<string, string>,
-): Loaded {
+export function parseFontTable(fontTableXml: string, fontTableRels: Map<string, string>): Loaded {
   const doc = parseXml(fontTableXml);
   const fonts = wAll(doc, "font");
   const declarations: FontDeclaration[] = [];
   const embeddedPartPaths = new Set<string>();
 
   for (const fEl of fonts) {
-    const name =
-      fEl.getAttributeNS(NS.w, "name") ?? fEl.getAttribute("w:name") ?? "";
+    const name = fEl.getAttributeNS(NS.w, "name") ?? fEl.getAttribute("w:name") ?? "";
     if (!name) continue;
     const decl: FontDeclaration = { name };
 
@@ -109,8 +103,7 @@ export function parseFontTable(
 }
 
 function readSig(sigEl: Element): FontDeclaration["sig"] | null {
-  const get = (name: string) =>
-    sigEl.getAttributeNS(NS.w, name) ?? sigEl.getAttribute(`w:${name}`);
+  const get = (name: string) => sigEl.getAttributeNS(NS.w, name) ?? sigEl.getAttribute(`w:${name}`);
   const usb0 = get("usb0");
   const usb1 = get("usb1");
   const usb2 = get("usb2");
@@ -128,10 +121,7 @@ function readSig(sigEl: Element): FontDeclaration["sig"] | null {
   };
 }
 
-function readEmbed(
-  fEl: Element,
-  rels: Map<string, string>,
-): FontDeclaration["embed"] | null {
+function readEmbed(fEl: Element, rels: Map<string, string>): FontDeclaration["embed"] | null {
   const slots: Array<["regular" | "bold" | "italic" | "boldItalic", string]> = [
     ["regular", "embedRegular"],
     ["bold", "embedBold"],
@@ -152,24 +142,17 @@ function readEmbed(
   return any ? out : null;
 }
 
-function readEmbedRef(
-  embedEl: Element,
-  rels: Map<string, string>,
-): FontEmbedRef | null {
-  const rid =
-    embedEl.getAttributeNS(NS.r, "id") ?? embedEl.getAttribute("r:id");
+function readEmbedRef(embedEl: Element, rels: Map<string, string>): FontEmbedRef | null {
+  const rid = embedEl.getAttributeNS(NS.r, "id") ?? embedEl.getAttribute("r:id");
   if (!rid) return null;
   const target = rels.get(rid);
   if (!target) return null;
   const partPath = target.startsWith("word/") ? target : `word/${target}`;
   const ref: FontEmbedRef = { partPath };
-  const fontKey =
-    embedEl.getAttributeNS(NS.w, "fontKey") ??
-    embedEl.getAttribute("w:fontKey");
+  const fontKey = embedEl.getAttributeNS(NS.w, "fontKey") ?? embedEl.getAttribute("w:fontKey");
   if (fontKey) ref.fontKey = fontKey;
   const subsetted =
-    embedEl.getAttributeNS(NS.w, "subsetted") ??
-    embedEl.getAttribute("w:subsetted");
+    embedEl.getAttributeNS(NS.w, "subsetted") ?? embedEl.getAttribute("w:subsetted");
   if (subsetted === "true" || subsetted === "1") ref.subsetted = true;
   return ref;
 }

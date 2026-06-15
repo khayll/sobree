@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseNumberingXml } from "./numbering";
 
-const NS =
-  'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
 
 /** numbering.xml where numId=2's abstractNum DEFERS its levels to the
  *  "Bullet" numbering style (numStyleLink), whose definition lives in a

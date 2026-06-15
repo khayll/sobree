@@ -5,17 +5,17 @@
  * server.test.ts integration test.
  */
 
-import * as Y from "yjs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  type HeadlessSobree as HeadlessSobreeType,
   HeadlessSobree,
+  type HeadlessSobree as HeadlessSobreeType,
   appendBlock,
   emptyDocument,
   heading,
   paragraph,
   text,
 } from "@sobree/core";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as Y from "yjs";
 import {
   ALL_TOOLS,
   deleteBlockTool,

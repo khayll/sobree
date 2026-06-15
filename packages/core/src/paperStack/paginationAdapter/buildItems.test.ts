@@ -1,5 +1,5 @@
-import { buildItems } from "./buildItems";
 import { beforeAll, describe, expect, it } from "vitest";
+import { buildItems } from "./buildItems";
 
 // jsdom doesn't implement Range.getClientRects; the paragraph-line
 // measurer falls back to a single-line metric when the rect list is
@@ -151,7 +151,7 @@ describe("buildItems: forced page breaks", () => {
 
 describe("buildItems: keepWithNext + monolithic flags", () => {
   it("headings get `keepWithNext: true`", () => {
-    const els = elements(`<h1>title</h1><p>body</p>`);
+    const els = elements("<h1>title</h1><p>body</p>");
     const items = buildItems(els);
     const heading = items.find((it) => it.type === "box" && it.el === els[0]);
     expect(heading?.type).toBe("box");
@@ -165,7 +165,7 @@ describe("buildItems: keepWithNext + monolithic flags", () => {
     // split a single row across pages even when its cells contain
     // multi-line content). <pre> stays monolithic at the block level.
     const table = document.createElement("div");
-    table.innerHTML = `<table><tr><td>x</td></tr><tr><td>y</td></tr></table><pre>code</pre>`;
+    table.innerHTML = "<table><tr><td>x</td></tr><tr><td>y</td></tr></table><pre>code</pre>";
     document.body.appendChild(table);
     const els = Array.from(table.children) as HTMLElement[];
     const items = buildItems(els);

@@ -18,13 +18,13 @@
 
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
 
-import { findSoffice, convertDocxToPdf } from "./pdf/soffice";
-import { extractTextItems } from "./pdf/extract";
 import { clusterIntoLines } from "./pdf/cluster";
+import { extractTextItems } from "./pdf/extract";
+import { convertDocxToPdf, findSoffice } from "./pdf/soffice";
 import type { FixtureMetrics } from "./pdf/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -52,9 +52,7 @@ async function extractFixture(
   const first = rawPages[0];
   return {
     fixture: fileName,
-    pdfSizePt: first
-      ? { width: first.width, height: first.height }
-      : { width: 0, height: 0 },
+    pdfSizePt: first ? { width: first.width, height: first.height } : { width: 0, height: 0 },
     pages: rawPages.map((p) => ({
       page: p.page,
       lines: clusterIntoLines(p.items),
@@ -70,23 +68,15 @@ async function main(): Promise<void> {
   let failures = 0;
   try {
     const entries = await readdir(FIXTURES_DIR);
-    const docxFiles = entries
-      .filter((f) => f.endsWith(".docx") && !f.startsWith("~$"))
-      .sort();
+    const docxFiles = entries.filter((f) => f.endsWith(".docx") && !f.startsWith("~$")).sort();
 
     for (const fileName of docxFiles) {
       try {
         const docxPath = join(FIXTURES_DIR, fileName);
         const metrics = await extractFixture(soffice, docxPath, fileName, tmp);
-        const outPath = join(
-          FIXTURES_DIR,
-          fileName.replace(/\.docx$/i, ".libreoffice.json"),
-        );
+        const outPath = join(FIXTURES_DIR, fileName.replace(/\.docx$/i, ".libreoffice.json"));
         writeFileSync(outPath, `${JSON.stringify(metrics, null, 2)}\n`, "utf8");
-        const lineCount = metrics.pages.reduce(
-          (sum, page) => sum + page.lines.length,
-          0,
-        );
+        const lineCount = metrics.pages.reduce((sum, page) => sum + page.lines.length, 0);
         process.stdout.write(
           `✓ ${fileName} → ${metrics.pages.length} page(s), ${lineCount} line(s)\n`,
         );

@@ -67,6 +67,7 @@ export function projectYDoc(ydoc: Y.Doc): {
 
   const blocks: Block[] = [];
   const ids: string[] = [];
+  // biome-ignore lint/complexity/noForEach: Yjs Y.Array.forEach, not Array.prototype — Y.Array isn't a for-of iterable.
   body.forEach((m) => {
     const id = (m.get(Y_BLOCK_ID_KEY) as string | undefined) ?? "";
     const block = projectBlock(m);

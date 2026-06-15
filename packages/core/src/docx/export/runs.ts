@@ -1,13 +1,3 @@
-import {
-  type ExportContext,
-  allocHyperlinkRel,
-  allocImageRel,
-  nextDocPr,
-  nextRevisionId,
-} from "./context";
-import { renderDrawing } from "./drawings";
-import { ptToHalfPt } from "../shared/units";
-import { el, escapeXmlText } from "../shared/xml";
 import type {
   DrawingRun,
   HyperlinkRun,
@@ -16,6 +6,16 @@ import type {
   RunProperties,
   SobreeDocument,
 } from "../../doc/types";
+import { ptToHalfPt } from "../shared/units";
+import { el, escapeXmlText } from "../shared/xml";
+import {
+  type ExportContext,
+  allocHyperlinkRel,
+  allocImageRel,
+  nextDocPr,
+  nextRevisionId,
+} from "./context";
+import { renderDrawing } from "./drawings";
 
 /**
  * Render a list of InlineRuns into concatenated `<w:r>` / `<w:fldSimple>`
@@ -138,8 +138,7 @@ function emitTextRun(
 }
 
 function emitBreak(type: "line" | "page" | "column"): string {
-  const attrs =
-    type === "line" ? undefined : { "w:type": type === "page" ? "page" : "column" };
+  const attrs = type === "line" ? undefined : { "w:type": type === "page" ? "page" : "column" };
   // No props on bare break runs, no ctx needed.
   return el("w:r", null, el("w:br", attrs ?? null));
 }
@@ -191,8 +190,7 @@ function propsToRPr(props: RunProperties, ctx?: ExportContext): string {
     // (recursion-free by `RunProperties.revisionFormat` contract), so
     // we render its rPr children directly.
     const beforeChildren = rprChildElements(rf.before);
-    const innerRPr =
-      beforeChildren.length > 0 ? el("w:rPr", null, beforeChildren) : el("w:rPr");
+    const innerRPr = beforeChildren.length > 0 ? el("w:rPr", null, beforeChildren) : el("w:rPr");
     parts.push(el("w:rPrChange", attrs, innerRPr));
   }
   return parts.length > 0 ? el("w:rPr", null, parts) : "";

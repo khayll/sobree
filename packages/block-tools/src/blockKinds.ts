@@ -104,7 +104,8 @@ export function blockTargetFrom(node: Node, stackRoot: HTMLElement): BlockTarget
   if (table && paper.contains(table)) return withBlockId({ kind: "table", element: table, paper });
 
   const heading = el.closest("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
-  if (heading && paper.contains(heading)) return withBlockId({ kind: "heading", element: heading, paper });
+  if (heading && paper.contains(heading))
+    return withBlockId({ kind: "heading", element: heading, paper });
 
   const bq = el.closest("blockquote") as HTMLElement | null;
   if (bq && paper.contains(bq)) return withBlockId({ kind: "blockquote", element: bq, paper });
@@ -129,10 +130,7 @@ function withBlockId(t: BlockTarget): BlockTarget {
 }
 
 /** Same lookup by arbitrary `Node` (handles TEXT_NODE). */
-export function blockTargetFromNode(
-  node: Node | null,
-  stackRoot: HTMLElement,
-): BlockTarget | null {
+export function blockTargetFromNode(node: Node | null, stackRoot: HTMLElement): BlockTarget | null {
   if (!node) return null;
   return blockTargetFrom(node, stackRoot);
 }

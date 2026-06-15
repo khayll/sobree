@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Editor } from "../editor";
 import { attachPresence } from "./attach";
-import type { AwarenessLike, AwarenessChanges } from "./awareness";
+import type { AwarenessChanges, AwarenessLike } from "./awareness";
 import { isPresenceState, presenceSelectionFromEditor } from "./state";
 
 /** Minimal in-memory `AwarenessLike` for tests. Real awareness ships
@@ -49,9 +49,7 @@ function fakeAwareness(clientID: number): AwarenessLike & {
       const was = states.has(id);
       states.set(id, state);
       fire(
-        was
-          ? { added: [], updated: [id], removed: [] }
-          : { added: [id], updated: [], removed: [] },
+        was ? { added: [], updated: [id], removed: [] } : { added: [id], updated: [], removed: [] },
       );
     },
     removeRemote(id) {
@@ -93,9 +91,7 @@ describe("presence state helpers", () => {
   it("isPresenceState rejects bad shapes", () => {
     expect(isPresenceState(null)).toBe(false);
     expect(isPresenceState({})).toBe(false);
-    expect(isPresenceState({ user: { id: "a", name: "A", color: "#fff" } })).toBe(
-      true,
-    );
+    expect(isPresenceState({ user: { id: "a", name: "A", color: "#fff" } })).toBe(true);
     expect(
       isPresenceState({
         user: { id: "a", name: "A", color: "#fff" },
@@ -193,4 +189,3 @@ describe("attachPresence", () => {
     }
   });
 });
-

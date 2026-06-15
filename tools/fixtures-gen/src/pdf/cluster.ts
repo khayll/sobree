@@ -11,8 +11,8 @@
  * since PDF y grows upward) and within each line left-to-right.
  */
 
-import type { LineMetric } from "./types";
 import type { RawTextItem } from "./extract";
+import type { LineMetric } from "./types";
 
 /** Two items with |Δy| ≤ this many pt are considered on the same line.
  *  Most fonts at 12pt have a baseline jitter under 0.5pt across glyphs;
@@ -41,7 +41,10 @@ export function clusterIntoLines(items: RawTextItem[]): LineMetric[] {
 
 function mergeLine(items: RawTextItem[]): LineMetric {
   const first = items[0]!;
-  const text = items.map((i) => i.text).join("").trim();
+  const text = items
+    .map((i) => i.text)
+    .join("")
+    .trim();
   const minX = Math.min(...items.map((i) => i.x));
   const maxRight = Math.max(...items.map((i) => i.x + i.width));
   const tallestH = Math.max(...items.map((i) => i.height));

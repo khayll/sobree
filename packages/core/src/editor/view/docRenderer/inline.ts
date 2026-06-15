@@ -1,3 +1,4 @@
+import { resolveRunStyle } from "../../../doc/styles";
 import type {
   HyperlinkRun,
   InlineRun,
@@ -5,7 +6,6 @@ import type {
   RunProperties,
   TextRun,
 } from "../../../doc/types";
-import { resolveRunStyle } from "../../../doc/styles";
 import { resolveFontFace } from "./fontFallback";
 
 /**
@@ -242,10 +242,7 @@ function renderDrawing(
  * exactly how Word wraps body text around the image. `floatMarginsEmu`
  * carries the OOXML `distT/B/L/R` clearance straight onto the box.
  */
-function applyFloat(
-  img: HTMLImageElement,
-  d: import("../../../doc/types").DrawingRun,
-): void {
+function applyFloat(img: HTMLImageElement, d: import("../../../doc/types").DrawingRun): void {
   img.style.float = d.placement === "floatLeft" ? "left" : "right";
   const m = d.floatMarginsEmu;
   if (m) {
@@ -376,7 +373,7 @@ function cssFromRunProps(p: RunProperties): string | null {
     // would override the OUTER <strong>/<em> wrappers, so the run's own
     // bold/italic win by suppressing the implied value.
     if (face.weight !== undefined && !p.bold) decls.push(`font-weight:${face.weight}`);
-    if (face.italic && !p.italic) decls.push(`font-style:italic`);
+    if (face.italic && !p.italic) decls.push("font-style:italic");
   }
   if (p.fontSizePt !== undefined) decls.push(`font-size:${p.fontSizePt}pt`);
   // `<w:caps/>` → CSS `text-transform: uppercase`. The source text

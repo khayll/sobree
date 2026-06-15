@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type {
-  BreakRun,
-  DrawingRun,
-  FieldRun,
-  HyperlinkRun,
-  InlineRun,
-  TabRun,
-} from "../doc/types";
+import type { BreakRun, DrawingRun, FieldRun, HyperlinkRun, InlineRun, TabRun } from "../doc/types";
 import {
   type DeltaOp,
   attrsToRunProps,
-  deltaToRuns,
   deepEqual,
+  deltaToRuns,
   runPropsToAttrs,
   runsToDelta,
 } from "./runs";
@@ -22,9 +15,7 @@ function rt(runs: InlineRun[]): InlineRun[] {
 
 describe("runs ↔ delta — round trip", () => {
   it("plain text", () => {
-    const runs: InlineRun[] = [
-      { kind: "text", text: "Hello, world.", properties: {} },
-    ];
+    const runs: InlineRun[] = [{ kind: "text", text: "Hello, world.", properties: {} }];
     expect(rt(runs)).toEqual(runs);
   });
 

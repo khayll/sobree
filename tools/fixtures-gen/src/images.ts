@@ -13,12 +13,12 @@
 
 import { mkdtempSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
 
-import { findSoffice, convertDocxToPdf } from "./pdf/soffice";
 import { renderPdfPages } from "./pdf/render";
+import { convertDocxToPdf, findSoffice } from "./pdf/soffice";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = join(
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   process.stderr.write(
-    `fixtures-gen images failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
+    `fixtures-gen images failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
   );
   process.exit(1);
 });

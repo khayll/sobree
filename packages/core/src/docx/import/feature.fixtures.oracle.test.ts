@@ -38,11 +38,11 @@
  * to assert on.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { importDocx } from "./index";
 import { renderBlocks } from "../../editor/view/docRenderer/block";
+import { importDocx } from "./index";
 
 const CORPUS_DIR = join(__dirname, "..", "..", "..", "..", "..", "tests", "corpus");
 
@@ -143,14 +143,7 @@ describe("rendering-fidelity oracle", () => {
       host.className = "sobree-editor";
       window.document.body.appendChild(host);
       try {
-        renderBlocks(
-          doc.body,
-          host,
-          doc.numbering,
-          doc.styles,
-          doc.rawParts,
-          undefined,
-        );
+        renderBlocks(doc.body, host, doc.numbering, doc.styles, doc.rawParts, undefined);
         const snapshot = {
           fixture: target.label,
           importWarnings: warnings,

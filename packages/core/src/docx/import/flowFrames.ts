@@ -27,13 +27,7 @@
  * bordered/filled boxes) stays an overlay, unchanged.
  */
 
-import type {
-  AnchoredFrame,
-  AnchoredContent,
-  Block,
-  DrawingRun,
-  Paragraph,
-} from "../../doc/types";
+import type { AnchoredContent, AnchoredFrame, Block, DrawingRun, Paragraph } from "../../doc/types";
 
 /** A frame whose content should flow inline rather than overlay. */
 function isFlowable(frame: AnchoredFrame): boolean {
@@ -120,8 +114,7 @@ function flattenContent(
     case "textbox":
       return content.body;
     case "group": {
-      const sx =
-        content.childCoordSystemCx > 0 ? renderedWidthEmu / content.childCoordSystemCx : 1;
+      const sx = content.childCoordSystemCx > 0 ? renderedWidthEmu / content.childCoordSystemCx : 1;
       const sy =
         content.childCoordSystemCy > 0 ? renderedHeightEmu / content.childCoordSystemCy : 1;
       return flattenChildren(content.children, sx, sy);

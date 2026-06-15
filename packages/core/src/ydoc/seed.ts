@@ -26,9 +26,7 @@ import {
  */
 export function seedYDoc(ydoc: Y.Doc, doc: SobreeDocument, ids: readonly string[]): void {
   if (ids.length !== doc.body.length) {
-    throw new Error(
-      `seedYDoc: ids length (${ids.length}) !== body length (${doc.body.length})`,
-    );
+    throw new Error(`seedYDoc: ids length (${ids.length}) !== body length (${doc.body.length})`);
   }
   const body = ydoc.getArray<Y.Map<unknown>>(Y_BODY_KEY);
   const meta = ydoc.getMap<string>(Y_META_KEY);
@@ -50,9 +48,7 @@ export function seedYDoc(ydoc: Y.Doc, doc: SobreeDocument, ids: readonly string[
     // Doing applyDelta on an unintegrated Y.Text *works* (Yjs queues the
     // operations) but produces "Invalid access" warnings on subsequent
     // reads. Two-phase avoids the noise.
-    const blockMaps = doc.body.map((block, i) =>
-      buildSkeletonBlockYMap(ids[i] ?? "", block),
-    );
+    const blockMaps = doc.body.map((block, i) => buildSkeletonBlockYMap(ids[i] ?? "", block));
     if (blockMaps.length > 0) body.insert(0, blockMaps);
     for (let i = 0; i < doc.body.length; i++) {
       populateBlockContent(blockMaps[i]!, doc.body[i]!);
@@ -111,10 +107,7 @@ export function populateBlockContent(map: Y.Map<unknown>, block: Block): void {
  * Populate paragraph content. Caller guarantees the map is integrated
  * (so its child Y.Text is too).
  */
-export function populateParagraphContent(
-  map: Y.Map<unknown>,
-  block: Paragraph,
-): void {
+export function populateParagraphContent(map: Y.Map<unknown>, block: Paragraph): void {
   // Properties.
   map.set(Y_BLOCK_PROPS_KEY, JSON.stringify(block.properties));
   // Text — must already exist on the map (set by buildSkeletonBlockYMap).
@@ -125,9 +118,7 @@ export function populateParagraphContent(
   }
   const delta = runsToDelta(block.runs);
   if (delta.length > 0) {
-    (text as Y.Text).applyDelta(
-      delta as Array<{ insert: unknown; attributes?: object }>,
-    );
+    (text as Y.Text).applyDelta(delta as Array<{ insert: unknown; attributes?: object }>);
   }
 }
 

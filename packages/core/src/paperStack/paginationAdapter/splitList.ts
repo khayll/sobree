@@ -17,9 +17,7 @@
  * fragments correctly.
  */
 export function splitListAtChild(el: HTMLElement, liIndex: number): HTMLElement {
-  const lis = Array.from(el.children).filter(
-    (c) => c.tagName === "LI",
-  ) as HTMLElement[];
+  const lis = Array.from(el.children).filter((c) => c.tagName === "LI") as HTMLElement[];
   if (liIndex <= 0 || liIndex >= lis.length) return el;
 
   const clone = document.createElement(el.tagName.toLowerCase());
@@ -30,7 +28,7 @@ export function splitListAtChild(el: HTMLElement, liIndex: number): HTMLElement 
   // For <ol>, set `start` on the clone so numbering continues across
   // the split. The head keeps its own start (or default 1).
   if (el.tagName === "OL") {
-    const headStart = parseInt(el.getAttribute("start") ?? "1", 10);
+    const headStart = Number.parseInt(el.getAttribute("start") ?? "1", 10);
     const tailStart = (Number.isFinite(headStart) ? headStart : 1) + liIndex;
     clone.setAttribute("start", String(tailStart));
   }

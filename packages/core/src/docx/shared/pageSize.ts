@@ -15,7 +15,10 @@ export interface PageGeometry {
  * landing spot, and the exact dimensions come back on export because we
  * write our own sectPr anyway.
  */
-export function matchPageSize(widthTwips: number, heightTwips: number): {
+export function matchPageSize(
+  widthTwips: number,
+  heightTwips: number,
+): {
   size: PageSizeKey;
   orientation: Orientation;
 } {
@@ -40,8 +43,6 @@ export function matchPageSize(widthTwips: number, heightTwips: number): {
 export function geometryToTwips(geom: PageGeometry): { w: number; h: number } {
   const mm = PAGE_SIZES[geom.size];
   const [widthMm, heightMm] =
-    geom.orientation === "portrait"
-      ? [mm.width, mm.height]
-      : [mm.height, mm.width];
+    geom.orientation === "portrait" ? [mm.width, mm.height] : [mm.height, mm.width];
   return { w: mmToTwips(widthMm), h: mmToTwips(heightMm) };
 }

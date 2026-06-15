@@ -1,5 +1,5 @@
-import { BlockRegistry } from "./blockRegistry";
 import { describe, expect, it } from "vitest";
+import { BlockRegistry } from "./blockRegistry";
 
 describe("BlockRegistry", () => {
   it("allocates sequential ids on reset", () => {

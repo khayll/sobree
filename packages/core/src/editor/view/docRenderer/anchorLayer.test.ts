@@ -15,7 +15,10 @@ beforeEach(() => {
 });
 
 function ctx() {
-  return { rawParts: { "word/media/img.png": new Uint8Array([0x89]) }, pictureUrlCache: new Map<string, string>() };
+  return {
+    rawParts: { "word/media/img.png": new Uint8Array([0x89]) },
+    pictureUrlCache: new Map<string, string>(),
+  };
 }
 
 function pictureFrame(over: Partial<AnchoredFrame> = {}): AnchoredFrame {
@@ -24,8 +27,8 @@ function pictureFrame(over: Partial<AnchoredFrame> = {}): AnchoredFrame {
     anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page" },
     offsetXEmu: EMU_PER_MM * 10, // 10mm
     offsetYEmu: EMU_PER_MM * 20, // 20mm
-    widthEmu: EMU_PER_MM * 50,   // 50mm
-    heightEmu: EMU_PER_MM * 30,  // 30mm
+    widthEmu: EMU_PER_MM * 50, // 50mm
+    heightEmu: EMU_PER_MM * 30, // 30mm
     content: { kind: "picture", partPath: "word/media/img.png" },
     ...over,
   };
@@ -126,8 +129,16 @@ describe("renderAnchorLayer", () => {
       content: {
         kind: "textbox",
         body: [
-          { kind: "paragraph", runs: [{ kind: "text", text: "Line 1", properties: {} }], properties: {} },
-          { kind: "paragraph", runs: [{ kind: "text", text: "Line 2", properties: {} }], properties: {} },
+          {
+            kind: "paragraph",
+            runs: [{ kind: "text", text: "Line 1", properties: {} }],
+            properties: {},
+          },
+          {
+            kind: "paragraph",
+            runs: [{ kind: "text", text: "Line 2", properties: {} }],
+            properties: {},
+          },
         ],
         fill: "#eeeeee",
       },
@@ -147,7 +158,11 @@ describe("renderAnchorLayer", () => {
       content: {
         kind: "textbox",
         body: [
-          { kind: "paragraph", runs: [{ kind: "text", text: "X", properties: {} }], properties: {} },
+          {
+            kind: "paragraph",
+            runs: [{ kind: "text", text: "X", properties: {} }],
+            properties: {},
+          },
         ],
       },
     });
@@ -169,8 +184,8 @@ describe("renderAnchorLayer", () => {
 
   it("renders group children scaled into the parent frame's coord space", () => {
     const frame: AnchoredFrame = pictureFrame({
-      widthEmu: EMU_PER_MM * 100,  // rendered 100mm wide
-      heightEmu: EMU_PER_MM * 50,  // rendered 50mm tall
+      widthEmu: EMU_PER_MM * 100, // rendered 100mm wide
+      heightEmu: EMU_PER_MM * 50, // rendered 50mm tall
       content: {
         kind: "group",
         childCoordSystemCx: EMU_PER_MM * 200, // local 200mm wide → scale 0.5

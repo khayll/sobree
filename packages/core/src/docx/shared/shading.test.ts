@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { NS } from "./namespaces";
 import { readShading } from "./shading";
 import { parseXml, wFirst } from "./xml";
-import { NS } from "./namespaces";
 
 /** Parse a `<w:tcPr>`-style parent and return the element to feed readShading. */
 function parentWith(shdAttrs: string): Element {

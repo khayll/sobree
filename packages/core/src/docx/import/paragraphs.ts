@@ -1,10 +1,10 @@
-import { type ImportedRun, readRun } from "./runs";
 import { NS } from "../shared/namespaces";
+import { readShading } from "../shared/shading";
 import { halfPtToPt, ooxmlLineHeightToCss } from "../shared/units";
 import { wChildren, wFirst, wVal } from "../shared/xml";
-import { readShading } from "../shared/shading";
-import { readParagraphBorders } from "./borders";
 import type { ParagraphFormat } from "../types";
+import { readParagraphBorders } from "./borders";
+import { type ImportedRun, readRun } from "./runs";
 
 /** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
 export type ImportedItem =
@@ -103,9 +103,7 @@ function collectParagraphChildren(
         text: "",
         format: {},
         isHardBreak: false,
-        field: fieldCached !== ""
-          ? { instruction, cached: fieldCached }
-          : { instruction },
+        field: fieldCached !== "" ? { instruction, cached: fieldCached } : { instruction },
       };
       if (revision) run.revision = revision;
       if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
@@ -125,8 +123,7 @@ function collectParagraphChildren(
       const instrText = wFirst(child, "instrText");
       if (fldChar) {
         const type =
-          fldChar.getAttributeNS(NS.w, "fldCharType") ??
-          fldChar.getAttribute("w:fldCharType");
+          fldChar.getAttributeNS(NS.w, "fldCharType") ?? fldChar.getAttribute("w:fldCharType");
         if (type === "begin") {
           // Flush any previously-open malformed field first.
           flushField();
@@ -170,8 +167,7 @@ function collectParagraphChildren(
       if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
       out.push({ kind: "run", run });
     } else if (child.localName === "hyperlink") {
-      const relId =
-        child.getAttributeNS(NS.r, "id") ?? child.getAttribute("r:id") ?? undefined;
+      const relId = child.getAttributeNS(NS.r, "id") ?? child.getAttribute("r:id") ?? undefined;
       const runs = wChildren(child, "r").map((r) => {
         const run = readRun(r);
         if (revision) run.revision = revision;
@@ -205,19 +201,15 @@ function collectParagraphChildren(
       // Emit one `ImportedRun` with `field` set so the paragraph
       // converter produces a `FieldRun`. Used by headers/footers to
       // carry page-number tokens through round-trip.
-      const instr =
-        child.getAttributeNS(NS.w, "instr") ??
-        child.getAttribute("w:instr") ??
-        "";
+      const instr = child.getAttributeNS(NS.w, "instr") ?? child.getAttribute("w:instr") ?? "";
       const innerR = wFirst(child, "r");
-      const cachedText = innerR ? wFirst(innerR, "t")?.textContent ?? "" : "";
+      const cachedText = innerR ? (wFirst(innerR, "t")?.textContent ?? "") : "";
       const run: ImportedRun = {
         text: "",
         format: {},
         isHardBreak: false,
-        field: cachedText !== ""
-          ? { instruction: instr, cached: cachedText }
-          : { instruction: instr },
+        field:
+          cachedText !== "" ? { instruction: instr, cached: cachedText } : { instruction: instr },
       };
       if (revision) run.revision = revision;
       if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
@@ -317,7 +309,8 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
 
   const spacing = wFirst(pPr, "spacing");
   if (spacing) {
-    const line = spacing.getAttributeNS(spacing.namespaceURI, "line") ?? spacing.getAttribute("w:line");
+    const line =
+      spacing.getAttributeNS(spacing.namespaceURI, "line") ?? spacing.getAttribute("w:line");
     const rule =
       spacing.getAttributeNS(spacing.namespaceURI, "lineRule") ??
       spacing.getAttribute("w:lineRule");
@@ -334,8 +327,10 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
     // they didn't ask for, blowing up vertical spacing and
     // pagination). We store the values on `pSpacingBefore` /
     // `pSpacingAfter` so the AST keeps them explicit (including 0).
-    const after = spacing.getAttributeNS(spacing.namespaceURI, "after") ?? spacing.getAttribute("w:after");
-    const before = spacing.getAttributeNS(spacing.namespaceURI, "before") ?? spacing.getAttribute("w:before");
+    const after =
+      spacing.getAttributeNS(spacing.namespaceURI, "after") ?? spacing.getAttribute("w:after");
+    const before =
+      spacing.getAttributeNS(spacing.namespaceURI, "before") ?? spacing.getAttribute("w:before");
     if (after !== null) {
       const n = Number(after);
       if (Number.isFinite(n)) format.spacingAfterTwips = n;
@@ -367,10 +362,8 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
     const stops: { positionTwips: number; alignment: string; leader?: string }[] = [];
     for (const tab of Array.from(tabsEl.children)) {
       if (tab.namespaceURI !== tabsEl.namespaceURI || tab.localName !== "tab") continue;
-      const posAttr =
-        tab.getAttributeNS(tab.namespaceURI, "pos") ?? tab.getAttribute("w:pos");
-      const valAttr =
-        tab.getAttributeNS(tab.namespaceURI, "val") ?? tab.getAttribute("w:val");
+      const posAttr = tab.getAttributeNS(tab.namespaceURI, "pos") ?? tab.getAttribute("w:pos");
+      const valAttr = tab.getAttributeNS(tab.namespaceURI, "val") ?? tab.getAttribute("w:val");
       const leaderAttr =
         tab.getAttributeNS(tab.namespaceURI, "leader") ?? tab.getAttribute("w:leader");
       if (posAttr === null) continue;
@@ -394,9 +387,7 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
   const indEl = wFirst(pPr, "ind");
   if (indEl) {
     const readTwipAttr = (name: string): number | undefined => {
-      const raw =
-        indEl.getAttributeNS(indEl.namespaceURI, name) ??
-        indEl.getAttribute(`w:${name}`);
+      const raw = indEl.getAttributeNS(indEl.namespaceURI, name) ?? indEl.getAttribute(`w:${name}`);
       if (raw === null) return undefined;
       const n = Number(raw);
       return Number.isFinite(n) ? n : undefined;

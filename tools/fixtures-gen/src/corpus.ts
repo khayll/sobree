@@ -19,33 +19,24 @@
  *   pnpm corpus:check jellap
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { rm } from "node:fs/promises";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
 
-import { discoverCorpus, type CorpusEntry, relPath } from "./corpus/discover";
-import {
-  type CorpusScore,
-  compareToBaseline,
-  scoreFromDrift,
-} from "./corpus/score";
-import { findSoffice, convertDocxToPdf } from "./pdf/soffice";
-import { extractTextItems } from "./pdf/extract";
-import { clusterIntoLines } from "./pdf/cluster";
-import { renderPdfPages } from "./pdf/render";
-import type { FixtureMetrics } from "./pdf/types";
-import { loadSnapshot } from "./compare/snapshot";
-import { matchBlocksToLines, flattenLines } from "./compare/match";
 import { buildDrift } from "./compare/drift";
+import { flattenLines, matchBlocksToLines } from "./compare/match";
 import { summarisePages } from "./compare/pages";
+import { loadSnapshot } from "./compare/snapshot";
+import { type CorpusEntry, discoverCorpus, relPath } from "./corpus/discover";
+import { type CorpusScore, compareToBaseline, scoreFromDrift } from "./corpus/score";
+import { clusterIntoLines } from "./pdf/cluster";
+import { extractTextItems } from "./pdf/extract";
+import { renderPdfPages } from "./pdf/render";
+import { convertDocxToPdf, findSoffice } from "./pdf/soffice";
+import type { FixtureMetrics } from "./pdf/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..", "..", "..");
@@ -66,7 +57,7 @@ async function main(): Promise<void> {
     process.stderr.write(
       filterSlug
         ? `No corpus entry found matching slug "${filterSlug}".\n`
-        : `No corpus entries discovered.\n`,
+        : "No corpus entries discovered.\n",
     );
     process.exit(1);
   }
@@ -90,9 +81,7 @@ async function main(): Promise<void> {
 
   if (mode === "baseline") {
     for (const r of results) writeBaseline(r.entry, r.score);
-    process.stdout.write(
-      `\nbaseline updated for ${results.length} entries — review and commit\n`,
-    );
+    process.stdout.write(`\nbaseline updated for ${results.length} entries — review and commit\n`);
     return;
   }
 
@@ -134,9 +123,7 @@ async function renderAll(entries: CorpusEntry[]): Promise<void> {
 }
 
 async function renderMissing(entries: CorpusEntry[]): Promise<void> {
-  const missing = entries.filter(
-    (e) => !existsSync(libreofficeMetricsPath(e)),
-  );
+  const missing = entries.filter((e) => !existsSync(libreofficeMetricsPath(e)));
   if (missing.length === 0) return;
   process.stdout.write(`rendering ${missing.length} missing libreoffice baselines...\n`);
   await renderAll(missing);
@@ -151,22 +138,14 @@ async function renderEntry(entry: CorpusEntry, soffice: string): Promise<void> {
     const first = rawPages[0];
     const metrics: FixtureMetrics = {
       fixture: entry.slug,
-      pdfSizePt: first
-        ? { width: first.width, height: first.height }
-        : { width: 0, height: 0 },
+      pdfSizePt: first ? { width: first.width, height: first.height } : { width: 0, height: 0 },
       pages: rawPages.map((p) => ({
         page: p.page,
         lines: clusterIntoLines(p.items),
       })),
     };
-    writeFileSync(
-      libreofficeMetricsPath(entry),
-      `${JSON.stringify(metrics, null, 2)}\n`,
-      "utf8",
-    );
-    await renderPdfPages(pdfPath, (n) =>
-      join(entry.libreofficeDir, `page-${n}.png`),
-    );
+    writeFileSync(libreofficeMetricsPath(entry), `${JSON.stringify(metrics, null, 2)}\n`, "utf8");
+    await renderPdfPages(pdfPath, (n) => join(entry.libreofficeDir, `page-${n}.png`));
   } finally {
     await rm(tmpDir, { recursive: true, force: true });
   }
@@ -177,9 +156,7 @@ async function scoreAll(entries: CorpusEntry[]): Promise<ScoredEntry[]> {
   for (const entry of entries) {
     const metricsPath = libreofficeMetricsPath(entry);
     if (!existsSync(metricsPath)) {
-      process.stderr.write(
-        `skip ${entry.slug} — missing ${relPath(metricsPath, REPO_ROOT)}\n`,
-      );
+      process.stderr.write(`skip ${entry.slug} — missing ${relPath(metricsPath, REPO_ROOT)}\n`);
       continue;
     }
     const metrics = JSON.parse(readFileSync(metricsPath, "utf8")) as FixtureMetrics;
@@ -226,11 +203,7 @@ function printResults(results: ScoredEntry[], mode: Mode): void {
     const pages = `${r.score.libreofficePages}p`;
     const matched = `${r.score.matchedBlocks}/${r.score.blockCount}`;
     const flag =
-      mode === "check" && r.regressions.length > 0
-        ? "✗"
-        : r.baseline === null
-          ? "·"
-          : "✓";
+      mode === "check" && r.regressions.length > 0 ? "✗" : r.baseline === null ? "·" : "✓";
     return `  ${flag} ${r.entry.slug.padEnd(40)} drift=${drift.padStart(6)} ${pages.padStart(4)} matched=${matched}`;
   });
   process.stdout.write(`\n${lines.join("\n")}\n`);
@@ -271,7 +244,7 @@ function writeBaseline(entry: CorpusEntry, score: CorpusScore): void {
 
 main().catch((err) => {
   process.stderr.write(
-    `corpus failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`,
+    `corpus failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
   );
   process.exit(1);
 });

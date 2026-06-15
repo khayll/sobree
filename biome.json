@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["dist", "node_modules", "coverage"]
+    "ignore": ["dist", "node_modules", "coverage", "tests/corpus", "**/__snapshots__", "**/*.snap"]
   },
   "organizeImports": {
     "enabled": true
@@ -22,9 +22,14 @@
     "rules": {
       "recommended": true,
       "style": {
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "warn",
+        "noParameterAssign": "warn"
+      },
+      "performance": {
+        "noDelete": "warn"
       },
       "suspicious": {
+        "noConfusingVoidType": "warn",
         "noExplicitAny": "warn"
       }
     }

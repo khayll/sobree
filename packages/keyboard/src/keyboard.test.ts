@@ -1,3 +1,4 @@
+import type { Editor, KeyDownPayload } from "@sobree/core";
 /**
  * Tests focus on the key→command mapping. Command execution itself is
  * covered by the core editor tests; here we just verify the right
@@ -5,8 +6,7 @@
  * bindings shadow the defaults.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { Editor, KeyDownPayload } from "@sobree/core";
-import { attachKeyboard, DEFAULT_BINDINGS } from "./index";
+import { DEFAULT_BINDINGS, attachKeyboard } from "./index";
 
 interface Stub {
   editor: Editor;
@@ -81,11 +81,7 @@ describe("attachKeyboard — default bindings", () => {
     fire({ key: "b", meta: true });
     fire({ key: "i", meta: true });
     fire({ key: "u", meta: true });
-    expect(executed).toEqual([
-      "mark.toggle.bold",
-      "mark.toggle.italic",
-      "mark.toggle.underline",
-    ]);
+    expect(executed).toEqual(["mark.toggle.bold", "mark.toggle.italic", "mark.toggle.underline"]);
   });
 
   it("Cmd+Shift+S dispatches mark.toggle.strike", () => {

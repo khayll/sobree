@@ -69,8 +69,7 @@ export class BlobCache {
     this.store = opts.store;
     this.onResolved = opts.onResolved ?? (() => {});
     this.onError =
-      opts.onError ??
-      ((h, err) => console.warn(`[blob-cache] fetch ${h} failed:`, err));
+      opts.onError ?? ((h, err) => console.warn(`[blob-cache] fetch ${h} failed:`, err));
   }
 
   /**

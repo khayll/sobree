@@ -262,10 +262,7 @@ function readLinkMark(attrs: Record<string, unknown> | undefined): LinkMark | nu
   return { href };
 }
 
-function stripKey(
-  obj: Record<string, unknown>,
-  key: string,
-): Record<string, unknown> {
+function stripKey(obj: Record<string, unknown>, key: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (k !== key) out[k] = v;
@@ -299,9 +296,7 @@ export function runPropsToAttrs(
  * defensively (forward-compat: a future plugin may add marks Sobree
  * doesn't model).
  */
-export function attrsToRunProps(
-  attrs: Record<string, unknown> | undefined,
-): RunProperties {
+export function attrsToRunProps(attrs: Record<string, unknown> | undefined): RunProperties {
   if (!attrs) return {};
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(attrs)) {

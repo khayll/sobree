@@ -176,7 +176,7 @@ function stripParagraphMarker(ctx: EditorContext, index: number): EditResult<voi
   if (!block || block.kind !== "paragraph") {
     return fail({ code: "invalid-position", details: "target is not a paragraph" });
   }
-  if (!block.properties.revision) return ok<void>(undefined as void, []);
+  if (!block.properties.revision) return ok<void>(undefined as undefined, []);
   const { revision: _strip, ...rest } = block.properties;
   const next = ctx.doc.body.slice();
   next[index] = { ...block, properties: rest };
@@ -199,7 +199,7 @@ export function markParagraphBreakForDelete(ctx: EditorContext, index: number): 
     return mergeWithPrevious(ctx, index);
   }
   if (existing) {
-    return ok<void>(undefined as void, []);
+    return ok<void>(undefined as undefined, []);
   }
   const revision: RevisionMark = author === undefined ? { type: "del" } : { type: "del", author };
   const next = ctx.doc.body.slice();
@@ -468,7 +468,7 @@ function applyAllRevisions(
     if (nextBody.length === 0) nextBody.push({ kind: "paragraph", properties: {}, runs: [] });
   }
 
-  if (bumps.length === 0) return ok<void>(undefined as void, []);
+  if (bumps.length === 0) return ok<void>(undefined as undefined, []);
   return ctx.commit({ body: nextBody }, bumps);
 }
 

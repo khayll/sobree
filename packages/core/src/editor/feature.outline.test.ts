@@ -1,7 +1,7 @@
+import { describe, expect, it } from "vitest";
 import { appendBlock, emptyDocument, heading, paragraph, text } from "../doc/builders";
 import type { SobreeDocument } from "../doc/types";
 import { Editor } from "./";
-import { describe, expect, it } from "vitest";
 
 function setupEditor(doc: SobreeDocument): Editor {
   const host = document.createElement("div");

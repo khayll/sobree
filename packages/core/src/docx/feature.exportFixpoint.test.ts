@@ -24,9 +24,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { importDocx } from "./import";
-import { exportDocx } from "./export";
 import type { Block, InlineRun, SobreeDocument } from "../doc/types";
+import { exportDocx } from "./export";
+import { importDocx } from "./import";
 
 const CORPUS_DIR = join(__dirname, "..", "..", "..", "..", "tests", "corpus");
 
@@ -100,9 +100,7 @@ function expectedAfterExport(doc: SobreeDocument): {
     })),
     listRefs: body
       .filter((b) => b.kind === "paragraph" && b.properties.numbering)
-      .map((b) =>
-        b.kind === "paragraph" ? JSON.stringify(b.properties.numbering) : "",
-      )
+      .map((b) => (b.kind === "paragraph" ? JSON.stringify(b.properties.numbering) : ""))
       .sort(),
   };
 }

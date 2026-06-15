@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { collectLivePartPaths, pruneOrphanParts } from "./parts";
 import { emptyDocument } from "./builders";
-import type {
-  AnchoredFrame,
-  Block,
-  DrawingRun,
-  Paragraph,
-  SobreeDocument,
-} from "./types";
+import { collectLivePartPaths, pruneOrphanParts } from "./parts";
+import type { AnchoredFrame, Block, DrawingRun, Paragraph, SobreeDocument } from "./types";
 
 /** Geometry-only frame fields; content is supplied per-test. */
 function frameShell(): Omit<AnchoredFrame, "content"> {
@@ -61,9 +55,7 @@ describe("collectLivePartPaths", () => {
 
   it("collects partPaths from inline drawings in body paragraphs", () => {
     const doc = makeDoc([paraWithImage("word/media/image1.png")]);
-    expect(collectLivePartPaths(doc)).toEqual(
-      new Set(["word/media/image1.png"]),
-    );
+    expect(collectLivePartPaths(doc)).toEqual(new Set(["word/media/image1.png"]));
   });
 
   it("collects across multiple drawings, deduplicated", () => {
@@ -95,9 +87,7 @@ describe("collectLivePartPaths", () => {
 
   it("descends into header/footer templates", () => {
     const doc = makeDoc([]);
-    doc.headerFooterBodies["header1.xml"] = [
-      paraWithImage("word/media/logo.png"),
-    ];
+    doc.headerFooterBodies["header1.xml"] = [paraWithImage("word/media/logo.png")];
     expect(collectLivePartPaths(doc)).toEqual(new Set(["word/media/logo.png"]));
   });
 
@@ -128,11 +118,7 @@ describe("collectLivePartPaths", () => {
       ],
     };
     expect(collectLivePartPaths(doc)).toEqual(
-      new Set([
-        "word/media/headerlogo.png",
-        "word/media/intbx.png",
-        "word/media/grpchild.png",
-      ]),
+      new Set(["word/media/headerlogo.png", "word/media/intbx.png", "word/media/grpchild.png"]),
     );
   });
 });

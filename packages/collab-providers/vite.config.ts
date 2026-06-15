@@ -20,13 +20,7 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     rollupOptions: {
-      external: [
-        "@sobree/core",
-        "yjs",
-        "y-websocket",
-        "y-indexeddb",
-        "y-webrtc",
-      ],
+      external: ["@sobree/core", "yjs", "y-websocket", "y-indexeddb", "y-webrtc"],
     },
   },
 });

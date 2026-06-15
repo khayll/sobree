@@ -1,8 +1,8 @@
-import type { BlockKind, BlockTarget } from "../blockKinds";
-import { icon } from "./icons";
 import type { BlockRef } from "@sobree/core";
 import type { Paragraph, SobreeDocument } from "@sobree/core";
 import type { Editor } from "@sobree/core";
+import type { BlockKind, BlockTarget } from "../blockKinds";
+import { icon } from "./icons";
 import { readSelectionState } from "./selectionState";
 
 export interface PerKindContext {
@@ -35,10 +35,7 @@ export function buildPerKindHtml(kind: BlockKind): string {
  * Wire clicks + input events for the per-kind fragment. Returns a detach
  * function. Safe to call even if `kind` has no extras (noop detach).
  */
-export function wirePerKindTools(
-  root: HTMLElement,
-  ctx: PerKindContext,
-): () => void {
+export function wirePerKindTools(root: HTMLElement, ctx: PerKindContext): () => void {
   const handlers: Array<() => void> = [];
 
   const onAlign = (e: Event) => {
@@ -47,7 +44,13 @@ export function wirePerKindTools(
     const arg = btn.getAttribute("data-arg");
     if (!arg) return;
     const alignment = arg === "justify" ? "both" : arg;
-    if (alignment !== "left" && alignment !== "center" && alignment !== "right" && alignment !== "both") return;
+    if (
+      alignment !== "left" &&
+      alignment !== "center" &&
+      alignment !== "right" &&
+      alignment !== "both"
+    )
+      return;
     applyToTargetBlocks(ctx, (ref) => {
       const result = ctx.editor.applyBlockProperties([ref], { alignment });
       warnOnEditFailure("align", result);
@@ -95,7 +98,13 @@ export function wirePerKindTools(
       else if (action === "align-list") {
         const arg = btn.getAttribute("data-arg");
         const alignment = arg === "justify" ? "both" : arg;
-        if (alignment !== "left" && alignment !== "center" && alignment !== "right" && alignment !== "both") return;
+        if (
+          alignment !== "left" &&
+          alignment !== "center" &&
+          alignment !== "right" &&
+          alignment !== "both"
+        )
+          return;
         applyAlignmentToWholeList(ctx, alignment);
       }
     };
@@ -149,11 +158,8 @@ function syncPerKindState(root: HTMLElement, ctx: PerKindContext): void {
 
   // Alignment buttons — only one is "pressed" at a time.
   const align = state.paragraphProps?.alignment;
-  const arg =
-    align === "both" ? "justify" : align === undefined ? "left" : align;
-  const alignBtns = root.querySelectorAll<HTMLButtonElement>(
-    'button[data-action="align"]',
-  );
+  const arg = align === "both" ? "justify" : align === undefined ? "left" : align;
+  const alignBtns = root.querySelectorAll<HTMLButtonElement>('button[data-action="align"]');
   for (const btn of alignBtns) {
     const on = btn.getAttribute("data-arg") === arg;
     btn.setAttribute("aria-pressed", String(on));
@@ -162,9 +168,7 @@ function syncPerKindState(root: HTMLElement, ctx: PerKindContext): void {
 
   // Line-spacing select — show the current multiplier (or blank for
   // "default"). The select uses string options like "1.5".
-  const lineSel = root.querySelector<HTMLSelectElement>(
-    'select[data-role="line-spacing"]',
-  );
+  const lineSel = root.querySelector<HTMLSelectElement>('select[data-role="line-spacing"]');
   if (lineSel) {
     const sp = state.paragraphProps?.spacing;
     if (sp?.line && sp.lineRule === "auto") {
@@ -177,9 +181,7 @@ function syncPerKindState(root: HTMLElement, ctx: PerKindContext): void {
   }
 
   // Heading level — show the current heading number (1..6) or blank.
-  const headingSel = root.querySelector<HTMLSelectElement>(
-    'select[data-role="heading-level"]',
-  );
+  const headingSel = root.querySelector<HTMLSelectElement>('select[data-role="heading-level"]');
   if (headingSel) {
     const styleId = state.paragraphProps?.styleId;
     const m = styleId?.match(/^Heading([1-6])$/);
@@ -193,9 +195,7 @@ function syncPerKindState(root: HTMLElement, ctx: PerKindContext): void {
   if (listToggle) {
     const isOrdered = state.listFormat === "decimal";
     listToggle.innerHTML = icon(isOrdered ? "list-numbered" : "list-bullet");
-    listToggle.title = isOrdered
-      ? "Switch to bullet list"
-      : "Switch to numbered list";
+    listToggle.title = isOrdered ? "Switch to bullet list" : "Switch to numbered list";
   }
 }
 
@@ -269,10 +269,7 @@ function buildImageHtml(): string {
 
 // === action helpers ===
 
-function applyToTargetBlocks(
-  ctx: PerKindContext,
-  fn: (ref: BlockRef) => void,
-): void {
+function applyToTargetBlocks(ctx: PerKindContext, fn: (ref: BlockRef) => void): void {
   const ref = refForTarget(ctx);
   if (ref) fn(ref);
 }
@@ -339,13 +336,15 @@ function applyAlignmentToWholeList(
   let start = info.index;
   while (start > 0) {
     const prev = doc.body[start - 1];
-    if (!prev || prev.kind !== "paragraph" || prev.properties.numbering?.numId !== targetNumId) break;
+    if (!prev || prev.kind !== "paragraph" || prev.properties.numbering?.numId !== targetNumId)
+      break;
     start--;
   }
   let endExclusive = info.index + 1;
   while (endExclusive < doc.body.length) {
     const next = doc.body[endExclusive];
-    if (!next || next.kind !== "paragraph" || next.properties.numbering?.numId !== targetNumId) break;
+    if (!next || next.kind !== "paragraph" || next.properties.numbering?.numId !== targetNumId)
+      break;
     endExclusive++;
   }
 
@@ -383,9 +382,7 @@ function toggleListKind(ctx: PerKindContext): void {
   if (!info) return;
   const block = doc.body[info.index];
   if (!block || block.kind !== "paragraph" || !block.properties.numbering) return;
-  const currentDef = doc.numbering.find(
-    (n) => n.numId === block.properties.numbering?.numId,
-  );
+  const currentDef = doc.numbering.find((n) => n.numId === block.properties.numbering?.numId);
   if (!currentDef) return;
   const currentFormat = currentDef.abstractFormat.levels[0]?.format ?? "bullet";
   const wantBullet = currentFormat !== "bullet";
@@ -395,8 +392,7 @@ function toggleListKind(ctx: PerKindContext): void {
   // in a single `setDocument`, so we don't have to re-resolve block refs
   // between operations.
   const existing = doc.numbering.find(
-    (n) =>
-      n.abstractFormat.levels[0]?.format === (wantBullet ? "bullet" : "decimal"),
+    (n) => n.abstractFormat.levels[0]?.format === (wantBullet ? "bullet" : "decimal"),
   );
   let targetNumId: number;
   let nextNumbering = doc.numbering;
@@ -443,9 +439,7 @@ function updateImageAltAtTarget(ctx: PerKindContext, alt: string): void {
   if (!info) return;
   const block = doc.body[info.index];
   if (!block || block.kind !== "paragraph") return;
-  const runs = block.runs.map((r) =>
-    r.kind === "drawing" ? { ...r, altText: alt } : r,
-  );
+  const runs = block.runs.map((r) => (r.kind === "drawing" ? { ...r, altText: alt } : r));
   ctx.editor.replaceBlock(ref, { ...block, runs });
 }
 

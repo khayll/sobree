@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { flattenZone, readSection } from "./headers";
 
 const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";

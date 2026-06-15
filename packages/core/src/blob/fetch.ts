@@ -52,14 +52,10 @@ export function fetchBlobStore(opts: FetchBlobStoreOptions): BlobStore {
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
   const fetchImpl = opts.fetch ?? globalThis.fetch;
   if (!fetchImpl) {
-    throw new Error(
-      "fetchBlobStore: no global `fetch` available. Pass one via opts.fetch.",
-    );
+    throw new Error("fetchBlobStore: no global `fetch` available. Pass one via opts.fetch.");
   }
 
-  const buildHeaders = async (
-    extra?: Record<string, string>,
-  ): Promise<Record<string, string>> => {
+  const buildHeaders = async (extra?: Record<string, string>): Promise<Record<string, string>> => {
     const dynamic = opts.headers ? await opts.headers() : {};
     return { ...dynamic, ...extra };
   };

@@ -133,10 +133,7 @@ function readPxDimension(styleValue: string, attrValue: string | null): number {
   return 0;
 }
 
-function mergeStyleAttribute(
-  base: RunProperties,
-  styleAttr: string | null,
-): RunProperties {
+function mergeStyleAttribute(base: RunProperties, styleAttr: string | null): RunProperties {
   if (!styleAttr) return base;
   const out: RunProperties = { ...base };
   for (const decl of styleAttr.split(";")) {
@@ -149,7 +146,10 @@ function mergeStyleAttribute(
     else if (key === "background" || key === "background-color") out.highlight = val;
     else if (key === "font-family") {
       out.fontFamily =
-        val.replace(/^['"]|['"]$/g, "").split(",")[0]?.trim() || val;
+        val
+          .replace(/^['"]|['"]$/g, "")
+          .split(",")[0]
+          ?.trim() || val;
     } else if (key === "font-size") {
       const m = val.match(/^([\d.]+)(pt|px)?$/);
       if (m?.[1]) {

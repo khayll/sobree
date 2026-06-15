@@ -14,11 +14,11 @@
  * table walkers — comment bodies are just small block streams.
  */
 
+import type { Block, Comment } from "../../doc/types";
+import { NS } from "../shared/namespaces";
+import { parseXml, wAll } from "../shared/xml";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 import { convertTable } from "./tables";
-import { parseXml, wAll } from "../shared/xml";
-import { NS } from "../shared/namespaces";
-import type { Block, Comment } from "../../doc/types";
 
 /** Namespace for Word 2013+ extensions (`commentsExtended.xml`). */
 const NS_W15 = "http://schemas.microsoft.com/office/word/2012/wordml";
@@ -39,9 +39,7 @@ export function parseCommentsXml(
   }
   // Pre-parse the extensions file (Word 2013+ adds `done` / parent on
   // each `commentEx`, keyed by the body paragraph's `w14:paraId`).
-  const ext = extendedXml
-    ? parseCommentsExtendedXml(extendedXml)
-    : new Map<string, CommentExt>();
+  const ext = extendedXml ? parseCommentsExtendedXml(extendedXml) : new Map<string, CommentExt>();
 
   // First pass: parse each `<w:comment>` body. Capture the first
   // paragraph's `w14:paraId` so the extensions (keyed by that id) can
@@ -51,8 +49,7 @@ export function parseCommentsXml(
   const paraIdToCommentId = new Map<string, number>();
   const commentIdToFirstParaId = new Map<number, string>();
   for (const comment of wAll(doc, "comment")) {
-    const idAttr =
-      comment.getAttributeNS(NS.w, "id") ?? comment.getAttribute("w:id");
+    const idAttr = comment.getAttributeNS(NS.w, "id") ?? comment.getAttribute("w:id");
     const id = Number(idAttr);
     if (!Number.isFinite(id) || id < 0) continue;
 
@@ -62,8 +59,7 @@ export function parseCommentsXml(
       if (child.namespaceURI !== NS.w) continue;
       if (child.localName === "p") {
         if (firstParaId === null) {
-          firstParaId =
-            child.getAttributeNS(NS_W14, "paraId") ?? child.getAttribute("w14:paraId");
+          firstParaId = child.getAttributeNS(NS_W14, "paraId") ?? child.getAttribute("w14:paraId");
         }
         body.push(convertParagraph(child, ctx));
       } else if (child.localName === "tbl") {
@@ -75,10 +71,8 @@ export function parseCommentsXml(
       commentIdToFirstParaId.set(id, firstParaId);
     }
 
-    const author =
-      comment.getAttributeNS(NS.w, "author") ?? comment.getAttribute("w:author");
-    const initials =
-      comment.getAttributeNS(NS.w, "initials") ?? comment.getAttribute("w:initials");
+    const author = comment.getAttributeNS(NS.w, "author") ?? comment.getAttribute("w:author");
+    const initials = comment.getAttributeNS(NS.w, "initials") ?? comment.getAttribute("w:initials");
     const date = comment.getAttributeNS(NS.w, "date") ?? comment.getAttribute("w:date");
     out[id] = {
       id,
@@ -136,11 +130,9 @@ function parseCommentsExtendedXml(xml: string): Map<string, CommentExt> {
   }
   const exs = Array.from(doc.getElementsByTagNameNS(NS_W15, "commentEx"));
   for (const ex of exs) {
-    const paraId =
-      ex.getAttributeNS(NS_W15, "paraId") ?? ex.getAttribute("w15:paraId");
+    const paraId = ex.getAttributeNS(NS_W15, "paraId") ?? ex.getAttribute("w15:paraId");
     if (!paraId) continue;
-    const done =
-      ex.getAttributeNS(NS_W15, "done") ?? ex.getAttribute("w15:done");
+    const done = ex.getAttributeNS(NS_W15, "done") ?? ex.getAttribute("w15:done");
     const paraIdParent =
       ex.getAttributeNS(NS_W15, "paraIdParent") ?? ex.getAttribute("w15:paraIdParent");
     const entry: CommentExt = {};

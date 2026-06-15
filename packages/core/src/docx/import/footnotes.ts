@@ -16,11 +16,11 @@
  * concern. Negative ids are also skipped (Word's reserved range).
  */
 
+import type { Block } from "../../doc/types";
+import { NS } from "../shared/namespaces";
+import { parseXml, wAll } from "../shared/xml";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 import { convertTable } from "./tables";
-import { parseXml, wAll } from "../shared/xml";
-import { NS } from "../shared/namespaces";
-import type { Block } from "../../doc/types";
 
 export function parseFootnotesXml(
   xml: string | undefined,
@@ -35,11 +35,9 @@ export function parseFootnotesXml(
   }
   const out: Record<number, Block[]> = {};
   for (const footnote of wAll(doc, "footnote")) {
-    const typeAttr =
-      footnote.getAttributeNS(NS.w, "type") ?? footnote.getAttribute("w:type");
+    const typeAttr = footnote.getAttributeNS(NS.w, "type") ?? footnote.getAttribute("w:type");
     if (typeAttr === "separator" || typeAttr === "continuationSeparator") continue;
-    const idAttr =
-      footnote.getAttributeNS(NS.w, "id") ?? footnote.getAttribute("w:id");
+    const idAttr = footnote.getAttributeNS(NS.w, "id") ?? footnote.getAttribute("w:id");
     const id = Number(idAttr);
     if (!Number.isFinite(id) || id < 1) continue;
 

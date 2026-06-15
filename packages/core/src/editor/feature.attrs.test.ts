@@ -1,7 +1,7 @@
+import { describe, expect, it } from "vitest";
 import { appendBlock, emptyDocument, heading, paragraph, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument } from "../doc/types";
 import { Editor } from "./";
-import { describe, expect, it } from "vitest";
 
 function titledDoc(): SobreeDocument {
   const d = emptyDocument();

@@ -133,7 +133,11 @@ describe("readParagraph — HYPERLINK fields", () => {
       ),
     );
     expect(items).toHaveLength(1);
-    const link = items[0] as { kind: string; href?: string; runs: Array<{ text: string; format: { styleId?: string } }> };
+    const link = items[0] as {
+      kind: string;
+      href?: string;
+      runs: Array<{ text: string; format: { styleId?: string } }>;
+    };
     expect(link.kind).toBe("hyperlink");
     expect(link.href).toBe("mailto:a@b.c");
     expect(link.runs[0]?.text).toBe("a@b.c");
@@ -143,12 +147,12 @@ describe("readParagraph — HYPERLINK fields", () => {
   });
 
   it("resolves \\l bookmark targets to fragment hrefs", () => {
-    const items = parse(field(' HYPERLINK \\l "sec1" ', `<w:r><w:t>see §1</w:t></w:r>`));
+    const items = parse(field(' HYPERLINK \\l "sec1" ', "<w:r><w:t>see §1</w:t></w:r>"));
     expect((items[0] as { href?: string }).href).toBe("#sec1");
   });
 
   it("leaves PAGE fields as FieldRun (live per-page substitution)", () => {
-    const items = parse(field(" PAGE ", `<w:r><w:t>3</w:t></w:r>`));
+    const items = parse(field(" PAGE ", "<w:r><w:t>3</w:t></w:r>"));
     const run = (items[0] as { run: { field?: { instruction: string; cached?: string } } }).run;
     expect(run.field).toEqual({ instruction: "PAGE", cached: "3" });
   });

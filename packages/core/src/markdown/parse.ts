@@ -24,13 +24,7 @@
  *     reference-style links, footnotes, autolinks.
  */
 
-import {
-  appendBlock,
-  emptyDocument,
-  heading,
-  paragraph,
-  text,
-} from "../doc/builders";
+import { appendBlock, emptyDocument, heading, paragraph, text } from "../doc/builders";
 import type {
   HyperlinkRun,
   InlineRun,
@@ -129,11 +123,7 @@ interface ParseContext {
   listState: { numId: number; ordered: boolean } | null;
 }
 
-function listItemParagraph(
-  ctx: ParseContext,
-  ordered: boolean,
-  runs: InlineRun[],
-): Paragraph {
+function listItemParagraph(ctx: ParseContext, ordered: boolean, runs: InlineRun[]): Paragraph {
   // Reuse the open list if the new item matches its kind, otherwise
   // open a fresh one with a freshly-allocated numId.
   if (!ctx.listState || ctx.listState.ordered !== ordered) {
@@ -274,7 +264,7 @@ function parseInlineWithBreaks(lines: string[]): InlineRun[] {
   const out: InlineRun[] = [];
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i] ?? "";
-    const hardBreak = /  $/.test(raw);
+    const hardBreak = / {2}$/.test(raw);
     const cleaned = raw.replace(/\s+$/, "");
     out.push(...parseInline(cleaned));
     if (i < lines.length - 1) {

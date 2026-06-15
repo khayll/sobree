@@ -6,10 +6,8 @@ const REL_TYPES = {
   footer: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
   image: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
   hyperlink: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
-  fontTable:
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
-  numbering:
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
+  fontTable: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+  numbering: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
   font: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
 } as const;
 
@@ -52,8 +50,7 @@ export function renderContentTypesXml(
     }),
     el("Override", {
       PartName: "/word/styles.xml",
-      ContentType:
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+      ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
     }),
   );
 
@@ -112,8 +109,7 @@ function imageMimeFromExtension(ext: string): string {
   if (lower === "svg") return "image/svg+xml";
   if (lower === "bmp") return "image/bmp";
   // OOXML embedded fonts — obfuscated TrueType/OpenType.
-  if (lower === "odttf")
-    return "application/vnd.openxmlformats-officedocument.obfuscatedFont";
+  if (lower === "odttf") return "application/vnd.openxmlformats-officedocument.obfuscatedFont";
   // Bare TTF/OTF (rare for embedded — Word always obfuscates).
   if (lower === "ttf") return "application/x-font-ttf";
   if (lower === "otf") return "application/x-font-otf";

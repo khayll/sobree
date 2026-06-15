@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCommentsXml } from "./comments";
-import { readParagraph } from "./paragraphs";
 import { convertDocumentXml } from "./document";
+import { readParagraph } from "./paragraphs";
 
 const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const ctx = { rels: new Map<string, string>() };
@@ -130,7 +130,8 @@ describe("readParagraph — comment ranges", () => {
     // Manually thread one set across two paragraphs: opens in para 1,
     // closes in para 2 — the middle of para 2 must still be tagged.
     const wrap = (xml: string) =>
-      new DOMParser().parseFromString(`<?xml version="1.0"?>${xml}`, "application/xml").documentElement;
+      new DOMParser().parseFromString(`<?xml version="1.0"?>${xml}`, "application/xml")
+        .documentElement;
     const p1 = wrap(`<w:p xmlns:w="${NS_W}">
       <w:r><w:t>before </w:t></w:r>
       <w:commentRangeStart w:id="0"/>
@@ -171,7 +172,8 @@ describe("readParagraph — comment ranges", () => {
     // Read the commentIds off the first run of every paragraph.
     const ids = body.map((b) =>
       b.kind === "paragraph"
-        ? (b.runs[0] as { properties?: { commentIds?: unknown } } | undefined)?.properties?.commentIds
+        ? (b.runs[0] as { properties?: { commentIds?: unknown } } | undefined)?.properties
+            ?.commentIds
         : undefined,
     );
     expect(ids).toEqual([[9], [9], [9]]);

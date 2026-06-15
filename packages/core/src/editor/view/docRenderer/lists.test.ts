@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { Block, NumberingDefinition } from "../../../doc/types";
 import { createListContainer, paragraphListInfo } from "./lists";
 
-function bulletNumbering(numId: number, glyph: string, leftTwips = 720, hangingTwips = 360): NumberingDefinition {
+function bulletNumbering(
+  numId: number,
+  glyph: string,
+  leftTwips = 720,
+  hangingTwips = 360,
+): NumberingDefinition {
   return {
     numId,
     abstractFormat: {

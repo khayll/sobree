@@ -23,9 +23,7 @@ describe("authorSlot", () => {
 
 describe("colorForAuthor", () => {
   it("returns a --sobree-author token reference with a hex fallback", () => {
-    expect(colorForAuthor("Alice")).toMatch(
-      /^var\(--sobree-author-[0-7], #[0-9a-f]{6}\)$/,
-    );
+    expect(colorForAuthor("Alice")).toMatch(/^var\(--sobree-author-[0-7], #[0-9a-f]{6}\)$/);
   });
 
   it("references the slot that authorSlot computes", () => {

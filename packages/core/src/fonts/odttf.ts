@@ -84,7 +84,7 @@ function keyToReversedBytes(fontKey: string): Uint8Array {
   }
   const fwd = new Uint8Array(16);
   for (let i = 0; i < 16; i++) {
-    fwd[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    fwd[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
   // Reverse in place.
   const rev = new Uint8Array(16);

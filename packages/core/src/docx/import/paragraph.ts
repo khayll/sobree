@@ -1,5 +1,3 @@
-import { type ImportedItem, readParagraph } from "./paragraphs";
-import type { ImportedRun } from "./runs";
 import type {
   Block,
   DrawingRun,
@@ -11,6 +9,8 @@ import type {
   TextRun,
 } from "../../doc/types";
 import type { ParagraphFormat, RunFormat } from "../types";
+import { type ImportedItem, readParagraph } from "./paragraphs";
+import type { ImportedRun } from "./runs";
 
 /**
  * Shared context for importing a body — rels + media lookup. Lives here
@@ -83,8 +83,8 @@ function hasLastRenderedPageBreak(p: Element): boolean {
     for (const child of Array.from(el.children)) {
       if (child.localName === "txbxContent") continue;
       if (
-        child.localName === "lastRenderedPageBreak"
-        && child.namespaceURI?.includes("wordprocessingml")
+        child.localName === "lastRenderedPageBreak" &&
+        child.namespaceURI?.includes("wordprocessingml")
       ) {
         return true;
       }

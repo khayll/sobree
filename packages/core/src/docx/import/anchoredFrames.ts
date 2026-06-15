@@ -28,14 +28,9 @@
  * the renderer is verified working off this output.
  */
 
-import type {
-  AnchoredContent,
-  AnchoredFrame,
-  AnchorOrigin,
-  Block,
-} from "../../doc/types";
+import type { AnchorOrigin, AnchoredContent, AnchoredFrame, Block } from "../../doc/types";
+import { type ThemePalette, readDrawingColor } from "../shared/drawingColor";
 import { NS } from "../shared/namespaces";
-import { readDrawingColor, type ThemePalette } from "../shared/drawingColor";
 import { parseCustomGeometry } from "./customGeometry";
 
 export interface AnchoredFramesContext {
@@ -434,8 +429,7 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
 function parsePicture(pic: Element, ctx: AnchoredFramesContext): AnchoredContent | null {
   const blip = pic.getElementsByTagNameNS(NS.a, "blip")[0];
   if (!blip) return null;
-  const rId =
-    blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
+  const rId = blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
   if (!rId) return null;
   const target = ctx.rels.get(rId);
   if (!target) return null;
@@ -456,10 +450,7 @@ function parsePicture(pic: Element, ctx: AnchoredFramesContext): AnchoredContent
  * overlays too. Falls back to flat text-only paragraphs when no walker
  * is injected (unit tests that exercise the parser in isolation).
  */
-function parseTextboxBody(
-  txbxContent: Element,
-  ctx: AnchoredFramesContext,
-): Block[] {
+function parseTextboxBody(txbxContent: Element, ctx: AnchoredFramesContext): Block[] {
   if (ctx.parseBlockBody) return ctx.parseBlockBody(txbxContent);
   const out: Block[] = [];
   for (const child of Array.from(txbxContent.children)) {
@@ -485,12 +476,8 @@ function readAnchorOrigin(
 ): AnchorOrigin {
   const posH = firstChildNS(anchor, NS.wp, "positionH");
   const posV = firstChildNS(anchor, NS.wp, "positionV");
-  const horizontalFrom = posH
-    ? coerceHRelativeFrom(posH.getAttribute("relativeFrom"))
-    : "page";
-  const verticalFrom = posV
-    ? coerceVRelativeFrom(posV.getAttribute("relativeFrom"))
-    : "page";
+  const horizontalFrom = posH ? coerceHRelativeFrom(posH.getAttribute("relativeFrom")) : "page";
+  const verticalFrom = posV ? coerceVRelativeFrom(posV.getAttribute("relativeFrom")) : "page";
 
   // Walk up from the drawing to its containing paragraph and look it
   // up in the caller's `bodyParagraphIndexByElement` map. When the
@@ -543,7 +530,7 @@ function readSpPrXfrm(shape: Element): {
   // Pick the SHALLOWEST xfrm — the one that's a direct grandchild of
   // the shape, not one nested deeper (e.g. inside a pic's body).
   let best: Element | undefined;
-  let bestDepth = Infinity;
+  let bestDepth = Number.POSITIVE_INFINITY;
   for (const x of xfrms) {
     let depth = 0;
     let cur: Element | null = x;
@@ -565,9 +552,7 @@ function readSpPrXfrm(shape: Element): {
   return out;
 }
 
-function readGeometry(
-  wsp: Element,
-): "rect" | "ellipse" | "roundedRect" | "line" {
+function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" | "line" {
   const prstGeom = wsp.getElementsByTagNameNS(NS.a, "prstGeom")[0];
   const prst = prstGeom?.getAttribute("prst");
   switch (prst) {
@@ -578,7 +563,6 @@ function readGeometry(
     case "line":
     case "straightConnector1":
       return "line";
-    case "rect":
     default:
       return "rect";
   }
@@ -587,9 +571,7 @@ function readGeometry(
 function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
   // First `<a:solidFill>` inside the shape's spPr — literal srgbClr or a
   // theme schemeClr (+ transforms), resolved by `readDrawingColor`.
-  const spPr =
-    firstChildNS(shape, NS.wps, "spPr") ??
-    firstChildNS(shape, NS.pic, "spPr");
+  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return undefined;
   // Use direct descendant traversal so we don't pick up a fill nested
   // deeper inside a child shape.
@@ -607,9 +589,7 @@ function readBorder(
 ):
   | { color: string; widthEmu: number; style: "solid" | "dashed" | "dotted" | "double" }
   | undefined {
-  const spPr =
-    firstChildNS(shape, NS.wps, "spPr") ??
-    firstChildNS(shape, NS.pic, "spPr");
+  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (!spPr) return undefined;
   const ln = firstChildNS(spPr, NS.a, "ln");
   if (!ln) return undefined;
@@ -622,9 +602,7 @@ function readBorder(
   return { color, widthEmu: widthEmu || 0, style };
 }
 
-function coerceBorderStyle(
-  v: string | null | undefined,
-): "solid" | "dashed" | "dotted" | "double" {
+function coerceBorderStyle(v: string | null | undefined): "solid" | "dashed" | "dotted" | "double" {
   switch (v) {
     case "dash":
     case "lgDash":

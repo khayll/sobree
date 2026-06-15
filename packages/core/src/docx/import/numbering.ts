@@ -24,14 +24,14 @@
  */
 
 import type {
-  NumberingDefinition,
   AbstractNumberingFormat,
+  NumberingDefinition,
   NumberingLevel,
   ParagraphIndent,
   RunProperties,
 } from "../../doc/types";
-import { parseXml, wAll, wFirst, wVal } from "../shared/xml";
 import { NS } from "../shared/namespaces";
+import { parseXml, wAll, wFirst, wVal } from "../shared/xml";
 
 export function parseNumberingXml(xml: string | undefined): NumberingDefinition[] {
   if (!xml) return [];
@@ -56,8 +56,7 @@ export function parseNumberingXml(xml: string | undefined): NumberingDefinition[
   const levelsByStyleDefinition = new Map<string, NumberingLevel[]>();
   for (const absEl of wAll(doc, "abstractNum")) {
     const idStr =
-      absEl.getAttributeNS(NS.w, "abstractNumId") ??
-      absEl.getAttribute("w:abstractNumId");
+      absEl.getAttributeNS(NS.w, "abstractNumId") ?? absEl.getAttribute("w:abstractNumId");
     if (!idStr) continue;
     const id = Number.parseInt(idStr, 10);
     if (!Number.isFinite(id)) continue;
@@ -84,8 +83,7 @@ export function parseNumberingXml(xml: string | undefined): NumberingDefinition[
   //    NumberingDefinition carrying the resolved format.
   const out: NumberingDefinition[] = [];
   for (const numEl of wAll(doc, "num")) {
-    const numIdStr =
-      numEl.getAttributeNS(NS.w, "numId") ?? numEl.getAttribute("w:numId");
+    const numIdStr = numEl.getAttributeNS(NS.w, "numId") ?? numEl.getAttribute("w:numId");
     if (!numIdStr) continue;
     const numId = Number.parseInt(numIdStr, 10);
     if (!Number.isFinite(numId)) continue;
@@ -106,8 +104,7 @@ export function parseNumberingXml(xml: string | undefined): NumberingDefinition[
 function readLevels(absEl: Element): NumberingLevel[] {
   const out: NumberingLevel[] = [];
   for (const lvlEl of wAll(absEl, "lvl")) {
-    const ilvlStr =
-      lvlEl.getAttributeNS(NS.w, "ilvl") ?? lvlEl.getAttribute("w:ilvl");
+    const ilvlStr = lvlEl.getAttributeNS(NS.w, "ilvl") ?? lvlEl.getAttribute("w:ilvl");
     if (!ilvlStr) continue;
     const ilvl = Number.parseInt(ilvlStr, 10);
     if (!Number.isFinite(ilvl)) continue;
@@ -187,8 +184,7 @@ function readIndent(pPr: Element): ParagraphIndent | undefined {
 }
 
 function readTwips(el: Element, name: string): number | null {
-  const v =
-    el.getAttributeNS(NS.w, name) ?? el.getAttribute(`w:${name}`);
+  const v = el.getAttributeNS(NS.w, name) ?? el.getAttribute(`w:${name}`);
   if (v === null) return null;
   const n = Number.parseInt(v, 10);
   return Number.isFinite(n) ? n : null;
@@ -216,16 +212,16 @@ function mapSymbolFontCodepoints(text: string, font: string): string {
     // Wingdings bullets — the lookup covers the markers that show up
     // in Word's built-in list templates (Office 365 + 2019+).
     const wingdings: Record<number, string> = {
-      0xf06c: "●", // BLACK CIRCLE — large dot
-      0xf06e: "■", // BLACK SQUARE — large filled square
-      0xf0a7: "▪", // BLACK SMALL SQUARE — bullet style used by Google CV template
-      0xf0a8: "□", // WHITE SQUARE
-      0xf076: "❖", // BLACK DIAMOND MINUS WHITE X
-      0xf0d8: "▶", // BLACK RIGHT-POINTING TRIANGLE
-      0xf0d9: "▷",
-      0xf07d: "▶", // Wingdings 3 "}" — right-pointing triangle (category bullets)
-      0xf0fc: "✓", // CHECK MARK
-      0xf0fb: "✗", // BALLOT X
+      61548: "●", // BLACK CIRCLE — large dot
+      61550: "■", // BLACK SQUARE — large filled square
+      61607: "▪", // BLACK SMALL SQUARE — bullet style used by Google CV template
+      61608: "□", // WHITE SQUARE
+      61558: "❖", // BLACK DIAMOND MINUS WHITE X
+      61656: "▶", // BLACK RIGHT-POINTING TRIANGLE
+      61657: "▷",
+      61565: "▶", // Wingdings 3 "}" — right-pointing triangle (category bullets)
+      61692: "✓", // CHECK MARK
+      61691: "✗", // BALLOT X
     };
     if (wingdings[cp]) return wingdings[cp]!;
     // Symbol font: U+F0B7 is the "•" bullet — same shape as U+2022.

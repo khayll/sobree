@@ -1,8 +1,8 @@
+import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument, Table, TableCell } from "../doc/types";
 import { exportDocx } from "./export/index";
 import { importDocx } from "./import/index";
-import { describe, expect, it } from "vitest";
 
 async function roundTripTable(table: Table): Promise<Table> {
   const doc = emptyDocument();
@@ -32,10 +32,7 @@ describe("DOCX table round-trip", () => {
     const table: Table = {
       kind: "table",
       grid: [2400, 2400],
-      rows: [
-        { isHeader: true, cells: [cell("A"), cell("B")] },
-        { cells: [cell("1"), cell("2")] },
-      ],
+      rows: [{ isHeader: true, cells: [cell("A"), cell("B")] }, { cells: [cell("1"), cell("2")] }],
       properties: {},
     };
     const back = await roundTripTable(table);
@@ -51,10 +48,7 @@ describe("DOCX table round-trip", () => {
       grid: [2400, 2400, 2400],
       rows: [
         {
-          cells: [
-            cell("merged", { gridSpan: 2 }),
-            cell("alone"),
-          ],
+          cells: [cell("merged", { gridSpan: 2 }), cell("alone")],
         },
         { cells: [cell("a"), cell("b"), cell("c")] },
       ],
@@ -73,16 +67,10 @@ describe("DOCX table round-trip", () => {
       grid: [2400, 2400],
       rows: [
         {
-          cells: [
-            cell("spanning", { vMerge: "restart" }),
-            cell("top"),
-          ],
+          cells: [cell("spanning", { vMerge: "restart" }), cell("top")],
         },
         {
-          cells: [
-            { vMerge: "continue", content: [paragraph([])] },
-            cell("bottom"),
-          ],
+          cells: [{ vMerge: "continue", content: [paragraph([])] }, cell("bottom")],
         },
       ],
       properties: {},
@@ -133,11 +121,7 @@ describe("DOM ↔ AST table round-trip with merges", () => {
         grid: [1200, 1200, 1200],
         rows: [
           {
-            cells: [
-              cell("stay", { vMerge: "restart" }),
-              cell("row0-b"),
-              cell("row0-c"),
-            ],
+            cells: [cell("stay", { vMerge: "restart" }), cell("row0-b"), cell("row0-c")],
           },
           {
             cells: [

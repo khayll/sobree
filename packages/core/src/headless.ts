@@ -52,7 +52,7 @@
  * post-hoc telemetry to identify the author.
  */
 
-import * as Y from "yjs";
+import type * as Y from "yjs";
 import { BlobCache, type BlobStore } from "./blob";
 import {
   type BlockRef,
@@ -64,7 +64,10 @@ import {
   ok,
 } from "./doc/api";
 import { emptyDocument } from "./doc/builders";
-import { type ParagraphPropertiesPatch, EditorCommands } from "./editor";
+import { runsLength } from "./doc/runs";
+import type { Block, ParagraphAlignment, ParagraphProperties, SobreeDocument } from "./doc/types";
+import { headingLevelOf, runsToText } from "./doc/walk";
+import { EditorCommands, type ParagraphPropertiesPatch } from "./editor";
 import type { BlockInfo, CommandBus, OutlineItem } from "./editor";
 import { BlockRegistry } from "./editor/internal/blockRegistry";
 import {
@@ -73,14 +76,6 @@ import {
   mergeSectionsAcross,
   removedSectionIndex,
 } from "./editor/internal/mutations";
-import { runsLength } from "./doc/runs";
-import type {
-  Block,
-  ParagraphAlignment,
-  ParagraphProperties,
-  SobreeDocument,
-} from "./doc/types";
-import { headingLevelOf, runsToText } from "./doc/walk";
 import { History } from "./history";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "./ydoc";
 
@@ -341,8 +336,7 @@ export class HeadlessSobree {
     const wasSectionBreak = this.doc.body[index]?.kind === "section_break";
     const next = this.doc.body.slice();
     next.splice(index, 1);
-    if (next.length === 0)
-      next.push({ kind: "paragraph", properties: {}, runs: [] });
+    if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
     const update: Partial<SobreeDocument> = { body: next };
     if (wasSectionBreak) {
       update.sections = mergeSectionsAcross(
@@ -354,10 +348,7 @@ export class HeadlessSobree {
   }
 
   /** Merge a patch into each target paragraph's properties. */
-  applyBlockProperties(
-    targets: BlockRef[],
-    patch: ParagraphPropertiesPatch,
-  ): EditResult<void> {
+  applyBlockProperties(targets: BlockRef[], patch: ParagraphPropertiesPatch): EditResult<void> {
     const lockCheck = this.checkRefs(targets);
     if (lockCheck) return lockCheck;
     const next = this.doc.body.slice();
@@ -426,9 +417,7 @@ export class HeadlessSobree {
     this.lastPartRefs = projected.partRefs;
     this.resolveCachedPartRefsInto(this.doc);
     if (this.blobCache) {
-      const missing = Object.values(projected.partRefs).filter(
-        (h) => !this.blobCache!.has(h),
-      );
+      const missing = Object.values(projected.partRefs).filter((h) => !this.blobCache!.has(h));
       if (missing.length > 0) {
         void this.blobCache.ensureLoaded(missing);
       }
@@ -480,9 +469,7 @@ export class HeadlessSobree {
         });
       }
       if (current.version !== ref.version) {
-        return lockConflict([
-          { blockId: ref.id, expected: ref.version, actual: current.version },
-        ]);
+        return lockConflict([{ blockId: ref.id, expected: ref.version, actual: current.version }]);
       }
     }
     return null;

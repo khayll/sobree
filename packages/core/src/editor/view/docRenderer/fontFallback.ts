@@ -38,15 +38,24 @@ const CHAINS: Array<{ match: RegExp; chain: string }> = [
   // ~2× wider — long dot-leader runs in CV templates ("……………")
   // then overflow the line. Carlito sits BEFORE Helvetica Neue so
   // any host with Carlito installed gets Word-fidelity rendering.
-  { match: /^calibri light$/i, chain: `'Calibri Light', Carlito, 'Helvetica Neue', 'Helvetica Light', Helvetica, Arial, sans-serif` },
-  { match: /^calibri$/i, chain: `Calibri, Carlito, 'Helvetica Neue', Helvetica, Arial, sans-serif` },
+  {
+    match: /^calibri light$/i,
+    chain: `'Calibri Light', Carlito, 'Helvetica Neue', 'Helvetica Light', Helvetica, Arial, sans-serif`,
+  },
+  {
+    match: /^calibri$/i,
+    chain: `Calibri, Carlito, 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
   // Serif families. Chain ends at Times for missing-font fallback
   // because Word and LibreOffice both substitute unknown serif fonts
   // with Times by default — putting Georgia or Hoefler ahead would
   // give visually different rendering than the user's Word, even
   // though Georgia is metrically closer to Bookman. Documents look
   // the same in Sobree and Word when the requested font is missing.
-  { match: /^bookman old style$/i, chain: `'Bookman Old Style', Bookman, 'URW Bookman L', 'Times New Roman', serif` },
+  {
+    match: /^bookman old style$/i,
+    chain: `'Bookman Old Style', Bookman, 'URW Bookman L', 'Times New Roman', serif`,
+  },
   { match: /^cambria$/i, chain: `Cambria, 'Times New Roman', serif` },
   { match: /^times new roman$/i, chain: `'Times New Roman', Times, serif` },
   { match: /^georgia$/i, chain: `Georgia, 'Times New Roman', serif` },
@@ -54,7 +63,7 @@ const CHAINS: Array<{ match: RegExp; chain: string }> = [
   { match: /^arial$/i, chain: `Arial, 'Helvetica Neue', Helvetica, sans-serif` },
   { match: /^helvetica$/i, chain: `Helvetica, 'Helvetica Neue', Arial, sans-serif` },
   { match: /^helvetica neue$/i, chain: `'Helvetica Neue', Helvetica, Arial, sans-serif` },
-  { match: /^verdana$/i, chain: `Verdana, Geneva, Tahoma, sans-serif` },
+  { match: /^verdana$/i, chain: "Verdana, Geneva, Tahoma, sans-serif" },
 ];
 
 /**

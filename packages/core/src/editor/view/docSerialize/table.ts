@@ -1,5 +1,5 @@
-import { serializeInlineChildren } from "./inline";
 import type { ParagraphAlignment, Table, TableCell, TableRow } from "../../../doc/types";
+import { serializeInlineChildren } from "./inline";
 
 /**
  * Convert a `<table>` back into a Table AST node.
@@ -31,10 +31,7 @@ export function tableFromElement(el: HTMLElement): Table {
   };
 }
 
-function rowFromElement(
-  tr: HTMLTableRowElement,
-  pending: Map<number, number>,
-): TableRow {
+function rowFromElement(tr: HTMLTableRowElement, pending: Map<number, number>): TableRow {
   const cellEls = Array.from(tr.querySelectorAll<HTMLTableCellElement>(":scope > th, :scope > td"));
   const isHeader = tr.parentElement?.tagName.toLowerCase() === "thead";
   const cells: TableCell[] = [];

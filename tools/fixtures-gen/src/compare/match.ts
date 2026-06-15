@@ -110,9 +110,7 @@ export function matchBlocksToLines(
 
       if (block.text.endsWith(ELLIPSIS)) {
         const next = blocks[i + 1];
-        const nextProbe = next
-          ? normalize(stripEllipsis(next.text)).slice(0, 20)
-          : null;
+        const nextProbe = next ? normalize(stripEllipsis(next.text)).slice(0, 20) : null;
         while (j < flatLines.length && lines.length < 16) {
           const lineText = stripLeadingMarker(normalize(flatLines[j]!.text));
           if (nextProbe && lineText.startsWith(nextProbe)) break;
@@ -157,9 +155,7 @@ export function matchBlocksToLines(
 }
 
 /** Flatten all pages' lines into a single array, preserving order. */
-export function flattenLines(
-  pages: Array<{ page: number; lines: LineMetric[] }>,
-): LineMetric[] {
+export function flattenLines(pages: Array<{ page: number; lines: LineMetric[] }>): LineMetric[] {
   return pages.flatMap((p) => p.lines);
 }
 
@@ -183,6 +179,9 @@ function normalize(text: string): string {
  */
 function stripLeadingMarker(text: string): string {
   return text
-    .replace(/^\s*(?:[•◦▪■\-–—]|(?:\(?[ivxlcdmIVXLCDM]+\)|[ivxlcdmIVXLCDM]+\.)|(?:\(?[A-Za-z]\)|[A-Za-z]\.)|(?:\(?\d+\)|\d+\.))\s+/u, "")
+    .replace(
+      /^\s*(?:[•◦▪■\-–—]|(?:\(?[ivxlcdmIVXLCDM]+\)|[ivxlcdmIVXLCDM]+\.)|(?:\(?[A-Za-z]\)|[A-Za-z]\.)|(?:\(?\d+\)|\d+\.))\s+/u,
+      "",
+    )
     .trim();
 }

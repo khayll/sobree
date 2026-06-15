@@ -40,11 +40,7 @@
 
 import * as Y from "yjs";
 import type { Selection } from "../doc/api";
-import {
-  DEFAULT_HISTORY_CONFIG,
-  type HistoryConfig,
-  type HistoryDepth,
-} from "./types";
+import { DEFAULT_HISTORY_CONFIG, type HistoryConfig, type HistoryDepth } from "./types";
 
 export type HistoryEvent = "change";
 export type HistoryListener = (depth: HistoryDepth) => void;

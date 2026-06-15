@@ -1,7 +1,3 @@
-import { type ExportContext, nextRevisionId } from "./context";
-import { inlinesToRuns } from "./runs";
-import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
-import { el, xmlDocument } from "../shared/xml";
 import type {
   Block,
   Paragraph,
@@ -11,6 +7,10 @@ import type {
   TableCell,
   TableRow,
 } from "../../doc/types";
+import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
+import { el, xmlDocument } from "../shared/xml";
+import { type ExportContext, nextRevisionId } from "./context";
+import { inlinesToRuns } from "./runs";
 
 /**
  * Render the SobreeDocument body into `word/document.xml` (string form).
@@ -170,7 +170,8 @@ function renderPPr(
     const attrs: Record<string, string | number> = {};
     if (props.indent.leftTwips !== undefined) attrs["w:left"] = props.indent.leftTwips;
     if (props.indent.rightTwips !== undefined) attrs["w:right"] = props.indent.rightTwips;
-    if (props.indent.firstLineTwips !== undefined) attrs["w:firstLine"] = props.indent.firstLineTwips;
+    if (props.indent.firstLineTwips !== undefined)
+      attrs["w:firstLine"] = props.indent.firstLineTwips;
     if (props.indent.hangingTwips !== undefined) attrs["w:hanging"] = props.indent.hangingTwips;
     if (Object.keys(attrs).length > 0) parts.push(el("w:ind", attrs));
   }

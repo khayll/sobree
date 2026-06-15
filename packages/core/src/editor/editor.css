@@ -137,8 +137,7 @@
    `--sobree-format-revision-color`. The glyph itself is neutral; the
    semantics are "this run's formatting was changed in tracked mode". */
 .sobree-editor .sobree-revision-format {
-  text-decoration: underline dashed
-    var(--sobree-format-revision-color, currentColor);
+  text-decoration: underline dashed var(--sobree-format-revision-color, currentColor);
   text-underline-offset: 3px;
 }
 

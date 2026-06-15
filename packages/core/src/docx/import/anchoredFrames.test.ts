@@ -21,7 +21,7 @@ const emptyCtx = { rels: new Map<string, string>() };
 
 describe("parseAnchoredFrames", () => {
   it("returns [] when there are no <w:drawing> elements", () => {
-    const doc = xml(`<w:body><w:p/></w:body>`);
+    const doc = xml("<w:body><w:p/></w:body>");
     expect(parseAnchoredFrames(doc, emptyCtx)).toEqual([]);
   });
 
@@ -61,7 +61,7 @@ describe("parseAnchoredFrames", () => {
     expect(f.content).toEqual({ kind: "picture", partPath: "word/media/image1.png" });
   });
 
-  it("sets behindText on `behindDoc=\"1\"` anchors", () => {
+  it('sets behindText on `behindDoc="1"` anchors', () => {
     const doc = xml(`<w:body><w:p><w:r><w:drawing>
       <wp:anchor behindDoc="1">
         <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
@@ -147,7 +147,7 @@ describe("parseAnchoredFrames", () => {
     </w:drawing></w:r></w:p></w:body>`);
     const frames = parseAnchoredFrames(doc, emptyCtx);
     expect(frames[0]!.content.kind).toBe("textbox");
-    const tb = frames[0]!.content as Extract<typeof frames[0]["content"], { kind: "textbox" }>;
+    const tb = frames[0]!.content as Extract<(typeof frames)[0]["content"], { kind: "textbox" }>;
     expect(tb.body).toHaveLength(2);
     expect(tb.body[0]).toMatchObject({
       kind: "paragraph",
@@ -176,7 +176,7 @@ describe("parseAnchoredFrames", () => {
     </w:drawing></w:r></w:p></w:body>`);
     const frames = parseAnchoredFrames(doc, emptyCtx);
     expect(frames[0]!.content.kind).toBe("group");
-    const g = frames[0]!.content as Extract<typeof frames[0]["content"], { kind: "group" }>;
+    const g = frames[0]!.content as Extract<(typeof frames)[0]["content"], { kind: "group" }>;
     expect(g.childCoordSystemCx).toBe(2000);
     expect(g.childCoordSystemCy).toBe(2000);
     expect(g.children).toHaveLength(2);
@@ -245,7 +245,7 @@ describe("parseAnchoredFrames", () => {
       </wp:anchor>
     </w:drawing></w:r></w:p></w:body>`);
     const frames = parseAnchoredFrames(doc, emptyCtx);
-    const g = frames[0]!.content as Extract<typeof frames[0]["content"], { kind: "group" }>;
+    const g = frames[0]!.content as Extract<(typeof frames)[0]["content"], { kind: "group" }>;
     expect(g.childCoordOffsetX).toBe(640436);
     expect(g.childCoordOffsetY).toBe(458979);
   });
@@ -267,7 +267,7 @@ describe("parseAnchoredFrames", () => {
       </wp:anchor>
     </w:drawing></w:r></w:p></w:body>`);
     const frames = parseAnchoredFrames(doc, emptyCtx);
-    const g = frames[0]!.content as Extract<typeof frames[0]["content"], { kind: "group" }>;
+    const g = frames[0]!.content as Extract<(typeof frames)[0]["content"], { kind: "group" }>;
     expect(g.childCoordOffsetX).toBeUndefined();
     expect(g.childCoordOffsetY).toBeUndefined();
   });

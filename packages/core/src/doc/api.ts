@@ -155,8 +155,6 @@ export function fail(error: EditError): EditResult<never> {
 }
 
 /** Specialised builder for the common optimistic-lock failure case. */
-export function lockConflict(
-  conflicts: OptimisticLockError["conflicts"],
-): EditResult<never> {
+export function lockConflict(conflicts: OptimisticLockError["conflicts"]): EditResult<never> {
   return fail({ code: "optimistic-lock", conflicts });
 }

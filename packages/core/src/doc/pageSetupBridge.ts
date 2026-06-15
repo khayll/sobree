@@ -1,4 +1,5 @@
 import type { PageSetup, PageZoneText } from "../paperStack/pageSetup";
+import { PAGE_SIZES } from "../paperStack/pageSetup";
 import { text as textRun } from "./builders";
 import type {
   Block,
@@ -9,7 +10,6 @@ import type {
   SectionProperties,
   TextRun,
 } from "./types";
-import { PAGE_SIZES } from "../paperStack/pageSetup";
 
 /**
  * Temporary bridge between Sobree's legacy `PageSetup`/`PageZoneText` model
@@ -45,11 +45,7 @@ export function pageSetupToSection(setup: PageSetup): SectionMaterials {
   const bodies: Record<string, Block[]> = {};
   let fileIdx = 1;
 
-  const attach = (
-    kind: "header" | "footer",
-    type: "default" | "first",
-    template: string,
-  ) => {
+  const attach = (kind: "header" | "footer", type: "default" | "first", template: string) => {
     const partId = `${kind}${fileIdx}.xml`;
     fileIdx += 1;
     const ref: HeaderFooterRef = { type, partId };

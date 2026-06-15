@@ -64,8 +64,7 @@ async function main(): Promise<void> {
     }
     try {
       const yws = await import(/* @vite-ignore */ "y-websocket");
-      const Provider = (yws as { WebsocketProvider: unknown })
-        .WebsocketProvider as new (
+      const Provider = (yws as { WebsocketProvider: unknown }).WebsocketProvider as new (
         url: string,
         room: string,
         doc: Y.Doc,

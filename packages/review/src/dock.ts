@@ -29,7 +29,7 @@
  * a per-block toolbar to act on them.
  */
 
-import { getFloatingCorner, type Editor, type FloatingCornerPlacement } from "@sobree/core";
+import { type Editor, type FloatingCornerPlacement, getFloatingCorner } from "@sobree/core";
 import { colorForAuthor } from "./authorColor";
 
 /** How long the flash pulse runs on a navigated-to mark, in ms. */
@@ -121,27 +121,21 @@ export class ReviewDock {
     const count = spans.length;
     if (summary) {
       const noun = count === 1 ? "change" : "changes";
-      const authorPart =
-        authors.size > 1 ? ` · ${authors.size} authors` : "";
+      const authorPart = authors.size > 1 ? ` · ${authors.size} authors` : "";
       summary.textContent = `${count} ${noun}${authorPart}`;
     }
     // Reflect the current author of the cursor span in the summary's
     // accent — same colour the marks use.
     const current = spans[this.cursorIndex];
     if (current && summary) {
-      summary.style.setProperty(
-        "--sobree-review-dock-accent",
-        colorForAuthor(current.author),
-      );
+      summary.style.setProperty("--sobree-review-dock-accent", colorForAuthor(current.author));
     }
   }
 
   // ---- handlers ----
 
   private handleClick(e: MouseEvent): void {
-    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
-      "button[data-action]",
-    );
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-action]");
     if (!btn) return;
     e.preventDefault();
     const action = btn.dataset.action;
@@ -170,8 +164,7 @@ export class ReviewDock {
     if (spans.length === 0) return;
     // Wrap around — common UX expectation for "next" past the last
     // item and "prev" before the first.
-    this.cursorIndex =
-      (this.cursorIndex + delta + spans.length) % spans.length;
+    this.cursorIndex = (this.cursorIndex + delta + spans.length) % spans.length;
     const span = spans[this.cursorIndex];
     if (!span) return;
     const mark = this.findMarkForSpan(span);

@@ -1,7 +1,7 @@
+import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument, Table, TableCell } from "../doc/types";
 import { Editor } from "./";
-import { describe, expect, it } from "vitest";
 
 function setupEditor(table: Table): Editor {
   const doc: SobreeDocument = emptyDocument();
@@ -301,10 +301,9 @@ describe("editor.table.mergeCells + unmergeCell", () => {
 describe("editor.table.setCellContent / setCellProperties", () => {
   it("replaces cell content", () => {
     const ed = setupEditor(simpleTable());
-    const r = ed.table.setCellContent(
-      { table: tableRef(ed), row: 1, col: 1 },
-      [paragraph([text("changed")])],
-    );
+    const r = ed.table.setCellContent({ table: tableRef(ed), row: 1, col: 1 }, [
+      paragraph([text("changed")]),
+    ]);
     expect(r.ok).toBe(true);
     const t = tableFromEditor(ed);
     expect(textOfCell(t.rows[1]?.cells[1])).toBe("changed");

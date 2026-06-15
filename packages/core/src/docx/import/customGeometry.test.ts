@@ -61,8 +61,8 @@ describe("parseCustomGeometry", () => {
   });
 
   it("returns null when there is no usable outline", () => {
-    expect(parseCustomGeometry(custGeom(`<a:avLst/>`))).toBeNull();
-    expect(parseCustomGeometry(custGeom(`<a:pathLst/>`))).toBeNull();
+    expect(parseCustomGeometry(custGeom("<a:avLst/>"))).toBeNull();
+    expect(parseCustomGeometry(custGeom("<a:pathLst/>"))).toBeNull();
     // Zero-area box.
     expect(
       parseCustomGeometry(

@@ -1,3 +1,4 @@
+import type { Editor } from "@sobree/core";
 import {
   BLOCK_KINDS,
   type BlockTarget,
@@ -5,7 +6,6 @@ import {
   blockTargetFromNode,
   iconSvg,
 } from "./blockKinds";
-import type { Editor } from "@sobree/core";
 
 export interface IndicatorOptions {
   stackRoot: HTMLElement;
@@ -163,8 +163,7 @@ export class BlockIndicator {
   }
 
   private setTarget(target: BlockTarget): void {
-    const same =
-      this.current?.element === target.element && this.current.kind === target.kind;
+    const same = this.current?.element === target.element && this.current.kind === target.kind;
     if (same) return;
     this.current = target;
     this.root.dataset.kind = target.kind;

@@ -100,8 +100,7 @@
   user-select: none;
   opacity: 0;
   transform: translateY(4px);
-  transition:
-    opacity var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
+  transition: opacity var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1)),
     transform var(--dur-base, 180ms) var(--ease-standard, cubic-bezier(0.2, 0, 0, 1));
   z-index: 40;
 }
@@ -163,10 +162,9 @@
   cursor: pointer;
   white-space: nowrap;
   flex: 0 0 auto;
-  transition:
-    background-color var(--dur-fast, 120ms) var(--ease-standard),
-    color var(--dur-fast, 120ms) var(--ease-standard),
-    border-color var(--dur-fast, 120ms) var(--ease-standard);
+  transition: background-color var(--dur-fast, 120ms) var(--ease-standard), color
+    var(--dur-fast, 120ms) var(--ease-standard), border-color var(--dur-fast, 120ms)
+    var(--ease-standard);
 }
 
 .sobree-block-toolbar button[data-action]:not(.tb-change-btn):hover,
@@ -198,8 +196,7 @@
   /* Establish positioning context for the ::after badge. */
   position: relative;
 }
-.sobree-block-toolbar
-  button[data-action="toggle-track-changes"][data-unresolved-count]::after {
+.sobree-block-toolbar button[data-action="toggle-track-changes"][data-unresolved-count]::after {
   content: attr(data-unresolved-count);
   position: absolute;
   top: -4px;
@@ -310,8 +307,8 @@
   font-size: 12px;
   color: var(--fg-muted, #5a5649);
   cursor: pointer;
-  transition: color var(--dur-fast, 120ms) var(--ease-standard),
-    background-color var(--dur-fast, 120ms) var(--ease-standard);
+  transition: color var(--dur-fast, 120ms) var(--ease-standard), background-color
+    var(--dur-fast, 120ms) var(--ease-standard);
 }
 
 .sobree-block-toolbar .tb-pill button:hover:not([disabled]) {
@@ -369,10 +366,9 @@
   border-radius: var(--radius-md, 4px);
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    background-color var(--dur-fast, 120ms) var(--ease-standard),
-    color var(--dur-fast, 120ms) var(--ease-standard),
-    border-color var(--dur-fast, 120ms) var(--ease-standard);
+  transition: background-color var(--dur-fast, 120ms) var(--ease-standard), color
+    var(--dur-fast, 120ms) var(--ease-standard), border-color var(--dur-fast, 120ms)
+    var(--ease-standard);
 }
 
 .sobree-block-toolbar .tb-change-btn:hover {
@@ -396,9 +392,8 @@
   z-index: 50;
   opacity: 0;
   transform: translateY(-4px);
-  transition:
-    opacity var(--dur-base, 180ms) var(--ease-standard),
-    transform var(--dur-base, 180ms) var(--ease-standard);
+  transition: opacity var(--dur-base, 180ms) var(--ease-standard), transform var(--dur-base, 180ms)
+    var(--ease-standard);
   pointer-events: none;
 }
 
@@ -610,8 +605,8 @@
   border-radius: var(--radius-sm, 2px);
   cursor: pointer;
   text-align: center;
-  transition: background-color var(--dur-fast, 120ms) var(--ease-standard, ease),
-    border-color var(--dur-fast, 120ms) var(--ease-standard, ease);
+  transition: background-color var(--dur-fast, 120ms) var(--ease-standard, ease), border-color
+    var(--dur-fast, 120ms) var(--ease-standard, ease);
 }
 
 .sobree-page-setup-popover .ps-insert-break:hover {

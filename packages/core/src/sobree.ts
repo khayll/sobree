@@ -1,14 +1,11 @@
-import { attachSections } from "./plugins/sections";
-import { DEFAULT_PAGE_SETUP, type PageSetup } from "./paperStack/pageSetup";
-import { PaperStack } from "./paperStack/paperStack";
-import {
-  pageSetupToSection,
-  sectionToPageSetup,
-} from "./doc/pageSetupBridge";
+import { pageSetupToSection, sectionToPageSetup } from "./doc/pageSetupBridge";
+import type { SectionProperties, SobreeDocument } from "./doc/types";
 import { exportDocx } from "./docx/export/index";
 import { importDocx } from "./docx/import/index";
 import { Editor, type OutlineItem, type TrackChangesState } from "./editor";
-import type { SectionProperties, SobreeDocument } from "./doc/types";
+import { DEFAULT_PAGE_SETUP, type PageSetup } from "./paperStack/pageSetup";
+import { PaperStack } from "./paperStack/paperStack";
+import { attachSections } from "./plugins/sections";
 
 export type SobreeMode = "edit" | "read";
 
@@ -96,9 +93,7 @@ export class Sobree {
     paginate: Set<(p: SobreeEventPayload["paginate"]) => void>;
     setup: Set<(p: SobreeEventPayload["setup"]) => void>;
     "mode-change": Set<(p: SobreeEventPayload["mode-change"]) => void>;
-    "track-changes-change": Set<
-      (p: SobreeEventPayload["track-changes-change"]) => void
-    >;
+    "track-changes-change": Set<(p: SobreeEventPayload["track-changes-change"]) => void>;
     "docx:import": Set<(p: SobreeEventPayload["docx:import"]) => void>;
     "docx:export": Set<(p: SobreeEventPayload["docx:export"]) => void>;
   } = {
@@ -124,7 +119,8 @@ export class Sobree {
       contentHosts: () => this.stack.contentHosts,
     };
     if (options.initialDocument) editorOpts.initialDocument = options.initialDocument;
-    if (options.changeDebounceMs !== undefined) editorOpts.changeDebounceMs = options.changeDebounceMs;
+    if (options.changeDebounceMs !== undefined)
+      editorOpts.changeDebounceMs = options.changeDebounceMs;
     if (options.ydoc) editorOpts.ydoc = options.ydoc;
     if (options.blobStore) editorOpts.blobStore = options.blobStore;
     if (options.trackChanges) editorOpts.trackChanges = options.trackChanges;
@@ -187,21 +183,15 @@ export class Sobree {
     });
     // Re-emit the editor's track-changes-change so listeners attached
     // to the façade see it without having to reach `sobree.editor.on`.
-    this.detachTrackChanges = this.editor.on(
-      "track-changes-change",
-      (state) => {
-        for (const cb of this.listeners["track-changes-change"]) {
-          try {
-            cb(state);
-          } catch (err) {
-            console.error(
-              "[sobree] track-changes-change listener threw:",
-              err,
-            );
-          }
+    this.detachTrackChanges = this.editor.on("track-changes-change", (state) => {
+      for (const cb of this.listeners["track-changes-change"]) {
+        try {
+          cb(state);
+        } catch (err) {
+          console.error("[sobree] track-changes-change listener threw:", err);
         }
-      },
-    );
+      }
+    });
   }
 
   // === access to the paper stack, for code that still needs it ===
@@ -259,10 +249,7 @@ export class Sobree {
     if (index === 0) return this.getPageSetup();
     const section = this.editor.getDocument().sections[index];
     if (!section) return this.getPageSetup();
-    const partial = sectionToPageSetup(
-      section,
-      this.editor.getDocument().headerFooterBodies,
-    );
+    const partial = sectionToPageSetup(section, this.editor.getDocument().headerFooterBodies);
     return { ...structuredClone(DEFAULT_PAGE_SETUP), ...partial };
   }
 
@@ -562,15 +549,12 @@ export class Sobree {
     // collapsed to text via blocksToTemplate. When the doc has no
     // header parts at all we clear it — the legacy text-template path
     // (from PageSetup) takes over.
-    const hasRichZones =
-      Object.keys(doc.headerFooterBodies ?? {}).length > 0;
+    const hasRichZones = Object.keys(doc.headerFooterBodies ?? {}).length > 0;
     this.stack.setRichZones(
       hasRichZones
         ? {
             headerFooterBodies: doc.headerFooterBodies,
-            ...(doc.headerFooterFrames
-              ? { headerFooterFrames: doc.headerFooterFrames }
-              : {}),
+            ...(doc.headerFooterFrames ? { headerFooterFrames: doc.headerFooterFrames } : {}),
             numbering: doc.numbering ?? [],
             styles: doc.styles ?? [],
             rawParts: doc.rawParts ?? {},

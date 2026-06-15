@@ -9,14 +9,8 @@
  * SAME paragraph merge correctly without clobbering each other.
  */
 
+import { appendBlock, createSobree, emptyDocument, paragraph, text } from "@sobree/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  createSobree,
-  paragraph,
-  text,
-  emptyDocument,
-  appendBlock,
-} from "@sobree/core";
 import { loopback } from "./loopback";
 
 describe("end-to-end: two editors via loopback (Phase 1b)", () => {
@@ -41,13 +35,9 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
     // of wiping.
     const editorB = createSobree(bHost, { ydoc: ydocB });
     try {
-      expect(editorB.getDocument().body.length).toBe(
-        editorA.getDocument().body.length,
-      );
+      expect(editorB.getDocument().body.length).toBe(editorA.getDocument().body.length);
       // The same id list — proves B adopted A's block ids verbatim.
-      const aIds = editorA.editor
-        .getBlocks()
-        .map((b) => b.id);
+      const aIds = editorA.editor.getBlocks().map((b) => b.id);
       const bIds = editorB.editor.getBlocks().map((b) => b.id);
       expect(bIds).toEqual(aIds);
     } finally {
@@ -68,9 +58,7 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
     try {
       const beforeBLength = editorB.getDocument().body.length;
       // Insert a block in A.
-      const lastA = editorA.editor.getBlock(
-        editorA.getDocument().body.length - 1,
-      );
+      const lastA = editorA.editor.getBlock(editorA.getDocument().body.length - 1);
       const result = editorA.editor.insertBlockAfter(
         { id: lastA.id, version: lastA.version },
         paragraph([text("inserted-in-A")]),
@@ -93,9 +81,7 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
     const editorB = createSobree(bHost, { ydoc: ydocB });
     try {
       const beforeA = editorA.getDocument().body.length;
-      const lastB = editorB.editor.getBlock(
-        editorB.getDocument().body.length - 1,
-      );
+      const lastB = editorB.editor.getBlock(editorB.getDocument().body.length - 1);
       const result = editorB.editor.insertBlockAfter(
         { id: lastB.id, version: lastB.version },
         paragraph([text("inserted-in-B")]),
@@ -124,16 +110,12 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
       // common (both adopted whatever was in the shared Y.Doc), but
       // the prefixes used for *new* inserts differ. Insert in each
       // and confirm the new ids don't collide.
-      const lastA = editorA.editor.getBlock(
-        editorA.getDocument().body.length - 1,
-      );
+      const lastA = editorA.editor.getBlock(editorA.getDocument().body.length - 1);
       editorA.editor.insertBlockAfter(
         { id: lastA.id, version: lastA.version },
         paragraph([text("a-new")]),
       );
-      const lastB = editorB.editor.getBlock(
-        editorB.getDocument().body.length - 2,
-      );
+      const lastB = editorB.editor.getBlock(editorB.getDocument().body.length - 2);
       editorB.editor.insertBlockAfter(
         { id: lastB.id, version: lastB.version },
         paragraph([text("b-new")]),
@@ -148,9 +130,7 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
       expect(aIdsAfter).toEqual(bIdsAfter);
       // No id starts with the same prefix from both peers (sanity
       // check that the prefix difference is real).
-      const distinctPrefixes = new Set(
-        [...aIds, ...bIds].map((id) => id.split("_")[0]),
-      );
+      const distinctPrefixes = new Set([...aIds, ...bIds].map((id) => id.split("_")[0]));
       // Both peers should have contributed at least one block,
       // hence at least 2 distinct client-id prefixes overall…
       // …assuming both did construction-time seeding. Skipped if
@@ -218,9 +198,7 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
       if (!para || para.kind !== "paragraph") {
         throw new Error("expected paragraph at index 1");
       }
-      const plainText = para.runs
-        .map((r) => (r.kind === "text" ? r.text : ""))
-        .join("");
+      const plainText = para.runs.map((r) => (r.kind === "text" ? r.text : "")).join("");
       expect(plainText).toBe("Hello, world!");
     } finally {
       editorA.destroy();
@@ -246,10 +224,7 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
       const aB = editorA.editor.getBlock(1);
       editorA.editor.replaceBlock(
         { id: aB.id, version: aB.version },
-        paragraph([
-          text("Hello "),
-          { kind: "text", text: "world", properties: { bold: true } },
-        ]),
+        paragraph([text("Hello "), { kind: "text", text: "world", properties: { bold: true } }]),
       );
 
       // B independently appends " more" — different concurrent op.
@@ -269,15 +244,11 @@ describe("end-to-end: two editors via loopback (Phase 1b)", () => {
       if (!para || para.kind !== "paragraph") {
         throw new Error("expected paragraph");
       }
-      const plainText = para.runs
-        .map((r) => (r.kind === "text" ? r.text : ""))
-        .join("");
+      const plainText = para.runs.map((r) => (r.kind === "text" ? r.text : "")).join("");
       // B's "more" survived.
       expect(plainText).toBe("Hello world more");
       // A's bold mark survived on at least one run.
-      const hasBold = para.runs.some(
-        (r) => r.kind === "text" && r.properties.bold === true,
-      );
+      const hasBold = para.runs.some((r) => r.kind === "text" && r.properties.bold === true);
       expect(hasBold).toBe(true);
       // Suppress unused-var lint for sharedId — kept for symmetry /
       // future assertions.

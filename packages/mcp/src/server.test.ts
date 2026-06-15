@@ -15,15 +15,10 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import * as Y from "yjs";
+import { appendBlock, emptyDocument, paragraph, text } from "@sobree/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  appendBlock,
-  emptyDocument,
-  paragraph,
-  text,
-} from "@sobree/core";
-import { createSobreeMcpServer, type SobreeMcpServer } from "./server";
+import * as Y from "yjs";
+import { type SobreeMcpServer, createSobreeMcpServer } from "./server";
 
 describe("@sobree/mcp — e2e via InMemoryTransport", () => {
   let client: Client;
@@ -40,10 +35,7 @@ describe("@sobree/mcp — e2e via InMemoryTransport", () => {
     const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
     await mcp.server.connect(serverTransport);
 
-    client = new Client(
-      { name: "test-client", version: "0.0.0" },
-      { capabilities: {} },
-    );
+    client = new Client({ name: "test-client", version: "0.0.0" }, { capabilities: {} });
     await client.connect(clientTransport);
   });
 

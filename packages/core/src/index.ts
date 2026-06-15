@@ -117,7 +117,14 @@ export type { Selection, BlockRef, InlinePosition, Range } from "./doc/api";
 export { PaperStack } from "./paperStack/paperStack";
 export { Paper } from "./paperStack/paper";
 export { PAGE_SIZES, DEFAULT_PAGE_SETUP } from "./paperStack/pageSetup";
-export type { PageSetup, PageSizeKey, PageZoneText, VerticalAlign, Orientation, Margins } from "./paperStack/pageSetup";
+export type {
+  PageSetup,
+  PageSizeKey,
+  PageZoneText,
+  VerticalAlign,
+  Orientation,
+  Margins,
+} from "./paperStack/pageSetup";
 
 // === viewport ===
 export { Viewport } from "./embed/viewport";

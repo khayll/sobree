@@ -1,6 +1,6 @@
+import type { DrawingRun } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { el, escapeXmlText } from "../shared/xml";
-import type { DrawingRun } from "../../doc/types";
 
 /**
  * Emit a `<w:drawing>` XML fragment for an inline image. Consumes an
@@ -17,11 +17,7 @@ export function renderDrawing(run: DrawingRun, rId: string, docPrId: number): st
   const descr = run.altText ?? "";
 
   const blip = el("a:blip", { "r:embed": rId });
-  const blipFill = el(
-    "pic:blipFill",
-    null,
-    `${blip}${el("a:stretch", null, el("a:fillRect"))}`,
-  );
+  const blipFill = el("pic:blipFill", null, `${blip}${el("a:stretch", null, el("a:fillRect"))}`);
   const nvPicPr = el(
     "pic:nvPicPr",
     null,
@@ -30,26 +26,14 @@ export function renderDrawing(run: DrawingRun, rId: string, docPrId: number): st
   const spPr = el(
     "pic:spPr",
     null,
-    `${el(
-      "a:xfrm",
-      null,
-      `${el("a:off", { x: 0, y: 0 })}${el("a:ext", { cx, cy })}`,
-    )}${el(
+    `${el("a:xfrm", null, `${el("a:off", { x: 0, y: 0 })}${el("a:ext", { cx, cy })}`)}${el(
       "a:prstGeom",
       { prst: "rect" },
       el("a:avLst"),
     )}`,
   );
-  const pic = el(
-    "pic:pic",
-    { "xmlns:pic": NS.pic },
-    `${nvPicPr}${blipFill}${spPr}`,
-  );
-  const graphicData = el(
-    "a:graphicData",
-    { uri: NS.pic },
-    pic,
-  );
+  const pic = el("pic:pic", { "xmlns:pic": NS.pic }, `${nvPicPr}${blipFill}${spPr}`);
+  const graphicData = el("a:graphicData", { uri: NS.pic }, pic);
   const graphic = el("a:graphic", { "xmlns:a": NS.a }, graphicData);
   const extent = el("wp:extent", { cx, cy });
   const docPr = el("wp:docPr", {
@@ -67,9 +51,5 @@ export function renderDrawing(run: DrawingRun, rId: string, docPrId: number): st
     },
     `${extent}${docPr}${graphic}`,
   );
-  return el(
-    "w:r",
-    null,
-    el("w:drawing", { "xmlns:wp": NS.wp }, inline),
-  );
+  return el("w:r", null, el("w:drawing", { "xmlns:wp": NS.wp }, inline));
 }

@@ -1,6 +1,6 @@
-import * as Y from "yjs";
 import { describe, expect, it } from "vitest";
-import { type DeltaOp, runsToDelta, deltaToRuns } from "./runs";
+import * as Y from "yjs";
+import { type DeltaOp, deltaToRuns, runsToDelta } from "./runs";
 import { diffApplyText } from "./textDiff";
 
 function makeYText(initialDelta: readonly DeltaOp[]): Y.Text {
@@ -123,10 +123,7 @@ describe("diffApplyText — format-only fast path", () => {
 
   it("bolding part of text only formats that part", () => {
     const t = makeYText([{ insert: "Hello world" }]);
-    diffApplyText(t, [
-      { insert: "Hello " },
-      { insert: "world", attributes: { bold: true } },
-    ]);
+    diffApplyText(t, [{ insert: "Hello " }, { insert: "world", attributes: { bold: true } }]);
     expect(deltaOf(t)).toEqual([
       { insert: "Hello " },
       { insert: "world", attributes: { bold: true } },
@@ -149,17 +146,9 @@ describe("diffApplyText — format-only fast path", () => {
 describe("diffApplyText — embeds", () => {
   it("inserting an embed in the middle", () => {
     const t = makeYText([{ insert: "abc" }]);
-    diffApplyText(t, [
-      { insert: "ab" },
-      { insert: { __sobree: "tab" } },
-      { insert: "c" },
-    ]);
+    diffApplyText(t, [{ insert: "ab" }, { insert: { __sobree: "tab" } }, { insert: "c" }]);
     const out = deltaOf(t);
-    expect(out).toEqual([
-      { insert: "ab" },
-      { insert: { __sobree: "tab" } },
-      { insert: "c" },
-    ]);
+    expect(out).toEqual([{ insert: "ab" }, { insert: { __sobree: "tab" } }, { insert: "c" }]);
   });
 
   it("embed round-trip via runs", () => {
@@ -210,10 +199,7 @@ describe("diffApplyText — concurrent edits via two Y.Docs", () => {
     Y.applyUpdate(docB, Y.encodeStateAsUpdate(docA));
 
     // A bolds "world" (chars 6..10). B inserts "!" at the end.
-    diffApplyText(tA, [
-      { insert: "Hello " },
-      { insert: "world", attributes: { bold: true } },
-    ]);
+    diffApplyText(tA, [{ insert: "Hello " }, { insert: "world", attributes: { bold: true } }]);
     diffApplyText(tB, [{ insert: "Hello world!" }]);
 
     Y.applyUpdate(docA, Y.encodeStateAsUpdate(docB));

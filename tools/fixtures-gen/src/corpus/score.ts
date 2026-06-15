@@ -68,12 +68,10 @@ export function scoreFromDrift(
     meanAbsDrift: drift.meanAbsDrift,
     libreofficePages,
     sobreePages,
-    pageCountDelta:
-      sobreePages === null ? null : Math.abs(sobreePages - libreofficePages),
+    pageCountDelta: sobreePages === null ? null : Math.abs(sobreePages - libreofficePages),
     blockCount: drift.blockCount,
     matchedBlocks: drift.matchedBlocks,
-    matchedBlockRatio:
-      drift.blockCount > 0 ? drift.matchedBlocks / drift.blockCount : 1,
+    matchedBlockRatio: drift.blockCount > 0 ? drift.matchedBlocks / drift.blockCount : 1,
   };
 }
 

@@ -1,14 +1,8 @@
+import type { BlockRef } from "@sobree/core";
+import type { Block, NumberingDefinition, Paragraph, SobreeDocument, Table } from "@sobree/core";
+import type { Editor } from "@sobree/core";
 import type { BlockTarget } from "../blockKinds";
 import { icon } from "./icons";
-import type { BlockRef } from "@sobree/core";
-import type {
-  Block,
-  NumberingDefinition,
-  Paragraph,
-  SobreeDocument,
-  Table,
-} from "@sobree/core";
-import type { Editor } from "@sobree/core";
 
 export interface ChangeTypeContext {
   editor: Editor;
@@ -265,11 +259,7 @@ function applyTarget(ctx: ChangeTypeContext, target: TargetKind): void {
   }
 }
 
-function applyConversion(
-  editor: Editor,
-  ref: BlockRef,
-  target: TargetKind,
-): void {
+function applyConversion(editor: Editor, ref: BlockRef, target: TargetKind): void {
   const info = editor.getBlockById(ref.id);
   if (!info) return;
 
@@ -346,20 +336,14 @@ function flattenTableToParagraph(editor: Editor, ref: BlockRef): void {
   editor.replaceBlock(ref, next);
 }
 
-function convertBlockToList(
-  editor: Editor,
-  ref: BlockRef,
-  format: "bullet" | "decimal",
-): void {
+function convertBlockToList(editor: Editor, ref: BlockRef, format: "bullet" | "decimal"): void {
   const doc = editor.getDocument();
   const info = editor.getBlockById(ref.id);
   if (!info) return;
   const block = doc.body[info.index];
   if (!block || block.kind !== "paragraph") return;
 
-  const existing = doc.numbering.find(
-    (n) => n.abstractFormat.levels[0]?.format === format,
-  );
+  const existing = doc.numbering.find((n) => n.abstractFormat.levels[0]?.format === format);
   let numId: number;
   let nextNumbering: NumberingDefinition[] = doc.numbering;
   if (existing) {

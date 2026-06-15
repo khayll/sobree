@@ -11,10 +11,10 @@
  *     override, register .odttf extension). Called by `docx/export/index.ts`.
  */
 
+import type { SobreeDocument } from "../doc/types";
+import type { ExportContext } from "../docx/export/context";
 import { NS } from "../docx/shared/namespaces";
 import { el, xmlDocument } from "../docx/shared/xml";
-import type { ExportContext } from "../docx/export/context";
-import type { SobreeDocument } from "../doc/types";
 import type { FontDeclaration, FontEmbedRef } from "./types";
 
 interface FontTableEmission {
@@ -24,8 +24,7 @@ interface FontTableEmission {
   fontTableRelsXml: string;
 }
 
-const FONT_REL_TYPE =
-  "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font";
+const FONT_REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font";
 
 const FONT_TABLE_CT =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml";
@@ -39,10 +38,7 @@ const FONT_TABLE_CT =
  *
  * No-op when `doc.fonts` is empty.
  */
-export function mountFontTableArtifacts(
-  doc: SobreeDocument,
-  ctx: ExportContext,
-): void {
+export function mountFontTableArtifacts(doc: SobreeDocument, ctx: ExportContext): void {
   const emission = emitFontTable(doc);
   if (!emission) return;
   ctx.parts["word/fontTable.xml"] = emission.fontTableXml;
@@ -75,20 +71,14 @@ export function emitFontTable(doc: SobreeDocument): FontTableEmission | null {
   let nextRid = 1;
   const fontRels: Array<{ id: string; target: string }> = [];
 
-  const fontEls = doc.fonts.map((decl) =>
-    renderFontEl(decl, () => `rId${nextRid++}`, fontRels),
-  );
+  const fontEls = doc.fonts.map((decl) => renderFontEl(decl, () => `rId${nextRid++}`, fontRels));
 
-  const fontTableXml = xmlDocument(
-    el("w:fonts", { "xmlns:w": NS.w, "xmlns:r": NS.r }, fontEls),
-  );
+  const fontTableXml = xmlDocument(el("w:fonts", { "xmlns:w": NS.w, "xmlns:r": NS.r }, fontEls));
 
   const relEls = fontRels.map(({ id, target }) =>
     el("Relationship", { Id: id, Type: FONT_REL_TYPE, Target: target }),
   );
-  const fontTableRelsXml = xmlDocument(
-    el("Relationships", { xmlns: NS.rel }, relEls),
-  );
+  const fontTableRelsXml = xmlDocument(el("Relationships", { xmlns: NS.rel }, relEls));
 
   return { fontTableXml, fontTableRelsXml };
 }

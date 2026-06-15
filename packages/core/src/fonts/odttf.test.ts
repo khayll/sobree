@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  deobfuscate,
-  generateFontKey,
-  isUnobfuscated,
-  obfuscate,
-} from "./odttf";
+import { deobfuscate, generateFontKey, isUnobfuscated, obfuscate } from "./odttf";
 
 const SAMPLE_KEY = "{302EE813-EB4A-4642-A93A-89EF99B2457E}";
 

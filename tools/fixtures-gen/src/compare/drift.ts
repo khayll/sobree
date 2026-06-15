@@ -13,17 +13,12 @@
  * can see *why* they're missing), but contribute null drift values.
  */
 
-import type { BlockDrift, FixtureDrift } from "./types";
 import type { MatchResult } from "./match";
+import type { BlockDrift, FixtureDrift } from "./types";
 
-export function buildDrift(
-  fixture: string,
-  matches: MatchResult[],
-): FixtureDrift {
+export function buildDrift(fixture: string, matches: MatchResult[]): FixtureDrift {
   const warnings: string[] = [];
-  const blocks: BlockDrift[] = matches.map((m) =>
-    buildBlockDrift(m, warnings),
-  );
+  const blocks: BlockDrift[] = matches.map((m) => buildBlockDrift(m, warnings));
 
   const multiLine = blocks.filter((b) => b.pdfDeltaY !== null);
   const driftsAbs = blocks
@@ -31,9 +26,7 @@ export function buildDrift(
     .filter((d): d is number => d !== null)
     .map(Math.abs);
   const meanAbsDrift =
-    driftsAbs.length > 0
-      ? driftsAbs.reduce((sum, n) => sum + n, 0) / driftsAbs.length
-      : null;
+    driftsAbs.length > 0 ? driftsAbs.reduce((sum, n) => sum + n, 0) / driftsAbs.length : null;
 
   return {
     fixture,
@@ -63,7 +56,9 @@ function buildBlockDrift(match: MatchResult, warnings: string[]): BlockDrift {
   }
 
   if (matchedLineCount === 0 && block.text.length > 0) {
-    warnings.push(`block[${block.index}] (${block.tag}) "${truncate(block.text)}" did not match any PDF line`);
+    warnings.push(
+      `block[${block.index}] (${block.tag}) "${truncate(block.text)}" did not match any PDF line`,
+    );
   }
 
   return {
@@ -93,9 +88,7 @@ function medianAdjacentDeltaY(lines: { y: number }[]): number | null {
   }
   deltas.sort((a, b) => a - b);
   const mid = Math.floor(deltas.length / 2);
-  return deltas.length % 2 === 0
-    ? (deltas[mid - 1]! + deltas[mid]!) / 2
-    : deltas[mid]!;
+  return deltas.length % 2 === 0 ? (deltas[mid - 1]! + deltas[mid]!) / 2 : deltas[mid]!;
 }
 
 function truncate(s: string, n = 40): string {

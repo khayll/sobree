@@ -24,9 +24,7 @@ export type ZoomControlsPluginOptions = Partial<
   Omit<ZoomControlsOptions, "container" | "viewport">
 >;
 
-export function zoomControls(
-  opts: ZoomControlsPluginOptions = {},
-): SobreePlugin {
+export function zoomControls(opts: ZoomControlsPluginOptions = {}): SobreePlugin {
   return {
     name: "zoom-controls",
     setup({ host, viewport, sobree }) {

@@ -1,6 +1,6 @@
 import type { BorderSpec, ParagraphBorders } from "../../doc/types";
-import { wFirst } from "../shared/xml";
 import { NS } from "../shared/namespaces";
+import { wFirst } from "../shared/xml";
 
 const STYLE_MAP: Record<string, BorderSpec["style"]> = {
   single: "single",

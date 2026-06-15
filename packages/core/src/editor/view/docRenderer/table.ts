@@ -49,12 +49,8 @@ export function renderTable(
   // Pre-compute rowspan per (row, col) for every restart cell.
   const rowSpans = computeRowSpans(table);
 
-  const headRows = table.rows
-    .map((r, i) => ({ r, i }))
-    .filter((x) => x.r.isHeader);
-  const bodyRows = table.rows
-    .map((r, i) => ({ r, i }))
-    .filter((x) => !x.r.isHeader);
+  const headRows = table.rows.map((r, i) => ({ r, i })).filter((x) => x.r.isHeader);
+  const bodyRows = table.rows.map((r, i) => ({ r, i })).filter((x) => !x.r.isHeader);
 
   if (headRows.length > 0) {
     const thead = document.createElement("thead");
@@ -124,8 +120,7 @@ function renderCell(
   // <w:vAlign w:val="top|center|bottom"/> on the cell. CSS table-cell
   // vertical alignment is the `vertical-align` property on the <td>.
   if (cell.verticalAlign) {
-    el.style.verticalAlign =
-      cell.verticalAlign === "center" ? "middle" : cell.verticalAlign;
+    el.style.verticalAlign = cell.verticalAlign === "center" ? "middle" : cell.verticalAlign;
   }
 
   // Delegate paragraph / nested-table rendering to renderBlocks so each
@@ -222,7 +217,10 @@ function applyTableBorders(t: HTMLElement, table: Table): void {
   // Treat declared-but-empty as "borderless on purpose"; the TableGrid
   // heuristic only fills in when the doc said nothing at all.
   const explicitlyDeclared = b !== undefined;
-  const hasAnyBorderSide = !!(b && (b.top || b.right || b.bottom || b.left || b.insideH || b.insideV));
+  const hasAnyBorderSide = !!(
+    b &&
+    (b.top || b.right || b.bottom || b.left || b.insideH || b.insideV)
+  );
   if (!hasAnyBorderSide && !isGridStyle) return;
   if (explicitlyDeclared && !hasAnyBorderSide) return; // explicit "no borders"
 
@@ -252,11 +250,16 @@ function borderSpecToCss(spec: { style: string; sizeEighthsOfPt: number; color: 
   // Map OOXML border styles → CSS `border-style` keywords. "single" /
   // "thick" / "wave" / unknown all collapse to `solid` — CSS doesn't
   // have wavy borders, and `single` isn't a valid CSS keyword.
-  const style = spec.style === "double" ? "double"
-    : spec.style === "dashed" ? "dashed"
-    : spec.style === "dotted" ? "dotted"
-    : spec.style === "none" ? "none"
-    : "solid";
+  const style =
+    spec.style === "double"
+      ? "double"
+      : spec.style === "dashed"
+        ? "dashed"
+        : spec.style === "dotted"
+          ? "dotted"
+          : spec.style === "none"
+            ? "none"
+            : "solid";
   const color = spec.color === "auto" ? "#888" : spec.color;
   return `${px}px ${style} ${color}`;
 }
@@ -271,7 +274,11 @@ function computeRowSpans(table: Table): Map<string, number> {
   // First pass: build a per-row, per-column view of cells.
   const grid: (TableCell | null)[][] = [];
   const maxCol = table.rows.reduce(
-    (n, r) => Math.max(n, r.cells.reduce((s, c) => s + (c.gridSpan ?? 1), 0)),
+    (n, r) =>
+      Math.max(
+        n,
+        r.cells.reduce((s, c) => s + (c.gridSpan ?? 1), 0),
+      ),
     0,
   );
   for (const row of table.rows) {
@@ -304,4 +311,3 @@ function computeRowSpans(table: Table): Map<string, number> {
   }
   return out;
 }
-

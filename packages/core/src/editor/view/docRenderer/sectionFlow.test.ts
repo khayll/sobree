@@ -13,8 +13,13 @@ function section(over: Partial<SectionProperties> = {}): SectionProperties {
   return {
     pageSize: { wTwips: 11906, hTwips: 16838, orientation: "portrait" },
     pageMargins: {
-      topTwips: 1440, rightTwips: 1440, bottomTwips: 1440, leftTwips: 1440,
-      headerTwips: 720, footerTwips: 720, gutterTwips: 0,
+      topTwips: 1440,
+      rightTwips: 1440,
+      bottomTwips: 1440,
+      leftTwips: 1440,
+      headerTwips: 720,
+      footerTwips: 720,
+      gutterTwips: 0,
     },
     headerRefs: [],
     footerRefs: [],
@@ -29,7 +34,9 @@ function p(text = ""): HTMLElement {
 }
 
 let host: HTMLElement;
-beforeEach(() => { host = doc.createElement("div"); });
+beforeEach(() => {
+  host = doc.createElement("div");
+});
 
 describe("openColumnContainerIfNeeded", () => {
   it("returns the host unchanged for single-column sections", () => {
@@ -118,13 +125,17 @@ describe("collapseSectionTrailerEmpty", () => {
   it("is a no-op when the last child isn't a section break", () => {
     host.append(p(""));
     collapseSectionTrailerEmpty(host);
-    expect((host.firstElementChild as HTMLElement).classList.contains("sobree-section-trailer-empty")).toBe(false);
+    expect(
+      (host.firstElementChild as HTMLElement).classList.contains("sobree-section-trailer-empty"),
+    ).toBe(false);
   });
 
   it("is a no-op when the trailer has text content", () => {
     host.append(p("not empty"), sectBreak());
     collapseSectionTrailerEmpty(host);
-    expect((host.firstElementChild as HTMLElement).classList.contains("sobree-section-trailer-empty")).toBe(false);
+    expect(
+      (host.firstElementChild as HTMLElement).classList.contains("sobree-section-trailer-empty"),
+    ).toBe(false);
   });
 
   it("is a no-op when the trailer carries an image", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { geometryToTwips, matchPageSize, type PageGeometry } from "./pageSize";
+import { type PageGeometry, geometryToTwips, matchPageSize } from "./pageSize";
 import { mmToTwips } from "./units";
 
 describe("matchPageSize", () => {

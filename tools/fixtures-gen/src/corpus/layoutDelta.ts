@@ -102,8 +102,7 @@ export function summariseDeltas(deltas: readonly LineDelta[]): {
   const matched = deltas.filter((d) => !d.unmatched);
   const ys = matched.map((d) => d.deltaY!).sort((a, b) => a - b);
   const xs = matched.map((d) => d.deltaX!).sort((a, b) => a - b);
-  const med = (arr: number[]) =>
-    arr.length === 0 ? 0 : arr[Math.floor(arr.length / 2)]!;
+  const med = (arr: number[]) => (arr.length === 0 ? 0 : arr[Math.floor(arr.length / 2)]!);
   const maxAbs = (arr: number[]) =>
     arr.length === 0 ? 0 : arr.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
   return {
