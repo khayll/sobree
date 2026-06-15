@@ -43,11 +43,11 @@ afterEach(() => {
 });
 
 describe("flowUnequalColumnSections", () => {
-  it("builds explicit-width tracks and fills track 0 to the budget, spilling the rest", () => {
+  it("builds explicit-width tracks and balances blocks across them", () => {
     installColHeightModel();
-    // 6 blocks × 100px, budget 300px → track 0 holds 3, track 1 the rest.
+    // 6 blocks × 100px → balanced 3/3 (each column 300px).
     const root = rootWith("116,52", "13", Array(6).fill(100));
-    flowUnequalColumnSections(root, 300);
+    flowUnequalColumnSections(root, 1000);
 
     const cols = root.querySelectorAll(".sobree-col");
     expect(cols.length).toBe(2);
@@ -60,11 +60,33 @@ describe("flowUnequalColumnSections", () => {
     expect(cols[1]!.children[0]!.textContent).toBe("b3");
   });
 
-  it("is idempotent — re-running re-flattens and re-fills to the same result", () => {
+  it("balances even when all content fits under the page budget", () => {
+    // The regression: a section shorter than one page must still split
+    // across columns (Word balances), not dump everything into track 0
+    // and leave track 1 empty. 4×100px, budget 1000px → 2/2, not 4/0.
+    installColHeightModel();
+    const root = rootWith("116,52", "13", Array(4).fill(100));
+    flowUnequalColumnSections(root, 1000);
+    const cols = root.querySelectorAll(".sobree-col");
+    expect(cols[0]!.childElementCount).toBe(2);
+    expect(cols[1]!.childElementCount).toBe(2);
+  });
+
+  it("honours the page budget as a hard ceiling, spilling the overflow", () => {
+    // 6×100px, budget 250px → track 0 may hold at most 2 (200px); a 3rd
+    // would breach 250, so it spills even though balance alone wouldn't.
+    installColHeightModel();
+    const root = rootWith("116,52", "13", Array(6).fill(100));
+    flowUnequalColumnSections(root, 250);
+    const cols = root.querySelectorAll(".sobree-col");
+    expect((cols[0] as HTMLElement).offsetHeight).toBeLessThanOrEqual(250);
+  });
+
+  it("is idempotent — re-running re-flattens and re-balances to the same result", () => {
     installColHeightModel();
     const root = rootWith("100,100", "10", Array(4).fill(100));
-    flowUnequalColumnSections(root, 200);
-    flowUnequalColumnSections(root, 200);
+    flowUnequalColumnSections(root, 1000);
+    flowUnequalColumnSections(root, 1000);
     const cols = root.querySelectorAll(".sobree-col");
     expect(cols.length).toBe(2); // not nested twice
     expect(cols[0]!.childElementCount).toBe(2);
