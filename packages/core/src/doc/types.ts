@@ -217,11 +217,18 @@ export type AnchoredContent =
   | {
       kind: "group";
       children: AnchoredFrame[];
-      /** Local coordinate system extent — children's offsets are
-       *  scaled `(width / childCoordSystemCx) × (height / childCoordSystemCy)`
-       *  to fit the group's actual rendered size. */
+      /** Local coordinate system extent (`<a:chExt>`). A child at offset
+       *  `P` maps into the group's rendered box as
+       *  `(P − childCoordOffset) × (size / childCoordSystem)` — the
+       *  extent gives the scale. */
       childCoordSystemCx: number;
       childCoordSystemCy: number;
+      /** Local coordinate system ORIGIN (`<a:chOff>`). Child offsets are
+       *  measured from this point, not from 0 — so it must be subtracted
+       *  before scaling, or the children shift by `chOff × scale`.
+       *  Absent ⇒ origin is `(0, 0)` (the common case). */
+      childCoordOffsetX?: number;
+      childCoordOffsetY?: number;
     };
 
 export interface Comment {

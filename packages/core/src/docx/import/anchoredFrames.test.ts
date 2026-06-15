@@ -196,6 +196,50 @@ describe("parseAnchoredFrames", () => {
     });
   });
 
+  it("reads the group's <a:chOff> child-coordinate origin", () => {
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:anchor>
+        <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>
+        <wp:extent cx="1000" cy="1000"/>
+        <a:graphic><a:graphicData>
+          <wpg:wgp>
+            <wpg:grpSpPr><a:xfrm><a:chOff x="640436" y="458979"/><a:chExt cx="1066800" cy="314325"/></a:xfrm></wpg:grpSpPr>
+            <wps:wsp>
+              <wps:spPr><a:xfrm><a:off x="640436" y="458979"/><a:ext cx="300" cy="400"/></a:xfrm><a:prstGeom prst="rect"/></wps:spPr>
+            </wps:wsp>
+          </wpg:wgp>
+        </a:graphicData></a:graphic>
+      </wp:anchor>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseAnchoredFrames(doc, emptyCtx);
+    const g = frames[0]!.content as Extract<typeof frames[0]["content"], { kind: "group" }>;
+    expect(g.childCoordOffsetX).toBe(640436);
+    expect(g.childCoordOffsetY).toBe(458979);
+  });
+
+  it("omits a zero <a:chOff> origin (stays absent in the AST)", () => {
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:anchor>
+        <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>
+        <wp:extent cx="1000" cy="1000"/>
+        <a:graphic><a:graphicData>
+          <wpg:wgp>
+            <wpg:grpSpPr><a:xfrm><a:chExt cx="2000" cy="2000"/></a:xfrm></wpg:grpSpPr>
+            <wps:wsp>
+              <wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="300" cy="400"/></a:xfrm><a:prstGeom prst="rect"/></wps:spPr>
+            </wps:wsp>
+          </wpg:wgp>
+        </a:graphicData></a:graphic>
+      </wp:anchor>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseAnchoredFrames(doc, emptyCtx);
+    const g = frames[0]!.content as Extract<typeof frames[0]["content"], { kind: "group" }>;
+    expect(g.childCoordOffsetX).toBeUndefined();
+    expect(g.childCoordOffsetY).toBeUndefined();
+  });
+
   it("assigns deterministic ids based on document order", () => {
     const doc = xml(`<w:body>
       <w:p><w:r><w:drawing><wp:anchor>
