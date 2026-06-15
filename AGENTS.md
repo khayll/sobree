@@ -243,13 +243,16 @@ intended.
 
 ```sh
 pnpm typecheck                    # all workspaces
+pnpm check                        # Biome format + import-order + lint (errors only)
 pnpm test                         # vitest in each package
 pnpm -F "@sobree/docs..." build   # builds core first, then docs (catches MDX errors)
 pnpm corpus:check                 # render fidelity gate (needs `soffice` on PATH)
 pnpm docs:coverage                # new public exports must be documented (ratchet)
 ```
 
-All five green is the gate before any PR. The docs build is non-optional — it's the only thing that catches MDX errors and dead links in content pages. `corpus:check` requires LibreOffice; if you don't have it locally, CI will run it for you.
+All six green is the gate before any PR. `pnpm check` fails only on
+error-severity diagnostics; deliberate `warn` rules and generated data
+(ignored in `biome.json`) don't block — run `pnpm format` to auto-fix. The docs build is non-optional — it's the only thing that catches MDX errors and dead links in content pages. `corpus:check` requires LibreOffice; if you don't have it locally, CI will run it for you.
 
 For changes that touch editor visuals (toolbar, indicator, pagination, paper stack, zone editor), spot-check in the **playground** before opening a PR — `pnpm dev` launches it at `localhost:5174`. Tests run in jsdom and don't catch visual regressions.
 

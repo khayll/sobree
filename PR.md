@@ -46,15 +46,22 @@ fails the gate.
 
 ## 3. The gate
 
-All five green before any PR (details in `AGENTS.md` → Verification):
+All six green before any PR (details in `AGENTS.md` → Verification):
 
 ```sh
 pnpm typecheck
+pnpm check            # Biome: format + import-order + lint (errors only)
 pnpm test
 pnpm -F "@sobree/docs..." build
 pnpm corpus:check
 pnpm docs:coverage
 ```
+
+`pnpm check` runs in CI (`build · test · typecheck`). It fails only on
+error-severity diagnostics — the codebase's deliberate `warn` rules
+(`noNonNullAssertion`, `noDelete`, …) and generated data (`tests/corpus`,
+snapshots, ignored in `biome.json`) don't block. Run `pnpm format` to
+auto-fix formatting before committing.
 
 Visual changes additionally get a playground spot-check
 (`pnpm dev` → localhost:5174) — jsdom doesn't catch layout.
