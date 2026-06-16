@@ -63,6 +63,30 @@ describe("readParagraph — tracked changes", () => {
 });
 
 describe("readParagraph", () => {
+  const styled = (val: string) =>
+    readParagraph(
+      new DOMParser().parseFromString(
+        `<?xml version="1.0"?><w:p xmlns:w="${NS_W}"><w:pPr><w:pStyle w:val="${val}"/></w:pPr></w:p>`,
+        "application/xml",
+      ).documentElement,
+    ).format;
+
+  it("canonicalises heading styles to a heading level", () => {
+    expect(styled("Heading1").headingLevel).toBe(1);
+    expect(styled("Heading3").headingLevel).toBe(3);
+    // OpenOffice's lowercase-with-space export.
+    expect(styled("heading 2").headingLevel).toBe(2);
+  });
+
+  it("does NOT treat `Title` as a heading — it keeps its own style", () => {
+    // `Title` is a distinct Word style with its own display font; mapping
+    // it to `Heading1` would discard that. It must stay `Title` so the
+    // renderer's cascade applies the real Title formatting.
+    const f = styled("Title");
+    expect(f.headingLevel).toBeUndefined();
+    expect(f.styleId).toBe("Title");
+  });
+
   it("reads <w:pPr><w:shd> into format.shading", () => {
     const doc = new DOMParser().parseFromString(
       `<?xml version="1.0"?><w:p xmlns:w="${NS_W}">

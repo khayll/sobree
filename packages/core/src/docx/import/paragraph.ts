@@ -97,10 +97,11 @@ function hasLastRenderedPageBreak(p: Element): boolean {
 function mapParagraphFormat(f: ParagraphFormat): ParagraphProperties {
   const out: ParagraphProperties = {};
   // Style anchor:
-  //   - heading → canonical `HeadingN` id (overrides whatever Word
-  //     called it — `heading 1`, `Heading1`, `Title`, etc.)
-  //   - otherwise → verbatim pStyle (e.g. `ListParagraph`, `BodyText`)
-  //     so the renderer's cascade picks up the style's pPr/rPr.
+  //   - heading → canonical `HeadingN` id (normalises `heading 1` /
+  //     `Heading1` so the renderer emits `<hN>`)
+  //   - otherwise → verbatim pStyle (e.g. `Title`, `ListParagraph`,
+  //     `BodyText`) so the renderer's cascade picks up the style's
+  //     pPr/rPr — `Title` keeps its own display font, not Heading1's.
   if (f.headingLevel && f.headingLevel >= 1 && f.headingLevel <= 6) {
     out.styleId = `Heading${f.headingLevel}`;
   } else if (f.styleId) {
