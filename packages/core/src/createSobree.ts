@@ -88,6 +88,13 @@ export interface CreateSobreeOptions {
    * viewport yourself.
    */
   fitOnMount?: FitOnMount;
+  /**
+   * Show a small, non-interactive `@sobree/core` version badge at the
+   * bottom-centre of the screen. Off by default. A debug aid for
+   * confirming which renderer build is live (e.g. past a stale cache
+   * after a deploy). Forwarded to `SobreeOptions.versionBadge`.
+   */
+  versionBadge?: boolean;
 }
 
 /**
@@ -184,6 +191,7 @@ export function createSobree(
     }),
     ...(options.ydoc && { ydoc: options.ydoc }),
     ...(options.blobStore && { blobStore: options.blobStore }),
+    ...(options.versionBadge && { versionBadge: true }),
   };
 
   const sobree = new Sobree(viewport.slot, sobreeOpts);

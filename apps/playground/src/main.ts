@@ -106,6 +106,9 @@ const editor = createSobree(host, {
   // example doc.
   ...(ydocHasContent ? {} : { content: simpleSeed() }),
   ydoc,
+  // Show the @sobree/core version badge in the dev playground so the
+  // rendered build is always identifiable.
+  versionBadge: true,
   plugins: [
     keyboard(),
     blockTools(),

@@ -19,6 +19,9 @@ export type {
   SobreeHandle,
 } from "./createSobree";
 
+// === build metadata ===
+export { VERSION } from "./version";
+
 // === markdown seed parser (for hello-world content) ===
 export { parseMarkdown } from "./markdown/parse";
 
