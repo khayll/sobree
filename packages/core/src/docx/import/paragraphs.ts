@@ -351,8 +351,15 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
   if (numPr) {
     const numId = wVal(wFirst(numPr, "numId"));
     const ilvl = wVal(wFirst(numPr, "ilvl"));
-    if (numId !== null) format.numId = Number(numId);
-    if (ilvl !== null) format.numLevel = Number(ilvl);
+    // `<w:numId w:val="0"/>` is OOXML's explicit "no numbering" sentinel
+    // (ECMA-376 §17.9.18): a paragraph uses it to CANCEL a list its
+    // style would otherwise inherit. Treat it as un-numbered — not as a
+    // real "list 0", which has no definition and would render as a stray
+    // ordered-list marker over-printing the text.
+    if (numId !== null && Number(numId) !== 0) {
+      format.numId = Number(numId);
+      if (ilvl !== null) format.numLevel = Number(ilvl);
+    }
   }
 
   // <w:tabs><w:tab w:val="left" w:pos="N"/>…</w:tabs>
