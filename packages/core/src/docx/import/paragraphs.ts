@@ -288,11 +288,17 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
 
   const styleVal = wVal(wFirst(pPr, "pStyle"));
   if (styleVal) {
-    // Word's canonical heading style names are `Heading1` ... `Heading6`.
-    // Also tolerate `heading 1` (OpenOffice exports) and `Title` (treat as H1).
+    // Word's canonical heading style names are `Heading1` ... `Heading6`
+    // (also tolerate `heading 1`, OpenOffice's lowercase export). These
+    // canonicalise to `HeadingN` so the renderer emits `<hN>`.
+    //
+    // `Title` is NOT folded in here: it's a distinct Word style with its
+    // own formatting (often a larger display font than Heading1), and
+    // mapping it to `Heading1` would discard that and re-style it as a
+    // heading. Carried through verbatim below, it resolves via its own
+    // style cascade like any other named style.
     const m = styleVal.match(/^heading\s*([1-6])$/i);
     if (m) format.headingLevel = Number(m[1]);
-    else if (styleVal.toLowerCase() === "title") format.headingLevel = 1;
     // Always carry the raw styleId through. The renderer uses it as
     // the cascade anchor — `ListParagraph` / `BodyText` / etc. style
     // pPr / rPr would otherwise be silently dropped.
