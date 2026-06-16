@@ -20,16 +20,23 @@ export function mountVersionBadge(doc: Document = document): () => void {
   el.textContent = `@sobree/core v${VERSION}`;
   // Decorative — keep it out of the accessibility tree and off the caret.
   el.setAttribute("aria-hidden", "true");
+  // A pill with its own background + shadow so it reads on ANY backdrop —
+  // bare grey text vanished where the badge straddled a dark region
+  // (e.g. a split-pane demo's code panel).
   Object.assign(el.style, {
     position: "fixed",
-    bottom: "6px",
+    bottom: "8px",
     left: "50%",
     transform: "translateX(-50%)",
     pointerEvents: "none",
     userSelect: "none",
     zIndex: "2147483647",
-    font: "11px/1.4 system-ui, -apple-system, sans-serif",
-    color: "rgba(0, 0, 0, 0.4)",
+    font: "11px/1 system-ui, -apple-system, sans-serif",
+    color: "rgba(0, 0, 0, 0.6)",
+    background: "rgba(255, 255, 255, 0.85)",
+    padding: "3px 9px",
+    borderRadius: "999px",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.2)",
   } satisfies Partial<CSSStyleDeclaration>);
   doc.body.appendChild(el);
   return () => el.remove();
