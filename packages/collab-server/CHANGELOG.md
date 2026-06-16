@@ -1,5 +1,12 @@
 # @sobree/collab-server
 
+## 0.1.11
+
+### Patch Changes
+
+- 926d1a8: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on a single version. No functional changes.
+
 ## 0.1.10
 
 ### Patch Changes
