@@ -87,6 +87,33 @@ describe("readParagraph", () => {
     expect(f.styleId).toBe("Title");
   });
 
+  it("reads <w:numPr> into numId / numLevel", () => {
+    const doc = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:p xmlns:w="${NS_W}"><w:pPr>
+         <w:numPr><w:ilvl w:val="2"/><w:numId w:val="7"/></w:numPr>
+       </w:pPr></w:p>`,
+      "application/xml",
+    );
+    const f = readParagraph(doc.documentElement).format;
+    expect(f.numId).toBe(7);
+    expect(f.numLevel).toBe(2);
+  });
+
+  it('treats <w:numId w:val="0"> as no numbering (the cancel-list sentinel)', () => {
+    // numId 0 cancels a list the paragraph style would inherit — it is
+    // NOT a real list, so it must not produce numbering on the AST.
+    const doc = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:p xmlns:w="${NS_W}"><w:pPr>
+         <w:pStyle w:val="BulletedList"/>
+         <w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr>
+       </w:pPr></w:p>`,
+      "application/xml",
+    );
+    const f = readParagraph(doc.documentElement).format;
+    expect(f.numId).toBeUndefined();
+    expect(f.numLevel).toBeUndefined();
+  });
+
   it("reads <w:pPr><w:shd> into format.shading", () => {
     const doc = new DOMParser().parseFromString(
       `<?xml version="1.0"?><w:p xmlns:w="${NS_W}">
