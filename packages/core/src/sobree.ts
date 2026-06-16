@@ -6,6 +6,7 @@ import { Editor, type OutlineItem, type TrackChangesState } from "./editor";
 import { DEFAULT_PAGE_SETUP, type PageSetup } from "./paperStack/pageSetup";
 import { PaperStack } from "./paperStack/paperStack";
 import { attachSections } from "./plugins/sections";
+import { mountVersionBadge } from "./versionBadge";
 
 export type SobreeMode = "edit" | "read";
 
@@ -66,6 +67,13 @@ export interface SobreeOptions {
    * `sobree.setTrackChanges(...)`.
    */
   trackChanges?: TrackChangesState;
+  /**
+   * Show a small, non-interactive `@sobree/core` version badge at the
+   * bottom-centre of the screen. Off by default. A debug aid for
+   * confirming which renderer build is live (e.g. past a stale cache
+   * after a deploy) — it has no other behaviour.
+   */
+  versionBadge?: boolean;
   // Plugins are no longer wired through Sobree directly — `createSobree()`
   // owns the pluggable surface and threads the editor + viewport + host
   // into each plugin's `setup(ctx)`. Direct `Sobree` users can still mount
@@ -88,6 +96,8 @@ export class Sobree {
   /** Guards a single in-flight `document.fonts.ready` repagination so
    *  repeated triggers while fonts load coalesce into one re-run. */
   private fontSettleScheduled = false;
+  /** Removes the version badge (when `versionBadge` is on). `null` otherwise. */
+  private versionBadgeTeardown: (() => void) | null = null;
   private readonly listeners: {
     change: Set<(p: SobreeEventPayload["change"]) => void>;
     paginate: Set<(p: SobreeEventPayload["paginate"]) => void>;
@@ -133,6 +143,9 @@ export class Sobree {
     // owns the pluggable surface and threads them in with a richer
     // PluginContext (editor + viewport + host + sobree).
     this.pluginDetachers.push(attachSections(this.editor));
+
+    // Optional renderer-version badge (debug aid, off by default).
+    if (options.versionBadge) this.versionBadgeTeardown = mountVersionBadge();
 
     // Seed the stack with the initial document's sections so the very
     // first pagination applies per-section vAlign correctly. Subsequent
@@ -623,6 +636,8 @@ export class Sobree {
       }
     }
     this.pluginDetachers.length = 0;
+    this.versionBadgeTeardown?.();
+    this.versionBadgeTeardown = null;
     this.detachChange();
     this.detachPaginate();
     this.detachTrackChanges();

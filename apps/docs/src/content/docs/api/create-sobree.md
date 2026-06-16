@@ -90,6 +90,14 @@ interface CreateSobreeOptions {
    *   - "none"            — leave the viewport at 1:1.
    */
   fitOnMount?: "width" | "page" | "none";
+
+  /**
+   * Show a small, non-interactive `@sobree/core` version badge at the
+   * bottom-centre of the screen. Off by default. A debug aid for
+   * confirming which renderer build is live (e.g. past a stale cache
+   * after a deploy).
+   */
+  versionBadge?: boolean;
 }
 ```
 
@@ -97,6 +105,22 @@ The default `fitOnMount: "width"` is why the editor renders looking
 like a printed page right after `createSobree()` — without it you'd
 see the A4 paper at 1:1 (typically much smaller than the host). Pass
 `fitOnMount: "none"` if you're driving zoom yourself.
+
+## Version
+
+`VERSION` is the published `@sobree/core` version string, baked in at
+build time:
+
+```ts
+import { VERSION } from "@sobree/core";
+
+console.log(VERSION); // e.g. "0.1.10"
+```
+
+Pass `versionBadge: true` to `createSobree` (or `new Sobree`) to float
+that version, greyed, at the bottom-centre of the screen — handy for
+confirming the live renderer build past a stale CDN / browser cache. It
+has no other behaviour.
 
 ## A typical interactive editor
 
