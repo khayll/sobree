@@ -1,5 +1,14 @@
 # @sobree/mcp
 
+## 0.1.13
+
+### Patch Changes
+
+- 6887618: Version bump only — released together with `@sobree/core` to keep the
+  `@sobree/*` package set on a single version. No functional changes.
+- Updated dependencies [6887618]
+  - @sobree/core@0.1.13
+
 ## 0.1.12
 
 ### Patch Changes
