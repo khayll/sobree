@@ -1,27 +1,21 @@
+/**
+ * Document- and section-level builders: the scaffolding a document needs
+ * before any content goes in (blank doc, default section / page geometry,
+ * the standard style set), plus small structural helpers.
+ */
+
 import type {
   Block,
   HeaderFooterRef,
-  InlineRun,
   NamedStyle,
   PageMargins,
   PageSize,
   Paragraph,
-  ParagraphProperties,
-  RunProperties,
   SectionProperties,
   SobreeDocument,
   Table,
-  TextRun,
-} from "./types";
-
-/**
- * Constructors for AST nodes. Two reasons these exist as separate helpers
- * instead of object literals at every call site:
- *   1. Defaults — letter-paper, no margins set, etc. — without sprinkling
- *      magic numbers into editor code.
- *   2. Future schema migration — when a new required field is added, all
- *      construction goes through here and the migration is one diff.
- */
+} from "../types";
+import { paragraph } from "./block";
 
 const A4_WIDTH_TWIPS = 11906; // 210 mm
 const A4_HEIGHT_TWIPS = 16838; // 297 mm
@@ -66,43 +60,6 @@ export function defaultMargins(): PageMargins {
     footerTwips: HALF_INCH_TWIPS,
     gutterTwips: 0,
   };
-}
-
-/** A paragraph with no runs and no properties beyond the defaults. */
-export function paragraph(runs: InlineRun[] = [], properties: ParagraphProperties = {}): Paragraph {
-  return { kind: "paragraph", properties, runs };
-}
-
-/** Heading paragraph (`Heading{level}` style, level clamped to 1..6). */
-export function heading(
-  level: number,
-  runs: InlineRun[] = [],
-  extra: ParagraphProperties = {},
-): Paragraph {
-  const lv = Math.max(1, Math.min(6, level));
-  return paragraph(runs, { ...extra, styleId: `Heading${lv}` });
-}
-
-/** Plain text run with optional formatting. */
-export function text(value: string, properties: RunProperties = {}): TextRun {
-  return { kind: "text", text: value, properties };
-}
-
-/** Convenience: emphasised (bold + italic) text run. */
-export function emphasis(value: string, properties: RunProperties = {}): TextRun {
-  return { kind: "text", text: value, properties: { ...properties, italic: true } };
-}
-
-export function strong(value: string, properties: RunProperties = {}): TextRun {
-  return { kind: "text", text: value, properties: { ...properties, bold: true } };
-}
-
-export function softBreak(): InlineRun {
-  return { kind: "break", type: "line" };
-}
-
-export function pageBreak(): InlineRun {
-  return { kind: "break", type: "page" };
 }
 
 /** Default Word styles every doc declares so headings render correctly.
