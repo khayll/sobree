@@ -13,14 +13,14 @@
       "attrs": {
         "data-block-index": "1",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
     },
     {
       "attrs": {
         "data-block-index": "2",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "This Service Agreement (the “Agreement”) is entered into bet…",
     },
@@ -28,7 +28,7 @@
       "attrs": {
         "data-block-index": "3",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Provider: Acme Consulting Ltd.",
     },
@@ -36,7 +36,7 @@
       "attrs": {
         "data-block-index": "4",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Address: 1 Example Street, London, EC1A 1AA",
     },
@@ -44,7 +44,7 @@
       "attrs": {
         "data-block-index": "5",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Registered no.: 12345678",
     },
@@ -52,7 +52,7 @@
       "attrs": {
         "data-block-index": "6",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "and:",
     },
@@ -72,7 +72,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
                       "tag": "P",
                       "text": "Client name",
                     },
@@ -87,7 +87,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
                       "tag": "P",
                       "text": "John Doe",
                     },
@@ -108,7 +108,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
                       "tag": "P",
                       "text": "Address",
                     },
@@ -123,7 +123,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
                       "tag": "P",
                       "text": "42 High Street, London",
                     },
@@ -144,7 +144,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
                       "tag": "P",
                       "text": "Contact",
                     },
@@ -159,7 +159,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
                       "tag": "P",
                       "text": "john.doe@example.com",
                     },
@@ -185,14 +185,14 @@
       "attrs": {
         "data-block-index": "8",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
     },
     {
       "attrs": {
         "data-block-index": "9",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "The Parties agree to the following terms (collectively, the …",
     },
@@ -206,7 +206,7 @@
             "data-block-index": "10",
             "data-style-id": "ListParagraph",
           },
-          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
           "tag": "LI",
           "text": "Scope. Provider shall deliver consulting services as describ…",
         },
@@ -215,7 +215,7 @@
             "data-block-index": "11",
             "data-style-id": "ListParagraph",
           },
-          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
           "tag": "LI",
           "text": "Term. This Agreement shall commence on the date of signature…",
         },
@@ -224,7 +224,7 @@
             "data-block-index": "12",
             "data-style-id": "ListParagraph",
           },
-          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
           "tag": "LI",
           "text": "Fees and Invoicing. The Client shall pay the Provider the fe…",
         },
@@ -233,7 +233,7 @@
             "data-block-index": "13",
             "data-style-id": "ListParagraph",
           },
-          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
           "tag": "LI",
           "text": "Confidentiality. Each Party shall keep confidential all info…",
         },
@@ -242,7 +242,7 @@
             "data-block-index": "14",
             "data-style-id": "ListParagraph",
           },
-          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+          "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
           "tag": "LI",
           "text": "Governing Law. This Agreement shall be governed by and const…",
         },
@@ -255,14 +255,14 @@
       "attrs": {
         "data-block-index": "15",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
     },
     {
       "attrs": {
         "data-block-index": "16",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Signed for and on behalf of the Parties:",
     },
@@ -270,14 +270,14 @@
       "attrs": {
         "data-block-index": "17",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
     },
     {
       "attrs": {
         "data-block-index": "18",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "……………………………………                      ……………………………………",
     },
@@ -285,7 +285,7 @@
       "attrs": {
         "data-block-index": "19",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Provider                                                    …",
     },
@@ -456,7 +456,7 @@
       "paragraphDefaults": undefined,
       "runDefaults": {
         "fontFamily": "Calibri",
-        "fontSizePt": 11,
+        "fontSizePt": 10,
       },
     },
   ],

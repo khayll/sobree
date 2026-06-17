@@ -241,8 +241,12 @@ function mergeParagraphProperties(
  */
 function naturalLeadingFor(fontFamily: string | undefined): number {
   if (!fontFamily) return 1.15;
-  const key = fontFamily.toLowerCase();
-  if (key.startsWith("calibri")) return 1.05;
+  // All current targets (Calibri/Carlito included) match LibreOffice at a
+  // ~1.15 natural leading. An earlier 1.05 special-case for Calibri was a
+  // mis-calibration: it was tuned to hit LO's line spacing while the run
+  // default font size was wrongly 11pt, so 11×1.05 happened to equal the
+  // true 10×1.15 for `line=360`. With the font-size default corrected to
+  // 10pt, the genuine 1.15 leading applies uniformly.
   return 1.15;
 }
 

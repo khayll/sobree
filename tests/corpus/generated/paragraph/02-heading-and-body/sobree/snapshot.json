@@ -13,7 +13,7 @@
       "attrs": {
         "data-block-index": "1",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "First body paragraph after the heading. Should have the head…",
     },
@@ -21,7 +21,7 @@
       "attrs": {
         "data-block-index": "2",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Second body paragraph. Should sit at body line-height with b…",
     },
@@ -192,7 +192,7 @@
       "paragraphDefaults": undefined,
       "runDefaults": {
         "fontFamily": "Calibri",
-        "fontSizePt": 11,
+        "fontSizePt": 10,
       },
     },
   ],
