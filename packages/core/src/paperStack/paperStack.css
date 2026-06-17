@@ -385,17 +385,14 @@
   min-width: 0;
 }
 
-/* Table cell borders driven by the per-table `--table-cell-border`
- * custom property set by `applyTableBorders` in the renderer when
- * `<w:tblBorders>` (or `tblStyle=TableGrid`) was declared. Defaults
- * to no border when the property is unset — so plain tables stay
- * borderless. */
+/* Bordered-table cells. The borders themselves are drawn per cell as
+ * inline `border-*` styles by the renderer (`applyCellBorders`), which
+ * keeps the table's INSIDE separators distinct from its OUTER frame —
+ * a CSS `border` on every cell can't tell those apart. This rule only
+ * supplies the default cell padding (≈ 0.08" / 2mm) so cells don't touch
+ * their gridlines; an explicit `<w:tblCellMar>` overrides it inline. */
 .paper-content table.sobree-table-bordered td,
 .paper-content table.sobree-table-bordered th {
-  border: var(--table-cell-border, none);
-  /* Word's default cell padding ≈ 0.08" / 2mm — without a hint the
-   * cells touch their borders. Honour explicit per-cell margins later
-   * via `tcMar`; this is the global default fallback. */
   padding: 0 4px;
 }
 

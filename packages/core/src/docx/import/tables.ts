@@ -1,5 +1,6 @@
-import type { Block, Table, TableCell, TableRow } from "../../doc/types";
+import type { Block, Table, TableCell, TableLook, TableRow } from "../../doc/types";
 import { readShading } from "../shared/shading";
+import { readCellBorders, readCellMargins, readTableBorders } from "../shared/tableBorders";
 import { wChildren, wFirst, wVal } from "../shared/xml";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 
@@ -32,6 +33,13 @@ export function convertTable(tbl: Element, ctx: ConvertContext): Table {
       // honoured the override.
       properties.borders = readTableBorders(tblBorders) ?? {};
     }
+    const look = readTblLook(tblPr);
+    if (look) properties.look = look;
+    const cellMar = wFirst(tblPr, "tblCellMar");
+    if (cellMar) {
+      const margins = readCellMargins(cellMar);
+      if (margins) properties.cellMargins = margins;
+    }
   }
   return {
     kind: "table",
@@ -42,36 +50,31 @@ export function convertTable(tbl: Element, ctx: ConvertContext): Table {
 }
 
 /**
- * Read `<w:tblBorders>` into a TableBorders. Each side child element
- * (`top`, `left`, `right`, `bottom`, `insideH`, `insideV`) is a
- * `BorderSpec` — `style` (single/double/dashed/…), `colorHex` (or
- * "auto"), `widthEighthsPt` (1/8 of a point).
+ * Read `<w:tblLook>`. The bitmask `w:val` is the legacy form; Word also
+ * writes the boolean attributes (`w:firstRow` etc.) which we prefer. A
+ * flag is on when its attribute is "1"/"true" OR the corresponding
+ * bitmask bit is set. `noHBand`/`noVBand` invert to `hBand`/`vBand`.
  */
-function readTableBorders(el: Element): NonNullable<Table["properties"]["borders"]> | null {
-  const out: NonNullable<Table["properties"]["borders"]> = {};
-  for (const side of ["top", "left", "right", "bottom", "insideH", "insideV"] as const) {
-    const child = wFirst(el, side);
-    if (!child) continue;
-    const val = child.getAttribute("w:val") ?? "single";
-    if (val === "none" || val === "nil") continue;
-    const sz = child.getAttribute("w:sz");
-    const color = child.getAttribute("w:color");
-    const style =
-      val === "single" ||
-      val === "double" ||
-      val === "dashed" ||
-      val === "dotted" ||
-      val === "thick" ||
-      val === "none"
-        ? val
-        : "single";
-    out[side] = {
-      style,
-      sizeEighthsOfPt: sz ? Number(sz) : 4,
-      color: color && color !== "auto" ? `#${color}` : "auto",
-    };
-  }
-  return Object.keys(out).length > 0 ? out : null;
+function readTblLook(tblPr: Element): TableLook | null {
+  const el = wFirst(tblPr, "tblLook");
+  if (!el) return null;
+  const bits = Number.parseInt(el.getAttribute("w:val") ?? "0", 16) || 0;
+  const flag = (attr: string, bit: number): boolean => {
+    const v = el.getAttribute(`w:${attr}`);
+    if (v != null) return v === "1" || v === "true";
+    return (bits & bit) !== 0;
+  };
+  const look: TableLook = {};
+  if (flag("firstRow", 0x0020)) look.firstRow = true;
+  if (flag("lastRow", 0x0040)) look.lastRow = true;
+  if (flag("firstColumn", 0x0080)) look.firstColumn = true;
+  if (flag("lastColumn", 0x0100)) look.lastColumn = true;
+  // The bitmask uses NO-band bits (0x0200 = noHBand, 0x0400 = noVBand);
+  // banding is on when that bit is CLEAR. The boolean attrs are also
+  // `noHBand`/`noVBand`, so read + invert.
+  if (!flag("noHBand", 0x0200)) look.hBand = true;
+  if (!flag("noVBand", 0x0400)) look.vBand = true;
+  return look;
 }
 
 function readGrid(tbl: Element): number[] {
@@ -119,6 +122,12 @@ function readCell(tc: Element, ctx: ConvertContext): TableCell {
     // <w:shd w:val="clear" w:fill="C6EFCE"/> — cell background colour.
     const cellShading = readShading(tcPr);
     if (cellShading) cell.shading = cellShading;
+    // <w:tcBorders> — per-cell edge overrides (win over table/style).
+    const tcBorders = wFirst(tcPr, "tcBorders");
+    if (tcBorders) {
+      const borders = readCellBorders(tcBorders);
+      if (borders) cell.borders = borders;
+    }
   }
 
   // Cell content: every direct child `<w:p>` or `<w:tbl>` becomes a Block.
