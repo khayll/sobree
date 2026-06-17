@@ -1,5 +1,65 @@
 # @sobree/core
 
+## 0.1.14
+
+### Patch Changes
+
+- 73cdf48: Fix vertical height drift from two compensating defaults, so documents
+  that specify no font size render at the correct height (and one-page
+  content stops spilling onto a second page).
+  - **Default run font size is now 10pt** (the OOXML application default),
+    not 11pt. 11pt only applies when a document's `<w:docDefaults>`
+    explicitly sets `sz=22` (the `Normal.dotm` template value); a document
+    that specifies no size anywhere renders at 10pt in both Word and
+    LibreOffice. Sobree's 11pt last-resort baseline over-sized every line
+    of such documents by 10%.
+  - **Calibri now uses the uniform 1.15 natural leading.** The earlier 1.05
+    special-case was a mis-calibration that compensated for the 11pt bug
+    (11 × 1.05 happened to equal the true 10 × 1.15 for `line=360`). With
+    the size corrected, the genuine 1.15 leading applies to every font.
+
+  Net effect across the corpus is a broad fidelity improvement (e.g.
+  complex-multipage line drift dropped ~80%), with no regressions.
+  Documents that explicitly set a font size, and new content created in the
+  editor, are unaffected.
+
+- 6392789: fix(table): resolve table-style conditional formatting (shading, banding, grid)
+
+  Tables that get their appearance from a `<w:style w:type="table">` rather
+  than direct cell formatting rendered flat — no header fill, no row banding,
+  no grid lines. The importer dropped table styles entirely and the renderer
+  only honoured a cell's own `<w:shd>` / `<w:tblBorders>`, so a document whose
+  header colour and gridlines live in the style (the common case for Word's
+  built-in and theme table styles) lost them on import.
+
+  Now the full table-style cascade resolves per cell, per ECMA-376 §17.7.6:
+  - Parse `<w:style w:type="table">` — base `<w:tblBorders>` + band sizes,
+    whole-table `<w:tcPr>` shading, and every `<w:tblStylePr>` conditional
+    region (`firstRow`/`lastRow`/`firstCol`/`lastCol`, row/column banding,
+    corner cells) into `NamedStyle.tableStyle`, merged up the `basedOn` chain.
+  - Read `<w:tblLook>` (which conditional formats are active, with the
+    `noHBand`/`noVBand` → banding-on inversion) and per-cell `<w:tcBorders>`.
+  - Resolve each cell's shading + border overrides at render time in
+    precedence order (whole-table → banding → first/last column → first/last
+    row → corner cells), with direct cell formatting still winning, and band
+    ranges correctly excluding the first/last row/column when those are active.
+
+  The table style's base borders now also draw the grid when the table
+  declares none of its own. Existing tables (direct `<w:shd>`, `TableGrid`,
+  explicit-none borders) are unchanged.
+
+  Two related border/spacing fidelity fixes ride along:
+  - **Inside vs. outer borders are now distinct.** Cell borders are drawn
+    per edge by position instead of via a uniform CSS `border` on every
+    cell, so a style that declares only `insideH`/`insideV` (interior
+    gridlines) no longer paints a perimeter frame the document never asked
+    for. Fully-bordered tables (`TableGrid`, explicit four-sides + inside)
+    render the identical grid as before.
+  - **Cell padding (`<w:tblCellMar>` / `<w:tcMar>`) is honoured.** The
+    table's (or style's) default cell margins now apply as cell padding, so
+    cells get their authored breathing room instead of sitting flush against
+    the gridlines.
+
 ## 0.1.13
 
 ### Patch Changes
