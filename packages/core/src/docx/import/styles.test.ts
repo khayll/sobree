@@ -8,14 +8,15 @@ const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
  * Regression coverage for the Normal-style cascade. Bug history:
  *
  *   `ensureWordBaseline` previously injected `fontFamily: "Calibri"` +
- *   `fontSizePt: 11` onto Normal whenever Normal's own `runDefaults`
+ *   a baseline size onto Normal whenever Normal's own `runDefaults`
  *   didn't specify them — even when `<w:docDefaults>` already provided
  *   them via the cascade. The injection silently overrode the docx
  *   author's choice. The Hungarian user-contract.docx declares Times
  *   New Roman in `<w:docDefaults><w:rPrDefault>`; Word/LibreOffice
  *   render the whole body as Times; Sobree wrongly rendered it as
- *   Calibri. The fix: only inject Calibri/11pt when the *cascade*
- *   (including DocDefaults via `basedOn`) provides no font/size.
+ *   Calibri. The fix: only inject the Calibri / 10pt baseline when the
+ *   *cascade* (including DocDefaults via `basedOn`) provides no
+ *   font/size. The size baseline is the OOXML application default (10pt).
  *
  *   Adding this test as a hard lock — any future change to
  *   `ensureWordBaseline` that re-introduces the override will fail
@@ -40,11 +41,12 @@ describe("parseStylesXml + ensureWordBaseline", () => {
     expect(styles).not.toBeNull();
     const resolved = resolveStyleCascade(styles!, "Normal");
     expect(resolved.runDefaults.fontFamily).toBe("Times New Roman");
-    // Size is unspecified everywhere — last-resort baseline (11pt) wins.
-    expect(resolved.runDefaults.fontSizePt).toBe(11);
+    // Size unspecified everywhere — the OOXML application default (10pt)
+    // wins, NOT the 11pt the Normal.dotm template ships as docDefault sz=22.
+    expect(resolved.runDefaults.fontSizePt).toBe(10);
   });
 
-  it("falls back to Calibri 11pt when neither Normal nor docDefaults sets a font", () => {
+  it("falls back to Calibri 10pt when neither Normal nor docDefaults sets a font", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <w:styles xmlns:w="${NS_W}">
   <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
@@ -54,7 +56,8 @@ describe("parseStylesXml + ensureWordBaseline", () => {
     const styles = parseStylesXml(xml);
     const resolved = resolveStyleCascade(styles!, "Normal");
     expect(resolved.runDefaults.fontFamily).toBe("Calibri");
-    expect(resolved.runDefaults.fontSizePt).toBe(11);
+    // OOXML application default — see the size note above.
+    expect(resolved.runDefaults.fontSizePt).toBe(10);
   });
 
   it("reads <w:shd> into paragraph-level shading on a style", () => {

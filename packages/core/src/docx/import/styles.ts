@@ -43,6 +43,15 @@ import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
 import { readTableStyle } from "./tableStyle";
 
 /**
+ * OOXML application-default run font size, in points. Used only as the
+ * last-resort baseline when a document specifies no `<w:sz>` anywhere in
+ * its style cascade (no docDefaults, no Normal). This is the value Word
+ * and LibreOffice both fall back to — distinct from the 11pt that the
+ * `Normal.dotm` template ships as an explicit `docDefaults` `sz=22`.
+ */
+const OOXML_DEFAULT_FONT_SIZE_PT = 10;
+
+/**
  * Canonicalise a heading style id to `HeadingN`.
  *
  * Word and OpenOffice name the heading styles inconsistently across docs:
@@ -226,7 +235,7 @@ function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacin
   }
 
   // --- Run defaults: font / size ---
-  // Only inject Calibri 11pt for fields the *cascade* doesn't already
+  // Only inject a baseline for fields the *cascade* doesn't already
   // provide. If the docx ships a `<w:docDefaults>` with rFonts set
   // (e.g. user-contract.docx declares Times New Roman for the whole
   // document), Normal inherits via `basedOn: "DocDefaults"` and the
@@ -234,8 +243,16 @@ function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacin
   // override the author's choice, breaking visual fidelity with Word.
   //
   // The check resolves the chain (Normal → basedOn → … → DocDefaults)
-  // and only fills in fields no ancestor specifies. Word's hardcoded
-  // Calibri-11pt baseline is the last-resort fallback, not an override.
+  // and only fills in fields no ancestor specifies.
+  //
+  // Size last-resort: the OOXML *application* default, 10pt — NOT the
+  // 11pt that the modern `Normal.dotm` template ships. 11pt only appears
+  // in a document when its `<w:docDefaults>` explicitly sets `sz=22`; a
+  // document that specifies no size anywhere (no docDefault sz, no Normal
+  // sz) renders at 10pt in both Word and LibreOffice. Defaulting to 11pt
+  // here over-sized every line of such documents by 10%, accumulating
+  // into a multi-millimetre vertical drift that could tip one-page
+  // content onto a second page.
   const resolved = resolveStyleCascade(styles, defaultStyleId);
   const existingRuns = target.runDefaults ?? {};
   const inheritedFontFamily = resolved.runDefaults.fontFamily;
@@ -243,7 +260,7 @@ function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacin
   target.runDefaults = {
     ...existingRuns,
     ...(inheritedFontFamily === undefined ? { fontFamily: "Calibri" } : {}),
-    ...(inheritedFontSize === undefined ? { fontSizePt: 11 } : {}),
+    ...(inheritedFontSize === undefined ? { fontSizePt: OOXML_DEFAULT_FONT_SIZE_PT } : {}),
   };
 
   // --- Paragraph defaults: NO hardcoded spacing baseline ---

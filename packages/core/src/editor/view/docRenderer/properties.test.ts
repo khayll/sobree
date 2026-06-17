@@ -29,13 +29,16 @@ describe("applyParagraphProps", () => {
     expect(Number(el.style.lineHeight)).toBeCloseTo(1.725, 3);
   });
 
-  it("uses Calibri's tighter natural leading (1.05) when the run font is Calibri", () => {
+  it("uses the uniform 1.15 natural leading for Calibri (matches LibreOffice)", () => {
+    // An earlier 1.05 special-case for Calibri was a mis-calibration that
+    // compensated for a wrong 11pt run-default font size; with the size
+    // corrected to 10pt, Calibri matches LibreOffice at the same 1.15
+    // leading every other font uses. 1.5 × 1.15 = 1.725.
     const el = p({
       spacing: { line: 360, lineRule: "auto" },
       runDefaults: { fontFamily: "Calibri" },
     });
-    // 1.5 × 1.05 = 1.575
-    expect(Number(el.style.lineHeight)).toBeCloseTo(1.575, 3);
+    expect(Number(el.style.lineHeight)).toBeCloseTo(1.725, 3);
   });
 
   it("lineRule=exact emits a FIXED pt line-height (line twips → pt), font-independent", () => {

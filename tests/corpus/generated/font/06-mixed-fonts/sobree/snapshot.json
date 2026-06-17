@@ -4,7 +4,7 @@
       "attrs": {
         "data-block-index": "0",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Default font here. Times New Roman here. Back to Calibri. Co…",
     },
@@ -12,7 +12,7 @@
       "attrs": {
         "data-block-index": "1",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
       "text": "Whole paragraph in Georgia, with some bold and italic mixed …",
     },
@@ -183,7 +183,7 @@
       "paragraphDefaults": undefined,
       "runDefaults": {
         "fontFamily": "Calibri",
-        "fontSizePt": 11,
+        "fontSizePt": 10,
       },
     },
   ],

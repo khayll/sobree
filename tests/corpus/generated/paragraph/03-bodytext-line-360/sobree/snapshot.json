@@ -4,7 +4,7 @@
       "attrs": {
         "data-block-index": "0",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5750000000000002;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; line-height: 1.7249999999999999;",
       "tag": "P",
       "text": "Paragraph one with explicit 1.5× line spacing. Lorem ipsum d…",
     },
@@ -12,7 +12,7 @@
       "attrs": {
         "data-block-index": "1",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5750000000000002;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; line-height: 1.7249999999999999;",
       "tag": "P",
       "text": "Paragraph two — should render with the same line-height as p…",
     },
@@ -20,7 +20,7 @@
       "attrs": {
         "data-block-index": "2",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.5750000000000002;",
+      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; line-height: 1.7249999999999999;",
       "tag": "P",
       "text": "Paragraph three — same.",
     },
@@ -191,7 +191,7 @@
       "paragraphDefaults": undefined,
       "runDefaults": {
         "fontFamily": "Calibri",
-        "fontSizePt": 11,
+        "fontSizePt": 10,
       },
     },
   ],
