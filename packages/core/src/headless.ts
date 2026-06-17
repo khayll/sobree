@@ -68,11 +68,12 @@ import { runsLength } from "./doc/runs";
 import type { Block, ParagraphAlignment, ParagraphProperties, SobreeDocument } from "./doc/types";
 import { headingLevelOf, runsToText } from "./doc/walk";
 import { EditorCommands, type ParagraphPropertiesPatch } from "./editor";
-import type { BlockInfo, CommandBus, OutlineItem } from "./editor";
+import type { BlockInfo, CommandBus, OutlineItem, SectionPropertiesPatch } from "./editor";
 import { BlockRegistry } from "./editor/internal/blockRegistry";
 import {
   type Mutation,
   mergeParagraphProps,
+  mergeSectionProps,
   mergeSectionsAcross,
   removedSectionIndex,
 } from "./editor/internal/mutations";
@@ -370,6 +371,22 @@ export class HeadlessSobree {
       bumps.push({ type: "bump", index });
     }
     return this.commit({ body: next }, bumps);
+  }
+
+  /** Merge a patch into a section's properties (page geometry, columns,
+   *  header/footer refs, vertical alignment). `sectionIndex` is the
+   *  section's position in the document's `sections` array. */
+  applySectionProperties(sectionIndex: number, patch: SectionPropertiesPatch): EditResult<void> {
+    const section = this.doc.sections[sectionIndex];
+    if (!Number.isInteger(sectionIndex) || section === undefined) {
+      return fail({
+        code: "invalid-state",
+        details: `no section at index ${sectionIndex} (document has ${this.doc.sections.length})`,
+      });
+    }
+    const next = this.doc.sections.slice();
+    next[sectionIndex] = mergeSectionProps(section, patch);
+    return this.commit({ sections: next }, []);
   }
 
   // === events ===

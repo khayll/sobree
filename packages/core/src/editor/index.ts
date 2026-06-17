@@ -33,6 +33,7 @@ import * as review from "./ops/review";
 import * as runs from "./ops/runs";
 import { type TrackedInput, createTrackedInput } from "./ops/trackedInput";
 import * as query from "./query";
+import { EditorSections } from "./sections";
 import { EditorSelection } from "./selection";
 import { EditorTable } from "./table";
 import { renderSobreeDocument } from "./view/docRenderer/index";
@@ -62,6 +63,7 @@ import type {
   OutlineItem,
   ParagraphPropertiesPatch,
   RevisionSpan,
+  SectionPropertiesPatch,
   SelectionPayload,
   TrackChangesState,
   Unsubscribe,
@@ -81,6 +83,7 @@ export type {
   OutlineItem,
   ParagraphPropertiesPatch,
   RevisionSpan,
+  SectionPropertiesPatch,
   SelectionPayload,
   TrackChangesState,
   Unsubscribe,
@@ -125,6 +128,13 @@ export class Editor {
    * and inherits optimistic-lock checking via `replaceBlock`.
    */
   readonly table: EditorTable;
+  /**
+   * Section-level edit operations — page size / margins, columns,
+   * header/footer references, vertical alignment. Grouped here (rather
+   * than as flat `Editor` methods) so the facade stays thin as the
+   * edit-op surface grows. Every method returns an `EditResult`.
+   */
+  readonly sections: EditorSections;
   /**
    * Named-command registry — the coordination point between plugins.
    * Plugins register commands on attach and unregister on detach;
@@ -284,6 +294,7 @@ export class Editor {
     });
 
     this.ctx = this.buildContext();
+    this.sections = new EditorSections(this.ctx);
     this.trackedInput = createTrackedInput(this.ctx);
     this.initDocumentState(options);
 
