@@ -17,9 +17,13 @@
  *     style — anything unspecified there falls through to Word's
  *     hardcoded baseline.
  *
- * Out of scope (silently dropped): table styles, numbering styles,
- * conditional formatting (`<w:tblStylePr>`), advanced font hints
- * (`hAnsi`, `cs`, `eastAsia`), runs without a recognised property.
+ * Out of scope (silently dropped): numbering styles, advanced font
+ * hints (`hAnsi`, `cs`, `eastAsia`), runs without a recognised property.
+ *
+ * Table styles (`<w:style w:type="table">`) ARE read: their base
+ * borders / shading + conditional formats (`<w:tblStylePr>`) parse into
+ * `NamedStyle.tableStyle` via {@link readTableStyle}, resolved per cell
+ * at render time (see `doc/tableStyle.ts`).
  */
 
 import { resolveStyleCascade } from "../../doc/styles";
@@ -36,6 +40,7 @@ import { readShading } from "../shared/shading";
 import { parseXml, wAll, wFirst, wOnOff, wVal } from "../shared/xml";
 import { readParagraphBorders } from "./borders";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
+import { readTableStyle } from "./tableStyle";
 
 /**
  * Canonicalise a heading style id to `HeadingN`.
@@ -112,6 +117,9 @@ export function parseStylesXml(
     const pPr = wFirst(styleEl, "pPr");
     const runDefaults = rPr ? readRunProperties(rPr) : undefined;
     const paragraphDefaults = pPr ? readParagraphProperties(pPr) : undefined;
+    // Table styles carry their borders / shading / conditional formats in
+    // tblPr/tcPr/tblStylePr rather than rPr/pPr.
+    const tableStyle = type === "table" ? readTableStyle(styleEl) : null;
 
     out.push({
       id: styleId,
@@ -121,6 +129,7 @@ export function parseStylesXml(
       ...(nextStyleId ? { nextStyleId: canonicalStyleId(nextStyleId) } : {}),
       ...(runDefaults ? { runDefaults } : {}),
       ...(paragraphDefaults ? { paragraphDefaults } : {}),
+      ...(tableStyle ? { tableStyle } : {}),
     });
   }
 

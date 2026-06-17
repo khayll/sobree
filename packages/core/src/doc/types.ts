@@ -16,6 +16,32 @@
  *     Defaults are applied at render time from the document's styles.
  */
 
+// Formatting value-types (borders, shading, table-style conditional
+// formatting) live in a dependency-free leaf module — none reference the
+// recursive `Block` graph, so keeping them out of `types.ts` avoids a
+// circular import. Imported here for the fields that reference them, and
+// re-exported so consumers keep importing every AST type from `./types`.
+import type {
+  BorderSpec,
+  Shading,
+  TableBorders,
+  TableCellBorders,
+  TableCellMargins,
+  TableLook,
+  TableStyleDefinition,
+} from "./formatting.types";
+export type {
+  BorderSpec,
+  Shading,
+  TableBorders,
+  TableCellBorders,
+  TableCellMargins,
+  TableConditionalType,
+  TableLook,
+  TableStyleCellFormat,
+  TableStyleDefinition,
+} from "./formatting.types";
+
 // === document ===
 
 export interface SobreeDocument {
@@ -690,25 +716,6 @@ export interface ParagraphBorders {
   between?: BorderSpec;
 }
 
-export interface BorderSpec {
-  style: "single" | "double" | "dashed" | "dotted" | "thick" | "none";
-  /** Eighths of a point (Word's `w:sz`). */
-  sizeEighthsOfPt: number;
-  /** `#rrggbb` or `auto`. */
-  color: string;
-  /** Twips of clear space between border and text. */
-  spaceTwips?: number;
-}
-
-export interface Shading {
-  /** Pattern (`clear`, `pct10`, `solid`, …). Most highlights are `clear`. */
-  pattern: string;
-  /** Background `#rrggbb` or `auto`. */
-  fill: string;
-  /** Pattern foreground `#rrggbb` or `auto`. */
-  color?: string;
-}
-
 // === tables ===
 
 export interface Table {
@@ -726,15 +733,14 @@ export interface TableProperties {
   borders?: TableBorders;
   /** Style reference (e.g. "TableGrid"). */
   styleId?: string;
-}
-
-export interface TableBorders {
-  top?: BorderSpec;
-  right?: BorderSpec;
-  bottom?: BorderSpec;
-  left?: BorderSpec;
-  insideH?: BorderSpec;
-  insideV?: BorderSpec;
+  /** `<w:tblLook>` — which of the table style's conditional formats are
+   *  active (first row / column, last row / column, row / column
+   *  banding). Gates {@link TableStyleDefinition} resolution. */
+  look?: TableLook;
+  /** `<w:tblCellMar>` — default inner padding for every cell (the table's
+   *  own value wins over the style's). Word's stock default is ~108 twips
+   *  left / right and 0 top / bottom when omitted. */
+  cellMargins?: TableCellMargins;
 }
 
 export interface TableRow {
@@ -753,13 +759,6 @@ export interface TableCell {
   borders?: TableCellBorders;
   /** Cell content — paragraphs and (rare) nested tables. */
   content: Block[];
-}
-
-export interface TableCellBorders {
-  top?: BorderSpec;
-  right?: BorderSpec;
-  bottom?: BorderSpec;
-  left?: BorderSpec;
 }
 
 // === sections (page setup, headers, footers) ===
@@ -860,6 +859,9 @@ export interface NamedStyle {
   paragraphDefaults?: ParagraphProperties;
   /** Default table properties (only for table styles). */
   tableDefaults?: TableProperties;
+  /** Table-style borders + conditional formatting (only for table
+   *  styles). Resolved per cell at render time. */
+  tableStyle?: TableStyleDefinition;
 }
 
 // === numbering ===

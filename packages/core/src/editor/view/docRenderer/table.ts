@@ -1,11 +1,24 @@
+import {
+  type TableCellPosition,
+  resolveTableCellFormat,
+  resolveTableStyle,
+} from "../../../doc/tableStyle";
 import type {
   Block,
+  BorderSpec,
   NamedStyle,
   NumberingDefinition,
   Table,
+  TableBorders,
   TableCell,
+  TableCellBorders,
+  TableCellMargins,
+  TableLook,
   TableRow,
+  TableStyleCellFormat,
+  TableStyleDefinition,
 } from "../../../doc/types";
+import { twipsToMmExact } from "./units";
 
 /**
  * Renderer for a table cell's block content, injected by the caller
@@ -44,7 +57,22 @@ export function renderTable(
   rawParts: Record<string, Uint8Array> = {},
 ): HTMLElement {
   const t = document.createElement("table");
-  applyTableBorders(t, table);
+
+  // Resolve the table style (`tblStyle` ref → merged definition) once.
+  // Its base borders draw the grid (own `<w:tblBorders>` still wins);
+  // its conditional formats colour rows / columns / corners per cell.
+  const styleDef = resolveTableStyle(styles, table.properties.styleId);
+  const effBorders = effectiveTableBorders(table, styleDef);
+  applyTableFrame(t, effBorders);
+
+  const cellCtx: CellStyleContext = {
+    def: styleDef,
+    look: table.properties.look ?? {},
+    rowCount: table.rows.length,
+    colCount: countColumns(table),
+    borders: effBorders,
+    margins: effectiveCellMargins(table, styleDef),
+  };
 
   // Pre-compute rowspan per (row, col) for every restart cell.
   const rowSpans = computeRowSpans(table);
@@ -56,7 +84,7 @@ export function renderTable(
     const thead = document.createElement("thead");
     for (const { r, i } of headRows) {
       thead.appendChild(
-        renderRow(r, i, "th", rowSpans, numbering, styles, rawParts, renderCellBlocks),
+        renderRow(r, i, "th", rowSpans, cellCtx, numbering, styles, rawParts, renderCellBlocks),
       );
     }
     t.appendChild(thead);
@@ -65,7 +93,7 @@ export function renderTable(
     const tbody = document.createElement("tbody");
     for (const { r, i } of bodyRows) {
       tbody.appendChild(
-        renderRow(r, i, "td", rowSpans, numbering, styles, rawParts, renderCellBlocks),
+        renderRow(r, i, "td", rowSpans, cellCtx, numbering, styles, rawParts, renderCellBlocks),
       );
     }
     t.appendChild(tbody);
@@ -73,11 +101,29 @@ export function renderTable(
   return t;
 }
 
+/** Per-table style context shared by every cell render — the resolved
+ *  style definition, the table's `<w:tblLook>`, the grid dimensions
+ *  needed to place each cell for conditional-format resolution, and the
+ *  effective table borders / cell margins. */
+interface CellStyleContext {
+  def: TableStyleDefinition | null;
+  look: TableLook;
+  rowCount: number;
+  colCount: number;
+  /** Effective table borders (own `<w:tblBorders>` ?? style base, plus
+   *  the `TableGrid` default). Inside vs outer is resolved per cell. */
+  borders: TableBorders | null;
+  /** Effective default cell padding (instance `<w:tblCellMar>` ?? style),
+   *  per side in twips. Absent sides fall back to Word's default. */
+  margins: TableCellMargins | undefined;
+}
+
 function renderRow(
   row: TableRow,
   rowIndex: number,
   defaultCell: "th" | "td",
   rowSpans: Map<string, number>,
+  cellCtx: CellStyleContext,
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
@@ -91,10 +137,26 @@ function renderRow(
       col += gridSpan;
       continue; // occluded by the restart cell above
     }
-    const el = renderCell(cell, defaultCell, numbering, styles, rawParts, renderCellBlocks);
+    const pos: TableCellPosition = {
+      rowIndex,
+      colIndex: col,
+      rowCount: cellCtx.rowCount,
+      colCount: cellCtx.colCount,
+    };
+    const rowSpan = rowSpans.get(`${rowIndex}:${col}`) ?? 1;
+    const el = renderCell(
+      cell,
+      defaultCell,
+      cellCtx,
+      pos,
+      { col: gridSpan, row: rowSpan },
+      numbering,
+      styles,
+      rawParts,
+      renderCellBlocks,
+    );
     if (gridSpan > 1) el.setAttribute("colspan", String(gridSpan));
-    const rs = rowSpans.get(`${rowIndex}:${col}`);
-    if (rs && rs > 1) el.setAttribute("rowspan", String(rs));
+    if (rowSpan > 1) el.setAttribute("rowspan", String(rowSpan));
     tr.appendChild(el);
     col += gridSpan;
   }
@@ -104,6 +166,9 @@ function renderRow(
 function renderCell(
   cell: TableCell,
   defaultTag: "th" | "td",
+  cellCtx: CellStyleContext,
+  pos: TableCellPosition,
+  span: { col: number; row: number },
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
@@ -111,12 +176,37 @@ function renderCell(
 ): HTMLElement {
   const el = document.createElement(defaultTag);
 
+  // Resolve the table style's conditional formatting for this cell
+  // position (gold header / banded rows / corners). Direct cell
+  // formatting below wins over it.
+  const styleFmt: TableStyleCellFormat = cellCtx.def
+    ? resolveTableCellFormat(cellCtx.def, cellCtx.look, pos)
+    : {};
+
   // <w:shd w:fill="XXXXXX"/> on the cell — colour the cell background.
   // We render only the `fill` (most common case); patterned shading
-  // (`pct10`, etc.) collapses to solid fill.
-  if (cell.shading?.fill && cell.shading.fill !== "#auto") {
-    el.style.backgroundColor = cell.shading.fill;
-  }
+  // (`pct10`, etc.) collapses to solid fill. A direct cell fill wins;
+  // otherwise the resolved table-style fill applies.
+  const fill =
+    cell.shading?.fill && cell.shading.fill !== "#auto"
+      ? cell.shading.fill
+      : styleFmt.shading?.fill && styleFmt.shading.fill !== "#auto"
+        ? styleFmt.shading.fill
+        : undefined;
+  if (fill) el.style.backgroundColor = fill;
+
+  // Borders, resolved per edge so the table's INSIDE separators
+  // (`insideH`/`insideV`) and its OUTER frame (top/right/bottom/left) stay
+  // distinct — a style that declares only inside borders must NOT draw a
+  // perimeter it never specified. Conditional-region borders and a cell's
+  // own `<w:tcBorders>` override the base edge.
+  applyCellBorders(el, cellCtx.borders, pos, span, styleFmt.borders, cell.borders);
+
+  // Cell padding from `<w:tblCellMar>` (instance ?? style). Word omits
+  // top/bottom by default but commonly sets vertical padding on banded
+  // tables; without it cells render cramped against the gridlines.
+  applyCellPadding(el, cellCtx.margins);
+
   // <w:vAlign w:val="top|center|bottom"/> on the cell. CSS table-cell
   // vertical alignment is the `vertical-align` property on the <td>.
   if (cell.verticalAlign) {
@@ -191,56 +281,114 @@ function tightenDefaultAfterSpacing(cellEl: HTMLElement): void {
   }
 }
 
-/**
- * Apply `<w:tblBorders>` to the rendered `<table>` and stamp a class
- * that drives per-cell border rules in CSS. We do it in CSS so the
- * pagination-time split of a table (per-page TR clones) inherits the
- * border styles via the `--border-*` custom properties on the table
- * itself — the cell rules read those vars regardless of which clone
- * the TD ended up in.
- *
- * Word's `<w:tblBorders>` covers the table's outer edges + the
- * inside-horizontal / inside-vertical separators. CSS doesn't have
- * "inside" border selectors, so we approximate by setting `border` on
- * every cell (giving you the inside separators) AND overriding the
- * outer edges with the explicit top/right/bottom/left specs.
- *
- * Tables with `tblStyle="TableGrid"` but no explicit `<w:tblBorders>`
- * also get default thin gray borders — TableGrid is Word's built-in
- * style for "every cell has a border".
- */
-function applyTableBorders(t: HTMLElement, table: Table): void {
-  const b = table.properties.borders;
-  const isGridStyle = table.properties.styleId === "TableGrid";
-  // `b` truthy means `<w:tblBorders>` was declared — even if every side
-  // resolved to "none" (importer carries an empty object in that case).
-  // Treat declared-but-empty as "borderless on purpose"; the TableGrid
-  // heuristic only fills in when the doc said nothing at all.
-  const explicitlyDeclared = b !== undefined;
-  const hasAnyBorderSide = !!(
-    b &&
-    (b.top || b.right || b.bottom || b.left || b.insideH || b.insideV)
-  );
-  if (!hasAnyBorderSide && !isGridStyle) return;
-  if (explicitlyDeclared && !hasAnyBorderSide) return; // explicit "no borders"
+/** Word's default `TableGrid` border — a thin auto-coloured line on every
+ *  edge (outer + inside) when the style declares no explicit borders. */
+const GRID_DEFAULT_BORDER: BorderSpec = { style: "single", sizeEighthsOfPt: 4, color: "auto" };
 
+/**
+ * Resolve the table's effective borders: the table's own `<w:tblBorders>`
+ * wins; otherwise the resolved table style's base borders apply. A
+ * declared-but-empty own `{}` is an explicit "no borders" and suppresses
+ * the style's borders. A bare `tblStyle="TableGrid"` with nothing declared
+ * gets the default full grid. Returns `null` when the table is borderless.
+ */
+function effectiveTableBorders(
+  table: Table,
+  styleDef: TableStyleDefinition | null,
+): TableBorders | null {
+  const own = table.properties.borders;
+  const b = own !== undefined ? own : styleDef?.borders;
+  const hasAnySide = !!(b && (b.top || b.right || b.bottom || b.left || b.insideH || b.insideV));
+  if (hasAnySide) return b ?? null;
+  // Explicit own-`{}` (declared but every side "none") → stay borderless,
+  // even under TableGrid (the doc overrode the style on purpose).
+  if (own !== undefined) return null;
+  if (table.properties.styleId === "TableGrid") {
+    return {
+      top: GRID_DEFAULT_BORDER,
+      right: GRID_DEFAULT_BORDER,
+      bottom: GRID_DEFAULT_BORDER,
+      left: GRID_DEFAULT_BORDER,
+      insideH: GRID_DEFAULT_BORDER,
+      insideV: GRID_DEFAULT_BORDER,
+    };
+  }
+  return null;
+}
+
+/** Effective default cell padding — the instance `<w:tblCellMar>` wins
+ *  per side over the style's. Returns `undefined` when neither sets any. */
+function effectiveCellMargins(
+  table: Table,
+  styleDef: TableStyleDefinition | null,
+): TableCellMargins | undefined {
+  const own = table.properties.cellMargins;
+  const style = styleDef?.cellMargins;
+  if (!own && !style) return undefined;
+  return { ...style, ...own };
+}
+
+/** Stamp the border-collapse + class needed for cell borders to merge
+ *  cleanly. The borders themselves are drawn per cell (inside vs outer),
+ *  not here — only the collapse mode and the padding-default class live
+ *  on the `<table>`. */
+function applyTableFrame(t: HTMLElement, borders: TableBorders | null): void {
+  if (!borders) return;
   t.style.borderCollapse = "collapse";
   t.classList.add("sobree-table-bordered");
+}
 
-  // Inside (cell-to-cell) border: prefer insideH / insideV if declared,
-  // fall back to a thin gray when only the outer borders are set
-  // (matches Word's typical behaviour for fully-bordered tables).
-  const inside = b?.insideH ?? b?.insideV;
-  const insideCss = inside ? borderSpecToCss(inside) : "1px solid #888";
-  t.style.setProperty("--table-cell-border", insideCss);
+/**
+ * Resolve and apply one cell's four borders. The base edge comes from the
+ * table borders, split by position: an OUTER edge (the table's perimeter)
+ * uses `top`/`right`/`bottom`/`left`; an INNER edge uses `insideH` (drawn
+ * as the top of every non-first row) / `insideV` (the left of every
+ * non-first column). This keeps an inside-only style from painting a
+ * perimeter it never declared. Conditional-region borders then a cell's
+ * own `<w:tcBorders>` override per side.
+ */
+function applyCellBorders(
+  el: HTMLElement,
+  borders: TableBorders | null,
+  pos: TableCellPosition,
+  span: { col: number; row: number },
+  styleBorders: TableCellBorders | undefined,
+  cellBorders: TableCell["borders"],
+): void {
+  const atTop = pos.rowIndex === 0;
+  const atLeft = pos.colIndex === 0;
+  const atBottom = pos.rowIndex + span.row >= pos.rowCount;
+  const atRight = pos.colIndex + span.col >= pos.colCount;
 
-  // Outer edges — set on the TABLE so the perimeter draws explicitly
-  // even when cells would otherwise collapse a half-pixel into the
-  // table edge.
-  if (b?.top) t.style.borderTop = borderSpecToCss(b.top);
-  if (b?.right) t.style.borderRight = borderSpecToCss(b.right);
-  if (b?.bottom) t.style.borderBottom = borderSpecToCss(b.bottom);
-  if (b?.left) t.style.borderLeft = borderSpecToCss(b.left);
+  const base: Record<"top" | "right" | "bottom" | "left", BorderSpec | undefined> = {
+    // Inside-H is drawn once per shared edge as the lower row's top; the
+    // upper row's bottom stays empty unless it's the table's bottom edge.
+    top: borders ? (atTop ? borders.top : borders.insideH) : undefined,
+    bottom: borders && atBottom ? borders.bottom : undefined,
+    left: borders ? (atLeft ? borders.left : borders.insideV) : undefined,
+    right: borders && atRight ? borders.right : undefined,
+  };
+
+  for (const side of ["top", "right", "bottom", "left"] as const) {
+    const spec = cellBorders?.[side] ?? styleBorders?.[side] ?? base[side];
+    if (spec) el.style.setProperty(`border-${side}`, borderSpecToCss(spec));
+  }
+}
+
+/** Apply default cell padding from `<w:tblCellMar>`. Word omits a side
+ *  → fall back to its stock defaults (108 twips L/R, 0 T/B). Skipped
+ *  entirely when no margins were declared, so plain tables keep the CSS
+ *  default. */
+function applyCellPadding(el: HTMLElement, margins: TableCellMargins | undefined): void {
+  if (!margins) return;
+  const top = margins.topTwips ?? 0;
+  const right = margins.rightTwips ?? 108;
+  const bottom = margins.bottomTwips ?? 0;
+  const left = margins.leftTwips ?? 108;
+  // Exact mm (not the integer-rounded `twipsToMm`) — cell padding is small
+  // enough that rounding 2.54mm → 3mm visibly over-pads.
+  const mm = (tw: number) => `${twipsToMmExact(tw).toFixed(2)}mm`;
+  el.style.padding = `${mm(top)} ${mm(right)} ${mm(bottom)} ${mm(left)}`;
 }
 
 function borderSpecToCss(spec: { style: string; sizeEighthsOfPt: number; color: string }): string {
@@ -262,6 +410,19 @@ function borderSpecToCss(spec: { style: string; sizeEighthsOfPt: number; color: 
             : "solid";
   const color = spec.color === "auto" ? "#888" : spec.color;
   return `${px}px ${style} ${color}`;
+}
+
+/** Maximum logical column count across all rows (accounting for
+ *  `gridSpan`). Used to place each cell for conditional-format edges. */
+function countColumns(table: Table): number {
+  return table.rows.reduce(
+    (n, r) =>
+      Math.max(
+        n,
+        r.cells.reduce((s, c) => s + (c.gridSpan ?? 1), 0),
+      ),
+    0,
+  );
 }
 
 /**
