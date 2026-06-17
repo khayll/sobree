@@ -101,6 +101,12 @@ export function renderTable(
   return t;
 }
 
+/** How many grid columns / rows a cell spans (`gridSpan` / `vMerge`). */
+interface TableCellSpan {
+  col: number;
+  row: number;
+}
+
 /** Per-table style context shared by every cell render — the resolved
  *  style definition, the table's `<w:tblLook>`, the grid dimensions
  *  needed to place each cell for conditional-format resolution, and the
@@ -168,7 +174,7 @@ function renderCell(
   defaultTag: "th" | "td",
   cellCtx: CellStyleContext,
   pos: TableCellPosition,
-  span: { col: number; row: number },
+  span: TableCellSpan,
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
@@ -200,7 +206,13 @@ function renderCell(
   // distinct — a style that declares only inside borders must NOT draw a
   // perimeter it never specified. Conditional-region borders and a cell's
   // own `<w:tcBorders>` override the base edge.
-  applyCellBorders(el, cellCtx.borders, pos, span, styleFmt.borders, cell.borders);
+  applyCellBorders(el, {
+    table: cellCtx.borders,
+    pos,
+    span,
+    region: styleFmt.borders,
+    direct: cell.borders,
+  });
 
   // Cell padding from `<w:tblCellMar>` (instance ?? style). Word omits
   // top/bottom by default but commonly sets vertical padding on banded
@@ -338,22 +350,31 @@ function applyTableFrame(t: HTMLElement, borders: TableBorders | null): void {
   t.classList.add("sobree-table-bordered");
 }
 
+/** Everything needed to resolve one cell's four borders. */
+interface CellBorderInputs {
+  /** Effective table-level borders (inside + outer), or null if borderless. */
+  table: TableBorders | null;
+  /** The cell's grid placement — which edges are the table's perimeter. */
+  pos: TableCellPosition;
+  span: TableCellSpan;
+  /** Conditional-region borders from the table style (override base edges). */
+  region?: TableCellBorders | undefined;
+  /** The cell's own `<w:tcBorders>` — direct formatting, wins over all. */
+  direct?: TableCellBorders | undefined;
+}
+
 /**
  * Resolve and apply one cell's four borders. The base edge comes from the
  * table borders, split by position: an OUTER edge (the table's perimeter)
  * uses `top`/`right`/`bottom`/`left`; an INNER edge uses `insideH` (drawn
  * as the top of every non-first row) / `insideV` (the left of every
  * non-first column). This keeps an inside-only style from painting a
- * perimeter it never declared. Conditional-region borders then a cell's
- * own `<w:tcBorders>` override per side.
+ * perimeter it never declared. Region borders, then the cell's own
+ * `<w:tcBorders>`, override per side.
  */
 function applyCellBorders(
   el: HTMLElement,
-  borders: TableBorders | null,
-  pos: TableCellPosition,
-  span: { col: number; row: number },
-  styleBorders: TableCellBorders | undefined,
-  cellBorders: TableCell["borders"],
+  { table, pos, span, region, direct }: CellBorderInputs,
 ): void {
   const atTop = pos.rowIndex === 0;
   const atLeft = pos.colIndex === 0;
@@ -363,14 +384,14 @@ function applyCellBorders(
   const base: Record<"top" | "right" | "bottom" | "left", BorderSpec | undefined> = {
     // Inside-H is drawn once per shared edge as the lower row's top; the
     // upper row's bottom stays empty unless it's the table's bottom edge.
-    top: borders ? (atTop ? borders.top : borders.insideH) : undefined,
-    bottom: borders && atBottom ? borders.bottom : undefined,
-    left: borders ? (atLeft ? borders.left : borders.insideV) : undefined,
-    right: borders && atRight ? borders.right : undefined,
+    top: table ? (atTop ? table.top : table.insideH) : undefined,
+    bottom: table && atBottom ? table.bottom : undefined,
+    left: table ? (atLeft ? table.left : table.insideV) : undefined,
+    right: table && atRight ? table.right : undefined,
   };
 
   for (const side of ["top", "right", "bottom", "left"] as const) {
-    const spec = cellBorders?.[side] ?? styleBorders?.[side] ?? base[side];
+    const spec = direct?.[side] ?? region?.[side] ?? base[side];
     if (spec) el.style.setProperty(`border-${side}`, borderSpecToCss(spec));
   }
 }

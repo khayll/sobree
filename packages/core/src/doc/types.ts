@@ -16,31 +16,33 @@
  *     Defaults are applied at render time from the document's styles.
  */
 
-// Formatting value-types (borders, shading, table-style conditional
-// formatting) live in a dependency-free leaf module — none reference the
-// recursive `Block` graph, so keeping them out of `types.ts` avoids a
-// circular import. Imported here for the fields that reference them, and
-// re-exported so consumers keep importing every AST type from `./types`.
+// Formatting primitives (borders, shading, cell spacing) and the
+// table-style conditional-formatting model live in dependency-free leaf
+// modules — none reference the recursive `Block` graph, so keeping them
+// out of `types.ts` avoids a circular import. Imported here for the fields
+// that reference them, and re-exported so consumers keep importing every
+// AST type from `./types`.
 import type {
   BorderSpec,
   Shading,
   TableBorders,
   TableCellBorders,
   TableCellMargins,
-  TableLook,
-  TableStyleDefinition,
 } from "./formatting.types";
+import type { TableLook, TableStyleDefinition } from "./tableStyle.types";
 export type {
   BorderSpec,
   Shading,
   TableBorders,
   TableCellBorders,
   TableCellMargins,
+} from "./formatting.types";
+export type {
   TableConditionalType,
   TableLook,
   TableStyleCellFormat,
   TableStyleDefinition,
-} from "./formatting.types";
+} from "./tableStyle.types";
 
 // === document ===
 
