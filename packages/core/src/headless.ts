@@ -68,6 +68,8 @@ import { runsLength } from "./doc/runs";
 import type {
   Block,
   NamedStyle,
+  NumberingDefinition,
+  NumberingLevel,
   ParagraphAlignment,
   ParagraphProperties,
   SobreeDocument,
@@ -426,6 +428,32 @@ export class HeadlessSobree {
       return fail({ code: "invalid-state", details: `no style "${id}"` });
     }
     return this.commit({ styles: this.doc.styles.filter((s) => s.id !== id) }, []);
+  }
+
+  /** Add a new numbering definition. Fails if `def.numId` already exists. */
+  defineNumbering(def: NumberingDefinition): EditResult<void> {
+    if (this.doc.numbering.some((n) => n.numId === def.numId)) {
+      return fail({ code: "invalid-state", details: `numbering ${def.numId} already exists` });
+    }
+    return this.commit({ numbering: [...this.doc.numbering, def] }, []);
+  }
+
+  /** Replace the levels of the definition with `numId`. Fails if missing. */
+  updateNumbering(numId: number, levels: NumberingLevel[]): EditResult<void> {
+    const numbering = this.doc.numbering;
+    const index = numbering.findIndex((n) => n.numId === numId);
+    if (index < 0) return fail({ code: "invalid-state", details: `no numbering ${numId}` });
+    const next = numbering.slice();
+    next[index] = { numId, abstractFormat: { levels } };
+    return this.commit({ numbering: next }, []);
+  }
+
+  /** Remove the definition with `numId`. Fails if missing. */
+  removeNumbering(numId: number): EditResult<void> {
+    if (!this.doc.numbering.some((n) => n.numId === numId)) {
+      return fail({ code: "invalid-state", details: `no numbering ${numId}` });
+    }
+    return this.commit({ numbering: this.doc.numbering.filter((n) => n.numId !== numId) }, []);
   }
 
   // === events ===
