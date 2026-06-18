@@ -21,7 +21,17 @@ import type {
   Selection,
 } from "../doc/api";
 import type { RunPropertiesPatch } from "../doc/runs";
-import type { Block, ParagraphAlignment, ParagraphProperties, SobreeDocument } from "../doc/types";
+import type {
+  Block,
+  HeaderFooterRef,
+  PageMargins,
+  PageSize,
+  ParagraphAlignment,
+  ParagraphProperties,
+  SectionColumns,
+  SectionProperties,
+  SobreeDocument,
+} from "../doc/types";
 
 export type ApiRangeType = ApiRange;
 
@@ -142,6 +152,24 @@ export interface OutlineItem {
 export type ParagraphPropertiesPatch = {
   [K in keyof ParagraphProperties]?: ParagraphProperties[K] | undefined;
 };
+
+/**
+ * Patch for a section's properties (page geometry, columns, header/footer
+ * refs, vertical alignment). `pageSize` / `pageMargins` are FIELD-merged
+ * into the existing values (so a partial — e.g. just `orientation` or
+ * `topTwips` — stays valid); every other field REPLACES wholesale, and an
+ * explicit `undefined` on an optional field clears it.
+ */
+export interface SectionPropertiesPatch {
+  pageSize?: Partial<PageSize>;
+  pageMargins?: Partial<PageMargins>;
+  columns?: SectionColumns | undefined;
+  headerRefs?: HeaderFooterRef[];
+  footerRefs?: HeaderFooterRef[];
+  titlePage?: boolean | undefined;
+  type?: SectionProperties["type"];
+  vAlign?: SectionProperties["vAlign"];
+}
 
 export type WrapTag = "sup" | "sub" | "strong" | "em" | "u" | "s" | "mark";
 

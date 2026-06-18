@@ -16,7 +16,7 @@ import type {
   SectionProperties,
   SobreeDocument,
 } from "../../doc/types";
-import type { ParagraphPropertiesPatch, WrapTag } from "../types";
+import type { ParagraphPropertiesPatch, SectionPropertiesPatch, WrapTag } from "../types";
 
 /**
  * One registry-level operation produced by a mutation. The caller
@@ -86,6 +86,43 @@ export function mergeParagraphProps(
     else (out as Record<string, unknown>)[k] = v;
   }
   return out;
+}
+
+/**
+ * Merge a {@link SectionPropertiesPatch} onto existing section properties.
+ * `pageSize` / `pageMargins` are FIELD-merged (a partial stays valid); the
+ * other fields replace wholesale. For the optional fields (`columns`,
+ * `titlePage`, `type`, `vAlign`) an explicit `undefined` clears them, while
+ * the required `headerRefs` / `footerRefs` only replace when present.
+ */
+export function mergeSectionProps(
+  prev: SectionProperties,
+  patch: SectionPropertiesPatch,
+): SectionProperties {
+  const out: SectionProperties = { ...prev };
+  if (patch.pageSize) out.pageSize = { ...out.pageSize, ...patch.pageSize };
+  if (patch.pageMargins) out.pageMargins = { ...out.pageMargins, ...patch.pageMargins };
+  if (patch.headerRefs !== undefined) out.headerRefs = patch.headerRefs;
+  if (patch.footerRefs !== undefined) out.footerRefs = patch.footerRefs;
+  assignOptional(out, "columns", patch, "columns");
+  assignOptional(out, "titlePage", patch, "titlePage");
+  assignOptional(out, "type", patch, "type");
+  assignOptional(out, "vAlign", patch, "vAlign");
+  return out;
+}
+
+/** Apply an optional field from `patch` onto `out` when the key is present:
+ *  `undefined` deletes it, any other value sets it. Absent ⇒ untouched. */
+function assignOptional<T extends object, P extends object>(
+  out: T,
+  outKey: keyof T,
+  patch: P,
+  patchKey: keyof P,
+): void {
+  if (!(patchKey in patch)) return;
+  const value = patch[patchKey];
+  if (value === undefined) delete out[outKey];
+  else (out as Record<string, unknown>)[outKey as string] = value;
 }
 
 /**
