@@ -322,6 +322,13 @@ export interface EditorOptions {
   initialDocument?: SobreeDocument;
   changeDebounceMs?: number;
   /**
+   * Show hidden text (`<w:vanish/>`) from the start. Default `false` —
+   * hidden text is not shown (print-faithful, matching Word/LibreOffice).
+   * Toggle at runtime with `setShowHiddenText`. When shown, hidden runs
+   * get a muted dotted underline so they can be read and edited.
+   */
+  showHiddenText?: boolean;
+  /**
    * Elements whose children are editable blocks, in document order. Called
    * fresh each time — the list can grow/shrink (e.g. during pagination).
    */

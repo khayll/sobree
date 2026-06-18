@@ -16,6 +16,13 @@ describe("applyParagraphProps", () => {
     expect(p({ alignment: "center" }).style.textAlign).toBe("center");
   });
 
+  it("emits firstLine indent as positive text-indent, hanging as negative", () => {
+    expect(p({ indent: { firstLineTwips: 720 } }).style.textIndent).toBe("13mm"); // 720tw ≈ 12.7 → 13
+    expect(p({ indent: { leftTwips: 720, hangingTwips: 360 } }).style.textIndent).toBe("-6mm");
+    // first-line indent is NOT applied to list items (marker geometry owns it)
+    expect(p({ indent: { firstLineTwips: 720 } }, [], "li").style.textIndent).toBe("");
+  });
+
   it("emits spacing before/after as mm margins (rounded)", () => {
     const el = p({ spacing: { beforeTwips: 240, afterTwips: 120 } });
     expect(el.style.marginTop).toBe("4mm"); // 240 twips ≈ 4.23 → 4

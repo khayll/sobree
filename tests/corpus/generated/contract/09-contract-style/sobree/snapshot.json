@@ -177,7 +177,7 @@
           "text": "Client nameJohn DoeAddress42 High Street, LondonContactjohn.…",
         },
       ],
-      "style": "border-collapse: collapse;",
+      "style": "border-collapse: collapse; width: 148.17mm;",
       "tag": "TABLE",
       "text": "Client nameJohn DoeAddress42 High Street, LondonContactjohn.…",
     },

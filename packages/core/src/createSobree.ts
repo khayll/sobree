@@ -95,6 +95,13 @@ export interface CreateSobreeOptions {
    * after a deploy). Forwarded to `SobreeOptions.versionBadge`.
    */
   versionBadge?: boolean;
+  /**
+   * Show hidden text (`<w:vanish/>`) from the start. Off by default
+   * (print-faithful — matches Word/LibreOffice). Toggle at runtime with
+   * the returned `setShowHiddenText`. Forwarded to
+   * `SobreeOptions.showHiddenText`.
+   */
+  showHiddenText?: boolean;
 }
 
 /**
@@ -130,6 +137,8 @@ export interface SobreeHandle {
   // === document I/O ===
   getDocument(): SobreeDocument;
   setDocument(doc: SobreeDocument): void;
+  /** Show or hide hidden text (`<w:vanish/>`). Off by default. */
+  setShowHiddenText(show: boolean): void;
   /** Replace the document with one parsed from a Markdown string (seed-quality). */
   loadMarkdown(md: string): void;
   /** Load a `.docx` file. Resolves with any import warnings. */
@@ -192,6 +201,7 @@ export function createSobree(
     ...(options.ydoc && { ydoc: options.ydoc }),
     ...(options.blobStore && { blobStore: options.blobStore }),
     ...(options.versionBadge && { versionBadge: true }),
+    ...(options.showHiddenText && { showHiddenText: true }),
   };
 
   const sobree = new Sobree(viewport.slot, sobreeOpts);
@@ -266,6 +276,7 @@ export function createSobree(
     // setup) automatically retunes the renderer — no explicit page-
     // setup overlay needed here.
     setDocument: (doc) => sobree.editor.setDocument(doc),
+    setShowHiddenText: (show) => sobree.editor.setShowHiddenText(show),
     loadMarkdown: (md) => sobree.editor.setDocument(parseMarkdown(md)),
     loadDocx: async (src) => {
       const sink = installWarningSink(sobree);

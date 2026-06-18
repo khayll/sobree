@@ -40,6 +40,16 @@ export function convertTable(tbl: Element, ctx: ConvertContext): Table {
       const margins = readCellMargins(cellMar);
       if (margins) properties.cellMargins = margins;
     }
+    // `<w:tblW>` — only ABSOLUTE widths (`w:type="dxa"`) map to
+    // `widthTwips`; `pct` / `auto` are content-driven and left unset.
+    const tblW = wFirst(tblPr, "tblW");
+    if (tblW && tblW.getAttribute("w:type") === "dxa") {
+      const w = Number.parseInt(tblW.getAttribute("w:w") ?? "", 10);
+      if (Number.isFinite(w) && w > 0) properties.widthTwips = w;
+    }
+    // `<w:jc>` — table horizontal alignment on the page.
+    const jc = wVal(wFirst(tblPr, "jc"));
+    if (jc === "left" || jc === "center" || jc === "right") properties.alignment = jc;
   }
   return {
     kind: "table",

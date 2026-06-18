@@ -331,6 +331,7 @@ export class Editor {
     const firstHost = this.getContentHosts()[0] ?? host;
     this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
     renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
+    if (options.showHiddenText) this.setShowHiddenText(true);
 
     // All host/document listeners + image-resize + the remote-Y.Doc
     // subscription live in `wireEditorDom`, which returns one teardown.
@@ -495,6 +496,16 @@ export class Editor {
    */
   getDocument(): SobreeDocument {
     return this.ensureCurrent();
+  }
+
+  /**
+   * Show or hide hidden text (`<w:vanish/>`). Off by default (print-
+   * faithful). A pure class flip on the editor root — no re-render, no
+   * document change; hidden runs stay in the DOM either way. When shown
+   * they get a muted dotted underline and become editable.
+   */
+  setShowHiddenText(show: boolean): void {
+    this.host.classList.toggle("sobree-show-hidden", show);
   }
 
   /** Replace the document. Fires `change` synchronously. */

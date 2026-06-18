@@ -160,6 +160,17 @@ export function applyParagraphProps(
   if (effective.indent?.rightTwips !== undefined) {
     el.style.marginRight = `${twipsToMm(effective.indent.rightTwips)}mm`;
   }
+  // `<w:ind w:firstLine>` / `<w:ind w:hanging>` — the first line's extra
+  // indent (firstLine, +) or outdent (hanging, −) vs the body, as CSS
+  // `text-indent`. Mutually exclusive in OOXML. LIs are skipped: their
+  // first-line hang is driven by the list marker geometry, not here.
+  if (!isLi) {
+    if (effective.indent?.firstLineTwips !== undefined) {
+      el.style.textIndent = `${twipsToMm(effective.indent.firstLineTwips)}mm`;
+    } else if (effective.indent?.hangingTwips !== undefined) {
+      el.style.textIndent = `-${twipsToMm(effective.indent.hangingTwips)}mm`;
+    }
+  }
   // Paragraph borders (`<w:pBdr>`). Word's sz is eighths-of-a-point;
   // convert to CSS px (1pt = 96/72 px). All four sides supported so
   // page-header dividers (top/bottom) and decorative box paragraphs
