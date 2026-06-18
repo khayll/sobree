@@ -52,3 +52,11 @@ export {
 export { type CellProperties, type TableOptions, table, tableCell, tableRow } from "./table";
 
 export { type NamedStyleOptions, namedStyle } from "./style";
+
+export {
+  type NumberingLevelOptions,
+  bulletDefinition,
+  numberingDefinition,
+  numberingLevel,
+  orderedDefinition,
+} from "./numbering";

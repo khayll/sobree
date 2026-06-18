@@ -26,6 +26,7 @@ import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
+import { EditorNumbering } from "./numbering";
 import * as blocks from "./ops/blocks";
 import * as comments from "./ops/comments";
 import * as parts from "./ops/parts";
@@ -145,6 +146,13 @@ export class Editor {
    * definitions themselves. Every method returns an `EditResult`.
    */
   readonly styles: EditorStyles;
+  /**
+   * Numbering / list-definition edit operations — define / update / remove
+   * the list formats paragraphs reference by `numId`. Pointing a paragraph
+   * at a list is `applyBlockProperties`; this manages the definitions.
+   * Every method returns an `EditResult`.
+   */
+  readonly numbering: EditorNumbering;
   /**
    * Named-command registry — the coordination point between plugins.
    * Plugins register commands on attach and unregister on detach;
@@ -306,6 +314,7 @@ export class Editor {
     this.ctx = this.buildContext();
     this.sections = new EditorSections(this.ctx);
     this.styles = new EditorStyles(this.ctx);
+    this.numbering = new EditorNumbering(this.ctx);
     this.trackedInput = createTrackedInput(this.ctx);
     this.initDocumentState(options);
 
