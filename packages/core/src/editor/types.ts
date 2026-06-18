@@ -24,6 +24,7 @@ import type { RunPropertiesPatch } from "../doc/runs";
 import type {
   Block,
   HeaderFooterRef,
+  NamedStyle,
   PageMargins,
   PageSize,
   ParagraphAlignment,
@@ -170,6 +171,16 @@ export interface SectionPropertiesPatch {
   type?: SectionProperties["type"];
   vAlign?: SectionProperties["vAlign"];
 }
+
+/**
+ * Patch for an existing named style (everything except its `id`). Each
+ * present field replaces the style's corresponding field wholesale; an
+ * explicit `undefined` clears an optional one. The required `type` /
+ * `displayName` are never cleared.
+ */
+export type NamedStylePatch = {
+  [K in keyof Omit<NamedStyle, "id">]?: NamedStyle[K] | undefined;
+};
 
 export type WrapTag = "sup" | "sub" | "strong" | "em" | "u" | "s" | "mark";
 

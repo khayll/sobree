@@ -11,12 +11,18 @@
 import type { RunPropertiesPatch } from "../../doc/runs";
 import type {
   Block,
+  NamedStyle,
   ParagraphProperties,
   RunProperties,
   SectionProperties,
   SobreeDocument,
 } from "../../doc/types";
-import type { ParagraphPropertiesPatch, SectionPropertiesPatch, WrapTag } from "../types";
+import type {
+  NamedStylePatch,
+  ParagraphPropertiesPatch,
+  SectionPropertiesPatch,
+  WrapTag,
+} from "../types";
 
 /**
  * One registry-level operation produced by a mutation. The caller
@@ -109,6 +115,22 @@ export function mergeSectionProps(
   assignOptional(out, "type", patch, "type");
   assignOptional(out, "vAlign", patch, "vAlign");
   return out;
+}
+
+/** Merge a {@link NamedStylePatch} onto an existing style. Each present
+ *  field replaces the style's field wholesale; an explicit `undefined`
+ *  clears an OPTIONAL field. The required `type` / `displayName` are never
+ *  cleared (an undefined for them is ignored). */
+export function mergeNamedStyle(prev: NamedStyle, patch: NamedStylePatch): NamedStyle {
+  const out = { ...prev } as unknown as Record<string, unknown>;
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) {
+      if (k !== "type" && k !== "displayName") delete out[k];
+    } else {
+      out[k] = v;
+    }
+  }
+  return out as unknown as NamedStyle;
 }
 
 /** Apply an optional field from `patch` onto `out` when the key is present:

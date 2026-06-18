@@ -65,13 +65,26 @@ import {
 } from "./doc/api";
 import { emptyDocument } from "./doc/builders";
 import { runsLength } from "./doc/runs";
-import type { Block, ParagraphAlignment, ParagraphProperties, SobreeDocument } from "./doc/types";
+import type {
+  Block,
+  NamedStyle,
+  ParagraphAlignment,
+  ParagraphProperties,
+  SobreeDocument,
+} from "./doc/types";
 import { headingLevelOf, runsToText } from "./doc/walk";
 import { EditorCommands, type ParagraphPropertiesPatch } from "./editor";
-import type { BlockInfo, CommandBus, OutlineItem, SectionPropertiesPatch } from "./editor";
+import type {
+  BlockInfo,
+  CommandBus,
+  NamedStylePatch,
+  OutlineItem,
+  SectionPropertiesPatch,
+} from "./editor";
 import { BlockRegistry } from "./editor/internal/blockRegistry";
 import {
   type Mutation,
+  mergeNamedStyle,
   mergeParagraphProps,
   mergeSectionProps,
   mergeSectionsAcross,
@@ -387,6 +400,32 @@ export class HeadlessSobree {
     const next = this.doc.sections.slice();
     next[sectionIndex] = mergeSectionProps(section, patch);
     return this.commit({ sections: next }, []);
+  }
+
+  /** Add a new named style. Fails if `style.id` already exists. */
+  defineStyle(style: NamedStyle): EditResult<void> {
+    if (this.doc.styles.some((s) => s.id === style.id)) {
+      return fail({ code: "invalid-state", details: `style "${style.id}" already exists` });
+    }
+    return this.commit({ styles: [...this.doc.styles, style] }, []);
+  }
+
+  /** Merge a patch into the style with `id`. Fails if no such style. */
+  updateStyle(id: string, patch: NamedStylePatch): EditResult<void> {
+    const styles = this.doc.styles;
+    const index = styles.findIndex((s) => s.id === id);
+    if (index < 0) return fail({ code: "invalid-state", details: `no style "${id}"` });
+    const next = styles.slice();
+    next[index] = mergeNamedStyle(styles[index] as NamedStyle, patch);
+    return this.commit({ styles: next }, []);
+  }
+
+  /** Remove the style with `id`. Fails if no such style. */
+  removeStyle(id: string): EditResult<void> {
+    if (!this.doc.styles.some((s) => s.id === id)) {
+      return fail({ code: "invalid-state", details: `no style "${id}"` });
+    }
+    return this.commit({ styles: this.doc.styles.filter((s) => s.id !== id) }, []);
   }
 
   // === events ===
