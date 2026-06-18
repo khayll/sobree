@@ -366,6 +366,12 @@ function cssFromRunProps(p: RunProperties): string | null {
   const decls: string[] = [];
   if (p.color) decls.push(`color:${p.color}`);
   if (p.highlight) decls.push(`background:${normaliseHighlight(p.highlight)}`);
+  // `<w:shd w:fill>` on the run — a background fill distinct from
+  // `<w:highlight>` (highlight is a fixed palette; shd is any colour).
+  // A real fill wins over highlight when both are present.
+  if (p.shading?.fill && p.shading.fill !== "auto" && p.shading.fill !== "#auto") {
+    decls.push(`background:${p.shading.fill}`);
+  }
   if (p.fontFamily) {
     const face = resolveFontFace(p.fontFamily);
     decls.push(`font-family:${face.stack}`);
@@ -382,6 +388,12 @@ function cssFromRunProps(p: RunProperties): string | null {
   // carries `caps`; rendering as-is shows lowercase, which mismatches
   // Word/LO's all-caps banner label.
   if (p.caps) decls.push("text-transform:uppercase");
+  // `<w:smallCaps/>` — lowercase letters render as small capitals.
+  if (p.smallCaps) decls.push("font-variant-caps:small-caps");
+  // `<w:dstrike/>` — a DOUBLE strikethrough. The single `<w:strike/>`
+  // is the `<s>` wrapper above; this is its own CSS so the two are
+  // independent (a run is one or the other in practice).
+  if (p.doubleStrike) decls.push("text-decoration:line-through double");
   return decls.length > 0 ? decls.join(";") : null;
 }
 
