@@ -64,6 +64,7 @@ export function renderTable(
   const styleDef = resolveTableStyle(styles, table.properties.styleId);
   const effBorders = effectiveTableBorders(table, styleDef);
   applyTableFrame(t, effBorders);
+  applyTableLayout(t, table.properties);
 
   const cellCtx: CellStyleContext = {
     def: styleDef,
@@ -348,6 +349,21 @@ function applyTableFrame(t: HTMLElement, borders: TableBorders | null): void {
   if (!borders) return;
   t.style.borderCollapse = "collapse";
   t.classList.add("sobree-table-bordered");
+}
+
+/** Table width (`<w:tblW w:type="dxa">`) + horizontal alignment
+ *  (`<w:jc>`). An absent width leaves the table at its content-driven auto
+ *  width; centre / right use auto margins, which work at any width. */
+function applyTableLayout(t: HTMLElement, props: Table["properties"]): void {
+  if (props.widthTwips !== undefined) {
+    t.style.width = `${twipsToMmExact(props.widthTwips).toFixed(2)}mm`;
+  }
+  if (props.alignment === "center") {
+    t.style.marginLeft = "auto";
+    t.style.marginRight = "auto";
+  } else if (props.alignment === "right") {
+    t.style.marginLeft = "auto";
+  }
 }
 
 /** Everything needed to resolve one cell's four borders. */

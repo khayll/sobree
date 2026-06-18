@@ -11,6 +11,25 @@ const table = (inner: string) =>
 
 const ONE_CELL = "<w:tr><w:tc><w:p/></w:tc></w:tr>";
 
+describe("convertTable — width + alignment", () => {
+  it("reads <w:tblW dxa> into widthTwips; ignores pct / auto", () => {
+    expect(
+      table(`<w:tblPr><w:tblW w:type="dxa" w:w="9000"/></w:tblPr>${ONE_CELL}`).properties
+        .widthTwips,
+    ).toBe(9000);
+    expect(
+      table(`<w:tblPr><w:tblW w:type="pct" w:w="5000"/></w:tblPr>${ONE_CELL}`).properties
+        .widthTwips,
+    ).toBeUndefined();
+  });
+
+  it("reads <w:jc> into alignment", () => {
+    expect(table(`<w:tblPr><w:jc w:val="center"/></w:tblPr>${ONE_CELL}`).properties.alignment).toBe(
+      "center",
+    );
+  });
+});
+
 describe("convertTable — tblLook", () => {
   it("reads the boolean attributes and inverts noHBand/noVBand to hBand/vBand", () => {
     const t = table(
