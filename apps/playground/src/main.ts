@@ -658,6 +658,15 @@ if (
   editor.sobree.on("track-changes-change", syncFromState);
 }
 
+// Hidden-text reveal toggle (`<w:vanish/>`). Off by default (print view);
+// on reveals hidden runs with a dotted underline so they're editable.
+const showHiddenCheckbox = document.getElementById("mode-show-hidden");
+if (showHiddenCheckbox instanceof HTMLInputElement) {
+  showHiddenCheckbox.addEventListener("change", () => {
+    editor.setShowHiddenText(showHiddenCheckbox.checked);
+  });
+}
+
 // === actions ===
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-action]")) {
@@ -748,6 +757,16 @@ The table below tracks delivery against the goals above.`);
   appendBlock(doc, demoTable());
 
   appendBlock(doc, paragraph([text("Two-space hard breaks work like the rest of Sobree.")]));
+
+  // Hidden text (`<w:vanish/>`) — invisible until "Show hidden text" is on.
+  appendBlock(
+    doc,
+    paragraph([
+      text("There is a "),
+      text("hidden editorial note", { hidden: true }),
+      text(" in this paragraph — toggle “Show hidden text” to reveal it."),
+    ]),
+  );
 
   return doc;
 }

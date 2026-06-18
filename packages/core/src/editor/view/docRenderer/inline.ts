@@ -150,9 +150,15 @@ function renderTextRun(run: TextRun, styles: readonly NamedStyle[] = []): Node {
   if (p.bold) node = wrap("strong", node);
 
   const style = cssFromRunProps(p);
-  if (style) {
+  // `<w:vanish/>` (hidden text) — always tagged with `sobree-hidden`; CSS
+  // hides it by default and reveals it (dotted underline) only when the
+  // editor root carries `sobree-show-hidden` (toggled via the
+  // `showHiddenText` option / `setShowHiddenText`). Keeping it class-driven
+  // means the toggle is a single class flip, no re-render.
+  if (style || p.hidden) {
     const span = document.createElement("span");
-    span.setAttribute("style", style);
+    if (style) span.setAttribute("style", style);
+    if (p.hidden) span.className = "sobree-hidden";
     span.appendChild(node);
     node = span;
   }

@@ -74,6 +74,11 @@ export interface SobreeOptions {
    * after a deploy) — it has no other behaviour.
    */
   versionBadge?: boolean;
+  /**
+   * Show hidden text (`<w:vanish/>`) from the start. Off by default
+   * (print-faithful). Toggle later with `editor.setShowHiddenText`.
+   */
+  showHiddenText?: boolean;
   // Plugins are no longer wired through Sobree directly — `createSobree()`
   // owns the pluggable surface and threads the editor + viewport + host
   // into each plugin's `setup(ctx)`. Direct `Sobree` users can still mount
@@ -133,6 +138,7 @@ export class Sobree {
       editorOpts.changeDebounceMs = options.changeDebounceMs;
     if (options.ydoc) editorOpts.ydoc = options.ydoc;
     if (options.blobStore) editorOpts.blobStore = options.blobStore;
+    if (options.showHiddenText) editorOpts.showHiddenText = true;
     if (options.trackChanges) editorOpts.trackChanges = options.trackChanges;
     this.editor = new Editor(this.stack.root, editorOpts);
 

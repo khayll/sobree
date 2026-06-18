@@ -25,4 +25,8 @@ describe("run CSS — previously-unrendered properties", () => {
     );
     expect(runSpan({ shading: { pattern: "clear", fill: "auto" } })).toBeNull();
   });
+
+  it("hidden → span carries the sobree-hidden class (CSS-controlled)", () => {
+    expect(runSpan({ hidden: true })?.className).toBe("sobree-hidden");
+  });
 });

@@ -385,6 +385,21 @@
   min-width: 0;
 }
 
+/* Hidden text (`<w:vanish/>`). Print-faithful default: not shown, takes no
+ * space — matching Word/LibreOffice print output. The `setShowHiddenText`
+ * toggle adds `sobree-show-hidden` to the editor root, revealing it with a
+ * muted dotted underline (Word's "show hidden text" affordance) so it can
+ * be read and edited. The run stays in the DOM either way, so round-trip
+ * is never affected. */
+.sobree-hidden {
+  display: none;
+}
+.sobree-show-hidden .sobree-hidden {
+  display: inline;
+  color: #9ca3af;
+  text-decoration: underline dotted;
+}
+
 /* Bordered-table cells. The borders themselves are drawn per cell as
  * inline `border-*` styles by the renderer (`applyCellBorders`), which
  * keeps the table's INSIDE separators distinct from its OUTER frame —
