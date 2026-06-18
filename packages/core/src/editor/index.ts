@@ -35,6 +35,7 @@ import { type TrackedInput, createTrackedInput } from "./ops/trackedInput";
 import * as query from "./query";
 import { EditorSections } from "./sections";
 import { EditorSelection } from "./selection";
+import { EditorStyles } from "./styles";
 import { EditorTable } from "./table";
 import { renderSobreeDocument } from "./view/docRenderer/index";
 import { serializeHostsToDocument } from "./view/docSerialize/index";
@@ -60,6 +61,7 @@ import type {
   EditorEventPayload,
   EditorOptions,
   KeyDownPayload,
+  NamedStylePatch,
   OutlineItem,
   ParagraphPropertiesPatch,
   RevisionSpan,
@@ -80,6 +82,7 @@ export type {
   EditorEventPayload,
   EditorOptions,
   KeyDownPayload,
+  NamedStylePatch,
   OutlineItem,
   ParagraphPropertiesPatch,
   RevisionSpan,
@@ -135,6 +138,13 @@ export class Editor {
    * edit-op surface grows. Every method returns an `EditResult`.
    */
   readonly sections: EditorSections;
+  /**
+   * Named-style edit operations — define / update / remove the style
+   * definitions content resolves through. Applying a `styleId` to content
+   * is `applyBlockProperties` / `applyRunProperties`; this manages the
+   * definitions themselves. Every method returns an `EditResult`.
+   */
+  readonly styles: EditorStyles;
   /**
    * Named-command registry — the coordination point between plugins.
    * Plugins register commands on attach and unregister on detach;
@@ -295,6 +305,7 @@ export class Editor {
 
     this.ctx = this.buildContext();
     this.sections = new EditorSections(this.ctx);
+    this.styles = new EditorStyles(this.ctx);
     this.trackedInput = createTrackedInput(this.ctx);
     this.initDocumentState(options);
 
