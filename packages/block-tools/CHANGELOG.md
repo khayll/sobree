@@ -1,5 +1,14 @@
 # @sobree/block-tools
 
+## 0.1.16
+
+### Patch Changes
+
+- Updated dependencies [3af7242]
+- Updated dependencies [2fd2233]
+- Updated dependencies [b11897b]
+  - @sobree/core@0.1.16
+
 ## 0.1.15
 
 ### Patch Changes

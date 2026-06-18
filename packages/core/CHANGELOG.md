@@ -1,5 +1,54 @@
 # @sobree/core
 
+## 0.1.16
+
+### Patch Changes
+
+- 3af7242: Add numbering / list-definition support: builders
+  (`numberingDefinition`, `numberingLevel`, plus `bulletDefinition` /
+  `orderedDefinition` convenience helpers) and the `editor.numbering` edit
+  operation (`define` / `update` / `remove`) for the `NumberingDefinition`s
+  in `SobreeDocument.numbering`.
+
+  Pointing a paragraph at a list is already `applyBlockProperties(refs, {
+numbering: { numId, level } })`; this manages the list-format definitions
+  those ids resolve to. Mirrored on HeadlessSobree (`defineNumbering` /
+  `updateNumbering` / `removeNumbering`) with Y.Doc parity.
+
+- 2fd2233: Add `editor.sections.setProperties(index, patch)` — a targeted,
+  undo-integrated edit operation for a section's page geometry (size,
+  margins), columns, header/footer references, and vertical alignment.
+  Previously these could only be changed by replacing the whole document.
+
+  Section ops are grouped under a new `editor.sections` sub-object
+  (mirroring `editor.table`) so the Editor facade stays thin as the edit-op
+  surface grows. `pageSize` / `pageMargins` are field-merged (a partial — e.g.
+  just `orientation` or `topTwips` — stays valid); other fields replace
+  wholesale, and an explicit `undefined` clears an optional one. The headless
+  peer exposes the same change as `applySectionProperties` for Y.Doc parity.
+  The new `SectionPropertiesPatch` type is exported.
+
+- b11897b: Add `editor.styles` — define, update, and remove the named-style
+  definitions (`SobreeDocument.styles`) content resolves through. Applying a
+  `styleId` to content already works (`applyBlockProperties` /
+  `applyRunProperties`); this is the complementary surface for the style
+  definitions themselves.
+
+  ```ts
+  editor.styles.define(
+    namedStyle("Caption", { runDefaults: { italic: true } }),
+  );
+  editor.styles.update("Heading1", { runDefaults: { color: "#1A5276" } });
+  editor.styles.remove("Caption");
+  ```
+
+  Grouped under the `editor.styles` sub-object (mirrors `editor.table` /
+  `editor.sections`). `update` replaces each present field wholesale and
+  clears an optional one on explicit `undefined`; required `type` /
+  `displayName` are never cleared. Mirrored on HeadlessSobree
+  (`defineStyle` / `updateStyle` / `removeStyle`) with Y.Doc parity. New
+  `NamedStylePatch` type exported.
+
 ## 0.1.15
 
 ### Patch Changes
