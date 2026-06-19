@@ -305,6 +305,16 @@
   margin: 0;
 }
 
+/* Heading outline numbers — "1", "1.1", "1.2" on numbered heading styles
+ * (`<w:numPr>` on a HeadingN-derived style). The renderer computes the
+ * number in document order and stamps it as `data-outline-number`; the
+ * `::before` paints it so it stays out of the editable text and selection.
+ * The trailing gap mimics Word's number-to-text tab. */
+.paper-content [data-outline-number]::before {
+  content: attr(data-outline-number);
+  margin-right: 0.6em;
+}
+
 /* Hanging list markers — Word's `<w:lvl><w:pPr><w:ind w:left="L"
  * w:hanging="H"/>`. The marker is a fixed `H`-wide `::before` box pulled
  * left by `H`, so the glyph sits at `L - H` and the text + wrapped lines

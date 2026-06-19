@@ -192,4 +192,19 @@ describe("style paragraph borders (<w:pBdr>)", () => {
     const styles = parseStylesXml(xml)!;
     expect(resolveStyleCascade(styles, "Head1").runDefaults.color).toBe("auto");
   });
+
+  it("reads a heading style's <w:numPr> into NamedStyle.numbering", () => {
+    // Source of heading outline numbers ("1", "1.1"). numId 0 cancels.
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="Head2">
+        <w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="14"/></w:numPr></w:pPr>
+      </w:style>
+      <w:style w:type="paragraph" w:styleId="Plain">
+        <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr></w:pPr>
+      </w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    expect(styles.find((s) => s.id === "Head2")?.numbering).toEqual({ numId: 14, level: 1 });
+    expect(styles.find((s) => s.id === "Plain")?.numbering).toBeUndefined();
+  });
 });
