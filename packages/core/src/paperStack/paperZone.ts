@@ -1,3 +1,4 @@
+import { fieldType } from "../doc/fields";
 import type { AnchoredFrame, Block, NamedStyle, NumberingDefinition } from "../doc/types";
 import { type AnchorLayerContext, renderAnchorLayer } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
@@ -75,9 +76,12 @@ export function setZoneText(zone: HTMLElement, text: string): void {
 function substituteFieldNodes(zone: HTMLElement, pageNumber: number, totalPages: number): void {
   const fields = zone.querySelectorAll<HTMLElement>("span.sobree-field");
   for (const field of Array.from(fields)) {
-    const instr = (field.dataset.field ?? "").trim().toUpperCase();
-    if (instr === "PAGE") field.textContent = String(pageNumber);
-    else if (instr === "NUMPAGES") field.textContent = String(totalPages);
+    // Match the field TYPE, not the whole instruction — Word appends
+    // switches (`PAGE \* MERGEFORMAT`) that would otherwise let the
+    // cached value leak through on every page.
+    const type = fieldType(field.dataset.field ?? "");
+    if (type === "PAGE") field.textContent = String(pageNumber);
+    else if (type === "NUMPAGES") field.textContent = String(totalPages);
     // Unknown instructions keep whatever the AST cached (Word writes a
     // cached value for non-resolvable fields, e.g. SECTION). No-op.
   }

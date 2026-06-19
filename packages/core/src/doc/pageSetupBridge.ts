@@ -1,6 +1,7 @@
 import type { PageSetup, PageZoneText } from "../paperStack/pageSetup";
 import { PAGE_SIZES } from "../paperStack/pageSetup";
 import { text as textRun } from "./builders";
+import { fieldType } from "./fields";
 import type {
   Block,
   FieldRun,
@@ -217,8 +218,9 @@ export function blocksToTemplate(blocks: readonly Block[]): string {
     for (const run of block.runs) {
       if (run.kind === "text") line += (run as TextRun).text;
       else if (run.kind === "field") {
-        if (run.instruction.trim().toUpperCase() === "PAGE") line += "{page}";
-        else if (run.instruction.trim().toUpperCase() === "NUMPAGES") line += "{pages}";
+        const type = fieldType(run.instruction);
+        if (type === "PAGE") line += "{page}";
+        else if (type === "NUMPAGES") line += "{pages}";
       } else if (run.kind === "break") line += "\n";
     }
     lines.push(line);

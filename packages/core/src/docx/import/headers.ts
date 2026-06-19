@@ -1,3 +1,4 @@
+import { fieldType } from "../../doc/fields";
 import type {
   HeaderFooterRef,
   SectionColumn,
@@ -188,9 +189,9 @@ function flattenParagraphText(p: Element): string {
 }
 
 function fieldToToken(instr: string): string {
-  const trimmed = instr.trim().toUpperCase();
-  if (trimmed === "PAGE") return "{page}";
-  if (trimmed === "NUMPAGES") return "{pages}";
+  const type = fieldType(instr);
+  if (type === "PAGE") return "{page}";
+  if (type === "NUMPAGES") return "{pages}";
   return "";
 }
 
