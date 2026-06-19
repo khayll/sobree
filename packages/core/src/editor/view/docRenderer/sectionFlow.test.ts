@@ -45,17 +45,41 @@ describe("openColumnContainerIfNeeded", () => {
     expect(host.children).toHaveLength(0);
   });
 
-  it("creates a column container with the requested count + gap", () => {
+  it("creates an equal-column container stamped with count + gap + section id", () => {
     const wrapper = openColumnContainerIfNeeded(
       host,
       section({ columns: { count: 2, spaceTwips: 720 } }),
+      3,
     );
     expect(wrapper).not.toBe(host);
-    expect(wrapper.className).toBe("sobree-section-cols");
-    expect(wrapper.style.columnCount).toBe("2");
-    // 720 twips → 13mm (rounded)
-    expect(wrapper.style.columnGap).toBe("13mm");
+    // Shared `.sobree-cols` (flow pass selector) + the equal variant.
+    expect(wrapper.className).toBe("sobree-cols sobree-section-cols");
+    expect(wrapper.dataset.colCount).toBe("2");
+    expect(wrapper.dataset.pagCid).toBe("cols-3");
+    // 720 twips → 13mm (rounded); the flow pass sizes equal tracks itself.
+    expect(wrapper.dataset.colGapMm).toBe("13");
+    expect(wrapper.dataset.colWidthsMm).toBeUndefined();
     expect(host.firstElementChild).toBe(wrapper);
+  });
+
+  it("creates an unequal-column container with explicit widths + gaps", () => {
+    const wrapper = openColumnContainerIfNeeded(
+      host,
+      section({
+        columns: {
+          count: 2,
+          equalWidth: false,
+          columns: [{ widthTwips: 6576, spaceTwips: 720 }, { widthTwips: 2928 }],
+        },
+      }),
+      1,
+    );
+    expect(wrapper.className).toBe("sobree-cols sobree-cols-unequal");
+    expect(wrapper.dataset.colCount).toBe("2");
+    expect(wrapper.dataset.pagCid).toBe("cols-1");
+    // 6576 twips → 116mm, 2928 → 52mm (rounded by twipsToMm)
+    expect(wrapper.dataset.colWidthsMm).toBe("116,52");
+    expect(wrapper.dataset.colGapsMm).toBe("13"); // one gap (n-1)
   });
 });
 
