@@ -1,5 +1,61 @@
 # @sobree/core
 
+## 0.1.19
+
+### Patch Changes
+
+- f293f79: Render heading outline numbers ("1", "1.1", "1.2", "2") on headings whose
+  paragraph style links a numbering definition (`<w:numPr>` on a heading
+  style) — previously dropped, so numbered headings imported as plain text.
+  - The style importer now reads a style's `<w:numPr>` into a new
+    `NamedStyle.numbering` field.
+  - A renderer pass walks the body in document order maintaining a counter
+    per outline level (with per-level reset), formats each number from the
+    numbering definition's `lvlText` + `numFmt` (decimal, roman, letter),
+    and stamps it as a `data-outline-number` marker painted via `::before`
+    — so the number stays out of the editable text and selection.
+
+  Scoped to heading styles (the style's basedOn chain reaches a built-in
+  `HeadingN`), so style-linked _lists_ are not mis-numbered.
+
+- b4b5a1f: Stop a mid-paragraph `<w:lastRenderedPageBreak/>` hint from forcing the
+  whole paragraph onto a new page.
+
+  Word records a layout hint at the exact run position where a page broke
+  last time. A hint at a paragraph's START is a real boundary, but a hint
+  in the MIDDLE marks where that paragraph's own lines wrapped to the next
+  page. The importer treated any hint in the paragraph as
+  `pageBreakBefore`, so a paragraph that should fill the bottom of a page
+  and continue overleaf was instead shoved entirely to the next page —
+  leaving the previous page half-empty and inflating the page count. It now
+  honours only a _leading_ hint; mid-paragraph hints are left to the line
+  paginator, which already splits a paragraph across a page boundary.
+
+- 2d7f19d: Fix header/footer `PAGE` / `NUMPAGES` fields that carry a formatting
+  switch (`PAGE \* MERGEFORMAT`, `NUMPAGES \* Arabic`) rendering a stale
+  cached value on every page instead of the live page number.
+
+  The field-instruction matching was exact (`instruction === "PAGE"`), so
+  Word's near-universal `\* MERGEFORMAT` switch made it miss and the cached
+  number leaked through. Recognition now matches the field TYPE (the first
+  token of the instruction) via a shared `fieldType()` helper, applied
+  consistently across the three places that resolve page fields (the
+  per-page zone substitution, the header/footer importer, and the
+  page-setup bridge).
+
+- 13498fe: Resolve two paragraph-style cascade gaps that made documents render
+  unlike Word:
+  - **Style-level first-line / hanging indent.** The style reader only
+    honoured `<w:ind w:left>` / `w:right`, so a body style carrying a
+    first-line indent (a very common pattern) was dropped and its
+    paragraphs rendered flush. It now reads `w:firstLine` / `w:hanging`
+    (and the `w:start` / `w:end` aliases) too.
+  - **`color="auto"` overrides.** A style that set `color="auto"` had it
+    silently dropped, so a heading style based on the built-in blue
+    `Heading1` inherited the blue instead of resetting to automatic
+    (black). `auto` is now kept and rendered as `currentColor`, so it
+    correctly overrides an inherited colour.
+
 ## 0.1.18
 
 ### Patch Changes
