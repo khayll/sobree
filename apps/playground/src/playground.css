@@ -73,6 +73,13 @@ body {
   gap: 6px;
 }
 
+.doc-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg, #1f1b16);
+  word-break: break-word;
+}
+
 .panel button {
   text-align: left;
   padding: 6px 10px;

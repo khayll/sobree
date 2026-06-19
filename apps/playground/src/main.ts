@@ -667,11 +667,24 @@ if (showHiddenCheckbox instanceof HTMLInputElement) {
   });
 }
 
+// === open-document name (sidebar) ===
+
+const docNameEl = document.getElementById("doc-name");
+function setDocName(name: string): void {
+  if (docNameEl) docNameEl.textContent = name.trim() || "Untitled";
+}
+// A hydrated Y.Doc came from IndexedDB — its original name isn't stored,
+// so it's "Untitled" until reloaded. A fresh start seeds the simple doc.
+setDocName(ydocHasContent ? "Untitled" : "Simple paragraph");
+
 // === actions ===
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-action]")) {
   btn.addEventListener("click", () => {
     const action = btn.dataset.action;
+    // Reflect the loaded source in the sidebar (export doesn't change it).
+    if (action?.startsWith("seed-")) setDocName(btn.textContent ?? "Untitled");
+    else if (action === "clear") setDocName("Untitled");
     switch (action) {
       case "seed-simple":
         editor.loadMarkdown(simpleSeed());
@@ -702,6 +715,7 @@ if (fileInput instanceof HTMLInputElement) {
     if (!file) return;
     try {
       const { warnings } = await editor.loadDocx(file);
+      setDocName(file.name);
       if (warnings.length) console.warn("import warnings:", warnings);
     } catch (err) {
       console.error("docx import failed:", err);
