@@ -370,7 +370,9 @@ function wrap(tag: "strong" | "em" | "u" | "s" | "sub" | "sup", child: Node): HT
  */
 function cssFromRunProps(p: RunProperties): string | null {
   const decls: string[] = [];
-  if (p.color) decls.push(`color:${p.color}`);
+  // `auto` is OOXML's automatic colour — render as currentColor so it
+  // overrides any inherited colour back to the document text colour.
+  if (p.color) decls.push(`color:${p.color === "auto" ? "currentColor" : p.color}`);
   if (p.highlight) decls.push(`background:${normaliseHighlight(p.highlight)}`);
   // `<w:shd w:fill>` on the run — a background fill distinct from
   // `<w:highlight>` (highlight is a fixed palette; shd is any colour).

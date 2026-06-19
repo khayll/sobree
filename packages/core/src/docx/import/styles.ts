@@ -386,10 +386,14 @@ function readRunProperties(rPr: Element): RunProperties | undefined {
   // `<w:caps/>` cascading through a named style — same toggle behaviour
   // as `bold` / `italic`. Mirrors the per-run read in `runs.ts`.
   if (toggleOn(wFirst(rPr, "caps"))) out.caps = true;
-  // <w:color w:val="FF0000"/> or "auto"
+  // <w:color w:val="FF0000"/> or "auto". KEEP "auto" — a style that sets
+  // color="auto" is deliberately overriding an inherited colour back to
+  // automatic (black), e.g. ACM's "Head1" based on the built-in blue
+  // "Heading1". Dropping it would let the inherited blue win. The
+  // renderer maps "auto" → currentColor.
   const colorVal = wVal(wFirst(rPr, "color"));
-  if (colorVal && colorVal !== "auto") {
-    out.color = colorVal.startsWith("#") ? colorVal : `#${colorVal}`;
+  if (colorVal) {
+    out.color = colorVal === "auto" ? "auto" : colorVal.startsWith("#") ? colorVal : `#${colorVal}`;
   }
   // <w:vertAlign w:val="superscript"/>
   const vAlign = wVal(wFirst(rPr, "vertAlign"));
@@ -424,14 +428,21 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
     if (Object.keys(sp).length > 0) out.spacing = sp;
   }
 
-  // <w:ind w:left="720" w:right="720"/>
+  // <w:ind w:left=".." w:right=".." w:firstLine=".." w:hanging=".."/> —
+  // read ALL four. A style commonly carries the body first-line indent
+  // (e.g. ACM's "Para" style sets w:firstLine="240"); reading only
+  // left/right silently dropped it. `start`/`end` are the newer aliases.
   const ind = wFirst(pPr, "ind");
   if (ind) {
     const indent: ParagraphIndent = {};
-    const left = readNumAttr(ind, "left");
+    const left = readNumAttr(ind, "left") ?? readNumAttr(ind, "start");
     if (left !== null) indent.leftTwips = left;
-    const right = readNumAttr(ind, "right");
+    const right = readNumAttr(ind, "right") ?? readNumAttr(ind, "end");
     if (right !== null) indent.rightTwips = right;
+    const firstLine = readNumAttr(ind, "firstLine");
+    if (firstLine !== null) indent.firstLineTwips = firstLine;
+    const hanging = readNumAttr(ind, "hanging");
+    if (hanging !== null) indent.hangingTwips = hanging;
     if (Object.keys(indent).length > 0) out.indent = indent;
   }
 

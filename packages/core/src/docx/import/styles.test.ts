@@ -151,4 +151,45 @@ describe("style paragraph borders (<w:pBdr>)", () => {
     });
     expect(paragraphDefaults.borders?.bottom).toBeUndefined();
   });
+
+  it("reads a style's first-line + hanging indent into the cascade", () => {
+    // Bug: the style-level pPr reader only honoured w:left / w:right, so a
+    // body style's first-line indent (e.g. ACM's "Para" w:firstLine=240)
+    // was silently dropped and paragraphs rendered flush.
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="Para">
+        <w:pPr><w:ind w:left="120" w:firstLine="240"/></w:pPr>
+      </w:style>
+      <w:style w:type="paragraph" w:styleId="Hang">
+        <w:pPr><w:ind w:hanging="360"/></w:pPr>
+      </w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    expect(resolveStyleCascade(styles, "Para").paragraphDefaults.indent).toEqual({
+      leftTwips: 120,
+      firstLineTwips: 240,
+    });
+    expect(resolveStyleCascade(styles, "Hang").paragraphDefaults.indent).toEqual({
+      hangingTwips: 360,
+    });
+  });
+
+  it("keeps color='auto' on a style so it OVERRIDES an inherited colour", () => {
+    // Bug: color="auto" was dropped, so a heading style based on the
+    // built-in blue Heading1 inherited the blue instead of resetting to
+    // automatic (black). Keep "auto" so it wins in the cascade; the
+    // renderer maps it to currentColor.
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="Heading1">
+        <w:name w:val="heading 1"/>
+        <w:rPr><w:color w:val="2E74B5"/></w:rPr>
+      </w:style>
+      <w:style w:type="paragraph" w:styleId="Head1">
+        <w:basedOn w:val="Heading1"/>
+        <w:rPr><w:color w:val="auto"/></w:rPr>
+      </w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    expect(resolveStyleCascade(styles, "Head1").runDefaults.color).toBe("auto");
+  });
 });
