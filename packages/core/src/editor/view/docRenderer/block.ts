@@ -48,13 +48,14 @@ export function renderBlocks(
    */
   let sectionIndex = 0;
   /**
-   * If the current section has `columns.count > 1` we wrap its blocks
-   * in a `<div class="sobree-section-cols">` so CSS `column-count` can
-   * flow content across the columns. `appendTarget` becomes that
-   * wrapper; on a section change we close it (revert to `host`) and
-   * re-evaluate for the new section.
+   * If the current section has `columns.count > 1` we wrap its blocks in
+   * a flat `<div class="sobree-cols">` stamped with the column geometry;
+   * PaperStack's `flowColumnSections` pass restructures it into per-page
+   * column tracks after layout. `appendTarget` becomes that wrapper; on a
+   * section change we close it (revert to `host`) and re-evaluate for the
+   * new section.
    */
-  let appendTarget: HTMLElement = openColumnContainerIfNeeded(host, sections[0]);
+  let appendTarget: HTMLElement = openColumnContainerIfNeeded(host, sections[0], 0);
 
   // Word's `<w:lastRenderedPageBreak/>` hints almost always land on
   // an EMPTY paragraph that the source author kept as a "end of
@@ -188,7 +189,7 @@ export function renderBlocks(
       // belongs to the section it ends, not to the next one.
       sectionIndex += 1;
       // Close any open column container and re-evaluate for the new section.
-      appendTarget = openColumnContainerIfNeeded(host, sections[sectionIndex]);
+      appendTarget = openColumnContainerIfNeeded(host, sections[sectionIndex], sectionIndex);
     }
   }
   // After the walk, evict trailing empties from whatever the final

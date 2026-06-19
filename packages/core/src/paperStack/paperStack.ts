@@ -17,7 +17,7 @@ import {
   zoneTemplateFor,
 } from "./pageSetup";
 import { paginateBlocks } from "./paginationAdapter";
-import { flowUnequalColumnSections } from "./paginationAdapter/columnFlow";
+import { flowColumnSections } from "./paginationAdapter/columnFlow";
 import { Paper } from "./paper";
 
 /**
@@ -293,11 +293,12 @@ export class PaperStack {
       if (block.parentElement !== firstContent) firstContent.appendChild(block);
     }
     mergeConsecutiveFragments(firstContent);
-    // Unequal-column sections (CSS can't lay them out) are flowed into
-    // explicit width tracks now that the body is laid out and heights are
-    // measurable. The wrapper stays one monolithic block to the paginator
-    // below — matching the equal-column path's single-page placement.
-    flowUnequalColumnSections(firstContent, budgetPx);
+    // Multi-column sections (equal and unequal) are flowed into explicit
+    // per-page column tracks now that the body is laid out and heights are
+    // measurable. Each page-chunk is a sub-page-height wrapper, so the
+    // column-agnostic paginator below simply places each on its own page;
+    // content snakes across pages between chunks.
+    flowColumnSections(firstContent, budgetPx);
     const consolidatedBlocks = Array.from(firstContent.children).filter(
       (c): c is HTMLElement => c instanceof HTMLElement,
     );

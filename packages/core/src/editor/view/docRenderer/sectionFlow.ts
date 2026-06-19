@@ -11,41 +11,47 @@ import type { SectionProperties } from "../../../doc/types";
 import { twipsToMm } from "./units";
 
 /**
- * If `section.columns.count > 1`, append a column container to `host`
- * and return it as the new append target. Otherwise return `host` —
- * single-column sections write directly to it.
+ * If `section.columns.count > 1`, append a multi-column container to
+ * `host` and return it as the new append target. Otherwise return `host`
+ * — single-column sections write directly to it.
+ *
+ * The container is flat here (blocks append straight in); after layout,
+ * PaperStack's `flowColumnSections` pass restructures it into per-page
+ * column tracks (and snakes content across pages). Both equal- and
+ * unequal-width sections share the `.sobree-cols` class and stamp their
+ * geometry onto the wrapper:
+ *   - `data-col-count`     — column count (every multi-column wrapper)
+ *   - `data-pag-cid`       — stable section id, so the flow pass can
+ *                            re-consolidate a section's per-page wrappers
+ *   - unequal: `data-col-widths-mm` + `data-col-gaps-mm` (explicit)
+ *   - equal:   `data-col-gap-mm` (tracks sized by the flow pass)
  */
 export function openColumnContainerIfNeeded(
   host: HTMLElement,
   section: SectionProperties | undefined,
+  sectionIndex = 0,
 ): HTMLElement {
   const cols = section?.columns;
   if (!cols || cols.count <= 1) return host;
 
-  // Unequal columns: CSS multi-column can't express per-column widths, so
-  // we stamp the geometry and let PaperStack flow blocks across explicit
-  // width tracks after layout (`flowUnequalColumnSections`). The blocks
-  // go in flat here; the fill pass restructures them into column boxes.
+  const wrapper = document.createElement("div");
+  wrapper.dataset.colCount = String(cols.count);
+  wrapper.dataset.pagCid = `cols-${sectionIndex}`;
+
   if (cols.equalWidth === false && cols.columns && cols.columns.length === cols.count) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "sobree-cols-unequal";
+    // Unequal columns: explicit per-column widths + per-gap spacing.
+    wrapper.className = "sobree-cols sobree-cols-unequal";
     wrapper.dataset.colWidthsMm = cols.columns.map((c) => twipsToMm(c.widthTwips)).join(",");
     wrapper.dataset.colGapsMm = cols.columns
       .slice(0, -1)
       .map((c) => twipsToMm(c.spaceTwips ?? cols.spaceTwips ?? 0))
       .join(",");
-    host.appendChild(wrapper);
-    return wrapper;
+  } else {
+    // Equal columns: one shared gap; the flow pass sizes the tracks.
+    wrapper.className = "sobree-cols sobree-section-cols";
+    wrapper.dataset.colGapMm = String(twipsToMm(cols.spaceTwips ?? 0));
   }
 
-  // Equal columns: native CSS multi-column. (All currently-clean column
-  // fixtures use this path — do not change its behaviour.)
-  const wrapper = document.createElement("div");
-  wrapper.className = "sobree-section-cols";
-  wrapper.style.columnCount = String(cols.count);
-  if (cols.spaceTwips !== undefined) {
-    wrapper.style.columnGap = `${twipsToMm(cols.spaceTwips)}mm`;
-  }
   host.appendChild(wrapper);
   return wrapper;
 }

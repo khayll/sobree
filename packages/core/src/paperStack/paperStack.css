@@ -411,15 +411,17 @@
   padding: 0 4px;
 }
 
-/* Unequal multi-column sections (Word `<w:cols w:equalWidth="0">`). CSS
- * multi-column can't size columns individually, so the column tracks are
- * laid side by side with explicit per-column widths (set inline in mm by
- * `flowUnequalColumnSections`); each `.sobree-col` is one filled track.
- * `align-items: flex-start` keeps short columns top-aligned like Word. */
-.paper-content .sobree-cols-unequal {
+/* Multi-column sections (Word `<w:cols>`). CSS multi-column can neither
+ * size columns individually nor snake content across our fixed-height
+ * page boxes, so `flowColumnSections` lays the tracks side by side as a
+ * flex row and fills them per page. Equal columns use `flex: 1` tracks;
+ * unequal columns carry explicit per-column `width` (both set inline by
+ * the flow pass). `align-items: flex-start` keeps short columns
+ * top-aligned like Word. */
+.paper-content .sobree-cols {
   display: flex;
   align-items: flex-start;
 }
-.paper-content .sobree-cols-unequal .sobree-col {
+.paper-content .sobree-cols .sobree-col {
   flex: 0 0 auto;
 }
