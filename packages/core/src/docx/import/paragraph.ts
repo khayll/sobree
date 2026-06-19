@@ -66,32 +66,67 @@ export function convertParagraph(
   // in `index.ts` for the threshold. Without that gate, jellap.docx's
   // single stale hint added an unwanted 4th page; complex-multipage's
   // 10 hints correctly produce its 16 pages.
-  if (honorLastRenderedPageBreaks && hasLastRenderedPageBreak(p)) {
+  if (honorLastRenderedPageBreaks && hasLeadingLastRenderedPageBreak(p)) {
     properties.pageBreakBefore = true;
   }
   return { kind: "paragraph", properties, runs: inlineRuns };
 }
 
-function hasLastRenderedPageBreak(p: Element): boolean {
-  // Walk descendants (NOT just direct children) — the marker is
-  // nested inside a `<w:r>`. We don't recurse into `<w:txbxContent>`
-  // (text-box content); textbox breaks shouldn't trigger the outer
-  // paragraph's break.
-  const stack: Element[] = [p];
-  while (stack.length > 0) {
-    const el = stack.pop()!;
+/**
+ * Is a `<w:lastRenderedPageBreak/>` reached, in document order, BEFORE any
+ * visible content of the paragraph?
+ *
+ * Word records a hint at the exact run position where a page broke last
+ * time. A hint at the paragraph START (or on an otherwise-empty
+ * paragraph) is a real page boundary — honour it as `pageBreakBefore`. A
+ * hint in the MIDDLE of a paragraph marks where the paragraph's own lines
+ * wrapped onto the next page; the line paginator already splits a
+ * paragraph across a page boundary, so forcing the WHOLE paragraph onto a
+ * new page here would strand the lines that belong on the previous page
+ * (leaving it half-empty). So only a leading hint counts.
+ */
+function hasLeadingLastRenderedPageBreak(p: Element): boolean {
+  let answer = false;
+  // Pre-order DFS in document order; stop at the first hint OR first
+  // visible run content, whichever comes first.
+  const visit = (el: Element): boolean => {
     for (const child of Array.from(el.children)) {
-      if (child.localName === "txbxContent") continue;
-      if (
-        child.localName === "lastRenderedPageBreak" &&
-        child.namespaceURI?.includes("wordprocessingml")
-      ) {
+      const name = child.localName;
+      // Skip property containers and text-box content (a textbox break
+      // is the textbox's concern, not the host paragraph's).
+      if (name === "pPr" || name === "rPr" || name === "txbxContent") continue;
+      if (name === "lastRenderedPageBreak" && child.namespaceURI?.includes("wordprocessingml")) {
+        answer = true;
         return true;
       }
-      stack.push(child);
+      if (isVisibleRunContent(child)) return true; // content before any hint
+      if (visit(child)) return true;
     }
+    return false;
+  };
+  visit(p);
+  return answer;
+}
+
+/** Does this element represent visible, page-filling run content (so a
+ *  later hint is mid-paragraph, not leading)? Whitespace-only text does
+ *  not count — Word commonly emits a leading space run before content. */
+function isVisibleRunContent(el: Element): boolean {
+  switch (el.localName) {
+    case "t":
+      return (el.textContent ?? "").trim().length > 0;
+    case "drawing":
+    case "object":
+    case "pict":
+    case "tab":
+    case "br":
+    case "fldSimple":
+    case "footnoteReference":
+    case "endnoteReference":
+      return true;
+    default:
+      return false;
   }
-  return false;
 }
 
 function mapParagraphFormat(f: ParagraphFormat): ParagraphProperties {

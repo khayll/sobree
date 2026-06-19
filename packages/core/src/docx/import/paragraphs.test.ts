@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { convertParagraph } from "./paragraph";
 import { readParagraph } from "./paragraphs";
 
 const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -206,5 +207,41 @@ describe("readParagraph — HYPERLINK fields", () => {
     const items = parse(field(" PAGE ", "<w:r><w:t>3</w:t></w:r>"));
     const run = (items[0] as { run: { field?: { instruction: string; cached?: string } } }).run;
     expect(run.field).toEqual({ instruction: "PAGE", cached: "3" });
+  });
+});
+
+describe("convertParagraph — lastRenderedPageBreak position", () => {
+  const para = (inner: string): Element =>
+    new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:p xmlns:w="${NS_W}">${inner}</w:p>`,
+      "application/xml",
+    ).documentElement;
+  const convert = (inner: string, honor: boolean) =>
+    convertParagraph(para(inner), { rels: new Map(), honorLastRenderedPageBreaks: honor });
+  const LRPB = "<w:r><w:lastRenderedPageBreak/></w:r>";
+  const TEXT = "<w:r><w:t>Some body text</w:t></w:r>";
+
+  it("honours a LEADING hint as pageBreakBefore", () => {
+    expect(convert(LRPB + TEXT, true).properties.pageBreakBefore).toBe(true);
+  });
+
+  it("honours a hint on an otherwise-empty paragraph (the deferral case)", () => {
+    expect(convert(LRPB, true).properties.pageBreakBefore).toBe(true);
+  });
+
+  it("IGNORES a MID-paragraph hint — the line paginator splits the paragraph", () => {
+    // A hint after content marks where the paragraph's own lines wrapped
+    // to the next page; forcing the whole paragraph onto a new page would
+    // strand the lines before it (the half-empty-page bug).
+    expect(convert(TEXT + LRPB + TEXT, true).properties.pageBreakBefore).toBeUndefined();
+  });
+
+  it("never sets pageBreakBefore when hints aren't honoured", () => {
+    expect(convert(LRPB + TEXT, false).properties.pageBreakBefore).toBeUndefined();
+  });
+
+  it("treats a leading whitespace-only run as still leading", () => {
+    const lead = `<w:r><w:t xml:space="preserve"> </w:t></w:r>`;
+    expect(convert(lead + LRPB + TEXT, true).properties.pageBreakBefore).toBe(true);
   });
 });
