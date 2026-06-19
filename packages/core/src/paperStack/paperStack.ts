@@ -256,24 +256,6 @@ export class PaperStack {
       if (stable && overflowPx <= OVERFLOW_TOLERANCE_PX) break;
     }
 
-    // Post-pagination: absorb under-filled middle papers. After the
-    // distribution loop converges, each paper has its blocks laid
-    // out in their final layout, so offsetHeight is reliable —
-    // measurements during pagination see absolute-positioned
-    // section-frame decorations as 0-height (they're out of flow at
-    // measurement time), so the in-paginate `collapseUnderfilledPages`
-    // pass under-estimates page contents and only catches truly tiny
-    // widows. This second pass uses the true rendered heights.
-    // Disabled — this post-distribute absorption was a session hack
-    // that fused tiny widow pages into the previous one to match a
-    // page-count target. With anchored content now living in its own
-    // layer (not consuming body-flow space), the paginator's primary
-    // pass produces correctly-sized pages on its own. Leaving the
-    // absorber on caused page 2 of complex-multipage to overflow by
-    // 696px (182% fill) — pulling section-heading + bullet content
-    // out of page 3 onto an already-full page 2.
-    void baselineBudgetPx;
-
     restoreSelection(saved);
     this.renderAllZones();
     this.applyPerSectionSettings();
@@ -315,24 +297,13 @@ export class PaperStack {
     // paragraphs anchored to the prior page rather than spawning a
     // dedicated page. Without this, jellap.docx ends with a 3rd page
     // containing two empty paragraphs.
-    const emptyCollapsed = collapseTrailingEmptyPages(rawPages);
-    // `collapseUnderfilledPages` (post-process widow absorption) was
-    // removed: at this point in the loop the blocks are still all
-    // stacked inside `firstContent` (per the `firstContent.appendChild`
-    // dance above) and `measureBlocksHeight` reads in-stack
-    // `offsetHeight`, which for tables and inline-frame wrappers is
-    // 5-10× smaller than the same content's height once distributed
-    // to its own paper. Traced live on complex-multipage: page 3's
-    // 268px Databases table measured 36px at collapse time → wrongly
-    // classified as a 15%-widow → absorbed back onto page 2 → page 2
-    // overflows 268px into the footer band.
-    //
-    // The paginator already produces correct page assignments
-    // (verified: with the absorber bypassed, page 2 lands at 98%
-    // fill, 0 overflow). Widow handling is a paginator-internals
-    // concern that belongs in the Knuth-Plass penalty function
-    // (Phase 2, task #164), not a post-process pass.
-    const pages = emptyCollapsed;
+    const pages = collapseTrailingEmptyPages(rawPages);
+    // Note: there is no post-pagination "underfilled page" absorption.
+    // Widow/orphan handling lives in the engine's break-cost function
+    // (`pagination/cost.ts`), not a post-process pass — a post-pass here
+    // would have to re-measure blocks while they're still stacked in
+    // `firstContent`, where tables / frames report a fraction of their
+    // distributed height and get misclassified as widows.
     const pageCount = Math.max(1, pages.length);
     this.ensurePaperCount(pageCount);
 
@@ -830,88 +801,6 @@ function mergeInto(head: HTMLElement, tail: HTMLElement): void {
  * a real "last page with just a signature line" still gets its own
  * page. Idempotent; safe to call on a single-page result.
  */
-/**
- * Walk paginator output forward, absorbing pages whose total content
- * height is ≤ 15% of `budgetPx` (the page-content budget) into the
- * previous page. These tiny tail-pages are paginator widows — usually
- * a 1-line overflow or an LRPB-induced sub-section that didn't have
- * room. Both Word and LO tolerate a bit of bottom-margin spill in
- * exchange for not spending an entire fresh page on the runt.
- *
- * Safety: only absorbs pages whose content height is smaller than the
- * previous page's slack PLUS the widow tolerance (~20% of budget).
- * If absorbing would visibly push content far past the page bottom,
- * we leave the runt page alone — better an underfilled page than
- * unreadable overflow.
- *
- * Run AFTER `collapseTrailingEmptyPages` so trailing whitespace is
- * already merged and we're working on the real content layout.
- */
-export function collapseUnderfilledPages(
-  pages: readonly HTMLElement[][],
-  budgetPx: number,
-): HTMLElement[][] {
-  if (budgetPx <= 0) return pages.map((p) => p.slice());
-
-  /** Two thresholds, picked by how underfilled the target page is.
-   *  TIGHT: typical widow — a 1-3 line tail-page. Absorb only when
-   *  it fits within a modest overflow.
-   *  AGGRESSIVE: a substantially-underfilled page (≤ 40% fill) is
-   *  almost always a paginator/LRPB mistake. Worth absorbing even
-   *  if the resulting overflow is noticeable, because the alternative
-   *  is an obviously-half-empty page that breaks the eye more than
-   *  a bit of bottom-margin spill.
-   *  Pages above the aggressive threshold are left alone. */
-  // Only the "tight" widow rule. We considered an "aggressive" pass
-  // for ≤40%-fill pages, but at the moment this function runs the
-  // candidate blocks are all stacked together in `firstContent` and
-  // any absolute-positioned decoration (section-frame banner, anchored
-  // shape, lifted textbox) contributes 0 to its block's flow
-  // offsetHeight — so a 700-px text-page that carries a 400-px
-  // backgroundframe looks like 300 px to `measureBlocksHeight` and
-  // accidentally qualifies as a widow. Constrain to tight so the
-  // misclassification can't cascade.
-  const WIDOW_FRACTION = 0.15;
-  const OVERFLOW_FRACTION = 0.2;
-  const widowThresholdPx = budgetPx * WIDOW_FRACTION;
-  const overflowPx = budgetPx * OVERFLOW_FRACTION;
-
-  const out: HTMLElement[][] = pages.map((p) => p.slice());
-  for (let i = 0; i + 1 < out.length; i++) {
-    const cur = out[i]!;
-    const next = out[i + 1]!;
-    // Don't absorb when the NEXT page's first block carries the
-    // OOXML `<w:pageBreakBefore/>` directive — merging would override
-    // the author's explicit page-boundary intent and stuff the
-    // heading mid-page. Per `data-page-break-before` stamped by the
-    // renderer from `Paragraph.properties.pageBreakBefore`.
-    const nextStartsWithForcedBreak =
-      next.length > 0 && next[0]!.hasAttribute("data-page-break-before");
-    if (nextStartsWithForcedBreak) continue;
-    const curH = measureBlocksHeight(cur);
-    const nextH = measureBlocksHeight(next);
-    // Refuse outright if cur is already over budget — absorbing more
-    // would just compound the overflow.
-    if (curH > budgetPx) continue;
-    if (nextH > 0 && nextH <= widowThresholdPx && curH + nextH <= budgetPx + overflowPx) {
-      cur.push(...next);
-      out.splice(i + 1, 1);
-      // Don't decrement i — we want to advance past the absorbed-into
-      // page so we never cascade-absorb several widows into one host
-      // page (that would compound overflow).
-    }
-  }
-  return out;
-}
-
-/** Sum offsetHeight of a page's blocks. Detached blocks (not yet in
- *  the DOM) report 0 — that's fine; they don't contribute to layout. */
-function measureBlocksHeight(blocks: readonly HTMLElement[]): number {
-  let total = 0;
-  for (const b of blocks) total += b.offsetHeight;
-  return total;
-}
-
 export function collapseTrailingEmptyPages(pages: readonly HTMLElement[][]): HTMLElement[][] {
   const out: HTMLElement[][] = pages.map((page) => page.slice());
   // Walk from the last page back. While the last page is fully empty
