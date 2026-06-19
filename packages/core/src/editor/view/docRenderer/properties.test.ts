@@ -115,6 +115,40 @@ describe("applyParagraphProps", () => {
     expect(el.style.fontSize).toBe("8pt");
   });
 
+  it("maps a run-default color of 'auto' to currentColor (overrides inherited)", () => {
+    const styles: NamedStyle[] = [
+      {
+        id: "Heading1",
+        type: "paragraph",
+        displayName: "Heading 1",
+        runDefaults: { color: "#2E74B5" },
+      },
+      {
+        id: "Head1",
+        type: "paragraph",
+        displayName: "Head1",
+        basedOn: "Heading1",
+        runDefaults: { color: "auto" },
+      },
+    ];
+    // Head1's `auto` wins over the inherited blue and renders as currentColor.
+    expect(p({ styleId: "Head1" }, styles).style.color).toBe("currentcolor");
+  });
+
+  it("renders a first-line indent inherited from a paragraph style", () => {
+    const styles: NamedStyle[] = [
+      {
+        id: "Para",
+        type: "paragraph",
+        displayName: "Para",
+        paragraphDefaults: { indent: { firstLineTwips: 240 } },
+      },
+    ];
+    // 240 twips ≈ 4.2mm → 4mm — applied even though the paragraph sets no
+    // direct indent of its own.
+    expect(p({ styleId: "Para" }, styles).style.textIndent).toBe("4mm");
+  });
+
   it("carries the style id verbatim in data-style-id for non-heading styles only", () => {
     expect(p({ styleId: "Footer" }).getAttribute("data-style-id")).toBe("Footer");
     expect(p({ styleId: "Heading2" }).getAttribute("data-style-id")).toBe(null);

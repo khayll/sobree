@@ -62,7 +62,8 @@ export function applyParagraphProps(
   // (declared in styles.xml) is parsed into the AST but never makes
   // it onto the rendered `<h1>` — headings render in the default
   // text colour instead of Word's blue.
-  if (runDefaults.color) el.style.color = runDefaults.color;
+  if (runDefaults.color)
+    el.style.color = runDefaults.color === "auto" ? "currentColor" : runDefaults.color;
   if (runDefaults.bold) el.style.fontWeight = "bold";
   if (runDefaults.italic) el.style.fontStyle = "italic";
   // `underline` is an enum (single / double / dotted / …) or
