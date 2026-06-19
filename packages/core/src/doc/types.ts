@@ -859,6 +859,12 @@ export interface NamedStyle {
   runDefaults?: RunProperties;
   /** Default paragraph properties. */
   paragraphDefaults?: ParagraphProperties;
+  /** Numbering linked via the style's `<w:numPr>` — the source of heading
+   *  outline numbers ("1", "1.1", "1.2"). `numId` references a
+   *  `NumberingDefinition`; `level` is the outline level this style sits at.
+   *  Distinct from `ParagraphProperties.numbering` (a paragraph's OWN list
+   *  membership); a style's numbering applies to every paragraph using it. */
+  numbering?: { numId: number; level: number };
   /** Default table properties (only for table styles). */
   tableDefaults?: TableProperties;
   /** Table-style borders + conditional formatting (only for table

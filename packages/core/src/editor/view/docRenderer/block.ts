@@ -9,6 +9,7 @@ import type {
 import { appendInlineRuns } from "./inline";
 import { renderInlineFrameBlock } from "./inlineFrame";
 import { applyListItemLevel, createListContainer, paragraphListInfo } from "./lists";
+import { computeOutlineNumbers } from "./outlineNumbering";
 import { renderParagraph } from "./paragraph";
 import { applyParagraphProps } from "./properties";
 import {
@@ -38,6 +39,10 @@ export function renderBlocks(
   blockIds?: readonly string[],
   sections: readonly SectionProperties[] = [],
 ): void {
+  // Outline numbers ("1", "1.1", …) for headings whose style links a
+  // numbering definition — computed in one document-order pass, stamped as
+  // a `data-outline-number` marker below.
+  const outlineNumbers = computeOutlineNumbers(blocks, styles, numbering);
   let currentList: { el: HTMLElement; numId: number } | null = null;
   /**
    * Section index for the block currently being rendered. Starts at 0
@@ -146,6 +151,8 @@ export function renderBlocks(
       rendered.dataset.blockIndex = String(i);
       if (block.kind === "paragraph") {
         stampBlockRevision(rendered, block.properties);
+        const outline = outlineNumbers.get(i);
+        if (outline) rendered.dataset.outlineNumber = outline;
       }
       // Section breaks always go to `host`, never into the current
       // column container. If a `<w:sectPr>` ends a 2-column section,

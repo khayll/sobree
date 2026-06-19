@@ -126,6 +126,10 @@ export function parseStylesXml(
     const pPr = wFirst(styleEl, "pPr");
     const runDefaults = rPr ? readRunProperties(rPr) : undefined;
     const paragraphDefaults = pPr ? readParagraphProperties(pPr) : undefined;
+    // `<w:pPr><w:numPr>` on a style is heading outline numbering (a heading
+    // style links a multi-level numbering definition); kept separate from
+    // paragraphDefaults so the renderer can number the heading itself.
+    const numbering = pPr ? readStyleNumbering(pPr) : undefined;
     // Table styles carry their borders / shading / conditional formats in
     // tblPr/tcPr/tblStylePr rather than rPr/pPr.
     const tableStyle = type === "table" ? readTableStyle(styleEl) : null;
@@ -138,6 +142,7 @@ export function parseStylesXml(
       ...(nextStyleId ? { nextStyleId: canonicalStyleId(nextStyleId) } : {}),
       ...(runDefaults ? { runDefaults } : {}),
       ...(paragraphDefaults ? { paragraphDefaults } : {}),
+      ...(numbering ? { numbering } : {}),
       ...(tableStyle ? { tableStyle } : {}),
     });
   }
@@ -462,6 +467,18 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
   if (shading) out.shading = shading;
 
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Read a style's `<w:numPr>` — `numId` + `ilvl` — for heading outline
+ *  numbering. Returns undefined when the style links no numbering or
+ *  cancels it (`numId 0`). */
+function readStyleNumbering(pPr: Element): { numId: number; level: number } | undefined {
+  const numPr = wFirst(pPr, "numPr");
+  if (!numPr) return undefined;
+  const numId = Number.parseInt(wVal(wFirst(numPr, "numId")) ?? "", 10);
+  if (!Number.isFinite(numId) || numId <= 0) return undefined; // 0 = cancel
+  const ilvl = Number.parseInt(wVal(wFirst(numPr, "ilvl")) ?? "0", 10);
+  return { numId, level: Number.isFinite(ilvl) ? ilvl : 0 };
 }
 
 function mapAlignment(raw: string | null): ParagraphAlignment | null {

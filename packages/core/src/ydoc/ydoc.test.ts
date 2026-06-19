@@ -30,6 +30,24 @@ describe("ydoc helpers", () => {
     expect(out.styles).toEqual(doc.styles);
   });
 
+  it("round-trips a heading style's outline numbering (NamedStyle.numbering)", () => {
+    const doc = seedDoc();
+    doc.styles.push({
+      id: "OutlineHead",
+      type: "paragraph",
+      displayName: "Outline Head",
+      basedOn: "Heading1",
+      numbering: { numId: 14, level: 0 },
+    });
+    const ydoc = new Y.Doc();
+    seedYDoc(ydoc, doc, ids(doc.body.length));
+    const { doc: out } = projectYDoc(ydoc);
+    expect(out.styles.find((s) => s.id === "OutlineHead")?.numbering).toEqual({
+      numId: 14,
+      level: 0,
+    });
+  });
+
   it("round-trips the floating layer (anchoredFrames + headerFooterFrames)", () => {
     const doc = seedDoc();
     const shape = (id: string): AnchoredFrame => ({
