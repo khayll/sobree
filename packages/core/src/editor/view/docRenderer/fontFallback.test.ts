@@ -43,4 +43,16 @@ describe("resolveFontFace", () => {
     // "Light" alone is a (weird) family name, not a token suffix.
     expect(resolveFontFace("Light").stack).toBe("Light, serif");
   });
+
+  it("falls back a missing SANS face to a sans generic, not the serif default", () => {
+    // Adobe-templated flyers (Myriad Pro) rendered serif because the
+    // unknown-font default ends in `serif`; these curated sans chains
+    // keep them sans, matching Word's substitution.
+    expect(resolveFontFace("Myriad Pro").stack).toBe(
+      "'Myriad Pro', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    );
+    expect(resolveFontFace("Myriad Pro Cond").stack).toMatch(/sans-serif$/);
+    expect(resolveFontFace("Open Sans").stack).toMatch(/sans-serif$/);
+    expect(resolveFontFace("Segoe UI").stack).toMatch(/sans-serif$/);
+  });
 });
