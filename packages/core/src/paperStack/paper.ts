@@ -319,10 +319,20 @@ export class Paper {
       headerPx - (Number.parseFloat(getComputedStyle(this.header).paddingBottom) || 0);
     const footerReqPx =
       footerPx - (Number.parseFloat(getComputedStyle(this.footer).paddingTop) || 0);
-    if (headerReqPx > marginTopPx + 1) {
+    // An EMPTY zone needs no body clearance — the body sits at the page
+    // margin. Its `offsetHeight` still includes the header-offset reserve
+    // plus an empty line, which would otherwise push the body ~0.2in past
+    // the margin (top margin then reads bigger than the bottom). Word
+    // doesn't reserve flow for an empty header/footer; a floating-only
+    // header (a claimed VML watermark, now in the absolute layer) is
+    // `is-empty` in flow, so its watermark still paints while the body
+    // stays at the margin.
+    const headerEmpty = this.header.classList.contains("is-empty");
+    const footerEmpty = this.footer.classList.contains("is-empty");
+    if (!headerEmpty && headerReqPx > marginTopPx + 1) {
       this.root.style.paddingTop = `${headerReqPx}px`;
     }
-    if (footerReqPx > marginBottomPx + 1) {
+    if (!footerEmpty && footerReqPx > marginBottomPx + 1) {
       this.root.style.paddingBottom = `${footerReqPx}px`;
     }
   }
