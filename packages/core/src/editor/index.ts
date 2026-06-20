@@ -250,6 +250,14 @@ export class Editor {
    */
   private domDirty = false;
   /**
+   * Ids of editable textbox frames whose DOM the user has edited since
+   * the last sync. Frames live in the floating overlay (outside the
+   * body content hosts), so they need their own read-back path —
+   * `syncFromDom` re-serialises each dirty frame into
+   * `anchoredFrames[id].content.body`.
+   */
+  private readonly dirtyFrameIds = new Set<string>();
+  /**
    * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
    * once in the constructor; closes over this instance's privates so the
    * `commit` pipeline / lock checks stay private to the class. See
@@ -343,7 +351,12 @@ export class Editor {
       trackedInput: this.trackedInput,
       isTrackedEnabled: () => this.trackChanges.enabled,
       onInput: () => {
-        this.domDirty = true;
+        // Route the edit: a caret inside an editable textbox frame reads
+        // back into that frame's body, NOT the document body. Everything
+        // else is an ordinary body edit.
+        const frameId = this.editedFrameId();
+        if (frameId !== null) this.dirtyFrameIds.add(frameId);
+        else this.domDirty = true;
         this.scheduleChange();
       },
       fireSelection: () => this.fireSelection(),
@@ -1035,35 +1048,89 @@ export class Editor {
    * DOM-to-AST round-trip.
    */
   private ensureCurrent(): SobreeDocument {
-    if (!this.domDirty) return this.doc;
+    if (!this.domDirty && this.dirtyFrameIds.size === 0) return this.doc;
     return this.syncFromDom();
   }
 
   private syncFromDom(): SobreeDocument {
-    const serialised = serializeHostsToDocument(this.getContentHosts());
-    const prevCount = this.registry.length();
-    const newCount = serialised.body.length;
+    // Body read-back — only when a body host actually changed. A pure
+    // frame edit (domDirty false) must NOT re-serialise the body: that
+    // would churn the registry and risk clobbering AST-only properties.
+    if (this.domDirty) {
+      const serialised = serializeHostsToDocument(this.getContentHosts());
+      const prevCount = this.registry.length();
+      const newCount = serialised.body.length;
 
-    if (newCount !== prevCount) {
-      // Structural change (user pressed Enter / Backspace, paste inserted
-      // blocks): we can't preserve ids across structural shifts cheaply,
-      // so re-stamp. Agents that held stale refs will see lock failures.
-      this.registry.reset(newCount);
-    } else {
-      // Same count: detect which blocks' serialised JSON changed.
-      const newJson = serialised.body.map((b) => JSON.stringify(b));
-      const changed: boolean[] = newJson.map((j, i) => j !== this.lastSerialisedBlocks[i]);
-      this.lastSerialisedBlocks = newJson;
-      this.registry.bumpChanged(changed);
+      if (newCount !== prevCount) {
+        // Structural change (user pressed Enter / Backspace, paste inserted
+        // blocks): we can't preserve ids across structural shifts cheaply,
+        // so re-stamp. Agents that held stale refs will see lock failures.
+        this.registry.reset(newCount);
+      } else {
+        // Same count: detect which blocks' serialised JSON changed.
+        const newJson = serialised.body.map((b) => JSON.stringify(b));
+        const changed: boolean[] = newJson.map((j, i) => j !== this.lastSerialisedBlocks[i]);
+        this.lastSerialisedBlocks = newJson;
+        this.registry.bumpChanged(changed);
+      }
+      this.doc = {
+        ...this.doc,
+        body: serialised.body,
+        numbering: serialised.numbering,
+      };
+      this.domDirty = false;
     }
-    this.doc = {
-      ...this.doc,
-      body: serialised.body,
-      numbering: serialised.numbering,
-    };
-    this.domDirty = false;
+    // Frame read-back — re-serialise each edited textbox frame's DOM into
+    // its `content.body`. Frames live in the floating overlay, outside the
+    // body hosts, so they're invisible to the body serializer above.
+    if (this.dirtyFrameIds.size > 0) this.syncFramesFromDom();
     this.mirrorToYDoc();
     return this.doc;
+  }
+
+  /**
+   * Re-read the DOM of each dirty editable textbox frame into the AST.
+   * The frame element IS the serialization host (the block renderer paints
+   * its body directly into it), so `serializeHostsToDocument([el])` yields
+   * the same `Block[]` shape as a body host. Matched to the AST frame by
+   * its stable `data-anchor-id`. Pure body swap — geometry/anchor untouched.
+   */
+  private syncFramesFromDom(): void {
+    const frames = this.doc.anchoredFrames;
+    if (!frames || frames.length === 0) {
+      this.dirtyFrameIds.clear();
+      return;
+    }
+    const elById = new Map<string, HTMLElement>();
+    for (const el of this.host.querySelectorAll<HTMLElement>(
+      ".paper-anchor[data-anchor-textbox]",
+    )) {
+      if (el.dataset.anchorId) elById.set(el.dataset.anchorId, el);
+    }
+    let changed = false;
+    const next = frames.map((f) => {
+      if (!this.dirtyFrameIds.has(f.id) || f.content.kind !== "textbox") return f;
+      const el = elById.get(f.id);
+      if (!el) return f;
+      const body = serializeHostsToDocument([el]).body;
+      changed = true;
+      return { ...f, content: { ...f.content, body } };
+    });
+    this.dirtyFrameIds.clear();
+    if (changed) this.doc = { ...this.doc, anchoredFrames: next };
+  }
+
+  /**
+   * The id of the editable textbox frame the caret currently sits in, or
+   * null when the selection is in ordinary body flow. Used to route an
+   * `input` event to the frame read-back instead of the body read-back.
+   */
+  private editedFrameId(): string | null {
+    const sel = this.host.ownerDocument.getSelection();
+    let node: Node | null = sel?.anchorNode ?? null;
+    if (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
+    const frame = (node as Element | null)?.closest?.(".paper-anchor[data-anchor-textbox]");
+    return (frame as HTMLElement | null)?.dataset.anchorId ?? null;
   }
 
   /**

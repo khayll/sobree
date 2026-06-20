@@ -42,6 +42,16 @@ export interface AnchorLayerContext {
    * stacked text (test/headless fallback).
    */
   renderBody?: (blocks: Block[], host: HTMLElement) => void;
+  /**
+   * When true, textbox frames become editable islands: the frame turns
+   * into its own `contentEditable` host (`pointer-events:auto`) so the
+   * user can click in and type. The editor wires the read-back that
+   * serialises the frame's DOM into `anchoredFrames[id].content.body`.
+   * False / absent → display-only overlay (read-only mode, decorations,
+   * headless). Pictures, shapes, and groups stay non-interactive
+   * regardless — only textbox prose is editable.
+   */
+  editable?: boolean;
 }
 
 /**
@@ -195,6 +205,18 @@ function paintTextbox(
   content: Extract<AnchoredContent, { kind: "textbox" }>,
   ctx: AnchorLayerContext,
 ): void {
+  // Editable mode: the frame becomes its own contentEditable island so
+  // the user can click in and type. `pointer-events:auto` re-enables it
+  // even though the overlay layer is `pointer-events:none` (decorations
+  // stay click-through). `data-anchor-textbox` marks it for the editor's
+  // frame read-back. The id is already on `host.dataset.anchorId`.
+  if (ctx.editable) {
+    host.contentEditable = "true";
+    host.dataset.anchorTextbox = "";
+    host.style.pointerEvents = "auto";
+    host.style.cursor = "text";
+    host.style.outline = "none";
+  }
   // The textbox FRAME (fill, border, padding) renders so the visual
   // chrome lands at the OOXML-declared coordinates.
   if (content.fill) host.style.background = content.fill;

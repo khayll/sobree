@@ -176,13 +176,21 @@ export class Sobree {
       // is the path that makes undo/redo of page-setup edits visually
       // revert the paper. Without it, Y.UndoManager reverses the AST
       // but the renderer keeps using the post-edit `setup`.
-      this.syncSetupFromDocument();
-      // Keep the stack's per-section overrides in sync. AST sections may
-      // have shifted (insert/delete of section breaks, edits to section
-      // properties); pull the latest so per-page vAlign stays correct.
-      this.syncStackSections();
-      // Don't repaginate while a header/footer zone is being edited in place.
-      this.paginateUnlessZoneEditing();
+      // A live edit inside a floating textbox frame changes only that
+      // frame's prose (already persisted to the AST/Y.Doc by the editor's
+      // frame read-back). Nothing structural moved, and re-pushing the
+      // doc to the stack would repaint the overlay and blow away the caret
+      // mid-typing — so skip the whole stack sync until focus leaves the
+      // frame. The next ordinary change repaints it from the current AST.
+      if (!this.isEditingFrame()) {
+        this.syncSetupFromDocument();
+        // Keep the stack's per-section overrides in sync. AST sections may
+        // have shifted (insert/delete of section breaks, edits to section
+        // properties); pull the latest so per-page vAlign stays correct.
+        this.syncStackSections();
+        // Don't repaginate while a header/footer zone is being edited in place.
+        this.paginateUnlessZoneEditing();
+      }
       for (const cb of this.listeners.change) {
         try {
           cb(payload);
@@ -363,8 +371,22 @@ export class Sobree {
    */
   private paginateUnlessZoneEditing(): void {
     if (this.stack.root.classList.contains("is-zone-editing")) return;
+    // A live edit inside a floating textbox frame must not trigger a
+    // repaginate: the frame's DOM already holds the keystroke, frames
+    // don't drive body pagination, and repainting the overlay would blow
+    // away the caret mid-typing. The frame read-back already persisted the
+    // edit to the AST/Y.Doc; the next body-driven repaginate repaints it.
+    if (this.isEditingFrame()) return;
     this.stack.repaginate();
     this.repaginateWhenFontsSettle();
+  }
+
+  /** True while the caret sits in an editable floating textbox frame. */
+  private isEditingFrame(): boolean {
+    const active = this.stack.root.ownerDocument.activeElement;
+    return (
+      active instanceof Element && active.closest(".paper-anchor[data-anchor-textbox]") !== null
+    );
   }
 
   /**
@@ -420,6 +442,10 @@ export class Sobree {
       host.contentEditable = editable ? "true" : "false";
     }
     this.stack.root.classList.toggle("is-read-mode", !editable);
+    // Repaint the floating layer so textbox frames pick up the new
+    // editable state (`anchorLayerCtx` reads `is-read-mode` at paint
+    // time): editable islands in edit mode, inert overlay in read mode.
+    this.stack.setAnchoredFrames(this.editor.getDocument().anchoredFrames ?? null);
     for (const cb of this.listeners["mode-change"]) {
       try {
         cb({ mode });
