@@ -248,12 +248,19 @@ export class Paper {
    * stays logical at any render tier.
    */
   private resolveFrames(frames: readonly AnchoredFrame[], zoneFlow: HTMLElement): AnchoredFrame[] {
-    // Margins come from the page-geometry CSS vars (the pgMar values),
-    // NOT the overflow-adjusted `padding-top` — a `margin`-relative frame
-    // anchors to the page margin, which a tall header doesn't move. px →
-    // EMU keeps it consistent with the `offsetTop` measurements below.
+    // A `margin`-anchored BODY frame measures from the top of the text
+    // area, which the header reserve pushes below the nominal `pgMar` top.
+    // Word/LibreOffice clear the header for these too — the marketing
+    // flyer's contact email (a `verticalFrom="margin"` frame) otherwise
+    // sits ~0.2in too high, bunched against the paragraph-anchored phone
+    // line above it. Use the body's rendered top so margin- and
+    // paragraph-anchored frames share one origin. Header/footer frames
+    // keep the nominal margin (their own zone is the reference). Horizontal
+    // is unaffected — the header reserve is vertical only.
     const marginTopEmu =
-      parsePxFromMm(this.root.style.getPropertyValue("--margin-top")) * EMU_PER_PX;
+      (zoneFlow === this.content
+        ? offsetTopWithin(this.content, this.root)
+        : parsePxFromMm(this.root.style.getPropertyValue("--margin-top"))) * EMU_PER_PX;
     const marginLeftEmu =
       parsePxFromMm(this.root.style.getPropertyValue("--margin-left")) * EMU_PER_PX;
     return frames.map((f) => {
@@ -319,20 +326,15 @@ export class Paper {
       headerPx - (Number.parseFloat(getComputedStyle(this.header).paddingBottom) || 0);
     const footerReqPx =
       footerPx - (Number.parseFloat(getComputedStyle(this.footer).paddingTop) || 0);
-    // An EMPTY zone needs no body clearance — the body sits at the page
-    // margin. Its `offsetHeight` still includes the header-offset reserve
-    // plus an empty line, which would otherwise push the body ~0.2in past
-    // the margin (top margin then reads bigger than the bottom). Word
-    // doesn't reserve flow for an empty header/footer; a floating-only
-    // header (a claimed VML watermark, now in the absolute layer) is
-    // `is-empty` in flow, so its watermark still paints while the body
-    // stays at the margin.
-    const headerEmpty = this.header.classList.contains("is-empty");
-    const footerEmpty = this.footer.classList.contains("is-empty");
-    if (!headerEmpty && headerReqPx > marginTopPx + 1) {
+    // Even an EMPTY header reserves its offset + one (blank) line: Word
+    // and LibreOffice push the body down to clear it, so the body top sits
+    // ~0.2in below the nominal margin and the top margin reads larger than
+    // the bottom. Match that — the watermark-only header here is `is-empty`
+    // in flow but its blank line still reserves space, exactly as in Word.
+    if (headerReqPx > marginTopPx + 1) {
       this.root.style.paddingTop = `${headerReqPx}px`;
     }
-    if (!footerEmpty && footerReqPx > marginBottomPx + 1) {
+    if (footerReqPx > marginBottomPx + 1) {
       this.root.style.paddingBottom = `${footerReqPx}px`;
     }
   }
