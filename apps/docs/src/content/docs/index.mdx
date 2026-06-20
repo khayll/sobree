@@ -70,7 +70,7 @@ Sobree is an open-source, print-view-first OOXML document engine for building Wo
       </svg>
     </span>
     <h3>Native OOXML AST</h3>
-    <p>Every node maps 1:1 to a <code>&lt;w:…&gt;</code> element. Round-trip is mechanical, not lossy. No abstraction layer between you and the spec.</p>
+    <p>Every node maps to OOXML document structure, so export works from the document model instead of a lossy HTML rewrite. You stay close to the spec without making the browser DOM the source of truth.</p>
   </article>
 
   <article class="sobree-feature">
