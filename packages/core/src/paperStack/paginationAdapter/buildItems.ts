@@ -131,11 +131,19 @@ function tableRowBoxes(table: HTMLElement, tid: string): DomItem[] {
   // clone in distributePages), then TBODY rows. Without this, tables
   // with header rows (Word's `<w:tblHeader/>` → renderer's THEAD)
   // lose their header entirely after pagination.
+  //
+  // Use querySelectorAll, not querySelector: the iterative repaginate
+  // loop can leave a table with MULTIPLE THEAD/TBODY sections (a clone's
+  // section merged back beside the source's). Walking only the first of
+  // each would miss the rows in the extra sections — those rows would
+  // never become boxes, never get distributed, and the source table husk
+  // (still holding them) would linger as an orphan at the front of the
+  // first paper. Walking every section emits every row exactly once.
   for (const section of ["thead", "tbody"] as const) {
-    const sec = table.querySelector(`:scope > ${section}`);
-    if (!sec) continue;
-    for (const child of Array.from(sec.children)) {
-      if (child.tagName === "TR" && child instanceof HTMLElement) trs.push(child);
+    for (const sec of table.querySelectorAll(`:scope > ${section}`)) {
+      for (const child of Array.from(sec.children)) {
+        if (child.tagName === "TR" && child instanceof HTMLElement) trs.push(child);
+      }
     }
   }
   // Fallback: table with no THEAD/TBODY — just walk direct TR children.
