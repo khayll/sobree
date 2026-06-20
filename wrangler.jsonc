@@ -1,0 +1,18 @@
+{
+  // Cloudflare Workers Builds currently runs the user deploy command from
+  // the repository root as `npx wrangler versions upload`. Keep this root
+  // config so Wrangler can discover the static docs assets without needing
+  // a `-c apps/docs/wrangler.jsonc` flag in the dashboard.
+  //
+  // The docs app still owns its local config at `apps/docs/wrangler.jsonc`;
+  // this root file mirrors the production deploy shape for Cloudflare CI.
+  //
+  // SECURITY: this file is in a PUBLIC repo. It must describe SHAPE, never
+  // SECRETS. Do NOT add `account_id`, `zone_id`, plaintext `vars`, or other
+  // deploy credentials here.
+  "name": "sobree-docs",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "apps/docs/dist"
+  }
+}
