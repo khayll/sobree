@@ -1,5 +1,12 @@
 # @sobree/collab-providers
 
+## 0.1.23
+
+### Patch Changes
+
+- Updated dependencies [aff3052]
+  - @sobree/core@0.1.23
+
 ## 0.1.22
 
 ### Patch Changes
