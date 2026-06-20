@@ -11,7 +11,7 @@ import { mountFontTableFromZip } from "../../fonts";
 import { type ThemePalette, parseThemeXml } from "../shared/drawingColor";
 import { parseXml } from "../shared/xml";
 import type { DocxImportResult } from "../types";
-import { parseAnchoredFrames } from "./anchoredFrames";
+import { parseAnchoredFrames, parseVmlFloatingFrames } from "./anchoredFrames";
 import { parseCommentsXml } from "./comments";
 import { convertBlocksFromContainer, convertDocumentXml } from "./document";
 import { floatWrappingImages } from "./floatFrames";
@@ -70,6 +70,12 @@ export async function importDocx(
     parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     ...(theme ? { theme } : {}),
   });
+  // Floating legacy-VML objects (`<w:pict>` watermarks / absolute-
+  // positioned backgrounds) become picture frames in the same overlay,
+  // claimed out of the flow so they don't render inline (which would
+  // inflate flow height and displace body content). Appended after the
+  // DrawingML anchors — both feed the one floating layer.
+  anchoredFrames.push(...parseVmlFloatingFrames(xml, { rels, ...(theme ? { theme } : {}) }));
   // Parse inline-drawing frames (`<w:drawing><wp:inline>` with
   // textbox payload) into the new InlineFrame model. Phase 1.1:
   // parser runs and results land on `doc.inlineFrames` for
@@ -290,6 +296,13 @@ function loadHeaderFooterParts(
           convertBlocksFromContainer(txbxContent, { rels: headerRels }).body,
         ...(theme ? { theme } : {}),
       });
+      // Floating VML in a header/footer is almost always a full-page
+      // watermark (`<w:pict>` with `position:absolute`). Claim it into the
+      // part's floating frames so it paints behind the zone instead of
+      // rendering inline — an inline watermark would balloon the header's
+      // flow height and `applyZoneOverflowPadding` would shove the body
+      // (and every paragraph-anchored frame) off the page.
+      partFrames.push(...parseVmlFloatingFrames(parsed, { rels: headerRels }));
       if (partFrames.length > 0) frames[ref.partId] = partFrames;
       // Header part roots: `<w:hdr>` or `<w:ftr>`. Both wrap a stream
       // of paragraphs + tables identical in shape to `<w:body>`.

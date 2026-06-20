@@ -99,6 +99,130 @@ export function parseAnchoredFrames(
   return out;
 }
 
+/**
+ * Parse FLOATING legacy-VML objects — `<w:pict>` / `<w:object>` whose
+ * `<v:shape style="position:absolute;…">` pins them to page/margin
+ * coordinates (watermarks, full-page decorative backgrounds, logos
+ * placed by absolute position). DrawingML anchors are handled by
+ * `parseAnchoredFrames`; this is the VML-era equivalent and returns the
+ * same `AnchoredFrame` model, so the renderer is oblivious to the
+ * source format.
+ *
+ * ONLY floating VML is claimed here — gated on `position:absolute`.
+ * An INLINE VML picture (an OLE logo sitting in the text flow) has no
+ * such style; it stays in flow and `runs.ts` reads it as a `DrawingRun`.
+ * That distinction is what stops a header watermark from inflating the
+ * header's flow height (and shoving the body off the page) while
+ * leaving ordinary inline VML images untouched.
+ *
+ * Behind-text when the shape's `z-index` is negative (Word's "behind
+ * text" wrap). Claims (removes) the container so the body / flow walker
+ * never double-renders it.
+ */
+export function parseVmlFloatingFrames(
+  xmlDoc: Document,
+  ctx: AnchoredFramesContext,
+  claim = true,
+): AnchoredFrame[] {
+  const out: AnchoredFrame[] = [];
+  const claimed: Element[] = [];
+  let counter = 0;
+  for (const tag of ["pict", "object"] as const) {
+    for (const container of Array.from(xmlDoc.getElementsByTagNameNS(NS.w, tag))) {
+      const frame = parseVmlFloat(container, ctx, () => `vml-${counter++}`);
+      if (frame) {
+        out.push(frame);
+        claimed.push(container);
+      }
+    }
+  }
+  if (claim) {
+    for (const el of claimed) el.parentNode?.removeChild(el);
+  }
+  return out;
+}
+
+function parseVmlFloat(
+  container: Element,
+  ctx: AnchoredFramesContext,
+  nextId: () => string,
+): AnchoredFrame | null {
+  // The positioned instance is the `<v:shape>` (or `<v:rect>` …) that
+  // carries BOTH an inline style and the `<v:imagedata>`. A sibling
+  // `<v:shapetype>` is a template with no style — anchoring off the
+  // imagedata's own parent skips it.
+  const imagedata = container.getElementsByTagNameNS(NS.v, "imagedata")[0];
+  if (!imagedata) return null; // pure shape (no image) — not handled here
+  const shape = imagedata.parentElement;
+  const style = parseVmlStyle(shape?.getAttribute("style") ?? "");
+  // Only floats belong in the overlay; inline VML stays in flow (runs.ts).
+  if (style.position !== "absolute") return null;
+
+  const widthEmu = vmlLengthToEmu(style.width);
+  const heightEmu = vmlLengthToEmu(style.height);
+  if (widthEmu <= 0 || heightEmu <= 0) return null;
+
+  const rId = imagedata.getAttributeNS(NS.r, "id") ?? imagedata.getAttribute("r:id");
+  if (!rId) return null;
+  const target = ctx.rels.get(rId);
+  if (!target) return null;
+
+  const frame: AnchoredFrame = {
+    id: nextId(),
+    anchor: {
+      sectionIndex: 0,
+      horizontalFrom: coerceHRelativeFrom(style["mso-position-horizontal-relative"] ?? null),
+      verticalFrom: coerceVRelativeFrom(style["mso-position-vertical-relative"] ?? null),
+    },
+    offsetXEmu: vmlLengthToEmu(style["margin-left"]),
+    offsetYEmu: vmlLengthToEmu(style["margin-top"]),
+    widthEmu,
+    heightEmu,
+    content: { kind: "picture", partPath: normalizePartPath(target) },
+  };
+  // A negative `z-index` is Word's "send behind text"; route to the
+  // behind-text overlay so body prose paints on top of the watermark.
+  const z = Number(style["z-index"]);
+  if (Number.isFinite(z) && z < 0) frame.behindText = true;
+  return frame;
+}
+
+/** Parse a VML inline `style="a:b;c:d"` string into a lowercased map. */
+function parseVmlStyle(style: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const decl of style.split(";")) {
+    const i = decl.indexOf(":");
+    if (i === -1) continue;
+    const key = decl.slice(0, i).trim().toLowerCase();
+    if (key) out[key] = decl.slice(i + 1).trim();
+  }
+  return out;
+}
+
+/**
+ * VML CSS length (`"575.55pt"`, `"1.5in"`, `"0"`) → EMU. Units map to
+ * points first (1pt = 12700 EMU); bare numbers are points (VML default).
+ */
+function vmlLengthToEmu(value: string | undefined): number {
+  if (!value) return 0;
+  const m = value.match(/(-?[\d.]+)\s*([a-z%]*)/i);
+  if (!m) return 0;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return 0;
+  const unit = (m[2] || "pt").toLowerCase();
+  const pt =
+    unit === "in"
+      ? n * 72
+      : unit === "px"
+        ? n * 0.75
+        : unit === "mm"
+          ? (n / 25.4) * 72
+          : unit === "cm"
+            ? (n / 2.54) * 72
+            : n; // pt or unitless
+  return Math.round(pt * 12700);
+}
+
 // === implementation ===
 
 function parseAnchoredFrame(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAnchoredFrames } from "./anchoredFrames";
+import { parseAnchoredFrames, parseVmlFloatingFrames } from "./anchoredFrames";
 
 function xml(source: string): Document {
   const wrapped = `<?xml version="1.0" encoding="UTF-8"?>
@@ -10,6 +10,7 @@ function xml(source: string): Document {
   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
   xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:v="urn:schemas-microsoft-com:vml"
   xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
   xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup">
 ${source}
@@ -305,5 +306,64 @@ describe("parseAnchoredFrames", () => {
     const map = new Map(ps.map((p, i) => [p, i] as const));
     const frames = parseAnchoredFrames(doc, { rels: new Map(), bodyParagraphIndexByElement: map });
     expect(frames[0]!.anchor.paragraphIndex).toBe(1);
+  });
+});
+
+describe("parseVmlFloatingFrames", () => {
+  const watermark = (style: string) => `
+    <w:p><w:r><w:pict>
+      <v:shape id="wm" type="#_x0000_t75" style="${style}">
+        <v:imagedata r:id="rId9"/>
+      </v:shape>
+    </w:pict></w:r></w:p>`;
+
+  it("parses a position:absolute VML watermark into a behind-text picture frame", () => {
+    const doc = xml(
+      watermark(
+        "position:absolute;margin-left:0;margin-top:0;width:575.55pt;height:744.85pt;z-index:-251657216;mso-position-horizontal-relative:margin;mso-position-vertical-relative:margin",
+      ),
+    );
+    const rels = new Map([["rId9", "media/image2.png"]]);
+    const frames = parseVmlFloatingFrames(doc, { rels });
+    expect(frames).toHaveLength(1);
+    const f = frames[0]!;
+    expect(f.content).toEqual({ kind: "picture", partPath: "word/media/image2.png" });
+    expect(f.behindText).toBe(true);
+    expect(f.anchor.horizontalFrom).toBe("margin");
+    expect(f.anchor.verticalFrom).toBe("margin");
+    // 575.55pt * 12700 EMU/pt
+    expect(f.widthEmu).toBe(Math.round(575.55 * 12700));
+    expect(f.heightEmu).toBe(Math.round(744.85 * 12700));
+  });
+
+  it("claims (removes) the <w:pict> so the flow walker can't double-render it", () => {
+    const doc = xml(watermark("position:absolute;width:100pt;height:100pt"));
+    expect(doc.getElementsByTagName("w:pict")).toHaveLength(1);
+    parseVmlFloatingFrames(doc, { rels: new Map([["rId9", "media/image2.png"]]) });
+    expect(doc.getElementsByTagName("w:pict")).toHaveLength(0);
+  });
+
+  it("leaves the XML intact when claim=false", () => {
+    const doc = xml(watermark("position:absolute;width:100pt;height:100pt"));
+    parseVmlFloatingFrames(doc, { rels: new Map([["rId9", "media/image2.png"]]) }, false);
+    expect(doc.getElementsByTagName("w:pict")).toHaveLength(1);
+  });
+
+  it("ignores INLINE VML (no position:absolute) — runs.ts renders those in flow", () => {
+    const doc = xml(watermark("width:100pt;height:100pt"));
+    expect(parseVmlFloatingFrames(doc, { rels: new Map([["rId9", "media/image2.png"]]) })).toEqual(
+      [],
+    );
+  });
+
+  it("is not behind-text when z-index is positive", () => {
+    const doc = xml(watermark("position:absolute;width:50pt;height:50pt;z-index:5"));
+    const f = parseVmlFloatingFrames(doc, { rels: new Map([["rId9", "media/image2.png"]]) })[0]!;
+    expect(f.behindText).toBeUndefined();
+  });
+
+  it("skips a float whose image rId has no rels target", () => {
+    const doc = xml(watermark("position:absolute;width:50pt;height:50pt"));
+    expect(parseVmlFloatingFrames(doc, { rels: new Map() })).toEqual([]);
   });
 });

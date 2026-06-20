@@ -16,7 +16,10 @@ function frame(
     id,
     anchor: {
       sectionIndex: 0,
-      horizontalFrom: "page",
+      // Column-relative by default: a flowable textbox lives in the text
+      // column's coordinate system (margin/page-relative boxes are
+      // absolute layout and stay overlays — see the dedicated test).
+      horizontalFrom: over.anchor?.horizontalFrom ?? "column",
       verticalFrom: over.anchor?.verticalFrom ?? "paragraph",
       ...(paragraphIndex !== undefined ? { paragraphIndex } : {}),
     },
@@ -93,6 +96,31 @@ describe("flowDisplacingTextboxes", () => {
     const out = flowDisplacingTextboxes(body, [wrapNone, behind, pageRel]);
     expect(out.body).toHaveLength(1);
     expect(out.frames).toHaveLength(3);
+  });
+
+  it("keeps margin/page-anchored textboxes as overlays (absolute layout, not flow)", () => {
+    const body = [para("A")];
+    // A flyer's positioned headings: displacing wrap + paragraph-V, but
+    // anchored horizontally to the page margin → an absolute layout grid.
+    const marginBox = frame("m", 0, textbox("Heading"), {
+      anchor: {
+        sectionIndex: 0,
+        horizontalFrom: "margin",
+        verticalFrom: "paragraph",
+        paragraphIndex: 0,
+      },
+    });
+    const pageBox = frame("pg", 0, textbox("Call-out"), {
+      anchor: {
+        sectionIndex: 0,
+        horizontalFrom: "page",
+        verticalFrom: "paragraph",
+        paragraphIndex: 0,
+      },
+    });
+    const out = flowDisplacingTextboxes(body, [marginBox, pageBox]);
+    expect(out.body).toHaveLength(1);
+    expect(out.frames).toHaveLength(2);
   });
 
   it("keeps bordered/filled boxes as overlays (chrome would be lost)", () => {

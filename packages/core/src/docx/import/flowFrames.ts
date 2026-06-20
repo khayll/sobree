@@ -32,6 +32,15 @@ import type { AnchoredContent, AnchoredFrame, Block, DrawingRun, Paragraph } fro
 /** A frame whose content should flow inline rather than overlay. */
 function isFlowable(frame: AnchoredFrame): boolean {
   if (frame.behindText) return false;
+  // Only a textbox positioned relative to the text COLUMN shares the
+  // body's coordinate system — splicing it in at the anchor keeps it
+  // where Word drew it. A box positioned relative to the page MARGIN or
+  // PAGE is an absolute layout element: a flyer's grid of headings and
+  // call-outs sits at fixed page coordinates, and inlining those would
+  // stack them into a single column and destroy the layout. Those stay
+  // positioned overlays. (Vertical anchoring is `paragraph` for both —
+  // it's the HORIZONTAL frame that tells flow from absolute placement.)
+  if (frame.anchor.horizontalFrom !== "column") return false;
   if (frame.anchor.verticalFrom !== "paragraph") return false;
   if (frame.anchor.paragraphIndex === undefined) return false;
   switch (frame.wrap) {
