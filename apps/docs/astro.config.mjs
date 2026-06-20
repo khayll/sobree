@@ -1,6 +1,19 @@
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 
+const softwareSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Sobree",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Web",
+  description: "Open-source, embeddable DOCX/OOXML editor engine for browser apps.",
+  url: "https://docs.sobree.dev/",
+  codeRepository: "https://github.com/khayll/sobree",
+  license: "https://opensource.org/license/mit",
+  programmingLanguage: "TypeScript",
+};
+
 /**
  * docs.sobree.dev — built on Starlight.
  *
@@ -17,6 +30,13 @@ export default defineConfig({
       logo: { src: "./src/assets/logo-mark.svg", replacesTitle: false },
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/khayll/sobree" }],
       customCss: ["./src/styles/sobree-tokens.css"],
+      head: [
+        {
+          tag: "script",
+          attrs: { type: "application/ld+json" },
+          content: JSON.stringify(softwareSchema),
+        },
+      ],
       sidebar: [
         {
           label: "Get started",
