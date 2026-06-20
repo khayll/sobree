@@ -1,5 +1,12 @@
 # @sobree/zoom-controls
 
+## 0.1.21
+
+### Patch Changes
+
+- Updated dependencies [8c89207]
+  - @sobree/core@0.1.21
+
 ## 0.1.20
 
 ### Patch Changes
