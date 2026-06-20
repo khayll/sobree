@@ -274,6 +274,13 @@ export class Editor {
    */
   private readonly dirtyFrameIds = new Set<string>();
   /**
+   * Set by `syncFromDom` when the pending change was a pure live frame
+   * keystroke; read (and reset) by `emitChangeNow` into the change
+   * payload's `liveFrameEdit`. Lets the host skip the overlay repaint
+   * that would clobber the caret, while still repainting on undo/remote.
+   */
+  private pendingLiveFrameEdit = false;
+  /**
    * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
    * once in the constructor; closes over this instance's privates so the
    * `commit` pipeline / lock checks stay private to the class. See
@@ -1069,6 +1076,11 @@ export class Editor {
   }
 
   private syncFromDom(): SobreeDocument {
+    // Classify the change so the host knows whether the floating overlay
+    // is already current (live frame typing) or stale (anything else).
+    const bodyChanged = this.domDirty;
+    const frameChanged = this.dirtyFrameIds.size > 0;
+    this.pendingLiveFrameEdit = frameChanged && !bodyChanged;
     // Body read-back — only when a body host actually changed. A pure
     // frame edit (domDirty false) must NOT re-serialise the body: that
     // would churn the registry and risk clobbering AST-only properties.
@@ -1202,6 +1214,10 @@ export class Editor {
    */
   private emitChangeNow(): void {
     this.revision += 1;
+    // Consume the flag here (not only when there are listeners) so a
+    // later emit can't inherit a stale `true`.
+    const liveFrameEdit = this.pendingLiveFrameEdit;
+    this.pendingLiveFrameEdit = false;
     if (!this.events.hasChangeListeners()) return;
     const stripped = stripBinary(this.doc);
     this.events.emitChange({
@@ -1210,6 +1226,7 @@ export class Editor {
       document: stripped,
       revision: this.revision,
       documentVersion: this.registry.documentVersion(),
+      ...(liveFrameEdit ? { liveFrameEdit: true } : {}),
     });
   }
 

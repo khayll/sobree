@@ -123,6 +123,15 @@ export interface ChangePayload {
   document: SobreeDocument;
   revision: number;
   documentVersion: number;
+  /**
+   * True when this change came from a live keystroke inside an editable
+   * textbox frame — the frame's DOM already holds the edit, so the host
+   * can skip repainting the floating overlay (which would clobber the
+   * caret). Absent / false for body edits, API mutations, undo/redo, and
+   * remote (Y.Doc-driven) changes — those re-render from the AST, so the
+   * overlay IS stale and must repaint.
+   */
+  liveFrameEdit?: boolean;
 }
 
 /** Summary of a top-level block, for `getBlocks()` and list-style UIs. */

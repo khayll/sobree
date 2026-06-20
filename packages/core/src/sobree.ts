@@ -176,13 +176,15 @@ export class Sobree {
       // is the path that makes undo/redo of page-setup edits visually
       // revert the paper. Without it, Y.UndoManager reverses the AST
       // but the renderer keeps using the post-edit `setup`.
-      // A live edit inside a floating textbox frame changes only that
-      // frame's prose (already persisted to the AST/Y.Doc by the editor's
-      // frame read-back). Nothing structural moved, and re-pushing the
-      // doc to the stack would repaint the overlay and blow away the caret
-      // mid-typing — so skip the whole stack sync until focus leaves the
-      // frame. The next ordinary change repaints it from the current AST.
-      if (!this.isEditingFrame()) {
+      // A live keystroke inside a floating textbox frame changes only that
+      // frame's prose, already in its DOM and persisted to the AST/Y.Doc by
+      // the editor's frame read-back. Nothing structural moved, and
+      // re-pushing the doc to the stack would repaint the overlay and blow
+      // away the caret mid-typing — so skip the stack sync for it. Every
+      // other change (body edit, API mutation, undo/redo, remote) is
+      // AST-driven: the overlay is stale and MUST repaint, even if a frame
+      // happens to be focused. The editor tags the former via `liveFrameEdit`.
+      if (!payload.liveFrameEdit) {
         this.syncSetupFromDocument();
         // Keep the stack's per-section overrides in sync. AST sections may
         // have shifted (insert/delete of section breaks, edits to section
@@ -371,23 +373,14 @@ export class Sobree {
    */
   private paginateUnlessZoneEditing(): void {
     if (this.stack.root.classList.contains("is-zone-editing")) return;
-    // A live edit inside a floating textbox frame must not trigger a
-    // repaginate: the frame's DOM already holds the keystroke, frames
-    // don't drive body pagination, and repainting the overlay would blow
-    // away the caret mid-typing. The frame read-back already persisted the
-    // edit to the AST/Y.Doc; the next body-driven repaginate repaints it.
-    if (this.isEditingFrame()) return;
+    // Live frame keystrokes never reach here — the change handler skips the
+    // whole stack sync for them (`liveFrameEdit`). Everything that does
+    // reach here is AST-driven and repaginates normally.
     this.stack.repaginate();
     this.repaginateWhenFontsSettle();
   }
 
   /** True while the caret sits in an editable floating textbox frame. */
-  private isEditingFrame(): boolean {
-    const active = this.stack.root.ownerDocument.activeElement;
-    return (
-      active instanceof Element && active.closest(".paper-anchor[data-anchor-textbox]") !== null
-    );
-  }
 
   /**
    * Pagination and column balancing measure laid-out text, so they depend

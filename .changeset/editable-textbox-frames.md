@@ -21,6 +21,10 @@ into `anchoredFrames[id].content.body` and persists to the Y.Doc.
   super- / subscript — Cmd+B/I/U etc.) apply natively to the frame's
   selection, and the read-back's inline serializer maps the resulting
   tags back to run properties.
+- Undo/redo of a frame edit now reverts the frame's DOM, not just the AST:
+  the change payload carries `liveFrameEdit` so the host skips the overlay
+  repaint only for a live keystroke (caret-preserving) and always repaints
+  on undo/redo and remote (Y.Doc) changes, which are AST-driven.
 
 Local editing only for now — frame bodies still mirror to the Y.Doc as a
 single meta blob, so granular/collaborative per-box editing is a
