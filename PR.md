@@ -77,3 +77,18 @@ diff: if the PR changes the *behaviour* of anything with an API page
 (viewport, history, docx, …), the page changes in the same PR.
 (Bug history: the render-tier retirement shipped in three PRs while
 `api/viewport.md` kept instructing embedders to wire the dead callback.)
+
+## 5. Public docs remain discoverable
+
+For docs, homepage, marketing, deployment, or positioning changes, verify
+that search and answer-engine entry points still describe the current
+product accurately:
+
+- `apps/docs/public/llms.txt` lists the best canonical entry points for
+  product, docs, architecture, and agent use cases.
+- `apps/docs/astro.config.mjs` sidebar links keep high-intent pages
+  crawlable and visible to humans.
+- High-intent pages under `apps/docs/src/content/docs/use-cases/` stay
+  consistent with homepage copy, README copy, and API reality.
+- New discoverability pages are linked from the Starlight sidebar or
+  another crawlable page; orphan pages do not count.
