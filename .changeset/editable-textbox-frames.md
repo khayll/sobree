@@ -16,6 +16,11 @@ into `anchoredFrames[id].content.body` and persists to the Y.Doc.
   read-back (`serializeHostsToDocument` per frame) instead of the body
   read-back, and skips the stack repaint while a frame is focused so the
   caret survives continuous typing. Read mode repaints the overlay inert.
+- Formatting shortcuts work inside frames: when the caret is in a frame,
+  the mark commands (`mark.toggle.bold` / italic / underline / strike /
+  super- / subscript — Cmd+B/I/U etc.) apply natively to the frame's
+  selection, and the read-back's inline serializer maps the resulting
+  tags back to run properties.
 
 Local editing only for now — frame bodies still mirror to the Y.Doc as a
 single meta blob, so granular/collaborative per-box editing is a

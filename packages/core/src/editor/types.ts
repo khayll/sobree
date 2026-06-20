@@ -212,6 +212,18 @@ export interface EditorLike {
     opts?: { expect?: Record<string, number> },
   ): EditResult<void>;
   readonly selection: EditorSelectionLike;
+  /**
+   * When the caret sits in an editable textbox frame, toggle a mark
+   * (`"strong"`/`"em"`/`"u"`/`"s"`/`"sup"`/`"sub"`) natively on that
+   * frame's selection — the frame read-back captures the result. Returns
+   * `true` when handled (caret was in a frame), `false` otherwise so the
+   * caller falls back to the body mark path. Optional: implemented by the
+   * DOM Editor, absent on headless peers (which have no frame DOM).
+   */
+  applyFrameMark?(tag: string): boolean;
+  /** Active state of `tag` at the frame caret, or `null` when the caret
+   *  isn't in a frame (caller uses the body `isMarkActive`). */
+  frameMarkActive?(tag: string): boolean | null;
 }
 
 export type EditorEvent = "change" | "selection" | "keydown" | "track-changes-change";

@@ -97,4 +97,37 @@ describe("editor.commands", () => {
     expect(snap?.isAvailable).toBe(true);
     expect(snap?.isActive).toBe(false);
   });
+
+  it("applyFrameMark is a no-op (false) when the caret is not in a textbox frame", () => {
+    // Body selection → the mark command falls through to the body path.
+    expect(ed.applyFrameMark("strong")).toBe(false);
+    expect(ed.frameMarkActive("strong")).toBeNull();
+  });
+
+  it("applyFrameMark routes to the frame when the caret is inside an editable textbox frame", () => {
+    const frame = document.createElement("div");
+    frame.className = "paper-anchor";
+    frame.dataset.anchorTextbox = "";
+    frame.dataset.anchorId = "anchor-9";
+    frame.contentEditable = "true";
+    const p = document.createElement("p");
+    p.textContent = "Hi";
+    frame.appendChild(p);
+    ed.host.appendChild(frame);
+    const sel = document.getSelection()!;
+    const r = document.createRange();
+    r.selectNodeContents(p);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    // jsdom has no execCommand — mock it to observe the native command the
+    // frame path issues (its document effect isn't testable here; the
+    // playground covers the full round-trip).
+    const execSpy = vi.fn(() => true);
+    (document as unknown as { execCommand: typeof document.execCommand }).execCommand =
+      execSpy as unknown as typeof document.execCommand;
+    expect(ed.applyFrameMark("strong")).toBe(true);
+    expect(execSpy).toHaveBeenCalledWith("bold");
+    expect(ed.applyFrameMark("u")).toBe(true);
+    expect(execSpy).toHaveBeenCalledWith("underline");
+  });
 });

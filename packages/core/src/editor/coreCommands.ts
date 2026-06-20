@@ -47,10 +47,15 @@ export function registerCoreCommands(
       name,
       title,
       run: () => {
+        // Caret in an editable textbox frame → apply natively there; the
+        // body-selection path below can't address frame coordinates.
+        if (editor.applyFrameMark?.(tag)) return;
         const range = rangeAtSelection(editor);
         if (range) toggleMark(editor, range, tag);
       },
       isActive: () => {
+        const inFrame = editor.frameMarkActive?.(tag);
+        if (inFrame !== null && inFrame !== undefined) return inFrame;
         const range = rangeAtSelection(editor);
         return !!range && isMarkActive(editor, range, tag);
       },

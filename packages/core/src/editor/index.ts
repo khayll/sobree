@@ -123,6 +123,22 @@ export type { RunPropertiesPatch };
  * Conflicts return `{ ok: false, error: { code: "optimistic-lock", … } }`
  * rather than throwing.
  */
+
+/**
+ * Mark tag → `document.execCommand` name, for applying a toggle mark
+ * inside an editable textbox frame (where the body-selection path can't
+ * reach). The native commands produce `<b>`/`<i>`/`<u>`/… which the
+ * frame read-back's inline serializer maps back to run properties.
+ */
+const MARK_EXEC_COMMAND: Record<string, string> = {
+  strong: "bold",
+  em: "italic",
+  u: "underline",
+  s: "strikeThrough",
+  sup: "superscript",
+  sub: "subscript",
+};
+
 export class Editor {
   readonly host: HTMLElement;
   readonly selection: EditorSelection;
@@ -1131,6 +1147,35 @@ export class Editor {
     if (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
     const frame = (node as Element | null)?.closest?.(".paper-anchor[data-anchor-textbox]");
     return (frame as HTMLElement | null)?.dataset.anchorId ?? null;
+  }
+
+  /**
+   * Toggle a mark on the caret inside an editable textbox frame, natively
+   * (`document.execCommand`), so the body-selection mark path doesn't have
+   * to understand frame coordinates. The resulting `<b>`/`<i>`/`<u>` tags
+   * round-trip through the frame read-back (the inline serializer maps them
+   * to run properties). Returns false when the caret isn't in a frame, so
+   * the mark command falls back to the body path.
+   */
+  applyFrameMark(tag: string): boolean {
+    const frameId = this.editedFrameId();
+    if (frameId === null) return false;
+    const cmd = MARK_EXEC_COMMAND[tag];
+    if (!cmd) return false;
+    this.host.ownerDocument.execCommand(cmd);
+    // `execCommand` fires `input`, but mark it dirty explicitly so the
+    // read-back runs even on engines that don't emit one for formatting.
+    this.dirtyFrameIds.add(frameId);
+    this.scheduleChange();
+    return true;
+  }
+
+  /** Active state of `tag` at a frame caret (toolbar highlight), or null
+   *  when the caret isn't in a frame. */
+  frameMarkActive(tag: string): boolean | null {
+    if (this.editedFrameId() === null) return null;
+    const cmd = MARK_EXEC_COMMAND[tag];
+    return cmd ? this.host.ownerDocument.queryCommandState(cmd) : false;
   }
 
   /**
