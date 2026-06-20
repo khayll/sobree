@@ -176,7 +176,14 @@ function zoneHasContent(z: PageZoneText): boolean {
 }
 
 function roundMm(twips: number): number {
-  return Math.round(twips / MM_TO_TWIPS);
+  // Keep sub-millimetre precision. Word's default 0.5" margin is 720
+  // twips = exactly 12.7mm; rounding to a whole millimetre (13mm) both
+  // shifts every margin-anchored frame ~0.3mm right — visible as uneven
+  // left/right page margins — AND breaks round-trip, since 13mm exports
+  // back as 737 twips, not 720. Two decimals is finer than one twip
+  // (≈0.0176mm), so the value survives the mm↔twip round-trip losslessly
+  // while still displaying cleanly (12.7, not 12.69999…) in the UI.
+  return Math.round((twips / MM_TO_TWIPS) * 100) / 100;
 }
 
 /**
