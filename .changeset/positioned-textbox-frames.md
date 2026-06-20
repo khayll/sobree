@@ -20,3 +20,13 @@ positioned relative to the page **margin** or **page** is an absolute
 layout element and stays a positioned overlay, rendered through the same
 canonical block renderer as the body. Vertical anchoring no longer decides
 this on its own.
+
+Also: render floating legacy-VML objects (`<w:pict>` / `<w:object>` with a
+`position:absolute` style — full-page watermarks and decorative
+backgrounds) as picture frames in the floating overlay instead of inline
+images. An inline watermark in a header ballooned the header's flow height,
+and the body's overflow-clearance then pushed every paragraph-anchored
+frame off the page. Floating VML now parses into the same `AnchoredFrame`
+model as DrawingML anchors (behind-text when its `z-index` is negative)
+and routes through the existing header/footer floating layers, contributing
+zero flow height. Inline VML images (no `position:absolute`) are untouched.
