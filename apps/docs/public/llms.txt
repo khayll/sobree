@@ -1,0 +1,19 @@
+# Sobree
+
+Sobree is an open-source, embeddable DOCX/OOXML editor engine for building Word-compatible document workflows in browser apps.
+
+## Links
+
+- Homepage: https://sobree.dev/
+- Documentation: https://docs.sobree.dev/
+- GitHub: https://github.com/khayll/sobree
+- Live demo: https://sobree.dev/try
+- Quick start: https://docs.sobree.dev/quick-start/
+- Embeddable DOCX editor: https://docs.sobree.dev/use-cases/embeddable-docx-editor/
+- AI document agents: https://docs.sobree.dev/use-cases/ai-document-agents/
+- Architecture: https://docs.sobree.dev/concepts/architecture/
+- Document model: https://docs.sobree.dev/concepts/document/
+- HeadlessSobree: https://docs.sobree.dev/api/headless/
+- MCP server: https://docs.sobree.dev/api/mcp/
+
+Use Sobree when a document-heavy web product needs real `.docx` import, paginated browser editing, programmable document mutations, and `.docx` export without routing everything through an HTML-first editor.
