@@ -64,6 +64,46 @@ const CHAINS: Array<{ match: RegExp; chain: string }> = [
   { match: /^helvetica$/i, chain: `Helvetica, 'Helvetica Neue', Arial, sans-serif` },
   { match: /^helvetica neue$/i, chain: `'Helvetica Neue', Helvetica, Arial, sans-serif` },
   { match: /^verdana$/i, chain: "Verdana, Geneva, Tahoma, sans-serif" },
+  // Humanist / geometric sans families common in marketing + web docs
+  // but rarely installed on the rendering host. The terminal generic
+  // MUST be `sans-serif`: the unknown-font default below ends in `serif`
+  // (right for an unknown SERIF face, which Word substitutes with Times),
+  // but a missing SANS face — Word substitutes those with a sans, not a
+  // serif — would otherwise render as Times here while Word shows sans.
+  // That's exactly the "why is the heading serif in Sobree but sans in
+  // Word" gap on Adobe-templated flyers (Myriad Pro). Chains stay
+  // macOS/Win-safe (Helvetica Neue / Segoe UI / Arial) for close metrics.
+  {
+    match: /^myriad pro$/i,
+    chain: `'Myriad Pro', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
+  {
+    match: /^myriad pro cond$/i,
+    chain: `'Myriad Pro Cond', 'Arial Narrow', 'Helvetica Neue', Helvetica, sans-serif`,
+  },
+  {
+    match: /^open sans$/i,
+    chain: `'Open Sans', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
+  { match: /^segoe ui$/i, chain: `'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif` },
+  { match: /^lato$/i, chain: `Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif` },
+  {
+    match: /^montserrat$/i,
+    chain: `Montserrat, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
+  { match: /^roboto$/i, chain: `Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif` },
+  {
+    match: /^source sans pro$/i,
+    chain: `'Source Sans Pro', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
+  {
+    match: /^(trebuchet ms|tahoma)$/i,
+    chain: `'Trebuchet MS', Tahoma, 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
+  {
+    match: /^century gothic$/i,
+    chain: `'Century Gothic', 'Apple Gothic', 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
 ];
 
 /**
