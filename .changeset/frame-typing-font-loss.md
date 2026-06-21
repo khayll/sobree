@@ -20,3 +20,8 @@ family corrupting) when you type into it.
   `font-family` value before splitting on commas, leaving a stray quote on
   the first name (`Myriad Pro Cond'`) that failed to round-trip. It now
   splits first, then strips quotes.
+- **Undo dropped focus out of the frame.** Undo/redo rebuilds the anchor
+  overlay, detaching the focused frame element — so the caret fell back to
+  `<body>` and the next `Cmd+Z` didn't route until you clicked back in. The
+  repaint now remembers the focused frame's id and caret offset, and
+  restores both into the freshly-painted same-id frame.
