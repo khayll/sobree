@@ -1,5 +1,5 @@
 ---
-"@sobree/core": minor
+"@sobree/core": patch
 ---
 
 Make floating text boxes editable. Anchored textbox frames (a flyer's
