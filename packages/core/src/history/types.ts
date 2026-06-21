@@ -4,6 +4,44 @@
  * SnapshotSelection) that lived here in Phase 1a are no longer needed.
  */
 
+import type { Selection } from "../doc/api";
+
+/**
+ * Selection inside an editable textbox frame. Frame bodies aren't body
+ * registry blocks, so the public `Selection` model can't address them —
+ * but undo/redo still needs to put the caret (or range) back. The editor
+ * captures this on a frame edit and restores it on undo, exactly as it
+ * does the body `Selection`; `History` treats the stashed value as opaque.
+ * A collapsed caret has `start === end`.
+ */
+export interface FrameSelection {
+  kind: "frame-selection";
+  /** `data-anchor-id` of the frame the selection was in. */
+  frameId: string;
+  /** Character offset of the selection start across the frame's text. */
+  start: number;
+  /** Character offset of the selection end (=== start for a caret). */
+  end: number;
+}
+
+/**
+ * What the editor stashes for an undo step: a body `Selection` (incl.
+ * `null` when focus is outside) or a {@link FrameSelection}. Restored
+ * verbatim on undo/redo so the cursor lands where the body's would.
+ */
+export type CapturedSelection = Selection | FrameSelection;
+
+/**
+ * Both ends of an undo step's cursor: where it sat BEFORE the edit and
+ * AFTER it. Undo restores `before` (you land where you started the edit);
+ * redo restores `after` (you land where the edit left you) — Word/Docs
+ * behaviour. Stashed on each `Y.UndoManager` stack item's meta.
+ */
+export interface UndoSelections {
+  before: CapturedSelection;
+  after: CapturedSelection;
+}
+
 export interface HistoryConfig {
   /** Hard cap on entry count (per stack). UndoManager doesn't expose
    *  a max-depth knob directly — kept here for forward-compat in case

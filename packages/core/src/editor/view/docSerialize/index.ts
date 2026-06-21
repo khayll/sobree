@@ -8,8 +8,25 @@ import { type BlockSerializeContext, blocksFromNodes } from "./block";
  * produced here — the Sobree façade injects those from its current page
  * setup state before handing the document off to the exporter.
  */
-export function serializeHostsToDocument(hosts: readonly HTMLElement[]): SobreeDocument {
-  const ctx: BlockSerializeContext = { numbering: [], currentList: null };
+export interface SerializeHostsOptions {
+  /**
+   * Capture each paragraph's effective base run style into
+   * `ParagraphProperties.runDefaults`. Set for textbox-frame read-back so a
+   * frame's font survives run-level styling loss; left off for body flow,
+   * which stays style-linked. See `BlockSerializeContext.captureRunDefaults`.
+   */
+  captureRunDefaults?: boolean;
+}
+
+export function serializeHostsToDocument(
+  hosts: readonly HTMLElement[],
+  options: SerializeHostsOptions = {},
+): SobreeDocument {
+  const ctx: BlockSerializeContext = {
+    numbering: [],
+    currentList: null,
+    captureRunDefaults: options.captureRunDefaults ?? false,
+  };
   const body = [];
   for (const host of hosts) {
     body.push(...blocksFromNodes(Array.from(host.childNodes), ctx));

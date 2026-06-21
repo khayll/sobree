@@ -18,12 +18,14 @@ import type { Block, InlineRun, SobreeDocument } from "../doc/types";
 import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
 import { FontFaceRegistry } from "../fonts";
 import { History } from "../history";
+import type { CapturedSelection } from "../history/types";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
 import { EditorCommands } from "./commands";
 import type { EditorContext } from "./context";
 import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
+import { applyFrameSelection, frameSelectionOffsets } from "./internal/frameCaret";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import { EditorNumbering } from "./numbering";
@@ -281,6 +283,20 @@ export class Editor {
    */
   private pendingLiveFrameEdit = false;
   /**
+   * The editing context the caret was last in — a frame id, or `"body"`.
+   * When it changes, the undo-capture group is closed so each box's edit
+   * is a distinct undo step. `null` until the first selection.
+   */
+  private lastEditContext: string | null = null;
+  /**
+   * Selection captured at `beforeinput` (pre-DOM-mutation) for the open
+   * undo group — restored on undo so the caret lands where the edit began.
+   * `hasPendingPreEdit` distinguishes "nothing stashed" from a stashed
+   * `null` (a body `Selection` can legitimately be `null`).
+   */
+  private pendingPreEdit: CapturedSelection = null;
+  private hasPendingPreEdit = false;
+  /**
    * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
    * once in the constructor; closes over this instance's privates so the
    * `commit` pipeline / lock checks stay private to the class. See
@@ -336,10 +352,10 @@ export class Editor {
     this.history = new History({
       ydoc: this.ydoc,
       localOrigin: "local",
-      captureSelection: () => this.selection.get(),
-      restoreSelection: (sel) => {
-        if (sel) applySelectionToDom(this._hosts(), this.registry, sel);
-      },
+      captureSelection: () => this.captureSelectionForHistory(),
+      capturePreEditSelection: () => this.capturePreEditSelection(),
+      restoreSelection: (sel) => this.restoreCapturedSelection(sel),
+      onGroupSettled: () => this.clearPendingPreEditSelection(),
     });
 
     this.ctx = this.buildContext();
@@ -373,6 +389,7 @@ export class Editor {
       history: this.history,
       trackedInput: this.trackedInput,
       isTrackedEnabled: () => this.trackChanges.enabled,
+      onBeforeInput: () => this.onBeforeInput(),
       onInput: () => {
         // Route the edit: a caret inside an editable textbox frame reads
         // back into that frame's body, NOT the document body. Everything
@@ -1122,6 +1139,11 @@ export class Editor {
    * its body directly into it), so `serializeHostsToDocument([el])` yields
    * the same `Block[]` shape as a body host. Matched to the AST frame by
    * its stable `data-anchor-id`. Pure body swap — geometry/anchor untouched.
+   *
+   * `captureRunDefaults` promotes each paragraph's rendered base font to
+   * `runDefaults`, so a frame's text keeps its size/family even when a
+   * keystroke (or a select-all-retype) strips every run's inline styling —
+   * the heading no longer collapses to the default font on the next repaint.
    */
   private syncFramesFromDom(): void {
     const frames = this.doc.anchoredFrames;
@@ -1140,7 +1162,7 @@ export class Editor {
       if (!this.dirtyFrameIds.has(f.id) || f.content.kind !== "textbox") return f;
       const el = elById.get(f.id);
       if (!el) return f;
-      const body = serializeHostsToDocument([el]).body;
+      const body = serializeHostsToDocument([el], { captureRunDefaults: true }).body;
       changed = true;
       return { ...f, content: { ...f.content, body } };
     });
@@ -1154,11 +1176,96 @@ export class Editor {
    * `input` event to the frame read-back instead of the body read-back.
    */
   private editedFrameId(): string | null {
+    return this.focusedFrameEl()?.dataset.anchorId ?? null;
+  }
+
+  /** The editable textbox frame element the caret is inside, or null. */
+  private focusedFrameEl(): HTMLElement | null {
     const sel = this.host.ownerDocument.getSelection();
     let node: Node | null = sel?.anchorNode ?? null;
     if (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
     const frame = (node as Element | null)?.closest?.(".paper-anchor[data-anchor-textbox]");
-    return (frame as HTMLElement | null)?.dataset.anchorId ?? null;
+    return (frame as HTMLElement | null) ?? null;
+  }
+
+  /** The (freshly-painted) frame element with this `data-anchor-id`, or null. */
+  private frameElById(id: string): HTMLElement | null {
+    for (const el of this.host.querySelectorAll<HTMLElement>(
+      ".paper-anchor[data-anchor-textbox]",
+    )) {
+      if (el.dataset.anchorId === id) return el;
+    }
+    return null;
+  }
+
+  /**
+   * Capture the live selection for an undo step. A selection inside an
+   * editable textbox frame becomes a `FrameSelection` — the body
+   * `Selection` model is keyed on registry blocks and can't address frame
+   * content — so undo can restore it the same way it restores a body
+   * selection. Everything else is an ordinary body selection.
+   */
+  private captureSelectionForHistory(): CapturedSelection {
+    const frame = this.focusedFrameEl();
+    if (frame?.dataset.anchorId) {
+      const offsets = frameSelectionOffsets(frame, this.host.ownerDocument) ?? { start: 0, end: 0 };
+      return { kind: "frame-selection", frameId: frame.dataset.anchorId, ...offsets };
+    }
+    return this.selection.get();
+  }
+
+  /**
+   * The selection BEFORE the edit that opened the current undo group,
+   * stashed by `onBeforeInput` (which fires before the DOM mutates). Falls
+   * back to the live selection for edits that bypass `beforeinput`
+   * (programmatic mutations, `setDocument`).
+   */
+  private capturePreEditSelection(): CapturedSelection {
+    return this.hasPendingPreEdit ? this.pendingPreEdit : this.captureSelectionForHistory();
+  }
+
+  /**
+   * Stash the pre-edit selection on the first input of a new undo group,
+   * so undo can land the caret where the edit began. `beforeinput` fires
+   * before the browser mutates the DOM, so the live selection here is the
+   * pre-edit position. Only the FIRST input of a group stashes; coalesced
+   * inputs leave the group's `before` intact (`History.onGroupSettled`
+   * clears the stash once a step has captured).
+   *
+   * Scoped to textbox frames. The body already restores its caret through
+   * the proven `applySelectionToDom` path on `stack-item-popped`; we leave
+   * its behaviour byte-for-byte unchanged (no pre-edit stash → `before`
+   * falls back to the post-edit selection, same as `after`). Frames had no
+   * working restore at all, so they get the full pre-/post-edit treatment.
+   */
+  private onBeforeInput(): void {
+    if (this.hasPendingPreEdit || this.focusedFrameEl() === null) return;
+    this.pendingPreEdit = this.captureSelectionForHistory();
+    this.hasPendingPreEdit = true;
+  }
+
+  /** Drop the pending pre-edit stash — a step has captured (or extended) it. */
+  private clearPendingPreEditSelection(): void {
+    this.hasPendingPreEdit = false;
+    this.pendingPreEdit = null;
+  }
+
+  /**
+   * Restore an undo step's selection. Fires on `stack-item-popped`, which
+   * runs AFTER the change handler has already repainted the frame overlay
+   * (`adoptYDocState` calls `emitChangeNow` synchronously), so a captured
+   * frame selection lands on the fresh frame element and sticks — the same
+   * lifecycle the body selection restore relies on.
+   */
+  private restoreCapturedSelection(sel: CapturedSelection): void {
+    if (sel && sel.kind === "frame-selection") {
+      const frame = this.frameElById(sel.frameId);
+      if (!frame) return;
+      frame.focus({ preventScroll: true });
+      applyFrameSelection(frame, { start: sel.start, end: sel.end }, this.host.ownerDocument);
+      return;
+    }
+    if (sel) applySelectionToDom(this._hosts(), this.registry, sel);
   }
 
   /**
@@ -1278,7 +1385,23 @@ export class Editor {
    * even when no subscribers exist (the early-return keeps it cheap).
    */
   private fireSelection(): void {
+    this.breakUndoOnContextChange();
     this.events.emitSelection(this.selection.get());
+  }
+
+  /**
+   * When the caret moves to a different editing context — another textbox
+   * frame, or between a frame and the body — close the undo-capture group
+   * so the next edit there is its own undo step. Without this, two edits
+   * to different boxes within `captureTimeout` coalesce and a single undo
+   * reverts both, unlike Word (where each box is a distinct action).
+   */
+  private breakUndoOnContextChange(): void {
+    const context = this.editedFrameId() ?? "body";
+    if (context !== this.lastEditContext) {
+      this.lastEditContext = context;
+      this.history.stopCapturing();
+    }
   }
 
   private fireKeyDown(e: KeyboardEvent): void {

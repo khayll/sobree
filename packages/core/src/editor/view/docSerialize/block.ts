@@ -4,7 +4,7 @@ import type {
   Paragraph,
   ParagraphProperties,
 } from "../../../doc/types";
-import { serializeInlineChildren } from "./inline";
+import { mergeStyleAttribute, serializeInlineChildren } from "./inline";
 import { tableFromElement } from "./table";
 
 export interface BlockSerializeContext {
@@ -15,6 +15,21 @@ export interface BlockSerializeContext {
    * caller between lists.
    */
   currentList: { numId: number; ordered: boolean } | null;
+  /**
+   * Capture each paragraph's effective base run style (from the rendered
+   * `<p>`'s inline font) into `ParagraphProperties.runDefaults`.
+   *
+   * Used for textbox-frame read-back only. A frame's text carries its font
+   * on the runs, with no named style to fall back on; so when a keystroke
+   * lands in a bare text node — or a select-all-retype replaces every
+   * styled span with one unstyled node — the runs lose their font and a
+   * repaint renders the whole line at the default tiny size. The `<p>`
+   * element keeps its inline font through these DOM edits, so promoting it
+   * to a paragraph-level default makes the font survive run-level loss.
+   * Body flow leaves this off: its runs legitimately inherit from named
+   * styles, which must stay style-linked across edits.
+   */
+  captureRunDefaults?: boolean;
 }
 
 export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeContext): Block[] {
@@ -64,6 +79,7 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
           properties: { numbering: { numId, level: 0 } },
           runs: serializeInlineChildren(li),
         };
+        if (ctx.captureRunDefaults) applyRunDefaults(paragraph.properties, li);
         out.push(paragraph);
       }
       ctx.currentList = null;
@@ -95,13 +111,19 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
       for (const child of Array.from(node.children)) {
         if (!(child instanceof HTMLElement)) continue;
         const para = paragraphFromElement(child, "Quote");
-        if (para) out.push(para);
+        if (para) {
+          if (ctx.captureRunDefaults) applyRunDefaults(para.properties, child);
+          out.push(para);
+        }
       }
       continue;
     }
 
     const para = paragraphFromElement(node);
-    if (para) out.push(para);
+    if (para) {
+      if (ctx.captureRunDefaults) applyRunDefaults(para.properties, node);
+      out.push(para);
+    }
   }
   return out;
 }
@@ -144,4 +166,21 @@ function paragraphFromElement(el: HTMLElement, forcedStyleId?: string): Paragrap
     properties,
     runs: serializeInlineChildren(el),
   };
+}
+
+/**
+ * Promote a paragraph's rendered base run style (the `<p>`'s own inline
+ * font, set by the renderer's dominant-run cascade) to
+ * `ParagraphProperties.runDefaults`, so the font survives even when every
+ * run loses its inline styling. See `BlockSerializeContext.captureRunDefaults`.
+ *
+ * The `<p>`'s inline style also carries paragraph-level declarations
+ * (line-height, text-align, margins); `mergeStyleAttribute` reads only the
+ * run-relevant ones (font-family, font-size, colour, weight, …) and drops
+ * the rest. Skip when nothing run-relevant is present so unstyled
+ * paragraphs stay clean.
+ */
+function applyRunDefaults(properties: ParagraphProperties, el: HTMLElement): void {
+  const runProps = mergeStyleAttribute({}, el.getAttribute("style"));
+  if (Object.keys(runProps).length > 0) properties.runDefaults = runProps;
 }

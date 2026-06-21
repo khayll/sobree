@@ -28,6 +28,9 @@ export interface EditorDomHooks {
   trackedInput: TrackedInput;
   /** Tracked-changes authoring mode is on right now. */
   isTrackedEnabled: () => boolean;
+  /** A real edit is about to mutate the DOM (`beforeinput`, before the
+   *  mutation). Lets the editor stash the pre-edit selection for undo. */
+  onBeforeInput: () => void;
   /** Mark the DOM dirty + schedule a debounced change. */
   onInput: () => void;
   /** Fire the editor's `selection` event. */
@@ -71,6 +74,11 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
       hooks.history.redo();
       return;
     }
+    // A genuine edit is about to mutate the DOM — stash the pre-edit
+    // selection so undo can land the caret where the edit began. Done
+    // before the tracked-changes interception below, which may rewrite or
+    // cancel the native mutation but doesn't change where it started.
+    hooks.onBeforeInput();
     // Tracked path: convert the edits we understand into typed
     // `insertRun` / `deleteRange` so the runs carry revision markers.
     // We also take over when tracked mode is OFF but the caret sits in a

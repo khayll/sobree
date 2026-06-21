@@ -133,7 +133,7 @@ function readPxDimension(styleValue: string, attrValue: string | null): number {
   return 0;
 }
 
-function mergeStyleAttribute(base: RunProperties, styleAttr: string | null): RunProperties {
+export function mergeStyleAttribute(base: RunProperties, styleAttr: string | null): RunProperties {
   if (!styleAttr) return base;
   const out: RunProperties = { ...base };
   for (const decl of styleAttr.split(";")) {
@@ -145,11 +145,16 @@ function mergeStyleAttribute(base: RunProperties, styleAttr: string | null): Run
     if (key === "color") out.color = val;
     else if (key === "background" || key === "background-color") out.highlight = val;
     else if (key === "font-family") {
+      // Take the FIRST family, THEN strip quotes. The renderer emits a
+      // fallback chain (`'Myriad Pro Cond', 'Arial Narrow', …`); stripping
+      // before the split left a stray quote on the first name
+      // (`Myriad Pro Cond'`), which then failed to round-trip.
       out.fontFamily =
         val
-          .replace(/^['"]|['"]$/g, "")
           .split(",")[0]
-          ?.trim() || val;
+          ?.trim()
+          .replace(/^['"]|['"]$/g, "")
+          .trim() || val;
     } else if (key === "font-size") {
       const m = val.match(/^([\d.]+)(pt|px)?$/);
       if (m?.[1]) {
