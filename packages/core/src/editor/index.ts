@@ -24,7 +24,6 @@ import type { EditorContext } from "./context";
 import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
-import { inheritBareRunStyling } from "./internal/frameRunStyling";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import { EditorNumbering } from "./numbering";
@@ -1129,6 +1128,11 @@ export class Editor {
    * its body directly into it), so `serializeHostsToDocument([el])` yields
    * the same `Block[]` shape as a body host. Matched to the AST frame by
    * its stable `data-anchor-id`. Pure body swap — geometry/anchor untouched.
+   *
+   * `captureRunDefaults` promotes each paragraph's rendered base font to
+   * `runDefaults`, so a frame's text keeps its size/family even when a
+   * keystroke (or a select-all-retype) strips every run's inline styling —
+   * the heading no longer collapses to the default font on the next repaint.
    */
   private syncFramesFromDom(): void {
     const frames = this.doc.anchoredFrames;
@@ -1147,7 +1151,7 @@ export class Editor {
       if (!this.dirtyFrameIds.has(f.id) || f.content.kind !== "textbox") return f;
       const el = elById.get(f.id);
       if (!el) return f;
-      const body = inheritBareRunStyling(serializeHostsToDocument([el]).body);
+      const body = serializeHostsToDocument([el], { captureRunDefaults: true }).body;
       changed = true;
       return { ...f, content: { ...f.content, body } };
     });

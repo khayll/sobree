@@ -133,7 +133,7 @@ function readPxDimension(styleValue: string, attrValue: string | null): number {
   return 0;
 }
 
-function mergeStyleAttribute(base: RunProperties, styleAttr: string | null): RunProperties {
+export function mergeStyleAttribute(base: RunProperties, styleAttr: string | null): RunProperties {
   if (!styleAttr) return base;
   const out: RunProperties = { ...base };
   for (const decl of styleAttr.split(";")) {
