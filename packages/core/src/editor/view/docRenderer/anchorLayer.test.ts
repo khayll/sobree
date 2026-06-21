@@ -182,6 +182,45 @@ describe("renderAnchorLayer", () => {
     expect(el.querySelectorAll("p")).toHaveLength(0);
   });
 
+  function textboxFrame(over: Partial<AnchoredFrame> = {}): AnchoredFrame {
+    return pictureFrame({
+      content: {
+        kind: "textbox",
+        body: [
+          {
+            kind: "paragraph",
+            runs: [{ kind: "text", text: "X", properties: {} }],
+            properties: {},
+          },
+        ],
+      },
+      ...over,
+    });
+  }
+
+  it("makes a textbox frame an editable island when editable", () => {
+    const layer = renderAnchorLayer([textboxFrame()], { ...ctx(), editable: true });
+    const el = layer.children[0] as HTMLElement;
+    expect(el.contentEditable).toBe("true");
+    expect(el.dataset.anchorTextbox).toBe("");
+    expect(el.style.pointerEvents).toBe("auto");
+  });
+
+  it("leaves textbox frames inert when not editable (read mode / headless)", () => {
+    const layer = renderAnchorLayer([textboxFrame()], ctx());
+    const el = layer.children[0] as HTMLElement;
+    expect(el.getAttribute("contenteditable")).toBeNull();
+    expect(el.dataset.anchorTextbox).toBeUndefined();
+    expect(el.style.pointerEvents).toBe("none");
+  });
+
+  it("never makes a picture frame editable, even in editable mode", () => {
+    const layer = renderAnchorLayer([pictureFrame()], { ...ctx(), editable: true });
+    const el = layer.children[0] as HTMLElement;
+    expect(el.getAttribute("contenteditable")).toBeNull();
+    expect(el.dataset.anchorTextbox).toBeUndefined();
+  });
+
   it("renders group children scaled into the parent frame's coord space", () => {
     const frame: AnchoredFrame = pictureFrame({
       widthEmu: EMU_PER_MM * 100, // rendered 100mm wide

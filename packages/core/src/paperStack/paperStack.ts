@@ -524,6 +524,10 @@ export class PaperStack {
       renderBody: (blocks: Block[], host: HTMLElement) => {
         renderBlocks(blocks, host, richZones.numbering, richZones.styles, richZones.rawParts);
       },
+      // Textbox frames are editable islands unless the stack is in read
+      // mode (`is-read-mode` is toggled by `Sobree.setMode`). Read off the
+      // root at paint time so a mode switch + repaint flips it.
+      editable: !this.root.classList.contains("is-read-mode"),
     };
   }
 
