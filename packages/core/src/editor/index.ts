@@ -24,6 +24,7 @@ import type { EditorContext } from "./context";
 import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
+import { inheritBareRunStyling } from "./internal/frameRunStyling";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import { EditorNumbering } from "./numbering";
@@ -1146,7 +1147,7 @@ export class Editor {
       if (!this.dirtyFrameIds.has(f.id) || f.content.kind !== "textbox") return f;
       const el = elById.get(f.id);
       if (!el) return f;
-      const body = serializeHostsToDocument([el]).body;
+      const body = inheritBareRunStyling(serializeHostsToDocument([el]).body);
       changed = true;
       return { ...f, content: { ...f.content, body } };
     });
