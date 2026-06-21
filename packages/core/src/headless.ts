@@ -205,8 +205,8 @@ export class HeadlessSobree {
       captureSelection: () => this.currentSelection,
       restoreSelection: (sel) => {
         // Headless has no DOM textbox frames, so a captured selection is
-        // always a body `Selection`; ignore the frame-caret variant.
-        this.currentSelection = sel?.kind === "frame-caret" ? null : sel;
+        // always a body `Selection`; ignore the frame-selection variant.
+        this.currentSelection = sel?.kind === "frame-selection" ? null : sel;
       },
     });
 

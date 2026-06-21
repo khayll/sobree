@@ -44,6 +44,7 @@ import {
   DEFAULT_HISTORY_CONFIG,
   type HistoryConfig,
   type HistoryDepth,
+  type UndoSelections,
 } from "./types";
 
 export type HistoryEvent = "change";
@@ -58,14 +59,23 @@ export interface HistoryOptions extends Partial<HistoryConfig> {
    *  local writes. UndoManager only tracks operations whose origin
    *  is in this set. Defaults to `"local"`. */
   localOrigin?: unknown;
-  /** Capture the *current* live selection — called as a stack item
-   *  is being added so we can stash it for restore on undo. Returns a
-   *  body `Selection` or a frame caret; `History` keeps it opaque. */
+  /** Capture the *current* (post-edit) live selection — called as a
+   *  stack item is added/updated, stashed as the step's `after`. Returns
+   *  a body `Selection` or a frame selection; `History` keeps it opaque. */
   captureSelection: () => CapturedSelection;
+  /** Capture the selection as it was BEFORE the edit that opened the
+   *  current undo step — stashed as the step's `before` and restored on
+   *  undo. Defaults to {@link captureSelection} when not provided (callers
+   *  without a pre-edit hook, e.g. headless, get post-edit on both). */
+  capturePreEditSelection?: () => CapturedSelection;
   /** Restore a previously-captured selection to the live DOM /
    *  EditorSelection. Called on undo / redo after the Y.Doc has been
    *  re-projected and re-rendered. */
   restoreSelection: (sel: CapturedSelection) => void;
+  /** Notify the caller that the current undo group has captured (or
+   *  extended) its selection, so it can drop any pending pre-edit stash.
+   *  Fires on every `stack-item-added` / `stack-item-updated`. */
+  onGroupSettled?: () => void;
 }
 
 /** Meta key used to stash captured selection on each stack item. */
@@ -75,11 +85,15 @@ export class History {
   private readonly mgr: Y.UndoManager;
   private readonly listeners = new Set<HistoryListener>();
   private readonly captureSelection: () => CapturedSelection;
+  private readonly capturePreEditSelection: () => CapturedSelection;
   private readonly restoreSelection: (sel: CapturedSelection) => void;
+  private readonly onGroupSettled: () => void;
 
   constructor(opts: HistoryOptions) {
     this.captureSelection = opts.captureSelection;
+    this.capturePreEditSelection = opts.capturePreEditSelection ?? opts.captureSelection;
     this.restoreSelection = opts.restoreSelection;
+    this.onGroupSettled = opts.onGroupSettled ?? (() => {});
     const captureTimeout = opts.coalesceIdleMs ?? DEFAULT_HISTORY_CONFIG.coalesceIdleMs;
     const localOrigin = opts.localOrigin ?? "local";
 
@@ -102,23 +116,37 @@ export class History {
       trackedOrigins: new Set([localOrigin]),
     });
 
-    // Stash the pre-edit selection on each newly-added stack item.
-    // Yjs fires this synchronously at the end of a tracked
-    // transaction — after the AST mutator has produced the new state.
-    // We capture the LIVE selection here, which is the post-edit
-    // position. For undo, we want the *pre-edit* position; that's
-    // captured separately via the input listener (see Editor).
+    // A NEW undo group opens. Yjs fires this synchronously at the end of
+    // the tracked transaction — after the AST mutator produced the new
+    // state, so the live selection is the POST-edit position (`after`).
+    // The PRE-edit position (`before`) was stashed by the editor's
+    // beforeinput hook; restoring it on undo lands the caret where the
+    // edit began — Word/Docs behaviour.
     this.mgr.on("stack-item-added", ({ stackItem }) => {
-      stackItem.meta.set(META_SELECTION_KEY, this.captureSelection());
+      const sels: UndoSelections = {
+        before: this.capturePreEditSelection(),
+        after: this.captureSelection(),
+      };
+      stackItem.meta.set(META_SELECTION_KEY, sels);
+      this.onGroupSettled();
       this.fire();
     });
 
-    // On pop (undo / redo), the inverse Y ops have already run and
-    // the editor's afterTransaction observer has re-projected +
-    // re-rendered. Restore selection to whatever was captured.
-    this.mgr.on("stack-item-popped", ({ stackItem }) => {
-      const sel = stackItem.meta.get(META_SELECTION_KEY) as CapturedSelection | undefined;
-      if (sel !== undefined) this.restoreSelection(sel);
+    // An op COALESCED into the open group (within `captureTimeout`). Keep
+    // the group's original `before`, but extend `after` to the new end so
+    // redo lands at the tail of the whole burst.
+    this.mgr.on("stack-item-updated", ({ stackItem }) => {
+      const sels = stackItem.meta.get(META_SELECTION_KEY) as UndoSelections | undefined;
+      if (sels) sels.after = this.captureSelection();
+      this.onGroupSettled();
+    });
+
+    // On pop (undo / redo), the inverse Y ops have already run and the
+    // editor's afterTransaction observer has re-projected + re-rendered.
+    // Undo restores where the edit BEGAN; redo, where it ENDED.
+    this.mgr.on("stack-item-popped", ({ stackItem, type }) => {
+      const sels = stackItem.meta.get(META_SELECTION_KEY) as UndoSelections | undefined;
+      if (sels) this.restoreSelection(type === "undo" ? sels.before : sels.after);
       this.fire();
     });
   }

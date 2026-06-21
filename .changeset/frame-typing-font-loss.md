@@ -24,8 +24,17 @@ family corrupting) when you type into it.
   isn't a body registry block, so the `Selection` model couldn't address it
   and undo skipped the cursor restore — the rebuilt overlay then dropped
   focus to `<body>`, and the next `Cmd+Z` didn't route until you clicked
-  back in. Frame carets are now first-class in the undo machinery: the
-  editor stashes a `FrameCaret` (frame id + character offset) on each frame
-  edit and restores it on `stack-item-popped`, the same lifecycle the body
-  selection uses. Undo/redo now puts the caret back in the frame — even if
-  focus had moved elsewhere first — exactly like the body.
+  back in. Frame selections are now first-class in the undo machinery, with
+  the same cursor behaviour you get in the body and in Word/Docs:
+  - **Undo lands where the edit began, redo where it ended.** Each undo step
+    stashes both the pre-edit selection (captured at `beforeinput`, before
+    the DOM mutates) and the post-edit one; undo restores the former, redo
+    the latter. A coalesced typing burst keeps its original start but
+    extends its end, so redo lands at the tail of the whole burst.
+  - **Replacing a selection reselects it on undo.** Frame selections are
+    captured as a `{ start, end }` character span, not just a caret, so
+    undoing a type-over restores the original highlight.
+  - Focus returns to the frame even if it had moved elsewhere first, and the
+    caret/range clamps cleanly when an undo reverts to shorter text.
+
+  The body's own undo cursor behaviour is unchanged.

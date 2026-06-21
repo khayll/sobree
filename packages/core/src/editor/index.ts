@@ -25,7 +25,7 @@ import type { EditorContext } from "./context";
 import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
-import { caretCharOffset, placeCaretAtOffset } from "./internal/frameCaret";
+import { applyFrameSelection, frameSelectionOffsets } from "./internal/frameCaret";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import { EditorNumbering } from "./numbering";
@@ -289,6 +289,14 @@ export class Editor {
    */
   private lastEditContext: string | null = null;
   /**
+   * Selection captured at `beforeinput` (pre-DOM-mutation) for the open
+   * undo group — restored on undo so the caret lands where the edit began.
+   * `hasPendingPreEdit` distinguishes "nothing stashed" from a stashed
+   * `null` (a body `Selection` can legitimately be `null`).
+   */
+  private pendingPreEdit: CapturedSelection = null;
+  private hasPendingPreEdit = false;
+  /**
    * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
    * once in the constructor; closes over this instance's privates so the
    * `commit` pipeline / lock checks stay private to the class. See
@@ -345,7 +353,9 @@ export class Editor {
       ydoc: this.ydoc,
       localOrigin: "local",
       captureSelection: () => this.captureSelectionForHistory(),
+      capturePreEditSelection: () => this.capturePreEditSelection(),
       restoreSelection: (sel) => this.restoreCapturedSelection(sel),
+      onGroupSettled: () => this.clearPendingPreEditSelection(),
     });
 
     this.ctx = this.buildContext();
@@ -379,6 +389,7 @@ export class Editor {
       history: this.history,
       trackedInput: this.trackedInput,
       isTrackedEnabled: () => this.trackChanges.enabled,
+      onBeforeInput: () => this.onBeforeInput(),
       onInput: () => {
         // Route the edit: a caret inside an editable textbox frame reads
         // back into that frame's body, NOT the document body. Everything
@@ -1188,34 +1199,70 @@ export class Editor {
   }
 
   /**
-   * Capture the live caret for an undo step. A caret inside an editable
-   * textbox frame becomes a `FrameCaret` — the body `Selection` model is
-   * keyed on registry blocks and can't address frame content — so undo can
-   * restore it the same way it restores a body caret. Everything else is an
-   * ordinary body selection.
+   * Capture the live selection for an undo step. A selection inside an
+   * editable textbox frame becomes a `FrameSelection` — the body
+   * `Selection` model is keyed on registry blocks and can't address frame
+   * content — so undo can restore it the same way it restores a body
+   * selection. Everything else is an ordinary body selection.
    */
   private captureSelectionForHistory(): CapturedSelection {
     const frame = this.focusedFrameEl();
     if (frame?.dataset.anchorId) {
-      const offset = caretCharOffset(frame, this.host.ownerDocument) ?? 0;
-      return { kind: "frame-caret", frameId: frame.dataset.anchorId, offset };
+      const offsets = frameSelectionOffsets(frame, this.host.ownerDocument) ?? { start: 0, end: 0 };
+      return { kind: "frame-selection", frameId: frame.dataset.anchorId, ...offsets };
     }
     return this.selection.get();
   }
 
   /**
-   * Restore an undo step's caret. Fires on `stack-item-popped`, which runs
-   * AFTER the change handler has already repainted the frame overlay
+   * The selection BEFORE the edit that opened the current undo group,
+   * stashed by `onBeforeInput` (which fires before the DOM mutates). Falls
+   * back to the live selection for edits that bypass `beforeinput`
+   * (programmatic mutations, `setDocument`).
+   */
+  private capturePreEditSelection(): CapturedSelection {
+    return this.hasPendingPreEdit ? this.pendingPreEdit : this.captureSelectionForHistory();
+  }
+
+  /**
+   * Stash the pre-edit selection on the first input of a new undo group,
+   * so undo can land the caret where the edit began. `beforeinput` fires
+   * before the browser mutates the DOM, so the live selection here is the
+   * pre-edit position. Only the FIRST input of a group stashes; coalesced
+   * inputs leave the group's `before` intact (`History.onGroupSettled`
+   * clears the stash once a step has captured).
+   *
+   * Scoped to textbox frames. The body already restores its caret through
+   * the proven `applySelectionToDom` path on `stack-item-popped`; we leave
+   * its behaviour byte-for-byte unchanged (no pre-edit stash → `before`
+   * falls back to the post-edit selection, same as `after`). Frames had no
+   * working restore at all, so they get the full pre-/post-edit treatment.
+   */
+  private onBeforeInput(): void {
+    if (this.hasPendingPreEdit || this.focusedFrameEl() === null) return;
+    this.pendingPreEdit = this.captureSelectionForHistory();
+    this.hasPendingPreEdit = true;
+  }
+
+  /** Drop the pending pre-edit stash — a step has captured (or extended) it. */
+  private clearPendingPreEditSelection(): void {
+    this.hasPendingPreEdit = false;
+    this.pendingPreEdit = null;
+  }
+
+  /**
+   * Restore an undo step's selection. Fires on `stack-item-popped`, which
+   * runs AFTER the change handler has already repainted the frame overlay
    * (`adoptYDocState` calls `emitChangeNow` synchronously), so a captured
-   * frame caret lands on the fresh frame element and sticks — the same
+   * frame selection lands on the fresh frame element and sticks — the same
    * lifecycle the body selection restore relies on.
    */
   private restoreCapturedSelection(sel: CapturedSelection): void {
-    if (sel && sel.kind === "frame-caret") {
+    if (sel && sel.kind === "frame-selection") {
       const frame = this.frameElById(sel.frameId);
       if (!frame) return;
       frame.focus({ preventScroll: true });
-      placeCaretAtOffset(frame, sel.offset, this.host.ownerDocument);
+      applyFrameSelection(frame, { start: sel.start, end: sel.end }, this.host.ownerDocument);
       return;
     }
     if (sel) applySelectionToDom(this._hosts(), this.registry, sel);

@@ -18,6 +18,52 @@ function edit(ydoc: Y.Doc, value: string): void {
   ydoc.transact(() => ydoc.getMap("meta").set("k", value), "local");
 }
 
+describe("History selection capture — before/after", () => {
+  // Build a History wired to scriptable capture functions so we can assert
+  // exactly which selection (pre- or post-edit) is restored on undo vs redo.
+  function wired() {
+    const ydoc = new Y.Doc();
+    let live: string | null = "pre"; // what captureSelection() returns "now"
+    const restored: string[] = [];
+    const h = new History({
+      ydoc,
+      coalesceIdleMs: 5000,
+      captureSelection: () => live as unknown as Selection,
+      capturePreEditSelection: () => "PRE" as unknown as Selection,
+      restoreSelection: (s) => restored.push(s as unknown as string),
+      onGroupSettled: () => {},
+    });
+    const setLive = (v: string) => {
+      live = v;
+    };
+    return { ydoc, h, restored, setLive };
+  }
+
+  it("undo restores the pre-edit selection; redo restores the post-edit one", () => {
+    const { ydoc, h, restored, setLive } = wired();
+    setLive("POST"); // live (post-edit) selection at stack-item-added
+    edit(ydoc, "x");
+
+    h.undo();
+    expect(restored).toEqual(["PRE"]); // undo → where the edit began
+    h.redo();
+    expect(restored).toEqual(["PRE", "POST"]); // redo → where it ended
+  });
+
+  it("a coalesced burst keeps the first pre-edit but extends post-edit", () => {
+    const { ydoc, h, restored, setLive } = wired();
+    setLive("POST-1");
+    edit(ydoc, "1"); // opens the group: before=PRE, after=POST-1
+    setLive("POST-2");
+    edit(ydoc, "2"); // coalesces: after extended to POST-2
+
+    h.undo();
+    expect(restored).toEqual(["PRE"]); // still the group's start
+    h.redo();
+    expect(restored).toEqual(["PRE", "POST-2"]); // tail of the whole burst
+  });
+});
+
 describe("History.stopCapturing", () => {
   it("makes the next edit a separate undo step", () => {
     const ydoc = new Y.Doc();
