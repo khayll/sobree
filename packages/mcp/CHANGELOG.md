@@ -1,5 +1,12 @@
 # @sobree/mcp
 
+## 0.1.24
+
+### Patch Changes
+
+- Updated dependencies [df4e9bb]
+  - @sobree/core@0.1.24
+
 ## 0.1.23
 
 ### Patch Changes
