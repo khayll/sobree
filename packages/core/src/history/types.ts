@@ -4,6 +4,30 @@
  * SnapshotSelection) that lived here in Phase 1a are no longer needed.
  */
 
+import type { Selection } from "../doc/api";
+
+/**
+ * Caret inside an editable textbox frame. Frame bodies aren't body
+ * registry blocks, so the public `Selection` model can't address them —
+ * but undo/redo still needs to put the caret back. The editor captures
+ * this on a frame edit and restores it on undo, exactly as it does the
+ * body `Selection`; `History` treats the stashed value as opaque.
+ */
+export interface FrameCaret {
+  kind: "frame-caret";
+  /** `data-anchor-id` of the frame the caret was in. */
+  frameId: string;
+  /** Character offset of the caret across the frame's text nodes. */
+  offset: number;
+}
+
+/**
+ * What the editor stashes on each undo step: a body `Selection` (incl.
+ * `null` when focus is outside) or a {@link FrameCaret}. Restored
+ * verbatim on undo/redo so the cursor lands where the body's would.
+ */
+export type CapturedSelection = Selection | FrameCaret;
+
 export interface HistoryConfig {
   /** Hard cap on entry count (per stack). UndoManager doesn't expose
    *  a max-depth knob directly — kept here for forward-compat in case

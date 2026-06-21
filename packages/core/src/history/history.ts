@@ -39,8 +39,12 @@
  */
 
 import * as Y from "yjs";
-import type { Selection } from "../doc/api";
-import { DEFAULT_HISTORY_CONFIG, type HistoryConfig, type HistoryDepth } from "./types";
+import {
+  type CapturedSelection,
+  DEFAULT_HISTORY_CONFIG,
+  type HistoryConfig,
+  type HistoryDepth,
+} from "./types";
 
 export type HistoryEvent = "change";
 export type HistoryListener = (depth: HistoryDepth) => void;
@@ -55,12 +59,13 @@ export interface HistoryOptions extends Partial<HistoryConfig> {
    *  is in this set. Defaults to `"local"`. */
   localOrigin?: unknown;
   /** Capture the *current* live selection — called as a stack item
-   *  is being added so we can stash it for restore on undo. */
-  captureSelection: () => Selection;
+   *  is being added so we can stash it for restore on undo. Returns a
+   *  body `Selection` or a frame caret; `History` keeps it opaque. */
+  captureSelection: () => CapturedSelection;
   /** Restore a previously-captured selection to the live DOM /
    *  EditorSelection. Called on undo / redo after the Y.Doc has been
    *  re-projected and re-rendered. */
-  restoreSelection: (sel: Selection) => void;
+  restoreSelection: (sel: CapturedSelection) => void;
 }
 
 /** Meta key used to stash captured selection on each stack item. */
@@ -69,8 +74,8 @@ const META_SELECTION_KEY = "sobree:selection";
 export class History {
   private readonly mgr: Y.UndoManager;
   private readonly listeners = new Set<HistoryListener>();
-  private readonly captureSelection: () => Selection;
-  private readonly restoreSelection: (sel: Selection) => void;
+  private readonly captureSelection: () => CapturedSelection;
+  private readonly restoreSelection: (sel: CapturedSelection) => void;
 
   constructor(opts: HistoryOptions) {
     this.captureSelection = opts.captureSelection;
@@ -112,7 +117,7 @@ export class History {
     // the editor's afterTransaction observer has re-projected +
     // re-rendered. Restore selection to whatever was captured.
     this.mgr.on("stack-item-popped", ({ stackItem }) => {
-      const sel = stackItem.meta.get(META_SELECTION_KEY) as Selection | undefined;
+      const sel = stackItem.meta.get(META_SELECTION_KEY) as CapturedSelection | undefined;
       if (sel !== undefined) this.restoreSelection(sel);
       this.fire();
     });

@@ -2,7 +2,6 @@ import { fieldType } from "../doc/fields";
 import type { AnchoredFrame, Block, NamedStyle, NumberingDefinition } from "../doc/types";
 import { type AnchorLayerContext, renderAnchorLayer } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
-import { withPreservedFrameFocus } from "./frameFocus";
 
 /**
  * Everything a header/footer zone needs to render its FLOW content. The
@@ -54,11 +53,9 @@ export function paintZoneFrames(
   frames: readonly AnchoredFrame[],
   ctx: AnchorLayerContext,
 ): void {
-  withPreservedFrameFocus(overlay, () => {
-    const fresh = renderAnchorLayer(frames, ctx);
-    overlay.replaceChildren(...Array.from(fresh.children));
-    overlay.classList.toggle("is-empty", frames.length === 0);
-  });
+  const fresh = renderAnchorLayer(frames, ctx);
+  overlay.replaceChildren(...Array.from(fresh.children));
+  overlay.classList.toggle("is-empty", frames.length === 0);
 }
 
 export function setZoneText(zone: HTMLElement, text: string): void {

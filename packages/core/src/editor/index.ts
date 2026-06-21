@@ -18,12 +18,14 @@ import type { Block, InlineRun, SobreeDocument } from "../doc/types";
 import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
 import { FontFaceRegistry } from "../fonts";
 import { History } from "../history";
+import type { CapturedSelection } from "../history/types";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
 import { EditorCommands } from "./commands";
 import type { EditorContext } from "./context";
 import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
+import { caretCharOffset, placeCaretAtOffset } from "./internal/frameCaret";
 import type { Mutation } from "./internal/mutations";
 import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import { EditorNumbering } from "./numbering";
@@ -342,10 +344,8 @@ export class Editor {
     this.history = new History({
       ydoc: this.ydoc,
       localOrigin: "local",
-      captureSelection: () => this.selection.get(),
-      restoreSelection: (sel) => {
-        if (sel) applySelectionToDom(this._hosts(), this.registry, sel);
-      },
+      captureSelection: () => this.captureSelectionForHistory(),
+      restoreSelection: (sel) => this.restoreCapturedSelection(sel),
     });
 
     this.ctx = this.buildContext();
@@ -1165,11 +1165,60 @@ export class Editor {
    * `input` event to the frame read-back instead of the body read-back.
    */
   private editedFrameId(): string | null {
+    return this.focusedFrameEl()?.dataset.anchorId ?? null;
+  }
+
+  /** The editable textbox frame element the caret is inside, or null. */
+  private focusedFrameEl(): HTMLElement | null {
     const sel = this.host.ownerDocument.getSelection();
     let node: Node | null = sel?.anchorNode ?? null;
     if (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
     const frame = (node as Element | null)?.closest?.(".paper-anchor[data-anchor-textbox]");
-    return (frame as HTMLElement | null)?.dataset.anchorId ?? null;
+    return (frame as HTMLElement | null) ?? null;
+  }
+
+  /** The (freshly-painted) frame element with this `data-anchor-id`, or null. */
+  private frameElById(id: string): HTMLElement | null {
+    for (const el of this.host.querySelectorAll<HTMLElement>(
+      ".paper-anchor[data-anchor-textbox]",
+    )) {
+      if (el.dataset.anchorId === id) return el;
+    }
+    return null;
+  }
+
+  /**
+   * Capture the live caret for an undo step. A caret inside an editable
+   * textbox frame becomes a `FrameCaret` — the body `Selection` model is
+   * keyed on registry blocks and can't address frame content — so undo can
+   * restore it the same way it restores a body caret. Everything else is an
+   * ordinary body selection.
+   */
+  private captureSelectionForHistory(): CapturedSelection {
+    const frame = this.focusedFrameEl();
+    if (frame?.dataset.anchorId) {
+      const offset = caretCharOffset(frame, this.host.ownerDocument) ?? 0;
+      return { kind: "frame-caret", frameId: frame.dataset.anchorId, offset };
+    }
+    return this.selection.get();
+  }
+
+  /**
+   * Restore an undo step's caret. Fires on `stack-item-popped`, which runs
+   * AFTER the change handler has already repainted the frame overlay
+   * (`adoptYDocState` calls `emitChangeNow` synchronously), so a captured
+   * frame caret lands on the fresh frame element and sticks — the same
+   * lifecycle the body selection restore relies on.
+   */
+  private restoreCapturedSelection(sel: CapturedSelection): void {
+    if (sel && sel.kind === "frame-caret") {
+      const frame = this.frameElById(sel.frameId);
+      if (!frame) return;
+      frame.focus({ preventScroll: true });
+      placeCaretAtOffset(frame, sel.offset, this.host.ownerDocument);
+      return;
+    }
+    if (sel) applySelectionToDom(this._hosts(), this.registry, sel);
   }
 
   /**

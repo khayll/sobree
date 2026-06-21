@@ -20,8 +20,12 @@ family corrupting) when you type into it.
   `font-family` value before splitting on commas, leaving a stray quote on
   the first name (`Myriad Pro Cond'`) that failed to round-trip. It now
   splits first, then strips quotes.
-- **Undo dropped focus out of the frame.** Undo/redo rebuilds the anchor
-  overlay, detaching the focused frame element — so the caret fell back to
-  `<body>` and the next `Cmd+Z` didn't route until you clicked back in. The
-  repaint now remembers the focused frame's id and caret offset, and
-  restores both into the freshly-painted same-id frame.
+- **Undo/redo lost the caret in a frame.** A frame's contentEditable body
+  isn't a body registry block, so the `Selection` model couldn't address it
+  and undo skipped the cursor restore — the rebuilt overlay then dropped
+  focus to `<body>`, and the next `Cmd+Z` didn't route until you clicked
+  back in. Frame carets are now first-class in the undo machinery: the
+  editor stashes a `FrameCaret` (frame id + character offset) on each frame
+  edit and restores it on `stack-item-popped`, the same lifecycle the body
+  selection uses. Undo/redo now puts the caret back in the frame — even if
+  focus had moved elsewhere first — exactly like the body.
