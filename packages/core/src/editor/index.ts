@@ -281,6 +281,12 @@ export class Editor {
    */
   private pendingLiveFrameEdit = false;
   /**
+   * The editing context the caret was last in — a frame id, or `"body"`.
+   * When it changes, the undo-capture group is closed so each box's edit
+   * is a distinct undo step. `null` until the first selection.
+   */
+  private lastEditContext: string | null = null;
+  /**
    * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
    * once in the constructor; closes over this instance's privates so the
    * `commit` pipeline / lock checks stay private to the class. See
@@ -1278,7 +1284,23 @@ export class Editor {
    * even when no subscribers exist (the early-return keeps it cheap).
    */
   private fireSelection(): void {
+    this.breakUndoOnContextChange();
     this.events.emitSelection(this.selection.get());
+  }
+
+  /**
+   * When the caret moves to a different editing context — another textbox
+   * frame, or between a frame and the body — close the undo-capture group
+   * so the next edit there is its own undo step. Without this, two edits
+   * to different boxes within `captureTimeout` coalesce and a single undo
+   * reverts both, unlike Word (where each box is a distinct action).
+   */
+  private breakUndoOnContextChange(): void {
+    const context = this.editedFrameId() ?? "body";
+    if (context !== this.lastEditContext) {
+      this.lastEditContext = context;
+      this.history.stopCapturing();
+    }
   }
 
   private fireKeyDown(e: KeyboardEvent): void {

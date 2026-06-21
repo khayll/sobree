@@ -128,6 +128,18 @@ export class History {
     return this.mgr.redo() !== null;
   }
 
+  /**
+   * Close the current undo-capture group so the NEXT local edit starts a
+   * fresh undo step instead of coalescing into the previous one (within
+   * `captureTimeout`). The editor calls this when the editing context
+   * changes — e.g. the caret moves to a different textbox frame, or
+   * between a frame and the body — so two distinct edits don't collapse
+   * into a single undo. No-op when there's nothing pending to capture.
+   */
+  stopCapturing(): void {
+    this.mgr.stopCapturing();
+  }
+
   canUndo(): boolean {
     return this.mgr.canUndo();
   }
