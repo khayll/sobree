@@ -10,7 +10,6 @@ import {
   type Selection,
   fail,
   lockConflict,
-  ok,
 } from "../doc/api";
 import { emptyDocument } from "../doc/builders";
 import type { RunPropertiesPatch } from "../doc/runs";
@@ -18,16 +17,16 @@ import type { Block, InlineRun, SobreeDocument } from "../doc/types";
 import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
 import { FontFaceRegistry } from "../fonts";
 import { History } from "../history";
-import type { CapturedSelection } from "../history/types";
-import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "../ydoc";
+import { projectYDoc, seedYDoc } from "../ydoc";
 import { EditorCommands } from "./commands";
 import type { EditorContext } from "./context";
 import { registerCoreCommands } from "./coreCommands";
 import { EditorEvents } from "./events";
 import { BlockRegistry } from "./internal/blockRegistry";
-import { applyFrameSelection, frameSelectionOffsets } from "./internal/frameCaret";
+import { ChangePipeline } from "./internal/changePipeline";
+import { FrameController } from "./internal/frames";
 import type { Mutation } from "./internal/mutations";
-import { applySelectionToDom, blockElementAtIndex, countBlocks } from "./internal/positionMap";
+import { blockElementAtIndex, countBlocks } from "./internal/positionMap";
 import { EditorNumbering } from "./numbering";
 import * as blocks from "./ops/blocks";
 import * as comments from "./ops/comments";
@@ -41,8 +40,7 @@ import { EditorSelection } from "./selection";
 import { EditorStyles } from "./styles";
 import { EditorTable } from "./table";
 import { renderSobreeDocument } from "./view/docRenderer/index";
-import { serializeHostsToDocument } from "./view/docSerialize/index";
-import { wireEditorDom } from "./wiring";
+import { type EditorDomHooks, wireEditorDom } from "./wiring";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
 export { EditorCommands } from "./commands";
@@ -127,19 +125,12 @@ export type { RunPropertiesPatch };
  */
 
 /**
- * Mark tag → `document.execCommand` name, for applying a toggle mark
- * inside an editable textbox frame (where the body-selection path can't
- * reach). The native commands produce `<b>`/`<i>`/`<u>`/… which the
- * frame read-back's inline serializer maps back to run properties.
+ * Initial track-changes state for the constructor: a defensive clone of
+ * the caller's option (so we never alias their object), or the off default.
  */
-const MARK_EXEC_COMMAND: Record<string, string> = {
-  strong: "bold",
-  em: "italic",
-  u: "underline",
-  s: "strikeThrough",
-  sup: "superscript",
-  sub: "subscript",
-};
+function initialTrackChanges(state: TrackChangesState | undefined): TrackChangesState {
+  return state ? { ...state } : { enabled: false };
+}
 
 export class Editor {
   readonly host: HTMLElement;
@@ -226,8 +217,6 @@ export class Editor {
   private readonly registry: BlockRegistry;
   private readonly debounceMs: number;
   private readonly getContentHosts: () => HTMLElement[];
-  private debounceHandle: number | null = null;
-  private revision = 0;
   /** The editor's observable event surface (change / selection / keydown
    *  / track-changes-change). See `./events.ts`. */
   private readonly events = new EditorEvents();
@@ -246,8 +235,6 @@ export class Editor {
    * `ops/trackedInput`.
    */
   private trackedInput!: TrackedInput;
-  /** Cached last-seen per-block JSON strings, for diff-based version bumps. */
-  private lastSerialisedBlocks: string[] = [];
   /** Tracks `@font-face` registrations for the document's embedded fonts. */
   private readonly fontFaces = new FontFaceRegistry();
   /**
@@ -259,43 +246,25 @@ export class Editor {
    */
   readonly history: History;
   /**
-   * True when DOM mutations since the last sync were user-driven (typing,
-   * paste, drag-drop image). False right after we render from AST — the
-   * DOM is then a projection of `this.doc`, and reading it back can't
-   * tell us anything the AST doesn't already know, while losing any
-   * fidelity the serializer drops (column widths, vAlign, …). `getDocument`
-   * and `emitChangeNow` sync only when this flag is set.
-   */
-  private domDirty = false;
-  /**
-   * Ids of editable textbox frames whose DOM the user has edited since
-   * the last sync. Frames live in the floating overlay (outside the
-   * body content hosts), so they need their own read-back path —
-   * `syncFromDom` re-serialises each dirty frame into
-   * `anchoredFrames[id].content.body`.
-   */
-  private readonly dirtyFrameIds = new Set<string>();
-  /**
-   * Set by `syncFromDom` when the pending change was a pure live frame
-   * keystroke; read (and reset) by `emitChangeNow` into the change
-   * payload's `liveFrameEdit`. Lets the host skip the overlay repaint
-   * that would clobber the caret, while still repainting on undo/remote.
-   */
-  private pendingLiveFrameEdit = false;
-  /**
    * The editing context the caret was last in — a frame id, or `"body"`.
    * When it changes, the undo-capture group is closed so each box's edit
    * is a distinct undo step. `null` until the first selection.
    */
   private lastEditContext: string | null = null;
   /**
-   * Selection captured at `beforeinput` (pre-DOM-mutation) for the open
-   * undo group — restored on undo so the caret lands where the edit began.
-   * `hasPendingPreEdit` distinguishes "nothing stashed" from a stashed
-   * `null` (a body `Selection` can legitimately be `null`).
+   * Editable-textbox-frame controller — owns the dirty-frame set, the
+   * frame DOM read-back, and the pre-/post-edit selection capture/restore
+   * that drives gold-standard frame undo. Built in the constructor. See
+   * `./internal/frames.ts`.
    */
-  private pendingPreEdit: CapturedSelection = null;
-  private hasPendingPreEdit = false;
+  private frames!: FrameController;
+  /**
+   * The change / sync pipeline — owns `revision`, the debounce handle, the
+   * per-block JSON cache + `domDirty`, and the render → mirror → emit
+   * cycle (`commit`, `syncFromDom`, `adoptYDocState`, …). Built in the
+   * constructor. See `./internal/changePipeline.ts`.
+   */
+  private pipeline!: ChangePipeline;
   /**
    * Kernel seam handed to the behaviour modules (`ops/*`, `query`). Built
    * once in the constructor; closes over this instance's privates so the
@@ -308,57 +277,33 @@ export class Editor {
     this.host = host;
     this.debounceMs = options.changeDebounceMs ?? 200;
     this.getContentHosts = options.contentHosts ?? (() => [host]);
-    if (options.trackChanges) {
-      // Seed silently — no listeners can exist yet, so no event needed.
-      this.trackChanges = { ...options.trackChanges };
-    }
+    // Seed track-changes silently — no listeners can exist yet.
+    this.trackChanges = initialTrackChanges(options.trackChanges);
 
     // Y.Doc backing — either user-provided (for providers / shared docs)
     // or freshly created. The BlockRegistry's id prefix incorporates the
     // Y.Doc's clientID so two peers don't both mint `b5` for different
     // blocks (Phase 1b: collision-safe across peers).
     this.ydoc = options.ydoc ?? new Y.Doc();
-    this.registry = new BlockRegistry({
-      idPrefix: `${this.ydoc.clientID.toString(36)}_`,
-    });
-
-    // Optional content-hashed blob layer. The cache's `onResolved`
-    // callback patches `this.doc.rawParts` and fires `change` so the
-    // renderer picks up a freshly-arrived blob without an explicit
-    // refresh from the embedder.
+    const clientId = this.ydoc.clientID.toString(36);
+    const idPrefix = `${clientId}_`;
+    this.registry = new BlockRegistry({ idPrefix });
     this.blobStore = options.blobStore ?? null;
-    this.blobCache = this.blobStore
-      ? new BlobCache({
-          store: this.blobStore,
-          onResolved: (hash) => parts.onBlobResolved(this.ctx, hash),
-        })
-      : null;
+    this.blobCache = this.createBlobCache();
 
     this.selection = new EditorSelection(this);
     this.table = new EditorTable(this);
     this.commands = new EditorCommands();
-
-    // History orchestrator — Phase 1b.6: backed by Y.UndoManager. The
-    // UndoManager observes the body / meta / parts top-level Y types
-    // and tracks operations whose origin matches `localOrigin`. Local
-    // edits (mirrored by `mirrorToYDoc()` with origin "local") create
-    // stack items; remote-provider edits (any other origin) don't —
-    // so `Cmd+Z` reverses only this peer's own edits.
-    //
-    // Selection is captured per stack-item-added (the post-edit
-    // selection — the pre-edit selection capture is handled by the
-    // beforeInput listener stashing) and restored on stack-item-popped
-    // after the Y observer has re-projected and re-rendered.
-    this.history = new History({
-      ydoc: this.ydoc,
-      localOrigin: "local",
-      captureSelection: () => this.captureSelectionForHistory(),
-      capturePreEditSelection: () => this.capturePreEditSelection(),
-      restoreSelection: (sel) => this.restoreCapturedSelection(sel),
-      onGroupSettled: () => this.clearPendingPreEditSelection(),
-    });
+    this.history = this.createHistory();
 
     this.ctx = this.buildContext();
+    // Frame controller + change pipeline operate over the context seam.
+    // Built after `ctx` (they take it) but before `initDocumentState`,
+    // which drives the pipeline's baseline + Y.Doc seed. The `History`
+    // callbacks reference `this.frames` lazily, so the ordering is safe
+    // (no undo can fire before construction completes).
+    this.frames = new FrameController(this.ctx);
+    this.pipeline = new ChangePipeline(this.ctx, this.events, this.frames, this.debounceMs);
     this.sections = new EditorSections(this.ctx);
     this.styles = new EditorStyles(this.ctx);
     this.numbering = new EditorNumbering(this.ctx);
@@ -369,6 +314,48 @@ export class Editor {
     // so headless callers and Cmd+Z share one dispatch surface.
     registerCoreCommands(this.commands, this, this.history);
 
+    this.mountHost(options);
+    // All host/document listeners + image-resize + the remote-Y.Doc
+    // subscription live in `wireEditorDom`, which returns one teardown.
+    this.domTeardown = wireEditorDom(this.buildDomHooks());
+  }
+
+  /**
+   * Optional content-hashed blob layer. The cache's `onResolved` callback
+   * patches `doc.rawParts` and fires `change` so the renderer picks up a
+   * freshly-arrived blob without an explicit refresh from the embedder.
+   */
+  private createBlobCache(): BlobCache | null {
+    if (!this.blobStore) return null;
+    return new BlobCache({
+      store: this.blobStore,
+      onResolved: (hash) => parts.onBlobResolved(this.ctx, hash),
+    });
+  }
+
+  /**
+   * History orchestrator — Phase 1b.6: backed by Y.UndoManager, which
+   * observes the body / meta / parts top-level Y types and tracks
+   * operations whose origin matches `localOrigin`. Local edits (mirrored
+   * with origin "local") create stack items; remote-provider edits don't —
+   * so `Cmd+Z` reverses only this peer's own edits. Selection capture /
+   * restore is delegated to the {@link FrameController} (referenced lazily;
+   * it's built right after this).
+   */
+  private createHistory(): History {
+    return new History({
+      ydoc: this.ydoc,
+      localOrigin: "local",
+      captureSelection: () => this.frames.captureSelectionForHistory(),
+      capturePreEditSelection: () => this.frames.capturePreEditSelection(),
+      restoreSelection: (sel) => this.frames.restoreCapturedSelection(sel),
+      onGroupSettled: () => this.frames.clearPendingPreEditSelection(),
+    });
+  }
+
+  /** Editor-attribute setup + the initial render of the seeded document. */
+  private mountHost(options: EditorOptions): void {
+    const { host } = this;
     host.classList.add("sobree-editor");
     host.contentEditable = "true";
     host.setAttribute("role", "textbox");
@@ -377,32 +364,35 @@ export class Editor {
 
     const firstHost = this.getContentHosts()[0] ?? host;
     this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
+    renderSobreeDocument(this.doc, firstHost, this.pipeline.blockIdsArray());
     if (options.showHiddenText) this.setShowHiddenText(true);
+  }
 
-    // All host/document listeners + image-resize + the remote-Y.Doc
-    // subscription live in `wireEditorDom`, which returns one teardown.
-    this.domTeardown = wireEditorDom({
-      host,
+  /** The hooks `wireEditorDom` calls — each forwards to the owning module. */
+  private buildDomHooks(): EditorDomHooks {
+    return {
+      host: this.host,
       ctx: this.ctx,
       ydoc: this.ydoc,
       history: this.history,
       trackedInput: this.trackedInput,
       isTrackedEnabled: () => this.trackChanges.enabled,
-      onBeforeInput: () => this.onBeforeInput(),
-      onInput: () => {
-        // Route the edit: a caret inside an editable textbox frame reads
-        // back into that frame's body, NOT the document body. Everything
-        // else is an ordinary body edit.
-        const frameId = this.editedFrameId();
-        if (frameId !== null) this.dirtyFrameIds.add(frameId);
-        else this.domDirty = true;
-        this.scheduleChange();
-      },
+      onBeforeInput: () => this.frames.onBeforeInput(),
+      onInput: () => this.handleInput(),
       fireSelection: () => this.fireSelection(),
       fireKeyDown: (e) => this.fireKeyDown(e),
-      adoptYDocState: () => this.adoptYDocState(),
-    });
+      adoptYDocState: () => this.pipeline.adoptYDocState(),
+    };
+  }
+
+  /**
+   * Route an `input` event. A caret inside an editable textbox frame reads
+   * back into that frame's body (not the document body); everything else is
+   * an ordinary body edit. Either way, schedule a debounced change.
+   */
+  private handleInput(): void {
+    if (!this.frames.routeInput()) this.pipeline.markBodyDirty();
+    this.pipeline.scheduleChange();
   }
 
   /**
@@ -419,14 +409,14 @@ export class Editor {
     if (ydocBody.length === 0) {
       this.doc = options.initialDocument ?? emptyDocument();
       this.registry.reset(this.doc.body.length);
-      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
-      seedYDoc(this.ydoc, this.doc, this.allBlockIds());
+      this.pipeline.captureBaseline(this.doc);
+      seedYDoc(this.ydoc, this.doc, this.pipeline.allBlockIds());
       this.lastPartRefs = {};
     } else {
       const projected = projectYDoc(this.ydoc);
       this.doc = projected.doc;
       this.registry.adoptIds(projected.ids);
-      this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
+      this.pipeline.captureBaseline(this.doc);
       this.lastPartRefs = projected.partRefs;
       parts.resolveCachedPartRefsInto(this.ctx, this.doc);
     }
@@ -455,8 +445,8 @@ export class Editor {
         self.doc = doc;
       },
       setDocument: (doc) => self.setDocument(doc),
-      renderCurrent: () => self.renderCurrent(),
-      restoreSnapshot: (snapshot) => self.restoreSnapshot(snapshot),
+      renderCurrent: () => self.pipeline.renderCurrent(),
+      restoreSnapshot: (snapshot) => self.pipeline.restoreSnapshot(snapshot),
       getContentHosts: () => self.getContentHosts(),
       _hosts: () => self._hosts(),
       get trackChanges() {
@@ -477,48 +467,16 @@ export class Editor {
         mutations: readonly Mutation[],
         value?: T,
         reason?: string,
-      ) => self.commit<T>(update, mutations, value, reason),
-      ensureCurrent: () => self.ensureCurrent(),
-      syncFromDom: () => self.syncFromDom(),
+      ) => self.pipeline.commit<T>(update, mutations, value, reason),
+      ensureCurrent: () => self.pipeline.ensureCurrent(),
+      syncFromDom: () => self.pipeline.syncFromDom(),
       checkRefs: (refs) => self.checkRefs(refs),
       checkRange: (range, expect) => self.checkRange(range, expect),
-      emitChangeNow: () => self.emitChangeNow(),
-      mirrorToYDoc: () => self.mirrorToYDoc(),
-      scheduleChange: () => self.scheduleChange(),
-      setDomDirty: (value) => {
-        self.domDirty = value;
-      },
+      emitChangeNow: () => self.pipeline.emitChangeNow(),
+      mirrorToYDoc: () => self.pipeline.mirrorToYDoc(),
+      scheduleChange: () => self.pipeline.scheduleChange(),
+      setDomDirty: (value) => self.pipeline.setDomDirty(value),
     };
-  }
-
-  /**
-   * Re-project the Y.Doc into `this.doc`, sync the BlockRegistry to
-   * the projected ids, re-render the DOM, and fire `change`. Called
-   * when a remote provider applies an update we didn't initiate.
-   */
-  private adoptYDocState(): void {
-    const projected = projectYDoc(this.ydoc);
-    this.doc = projected.doc;
-    this.registry.adoptIds(projected.ids);
-    this.lastSerialisedBlocks = this.doc.body.map((b) => JSON.stringify(b));
-    this.lastPartRefs = projected.partRefs;
-    // Resolve hash-addressed parts through the local cache. Hashes
-    // not yet cached: kick off background fetches; `onBlobResolved`
-    // patches + re-renders when they land.
-    parts.resolveCachedPartRefsInto(this.ctx, this.doc);
-    if (this.blobCache) {
-      const missing = Object.values(projected.partRefs).filter((h) => !this.blobCache!.has(h));
-      if (missing.length > 0) {
-        void this.blobCache.ensureLoaded(missing);
-      }
-    }
-    const hosts = this.getContentHosts();
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.host;
-    this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
-    this.domDirty = false;
-    this.emitChangeNow();
   }
 
   /**
@@ -548,7 +506,7 @@ export class Editor {
    * throw away properties the renderer doesn't surface.
    */
   getDocument(): SobreeDocument {
-    return this.ensureCurrent();
+    return this.pipeline.ensureCurrent();
   }
 
   /**
@@ -566,49 +524,7 @@ export class Editor {
     // Phase 1b.6: Y.UndoManager auto-tracks the resulting Y operations
     // (via origin "local" applied by `mirrorToYDoc`), so no explicit
     // history recording is needed here.
-    this.applyDocument(doc);
-  }
-
-  /**
-   * Internal apply path shared by `setDocument` and any other
-   * full-replace caller. The Y.Doc mirror produces tracked Y
-   * operations that Y.UndoManager turns into a single stack item.
-   */
-  private applyDocument(doc: SobreeDocument): void {
-    this.doc = doc;
-    this.registry.reset(doc.body.length);
-    this.lastSerialisedBlocks = doc.body.map((b) => JSON.stringify(b));
-    this.renderCurrent();
-    this.domDirty = false;
-    this.mirrorToYDoc();
-    this.emitChangeNow();
-  }
-
-  /**
-   * Re-render the current `doc` into the content hosts. Syncs
-   * `@font-face` registrations BEFORE rendering so newly-embedded fonts
-   * are available to the render pass. No selection restore, no change
-   * emit — callers sequence those.
-   */
-  private renderCurrent(): void {
-    const hosts = this.getContentHosts();
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.host;
-    this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
-  }
-
-  /**
-   * Soft-revert to a doc `snapshot` and re-render. Resets the
-   * serialised-block cache + dom-dirty flag; no registry reset, mirror, or
-   * change emit. Used to undo native IME mutations before a tracked
-   * re-insert (see `ops/trackedInput`).
-   */
-  private restoreSnapshot(snapshot: SobreeDocument): void {
-    this.doc = snapshot;
-    this.lastSerialisedBlocks = snapshot.body.map((b) => JSON.stringify(b));
-    this.domDirty = false;
-    this.renderCurrent();
+    this.pipeline.applyDocument(doc);
   }
 
   /**
@@ -649,7 +565,7 @@ export class Editor {
 
   /** Monotonic counter bumped on each `change` event. */
   getRevision(): number {
-    return this.revision;
+    return this.pipeline.getRevision();
   }
 
   /** Monotonic document-wide version (bumps on any mutation). */
@@ -963,10 +879,7 @@ export class Editor {
   }
 
   destroy(): void {
-    if (this.debounceHandle !== null) {
-      window.clearTimeout(this.debounceHandle);
-      this.debounceHandle = null;
-    }
+    this.pipeline.cancelPending();
     // Removes all DOM/document listeners, image-resize handles, the
     // Y.Doc subscription, and resets the tracked-input snapshot.
     this.domTeardown?.();
@@ -994,20 +907,6 @@ export class Editor {
   /** @internal */
   _blockElementAt(index: number): HTMLElement | null {
     return blockElementAtIndex(this._hosts(), index);
-  }
-
-  /**
-   * Parallel array of live block ids (same length as `doc.body`), used
-   * by the renderer to stamp `data-block-id` onto every block element.
-   * Lets external tools (block tools, embedders) locate a block's DOM
-   * element after the body is re-rendered from scratch.
-   */
-  private blockIdsArray(): string[] {
-    const out: string[] = [];
-    for (let i = 0; i < this.doc.body.length; i++) {
-      out.push(this.registry.refAt(i).id);
-    }
-    return out;
   }
 
   // === internals ===
@@ -1039,343 +938,19 @@ export class Editor {
   }
 
   /**
-   * Apply a mutation to `this.doc`, update the registry, re-render, fire
-   * change. Returns the affected refs (post-bump).
-   */
-  private commit<T = void>(
-    update: Partial<SobreeDocument>,
-    mutations: readonly Mutation[],
-    value?: T,
-    _reason = "commit",
-  ): EditResult<T> {
-    const savedSelection = this.selection.get();
-
-    // Phase 1b.6: Y.UndoManager auto-tracks the resulting Y operations
-    // via origin "local" (set by `mirrorToYDoc`). No explicit
-    // pre-commit recording needed.
-
-    const next: SobreeDocument = { ...this.doc, ...update };
-
-    // Apply registry mutations first so `affected` reports new versions.
-    const affected: BlockRef[] = [];
-    for (const m of mutations) {
-      if (m.type === "insert") affected.push(this.registry.insert(m.index));
-      else if (m.type === "remove") this.registry.remove(m.index);
-      else if (m.type === "bump") affected.push(this.registry.bump(m.index));
-    }
-
-    this.doc = next;
-    this.lastSerialisedBlocks = next.body.map((b) => JSON.stringify(b));
-    const hosts = this.getContentHosts();
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.host;
-    renderSobreeDocument(this.doc, firstHost, this.blockIdsArray());
-
-    // Best-effort selection restore (block must still exist + offset still valid).
-    if (savedSelection) applySelectionToDom(this._hosts(), this.registry, savedSelection);
-
-    this.domDirty = false;
-    this.mirrorToYDoc();
-    this.emitChangeNow();
-    return ok<T>(value as T, affected);
-  }
-
-  /**
-   * Ensure `this.doc` reflects the latest edits. If the DOM has been
-   * dirtied by user typing / paste / drop, pull the latest content out
-   * of it and bump affected block versions. If the last mutation came
-   * from the API, the AST is already current — skip the (lossy)
-   * DOM-to-AST round-trip.
-   */
-  private ensureCurrent(): SobreeDocument {
-    if (!this.domDirty && this.dirtyFrameIds.size === 0) return this.doc;
-    return this.syncFromDom();
-  }
-
-  private syncFromDom(): SobreeDocument {
-    // Classify the change so the host knows whether the floating overlay
-    // is already current (live frame typing) or stale (anything else).
-    const bodyChanged = this.domDirty;
-    const frameChanged = this.dirtyFrameIds.size > 0;
-    this.pendingLiveFrameEdit = frameChanged && !bodyChanged;
-    // Body read-back — only when a body host actually changed. A pure
-    // frame edit (domDirty false) must NOT re-serialise the body: that
-    // would churn the registry and risk clobbering AST-only properties.
-    if (this.domDirty) {
-      const serialised = serializeHostsToDocument(this.getContentHosts());
-      const prevCount = this.registry.length();
-      const newCount = serialised.body.length;
-
-      if (newCount !== prevCount) {
-        // Structural change (user pressed Enter / Backspace, paste inserted
-        // blocks): we can't preserve ids across structural shifts cheaply,
-        // so re-stamp. Agents that held stale refs will see lock failures.
-        this.registry.reset(newCount);
-      } else {
-        // Same count: detect which blocks' serialised JSON changed.
-        const newJson = serialised.body.map((b) => JSON.stringify(b));
-        const changed: boolean[] = newJson.map((j, i) => j !== this.lastSerialisedBlocks[i]);
-        this.lastSerialisedBlocks = newJson;
-        this.registry.bumpChanged(changed);
-      }
-      this.doc = {
-        ...this.doc,
-        body: serialised.body,
-        numbering: serialised.numbering,
-      };
-      this.domDirty = false;
-    }
-    // Frame read-back — re-serialise each edited textbox frame's DOM into
-    // its `content.body`. Frames live in the floating overlay, outside the
-    // body hosts, so they're invisible to the body serializer above.
-    if (this.dirtyFrameIds.size > 0) this.syncFramesFromDom();
-    this.mirrorToYDoc();
-    return this.doc;
-  }
-
-  /**
-   * Re-read the DOM of each dirty editable textbox frame into the AST.
-   * The frame element IS the serialization host (the block renderer paints
-   * its body directly into it), so `serializeHostsToDocument([el])` yields
-   * the same `Block[]` shape as a body host. Matched to the AST frame by
-   * its stable `data-anchor-id`. Pure body swap — geometry/anchor untouched.
-   *
-   * `captureRunDefaults` promotes each paragraph's rendered base font to
-   * `runDefaults`, so a frame's text keeps its size/family even when a
-   * keystroke (or a select-all-retype) strips every run's inline styling —
-   * the heading no longer collapses to the default font on the next repaint.
-   */
-  private syncFramesFromDom(): void {
-    const frames = this.doc.anchoredFrames;
-    if (!frames || frames.length === 0) {
-      this.dirtyFrameIds.clear();
-      return;
-    }
-    const elById = new Map<string, HTMLElement>();
-    for (const el of this.host.querySelectorAll<HTMLElement>(
-      ".paper-anchor[data-anchor-textbox]",
-    )) {
-      if (el.dataset.anchorId) elById.set(el.dataset.anchorId, el);
-    }
-    let changed = false;
-    const next = frames.map((f) => {
-      if (!this.dirtyFrameIds.has(f.id) || f.content.kind !== "textbox") return f;
-      const el = elById.get(f.id);
-      if (!el) return f;
-      const body = serializeHostsToDocument([el], { captureRunDefaults: true }).body;
-      changed = true;
-      return { ...f, content: { ...f.content, body } };
-    });
-    this.dirtyFrameIds.clear();
-    if (changed) this.doc = { ...this.doc, anchoredFrames: next };
-  }
-
-  /**
-   * The id of the editable textbox frame the caret currently sits in, or
-   * null when the selection is in ordinary body flow. Used to route an
-   * `input` event to the frame read-back instead of the body read-back.
-   */
-  private editedFrameId(): string | null {
-    return this.focusedFrameEl()?.dataset.anchorId ?? null;
-  }
-
-  /** The editable textbox frame element the caret is inside, or null. */
-  private focusedFrameEl(): HTMLElement | null {
-    const sel = this.host.ownerDocument.getSelection();
-    let node: Node | null = sel?.anchorNode ?? null;
-    if (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
-    const frame = (node as Element | null)?.closest?.(".paper-anchor[data-anchor-textbox]");
-    return (frame as HTMLElement | null) ?? null;
-  }
-
-  /** The (freshly-painted) frame element with this `data-anchor-id`, or null. */
-  private frameElById(id: string): HTMLElement | null {
-    for (const el of this.host.querySelectorAll<HTMLElement>(
-      ".paper-anchor[data-anchor-textbox]",
-    )) {
-      if (el.dataset.anchorId === id) return el;
-    }
-    return null;
-  }
-
-  /**
-   * Capture the live selection for an undo step. A selection inside an
-   * editable textbox frame becomes a `FrameSelection` — the body
-   * `Selection` model is keyed on registry blocks and can't address frame
-   * content — so undo can restore it the same way it restores a body
-   * selection. Everything else is an ordinary body selection.
-   */
-  private captureSelectionForHistory(): CapturedSelection {
-    const frame = this.focusedFrameEl();
-    if (frame?.dataset.anchorId) {
-      const offsets = frameSelectionOffsets(frame, this.host.ownerDocument) ?? { start: 0, end: 0 };
-      return { kind: "frame-selection", frameId: frame.dataset.anchorId, ...offsets };
-    }
-    return this.selection.get();
-  }
-
-  /**
-   * The selection BEFORE the edit that opened the current undo group,
-   * stashed by `onBeforeInput` (which fires before the DOM mutates). Falls
-   * back to the live selection for edits that bypass `beforeinput`
-   * (programmatic mutations, `setDocument`).
-   */
-  private capturePreEditSelection(): CapturedSelection {
-    return this.hasPendingPreEdit ? this.pendingPreEdit : this.captureSelectionForHistory();
-  }
-
-  /**
-   * Stash the pre-edit selection on the first input of a new undo group,
-   * so undo can land the caret where the edit began. `beforeinput` fires
-   * before the browser mutates the DOM, so the live selection here is the
-   * pre-edit position. Only the FIRST input of a group stashes; coalesced
-   * inputs leave the group's `before` intact (`History.onGroupSettled`
-   * clears the stash once a step has captured).
-   *
-   * Scoped to textbox frames. The body already restores its caret through
-   * the proven `applySelectionToDom` path on `stack-item-popped`; we leave
-   * its behaviour byte-for-byte unchanged (no pre-edit stash → `before`
-   * falls back to the post-edit selection, same as `after`). Frames had no
-   * working restore at all, so they get the full pre-/post-edit treatment.
-   */
-  private onBeforeInput(): void {
-    if (this.hasPendingPreEdit || this.focusedFrameEl() === null) return;
-    this.pendingPreEdit = this.captureSelectionForHistory();
-    this.hasPendingPreEdit = true;
-  }
-
-  /** Drop the pending pre-edit stash — a step has captured (or extended) it. */
-  private clearPendingPreEditSelection(): void {
-    this.hasPendingPreEdit = false;
-    this.pendingPreEdit = null;
-  }
-
-  /**
-   * Restore an undo step's selection. Fires on `stack-item-popped`, which
-   * runs AFTER the change handler has already repainted the frame overlay
-   * (`adoptYDocState` calls `emitChangeNow` synchronously), so a captured
-   * frame selection lands on the fresh frame element and sticks — the same
-   * lifecycle the body selection restore relies on.
-   */
-  private restoreCapturedSelection(sel: CapturedSelection): void {
-    if (sel && sel.kind === "frame-selection") {
-      const frame = this.frameElById(sel.frameId);
-      if (!frame) return;
-      frame.focus({ preventScroll: true });
-      applyFrameSelection(frame, { start: sel.start, end: sel.end }, this.host.ownerDocument);
-      return;
-    }
-    if (sel) applySelectionToDom(this._hosts(), this.registry, sel);
-  }
-
-  /**
    * Toggle a mark on the caret inside an editable textbox frame, natively
-   * (`document.execCommand`), so the body-selection mark path doesn't have
-   * to understand frame coordinates. The resulting `<b>`/`<i>`/`<u>` tags
-   * round-trip through the frame read-back (the inline serializer maps them
-   * to run properties). Returns false when the caret isn't in a frame, so
-   * the mark command falls back to the body path.
+   * (`document.execCommand`). Returns false when the caret isn't in a
+   * frame, so the mark command falls back to the body path. See
+   * {@link FrameController.applyFrameMark}.
    */
   applyFrameMark(tag: string): boolean {
-    const frameId = this.editedFrameId();
-    if (frameId === null) return false;
-    const cmd = MARK_EXEC_COMMAND[tag];
-    if (!cmd) return false;
-    this.host.ownerDocument.execCommand(cmd);
-    // `execCommand` fires `input`, but mark it dirty explicitly so the
-    // read-back runs even on engines that don't emit one for formatting.
-    this.dirtyFrameIds.add(frameId);
-    this.scheduleChange();
-    return true;
+    return this.frames.applyFrameMark(tag);
   }
 
   /** Active state of `tag` at a frame caret (toolbar highlight), or null
    *  when the caret isn't in a frame. */
   frameMarkActive(tag: string): boolean | null {
-    if (this.editedFrameId() === null) return null;
-    const cmd = MARK_EXEC_COMMAND[tag];
-    return cmd ? this.host.ownerDocument.queryCommandState(cmd) : false;
-  }
-
-  /**
-   * Schedule a DOM-driven change emit. Called from the `input` listener
-   * when the user types — the DOM is the source of truth and we sync the
-   * AST from it before notifying listeners.
-   */
-  private scheduleChange(): void {
-    if (this.debounceHandle !== null) window.clearTimeout(this.debounceHandle);
-    this.debounceHandle = window.setTimeout(() => {
-      this.debounceHandle = null;
-      this.ensureCurrent();
-      this.emitChangeNow();
-    }, this.debounceMs);
-  }
-
-  /**
-   * Emit a `change` event using the current in-memory AST verbatim. Do
-   * NOT sync from DOM — callers that need a DOM sync should call it
-   * explicitly (user-typing path does). API mutations have already
-   * rendered their AST into the DOM and must not let the lossy DOM-read
-   * overwrite properties the renderer doesn't surface
-   * (column widths, verticalAlign, table properties, …).
-   */
-  private emitChangeNow(): void {
-    this.revision += 1;
-    // Consume the flag here (not only when there are listeners) so a
-    // later emit can't inherit a stale `true`.
-    const liveFrameEdit = this.pendingLiveFrameEdit;
-    this.pendingLiveFrameEdit = false;
-    if (!this.events.hasChangeListeners()) return;
-    const stripped = stripBinary(this.doc);
-    this.events.emitChange({
-      doc: stripped,
-      // Alias for backwards compat — same reference, no clone cost.
-      document: stripped,
-      revision: this.revision,
-      documentVersion: this.registry.documentVersion(),
-      ...(liveFrameEdit ? { liveFrameEdit: true } : {}),
-    });
-  }
-
-  // === Y.Doc mirroring ===
-
-  /**
-   * Snapshot of the live block ids in body order — used both as the
-   * input to `applyDocumentToYDoc` (so each Y.Map carries its stable
-   * id) and as the `blockIdsArray()` the renderer uses to set the
-   * `data-block-id` attribute.
-   */
-  private allBlockIds(): string[] {
-    const out: string[] = [];
-    for (let i = 0; i < this.registry.length(); i++) {
-      out.push(this.registry.refAt(i).id);
-    }
-    return out;
-  }
-
-  /**
-   * Mirror the current `this.doc` into the Y.Doc as a single
-   * transaction. The diff is performed by `applyDocumentToYDoc`,
-   * which matches blocks by id so concurrent edits to *different*
-   * blocks merge cleanly via the Y.Array CRDT.
-   *
-   * Origin is `"local"` so a future Y observer can distinguish locally-
-   * driven mutations (already rendered) from remote ones (need re-render).
-   */
-  private mirrorToYDoc(): void {
-    // When a BlobStore is configured, any path that's been migrated
-    // to a partRef (or is currently being migrated) must not get
-    // mirrored inline — that would re-introduce the bytes into the
-    // Y.Doc. Without a BlobStore, the skip set is empty and behavior
-    // is identical to today.
-    const skip = parts.computePartPathSkipSet(this.ctx);
-    applyDocumentToYDoc(
-      this.ydoc,
-      this.doc,
-      this.allBlockIds(),
-      "local",
-      skip ? { skipPartPaths: skip } : {},
-    );
+    return this.frames.frameMarkActive(tag);
   }
 
   /**
@@ -1397,7 +972,7 @@ export class Editor {
    * reverts both, unlike Word (where each box is a distinct action).
    */
   private breakUndoOnContextChange(): void {
-    const context = this.editedFrameId() ?? "body";
+    const context = this.frames.editedFrameId() ?? "body";
     if (context !== this.lastEditContext) {
       this.lastEditContext = context;
       this.history.stopCapturing();
@@ -1407,16 +982,6 @@ export class Editor {
   private fireKeyDown(e: KeyboardEvent): void {
     this.events.emitKeyDown(e);
   }
-}
-
-// === helpers ===
-
-/**
- * Strip binary `rawParts` from a document before emitting on the event
- * stream. Keeps the payload JSON-clean for WebSocket/MCP transport.
- */
-function stripBinary(doc: SobreeDocument): SobreeDocument {
-  return { ...doc, rawParts: {} };
 }
 
 // Re-export countBlocks for any callers that need it.

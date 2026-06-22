@@ -82,11 +82,23 @@ inside the window merge into the open stack item; a pause longer than
 
 ## Selection restoration
 
-Selection is captured in `stackItem.meta` when each stack item is
-added, and restored on `stack-item-popped`. Because Y.Doc updates
-preserve block-id stability across undo (the UndoManager re-inserts
-the original Y.Map identities), id-keyed selections survive the
-undo/redo cycle without index translation.
+Each undo step stores **both** ends of its cursor in `stackItem.meta`:
+where the selection sat *before* the edit (captured at `beforeinput`,
+before the DOM mutates) and *after* it (the live selection when the
+stack item is added). On `stack-item-popped`, **undo** restores the
+`before` cursor — you land where the edit began — and **redo** restores
+the `after` cursor — where it left you. A coalesced typing burst keeps
+its original `before` and extends its `after` to the tail of the burst.
+Because Y.Doc updates preserve block-id stability across undo (the
+UndoManager re-inserts the original Y.Map identities), id-keyed
+selections survive the undo/redo cycle without index translation.
+
+Editable textbox-frame selections are restored too. A frame's
+contentEditable body isn't a body registry block, so the public
+`Selection` model can't address it; the editor captures a frame caret
+or range as a `{ start, end }` character span and restores it onto the
+freshly-repainted frame, so undo/redo of a frame edit behaves the same
+as in body flow (including reselecting replaced text on undo).
 
 ## Edge cases
 
