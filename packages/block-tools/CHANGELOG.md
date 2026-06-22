@@ -1,5 +1,12 @@
 # @sobree/block-tools
 
+## 0.1.26
+
+### Patch Changes
+
+- Updated dependencies [dbe703d]
+  - @sobree/core@0.1.26
+
 ## 0.1.25
 
 ### Patch Changes
