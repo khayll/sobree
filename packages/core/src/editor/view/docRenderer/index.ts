@@ -30,7 +30,23 @@ export function renderSobreeDocument(
   // Falls back to Word's factory default 720 twips (0.5") when the
   // doc's settings.xml omits the element.
   applyDefaultTabStop(host, doc.settings?.defaultTabStopTwips ?? 720);
-  renderBlocks(doc.body, host, doc.numbering, doc.styles, doc.rawParts, blockIds, doc.sections);
+  // Body block indices that carry an anchored frame — so an otherwise-empty
+  // float-only page (a brochure panel page) is still a valid page break
+  // target. See `renderBlocks`' page-break deferral.
+  const frameAnchoredIndices = new Set<number>();
+  for (const f of doc.anchoredFrames ?? []) {
+    if (f.anchor.paragraphIndex !== undefined) frameAnchoredIndices.add(f.anchor.paragraphIndex);
+  }
+  renderBlocks(
+    doc.body,
+    host,
+    doc.numbering,
+    doc.styles,
+    doc.rawParts,
+    blockIds,
+    doc.sections,
+    frameAnchoredIndices,
+  );
   if (doc.footnotes && Object.keys(doc.footnotes).length > 0) {
     renderFootnotesAside(doc, host);
   }

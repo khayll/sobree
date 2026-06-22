@@ -322,7 +322,7 @@ export class PaperStack {
     // paragraphs anchored to the prior page rather than spawning a
     // dedicated page. Without this, jellap.docx ends with a 3rd page
     // containing two empty paragraphs.
-    const pages = collapseTrailingEmptyPages(rawPages);
+    const pages = collapseTrailingEmptyPages(rawPages, this.anchoredBlockIndices());
     // Note: there is no post-pagination "underfilled page" absorption.
     // Widow/orphan handling lives in the engine's break-cost function
     // (`pagination/cost.ts`), not a post-process pass — a post-pass here
@@ -572,6 +572,16 @@ export class PaperStack {
    *
    * Cheap and idempotent; safe to call after any layout change.
    */
+  /** Body block indices a floating frame is anchored to. A body-empty page
+   *  holding one of these carries an absolute overlay and must not collapse. */
+  private anchoredBlockIndices(): Set<number> {
+    const out = new Set<number>();
+    for (const f of this.anchoredFrames ?? []) {
+      if (f.anchor.paragraphIndex !== undefined) out.add(f.anchor.paragraphIndex);
+    }
+    return out;
+  }
+
   private paintAnchorLayers(): void {
     const frames = this.anchoredFrames;
     const deps = this.anchorRenderDeps;
@@ -835,13 +845,27 @@ function mergeInto(head: HTMLElement, tail: HTMLElement): void {
  * a real "last page with just a signature line" still gets its own
  * page. Idempotent; safe to call on a single-page result.
  */
-export function collapseTrailingEmptyPages(pages: readonly HTMLElement[][]): HTMLElement[][] {
+export function collapseTrailingEmptyPages(
+  pages: readonly HTMLElement[][],
+  anchoredBlockIndices: ReadonlySet<number> = new Set(),
+): HTMLElement[][] {
   const out: HTMLElement[][] = pages.map((page) => page.slice());
+  // A page whose body is empty but which a floating frame is anchored to
+  // is NOT collapsible — it carries an absolute overlay (a brochure's
+  // full-page background image, its positioned text panels) that LO/Word
+  // keep on their own page. Collapsing it would pile those frames onto a
+  // neighbouring page. (The trifold's two pages are both empty in body
+  // flow; all their content is anchored frames.)
+  const anchorsFrame = (page: readonly HTMLElement[]): boolean =>
+    page.some((el) => {
+      const idx = el.getAttribute("data-block-index");
+      return idx !== null && anchoredBlockIndices.has(Number(idx));
+    });
   // Walk from the last page back. While the last page is fully empty
   // and we have a previous page to absorb into, merge it down.
   while (out.length >= 2) {
     const last = out[out.length - 1];
-    if (!last || !last.every(isVisuallyEmptyBlock)) break;
+    if (!last || anchorsFrame(last) || !last.every(isVisuallyEmptyBlock)) break;
     const prev = out[out.length - 2]!;
     prev.push(...last);
     out.pop();
@@ -855,7 +879,7 @@ export function collapseTrailingEmptyPages(pages: readonly HTMLElement[][]): HTM
   for (let i = out.length - 2; i >= 0; i--) {
     const page = out[i]!;
     if (page.length === 0) continue;
-    if (!page.every(isVisuallyEmptyBlock)) continue;
+    if (anchorsFrame(page) || !page.every(isVisuallyEmptyBlock)) continue;
     // All blocks visually empty. Push them onto the next page's
     // start so document order is preserved, then drop this page.
     const next = out[i + 1];

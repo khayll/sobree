@@ -27,11 +27,24 @@
  * bordered/filled boxes) stays an overlay, unchanged.
  */
 
-import type { AnchoredContent, AnchoredFrame, Block, DrawingRun, Paragraph } from "../../doc/types";
+import type {
+  AnchoredContent,
+  AnchoredFrame,
+  Block,
+  DrawingRun,
+  Paragraph,
+  SectionProperties,
+} from "../../doc/types";
 
 /** A frame whose content should flow inline rather than overlay. */
-function isFlowable(frame: AnchoredFrame): boolean {
+function isFlowable(frame: AnchoredFrame, sections: readonly SectionProperties[]): boolean {
   if (frame.behindText) return false;
+  // A column-anchored textbox in a MULTI-COLUMN section is a positioned
+  // panel in a grid (a brochure/trifold), not a flow call-out. Splicing it
+  // into the body at its anchor paragraph would stack the parallel panels
+  // into one snaking column and destroy the layout. Single-column sections
+  // keep the flow treatment (a tall in-column call-out that must paginate).
+  if ((sections[frame.anchor.sectionIndex]?.columns?.count ?? 1) > 1) return false;
   // Only a textbox positioned relative to the text COLUMN shares the
   // body's coordinate system — splicing it in at the anchor keeps it
   // where Word drew it. A box positioned relative to the page MARGIN or
@@ -204,8 +217,9 @@ function withLeadingImages(blocks: Block[], images: DrawingRun[]): Block[] {
 export function flowDisplacingTextboxes(
   body: readonly Block[],
   frames: readonly AnchoredFrame[],
+  sections: readonly SectionProperties[],
 ): { body: Block[]; frames: AnchoredFrame[] } {
-  const flowable = frames.filter(isFlowable);
+  const flowable = frames.filter((f) => isFlowable(f, sections));
   if (flowable.length === 0) {
     return { body: body.slice(), frames: frames.slice() };
   }

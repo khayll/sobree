@@ -38,6 +38,10 @@ export function renderBlocks(
   rawParts: Record<string, Uint8Array> = {},
   blockIds?: readonly string[],
   sections: readonly SectionProperties[] = [],
+  /** Body block indices that carry an anchored frame. Such a block counts
+   *  as a valid target for a deferred page break even when its body flow is
+   *  empty — a float-only brochure panel page is still a page. */
+  frameAnchoredIndices: ReadonlySet<number> = new Set(),
 ): void {
   // Outline numbers ("1", "1.1", …) for headings whose style links a
   // numbering definition — computed in one document-order pass, stamped as
@@ -89,31 +93,46 @@ export function renderBlocks(
     return true;
   };
 
+  const paragraphHasPageBreakRun = (b: Block): boolean =>
+    b.kind === "paragraph" && b.runs.some((r) => r.kind === "break" && r.type === "page");
+
   const flushList = () => {
     currentList = null;
   };
 
   for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
+    let block = blocks[i];
     if (!block) continue;
     const id = blockIds?.[i];
 
-    // Page-break deferral: if this block carries pageBreakBefore but
-    // is visually empty, suppress its break and remember it. Apply
-    // the pending break to the next non-empty block instead. See the
-    // pendingPageBreak comment above for why.
-    if (block.kind === "paragraph" && block.properties.pageBreakBefore) {
-      if (isVisuallyEmptyBlock(block)) {
+    // Page-break deferral: an empty paragraph whose break (a
+    // `pageBreakBefore` property OR a `<w:br type="page">` run) would
+    // otherwise land BEFORE it — wasting the previous page and pushing the
+    // empty paragraph to the top of the next. Suppress it and re-apply to
+    // the next block that has real content OR an anchored frame. The frame
+    // check is load-bearing for float-only pages (a brochure panel page is
+    // empty in body flow but is still a page); without it the deferred break
+    // would never find a target and the document would collapse to one page.
+    // (Clone, never mutate the source AST.)
+    let triggeredHere = false;
+    if (block.kind === "paragraph" && isVisuallyEmptyBlock(block)) {
+      if (block.properties.pageBreakBefore || paragraphHasPageBreakRun(block)) {
         pendingPageBreak = true;
-        // strip the break from this block so the renderer doesn't
-        // apply it. Use a shallow clone of properties so we don't
-        // mutate the source AST.
-        block.properties = { ...block.properties, pageBreakBefore: false };
+        triggeredHere = true;
+        block = {
+          ...block,
+          properties: { ...block.properties, pageBreakBefore: false },
+          runs: block.runs.filter((r) => !(r.kind === "break" && r.type === "page")),
+        };
       }
     }
-    if (pendingPageBreak && !isVisuallyEmptyBlock(block)) {
+    if (
+      pendingPageBreak &&
+      !triggeredHere &&
+      (!isVisuallyEmptyBlock(block) || frameAnchoredIndices.has(i))
+    ) {
       if (block.kind === "paragraph") {
-        block.properties = { ...block.properties, pageBreakBefore: true };
+        block = { ...block, properties: { ...block.properties, pageBreakBefore: true } };
       }
       pendingPageBreak = false;
     }
