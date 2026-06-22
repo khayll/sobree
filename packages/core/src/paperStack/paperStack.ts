@@ -28,14 +28,25 @@ import { Paper } from "./paper";
  * templates. Cleared (set back to `null`) when the doc has no
  * header/footer parts — falls back to the legacy text path.
  */
-export interface RichZonesSource {
+/**
+ * The document render dependencies the anchored-frame layer needs to paint
+ * frame content — pictures (via `rawParts`) and textbox bodies (via
+ * `renderBlocks`, which wants `numbering` + `styles`). Deliberately
+ * independent of header/footer rich zones: a document with floating
+ * drawings but NO header/footer still needs these to render its frames, so
+ * the anchor layer must not be gated on {@link RichZonesSource}.
+ */
+export interface AnchorRenderDeps {
+  numbering: readonly NumberingDefinition[];
+  styles: readonly NamedStyle[];
+  rawParts: Record<string, Uint8Array>;
+}
+
+export interface RichZonesSource extends AnchorRenderDeps {
   headerFooterBodies: Record<string, Block[]>;
   /** Floating frames per header/footer part, keyed by the same partId as
    *  `headerFooterBodies`. Absent for docs whose zones have no floats. */
   headerFooterFrames?: Record<string, AnchoredFrame[]>;
-  numbering: readonly NumberingDefinition[];
-  styles: readonly NamedStyle[];
-  rawParts: Record<string, Uint8Array>;
 }
 
 const MM_TO_PX = 96 / 25.4;
@@ -98,6 +109,14 @@ export class PaperStack {
    * `null` → no floating layer at all (skeleton state during Phase B).
    */
   private anchoredFrames: AnchoredFrame[] | null = null;
+  /**
+   * Render deps for {@link anchoredFrames}, carried with them so the anchor
+   * layer can paint frame content (pictures, textbox bodies) WITHOUT a
+   * {@link RichZonesSource}. Set alongside `anchoredFrames`; the body
+   * floating layer used to wrongly source these from `richZones`, which
+   * dropped every frame in a header/footer-less document.
+   */
+  private anchorRenderDeps: AnchorRenderDeps | null = null;
   /** Reused blob-URL cache across renders so the same image isn't re-uploaded. */
   private readonly anchorPictureUrlCache = new Map<string, string>();
 
@@ -140,9 +159,15 @@ export class PaperStack {
    *
    * Call after `setRichZones`/`updateBodyBlocks` so the next render
    * picks up the new floating content alongside body flow.
+   *
+   * `deps` carries the render context (rawParts / numbering / styles) the
+   * frames need to paint — supplied here, not borrowed from `richZones`, so
+   * floating content renders whether or not the document has header/footer
+   * zones.
    */
-  setAnchoredFrames(frames: readonly AnchoredFrame[] | null): void {
+  setAnchoredFrames(frames: readonly AnchoredFrame[] | null, deps: AnchorRenderDeps): void {
     this.anchoredFrames = frames ? frames.slice() : null;
+    this.anchorRenderDeps = deps;
     this.paintAnchorLayers();
   }
 
@@ -517,12 +542,12 @@ export class PaperStack {
    * `renderBlocks` pipeline so anchored text matches body formatting,
    * keeping `anchorLayer` decoupled from `block.ts`.
    */
-  private anchorLayerCtx(richZones: RichZonesSource): AnchorLayerContext {
+  private anchorLayerCtx(deps: AnchorRenderDeps): AnchorLayerContext {
     return {
-      rawParts: richZones.rawParts,
+      rawParts: deps.rawParts,
       pictureUrlCache: this.anchorPictureUrlCache,
       renderBody: (blocks: Block[], host: HTMLElement) => {
-        renderBlocks(blocks, host, richZones.numbering, richZones.styles, richZones.rawParts);
+        renderBlocks(blocks, host, deps.numbering, deps.styles, deps.rawParts);
       },
       // Textbox frames are editable islands unless the stack is in read
       // mode (`is-read-mode` is toggled by `Sobree.setMode`). Read off the
@@ -549,12 +574,17 @@ export class PaperStack {
    */
   private paintAnchorLayers(): void {
     const frames = this.anchoredFrames;
-    if (!this.richZones || frames === null) {
+    const deps = this.anchorRenderDeps;
+    // Gate on the FRAMES, not on rich zones: anchored frames are body
+    // content, orthogonal to header/footer zones. (Historically this also
+    // checked `this.richZones`, which silently dropped every frame in a
+    // header/footer-less document.)
+    if (frames === null || deps === null) {
       // No floating layer wanted — clear every paper's overlay.
       for (const p of this.papers) p.setAnchoredFrames([], this.emptyAnchorCtx());
       return;
     }
-    const ctx = this.anchorLayerCtx(this.richZones);
+    const ctx = this.anchorLayerCtx(deps);
     // Build per-page assignment. A paragraph-anchored frame lives on
     // the page whose .paper-content contains an element stamped with
     // `data-block-index="N"` where N === paragraphIndex. Anything

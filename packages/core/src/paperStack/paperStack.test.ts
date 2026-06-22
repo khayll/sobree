@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { collapseTrailingEmptyPages } from "./paperStack";
+import type { AnchoredFrame } from "../doc/types";
+import { DEFAULT_PAGE_SETUP } from "./pageSetup";
+import { type AnchorRenderDeps, PaperStack, collapseTrailingEmptyPages } from "./paperStack";
 
 // vitest is configured with `environment: "jsdom"`, so `window.document`
 // is available globally — no need to import jsdom directly.
@@ -92,5 +94,41 @@ describe("collapseTrailingEmptyPages", () => {
     const first = collapseTrailingEmptyPages(pages);
     const second = collapseTrailingEmptyPages(first);
     expect(second).toEqual(first);
+  });
+});
+
+describe("PaperStack anchored frames — independent of header/footer rich zones", () => {
+  const deps: AnchorRenderDeps = { rawParts: {}, numbering: [], styles: [] };
+  const bgFrame: AnchoredFrame = {
+    id: "bg",
+    anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page" },
+    offsetXEmu: 0,
+    offsetYEmu: 0,
+    widthEmu: 914400,
+    heightEmu: 914400,
+    behindText: true,
+    content: { kind: "shape", geometry: "rect", fill: "#A4C639" },
+  };
+
+  it("paints floating frames when the document has NO rich zones", () => {
+    // Regression: `paintAnchorLayers` used to gate on `this.richZones`,
+    // so a header/footer-less document (e.g. the trifold brochure) silently
+    // dropped 100% of its anchored drawings — full-page background images,
+    // watermarks, shapes. Frames are body content, orthogonal to zones.
+    const container = doc.createElement("div");
+    doc.body.appendChild(container);
+    const stack = new PaperStack(container, DEFAULT_PAGE_SETUP);
+    stack.setRichZones(null); // no headers/footers
+    stack.setAnchoredFrames([bgFrame], deps);
+    expect(container.querySelectorAll(".paper-anchor")).toHaveLength(1);
+  });
+
+  it("clears the floating layer when frames are null", () => {
+    const container = doc.createElement("div");
+    doc.body.appendChild(container);
+    const stack = new PaperStack(container, DEFAULT_PAGE_SETUP);
+    stack.setAnchoredFrames([bgFrame], deps);
+    stack.setAnchoredFrames(null, deps);
+    expect(container.querySelectorAll(".paper-anchor")).toHaveLength(0);
   });
 });

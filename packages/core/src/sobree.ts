@@ -4,7 +4,7 @@ import { exportDocx } from "./docx/export/index";
 import { importDocx } from "./docx/import/index";
 import { Editor, type OutlineItem, type TrackChangesState } from "./editor";
 import { DEFAULT_PAGE_SETUP, type PageSetup } from "./paperStack/pageSetup";
-import { PaperStack } from "./paperStack/paperStack";
+import { type AnchorRenderDeps, PaperStack } from "./paperStack/paperStack";
 import { attachSections } from "./plugins/sections";
 import { mountVersionBadge } from "./versionBadge";
 
@@ -438,7 +438,8 @@ export class Sobree {
     // Repaint the floating layer so textbox frames pick up the new
     // editable state (`anchorLayerCtx` reads `is-read-mode` at paint
     // time): editable islands in edit mode, inert overlay in read mode.
-    this.stack.setAnchoredFrames(this.editor.getDocument().anchoredFrames ?? null);
+    const doc = this.editor.getDocument();
+    this.stack.setAnchoredFrames(doc.anchoredFrames ?? null, anchorRenderDeps(doc));
     for (const cb of this.listeners["mode-change"]) {
       try {
         cb({ mode });
@@ -605,7 +606,7 @@ export class Sobree {
     // is the ONLY paint path for anchored content. Inline textboxes
     // are still lifted into body flow (the new layer doesn't yet
     // model inline positioning); that's the next slice of Phase B.
-    this.stack.setAnchoredFrames(doc.anchoredFrames ?? null);
+    this.stack.setAnchoredFrames(doc.anchoredFrames ?? null, anchorRenderDeps(doc));
   }
 
   /**
@@ -685,6 +686,19 @@ export class Sobree {
  * Falls back to `DEFAULT_PAGE_SETUP` when no document is provided or when
  * the section is silent on layout.
  */
+/**
+ * The render deps the anchored-frame layer needs, pulled from the document
+ * itself — so floating content paints whether or not the doc has
+ * header/footer rich zones. See `PaperStack.setAnchoredFrames`.
+ */
+function anchorRenderDeps(doc: SobreeDocument): AnchorRenderDeps {
+  return {
+    rawParts: doc.rawParts ?? {},
+    numbering: doc.numbering ?? [],
+    styles: doc.styles ?? [],
+  };
+}
+
 function deriveSetupFromDocument(doc: SobreeDocument | undefined): PageSetup {
   const base = structuredClone(DEFAULT_PAGE_SETUP);
   if (!doc) return base;
