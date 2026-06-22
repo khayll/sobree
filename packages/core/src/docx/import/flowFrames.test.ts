@@ -42,7 +42,7 @@ describe("flowDisplacingTextboxes", () => {
   it("splices a displacing textbox's body after its anchor paragraph", () => {
     const body: Block[] = [para("A"), para("B"), para("C")];
     const f = frame("f1", 1, textbox("X", "Y"));
-    const out = flowDisplacingTextboxes(body, [f]);
+    const out = flowDisplacingTextboxes(body, [f], []);
     expect(
       out.body.map(
         (b) => (b as Paragraph).runs[0] && ((b as Paragraph).runs[0] as { text: string }).text,
@@ -69,7 +69,7 @@ describe("flowDisplacingTextboxes", () => {
       childCoordSystemCx: 1,
       childCoordSystemCy: 1,
     };
-    const out = flowDisplacingTextboxes([para("anchor")], [frame("g", 0, group)]);
+    const out = flowDisplacingTextboxes([para("anchor")], [frame("g", 0, group)], []);
     // Text content in order (joining text runs only).
     const text = (b: Block) =>
       (b as Paragraph).runs
@@ -93,7 +93,7 @@ describe("flowDisplacingTextboxes", () => {
     const pageRel = frame("p", 0, textbox("Z"), {
       anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page", paragraphIndex: 0 },
     });
-    const out = flowDisplacingTextboxes(body, [wrapNone, behind, pageRel]);
+    const out = flowDisplacingTextboxes(body, [wrapNone, behind, pageRel], []);
     expect(out.body).toHaveLength(1);
     expect(out.frames).toHaveLength(3);
   });
@@ -118,7 +118,7 @@ describe("flowDisplacingTextboxes", () => {
         paragraphIndex: 0,
       },
     });
-    const out = flowDisplacingTextboxes(body, [marginBox, pageBox]);
+    const out = flowDisplacingTextboxes(body, [marginBox, pageBox], []);
     expect(out.body).toHaveLength(1);
     expect(out.frames).toHaveLength(2);
   });
@@ -129,7 +129,7 @@ describe("flowDisplacingTextboxes", () => {
       body: [para("Z")],
       border: { color: "#000", widthEmu: 9525, style: "solid" },
     });
-    const out = flowDisplacingTextboxes([para("A")], [bordered]);
+    const out = flowDisplacingTextboxes([para("A")], [bordered], []);
     expect(out.body).toHaveLength(1);
     expect(out.frames).toHaveLength(1);
   });
@@ -138,7 +138,7 @@ describe("flowDisplacingTextboxes", () => {
     const body = [para("A"), para("B"), para("C")];
     const flow = frame("flow", 0, textbox("X", "Y")); // inserts 2 after index 0
     const overlay = frame("ov", 2, textbox("Z"), { wrap: "none" }); // anchored to C
-    const out = flowDisplacingTextboxes(body, [flow, overlay]);
+    const out = flowDisplacingTextboxes(body, [flow, overlay], []);
     // C moved from index 2 → 4 (A,X,Y,B,C? no: A then X,Y then B then C)
     // body: [A, X, Y, B, C] → C at index 4
     const ov = out.frames.find((f) => f.id === "ov");
@@ -147,7 +147,7 @@ describe("flowDisplacingTextboxes", () => {
 
   it("is a no-op (copies) when no frame is flowable", () => {
     const body = [para("A")];
-    const out = flowDisplacingTextboxes(body, []);
+    const out = flowDisplacingTextboxes(body, [], []);
     expect(out.body).toEqual(body);
     expect(out.body).not.toBe(body);
   });

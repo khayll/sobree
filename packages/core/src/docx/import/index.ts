@@ -142,16 +142,20 @@ export async function importDocx(
   // of clipping in the absolute overlay. Pure decorations (pictures,
   // bordered boxes, behind-text, wrapNone floats) stay in
   // `anchoredFrames`.
-  const { body: flowedBody, frames: flowedFrames } = flowDisplacingTextboxes(
-    rawBody,
-    anchoredFrames,
-  );
-
   // Build all sections from the collected sectPrs (inline + body-level).
   // Each section's headerRefs/footerRefs are resolved through `rels` to
   // partIds; the referenced header/footer XML parts are loaded into
-  // `headerFooterBodies` so the editor can render them.
+  // `headerFooterBodies` so the editor can render them. Built BEFORE the
+  // textbox-flow pass because that pass needs each section's column count
+  // (a column-anchored textbox in a multi-column section is a positioned
+  // panel, not flow content — see `flowDisplacingTextboxes`).
   const sections = sectPrEls.map((el) => readSection(el, rels));
+
+  const { body: flowedBody, frames: flowedFrames } = flowDisplacingTextboxes(
+    rawBody,
+    anchoredFrames,
+    sections,
+  );
 
   // Wrap-mode anchored PICTURES (square/tight/through) become CSS floats at
   // the head of their anchor paragraph so body text flows around them.
