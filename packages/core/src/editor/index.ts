@@ -124,6 +124,14 @@ export type { RunPropertiesPatch };
  * rather than throwing.
  */
 
+/**
+ * Initial track-changes state for the constructor: a defensive clone of
+ * the caller's option (so we never alias their object), or the off default.
+ */
+function initialTrackChanges(state: TrackChangesState | undefined): TrackChangesState {
+  return state ? { ...state } : { enabled: false };
+}
+
 export class Editor {
   readonly host: HTMLElement;
   readonly selection: EditorSelection;
@@ -270,7 +278,7 @@ export class Editor {
     this.debounceMs = options.changeDebounceMs ?? 200;
     this.getContentHosts = options.contentHosts ?? (() => [host]);
     // Seed track-changes silently — no listeners can exist yet.
-    if (options.trackChanges) this.trackChanges = { ...options.trackChanges };
+    this.trackChanges = initialTrackChanges(options.trackChanges);
 
     // Y.Doc backing — either user-provided (for providers / shared docs)
     // or freshly created. The BlockRegistry's id prefix incorporates the
