@@ -278,7 +278,8 @@ export class Editor {
     // blocks (Phase 1b: collision-safe across peers).
     this.ydoc = options.ydoc ?? new Y.Doc();
     const clientId = this.ydoc.clientID.toString(36);
-    this.registry = new BlockRegistry({ idPrefix: `${clientId}_` });
+    const idPrefix = `${clientId}_`;
+    this.registry = new BlockRegistry({ idPrefix });
     this.blobStore = options.blobStore ?? null;
     this.blobCache = this.createBlobCache();
 
