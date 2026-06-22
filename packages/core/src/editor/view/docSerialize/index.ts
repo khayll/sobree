@@ -22,23 +22,43 @@ export function serializeHostsToDocument(
   hosts: readonly HTMLElement[],
   options: SerializeHostsOptions = {},
 ): SobreeDocument {
+  return serializeHostsWithSources(hosts, options).document;
+}
+
+/**
+ * Like {@link serializeHostsToDocument}, but also returns each block's
+ * source DOM element (parallel to `document.body`, `null` for bare text
+ * nodes). The editor reads each element's stable `data-block-id` to match a
+ * re-read block back to its previous AST block — so block-level properties
+ * the contentEditable DOM can't carry survive the read-back across plain
+ * typing AND structural edits (Enter / Backspace / paste / reorder).
+ */
+export function serializeHostsWithSources(
+  hosts: readonly HTMLElement[],
+  options: SerializeHostsOptions = {},
+): { document: SobreeDocument; sources: (HTMLElement | null)[] } {
+  const sources: (HTMLElement | null)[] = [];
   const ctx: BlockSerializeContext = {
     numbering: [],
     currentList: null,
     sectionBreaks: 0,
     captureRunDefaults: options.captureRunDefaults ?? false,
+    sources,
   };
   const body = [];
   for (const host of hosts) {
     body.push(...blocksFromNodes(Array.from(host.childNodes), ctx));
   }
   return {
-    body,
-    sections: [],
-    headerFooterBodies: {},
-    styles: defaultStyles(),
-    numbering: ctx.numbering,
-    rawParts: {},
-    fonts: [],
+    document: {
+      body,
+      sections: [],
+      headerFooterBodies: {},
+      styles: defaultStyles(),
+      numbering: ctx.numbering,
+      rawParts: {},
+      fonts: [],
+    },
+    sources,
   };
 }
