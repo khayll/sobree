@@ -16,6 +16,17 @@ export interface BlockSerializeContext {
    */
   currentList: { numId: number; ordered: boolean } | null;
   /**
+   * Running count of section breaks seen so far (across all hosts). The Nth
+   * section break transitions to section N — matching the renderer's
+   * order-based section assignment — so the count IS the break's
+   * `toSectionIndex`. Reconstructing it is load-bearing: the renderer reads
+   * a break's page-break-vs-continuous behaviour from `sections[toSectionIndex]`,
+   * so a wrong index (e.g. a hardcoded 0) makes a continuous break re-render
+   * as a forced page break, exploding the layout on the next re-render
+   * (undo/redo/remote).
+   */
+  sectionBreaks: number;
+  /**
    * Capture each paragraph's effective base run style (from the rendered
    * `<p>`'s inline font) into `ParagraphProperties.runDefaults`.
    *
@@ -52,7 +63,8 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
     // `contenteditable="false"` skip below, since the marker is also
     // contenteditable=false but carries semantic meaning.
     if (node.classList.contains("sobree-section-break")) {
-      out.push({ kind: "section_break", toSectionIndex: 0 });
+      ctx.sectionBreaks += 1;
+      out.push({ kind: "section_break", toSectionIndex: ctx.sectionBreaks });
       ctx.currentList = null;
       continue;
     }

@@ -96,3 +96,25 @@ describe("serializeHostsToDocument — multi-column section un-wrap", () => {
     expect(serializeHostsToDocument([h]).body.map(bodyText)).toEqual(["X", "Y"]);
   });
 });
+
+describe("serializeHostsToDocument — section-break toSectionIndex", () => {
+  it("reconstructs each break's target section index (Nth break → section N)", () => {
+    // The renderer reads a break's page-break-vs-continuous behaviour from
+    // `sections[toSectionIndex]`, so the read-back must recover the real
+    // index. A hardcoded 0 made every break resolve to section 0 (default
+    // next-page), exploding a continuous-section doc into one page per
+    // section on the next re-render.
+    const h = host(`
+      <p>section zero</p>
+      <div class="sobree-section-break" contenteditable="false"></div>
+      <p>section one</p>
+      <div class="sobree-section-break" contenteditable="false"></div>
+      <p>section two</p>`);
+    const body = serializeHostsToDocument([h]).body;
+    const breaks = body.filter((b) => b.kind === "section_break") as {
+      kind: "section_break";
+      toSectionIndex: number;
+    }[];
+    expect(breaks.map((b) => b.toSectionIndex)).toEqual([1, 2]);
+  });
+});

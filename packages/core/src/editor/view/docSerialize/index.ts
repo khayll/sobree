@@ -25,6 +25,7 @@ export function serializeHostsToDocument(
   const ctx: BlockSerializeContext = {
     numbering: [],
     currentList: null,
+    sectionBreaks: 0,
     captureRunDefaults: options.captureRunDefaults ?? false,
   };
   const body = [];
