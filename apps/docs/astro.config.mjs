@@ -27,6 +27,13 @@ export default defineConfig({
           ],
         },
         {
+          label: "Use cases",
+          items: [
+            { label: "Embeddable DOCX editor", link: "/use-cases/embeddable-docx-editor/" },
+            { label: "AI document agents", link: "/use-cases/ai-document-agents/" },
+          ],
+        },
+        {
           label: "Concepts",
           items: [
             { label: "Architecture", link: "/concepts/architecture/" },
