@@ -57,6 +57,24 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
       continue;
     }
 
+    // Multi-column section wrapper — a pure LAYOUT artifact. `flowColumnSections`
+    // restructures a multi-column section's blocks into `.sobree-col` tracks
+    // (chunked per page) for the snaking layout; the AST has no such wrapper
+    // (just a flat block list + the section's column property). So the readback
+    // must UN-WRAP it, the exact inverse of the render-side wrap: recurse into
+    // each track's children in DOM order — which is document order, since
+    // blocks move WHOLE into tracks, never split (see `columnFlow.ts`). Without
+    // this the whole wrapper serialises as one merged paragraph, collapsing the
+    // section's paragraphs and destroying its content on the first edit.
+    if (node.classList.contains("sobree-cols")) {
+      const tracks = Array.from(node.querySelectorAll<HTMLElement>(":scope > .sobree-col"));
+      const sources = tracks.length > 0 ? tracks : [node];
+      for (const src of sources) {
+        out.push(...blocksFromNodes(Array.from(src.childNodes), ctx));
+      }
+      continue;
+    }
+
     if (node.getAttribute("contenteditable") === "false") continue;
 
     const tag = node.tagName.toLowerCase();

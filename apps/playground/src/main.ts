@@ -26,6 +26,7 @@ import { keyboard } from "@sobree/keyboard";
 import { review } from "@sobree/review";
 import { zoomControls } from "@sobree/zoom-controls";
 
+import { fieldAlmanacSeed } from "./seeds/fieldAlmanac";
 import "./playground.css";
 
 const host = resolveHost();
@@ -697,6 +698,9 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-action]"))
         break;
       case "seed-a5":
         editor.setDocument(a5Seed());
+        break;
+      case "seed-try":
+        editor.setDocument(fieldAlmanacSeed());
         break;
       case "clear":
         editor.loadMarkdown("");

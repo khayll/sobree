@@ -44,3 +44,55 @@ describe("serializeHostsToDocument — captureRunDefaults (frame read-back)", ()
     expect(firstParagraph(host(heading)).properties.runDefaults).toBeUndefined();
   });
 });
+
+describe("serializeHostsToDocument — multi-column section un-wrap", () => {
+  const bodyText = (b: { kind: string; runs?: { kind: string; text?: string }[] }) =>
+    (b as Paragraph).runs?.map((r) => (r.kind === "text" ? r.text : "")).join("") ?? "";
+
+  it("un-wraps `.sobree-cols` tracks back to flat blocks in document order", () => {
+    // What `flowColumnSections` produces for a 2-column section: a wrapper
+    // with two `.sobree-col` tracks, each holding WHOLE paragraphs. The
+    // readback must recover the flat paragraph sequence — col0 then col1
+    // (snaking = document order) — not one merged paragraph.
+    const h = host(`
+      <div class="sobree-cols sobree-section-col">
+        <div class="sobree-col"><p>A</p><p>B</p></div>
+        <div class="sobree-col"><p>C</p><p>D</p></div>
+      </div>`);
+    const body = serializeHostsToDocument([h]).body;
+    expect(body).toHaveLength(4);
+    expect(body.map(bodyText)).toEqual(["A", "B", "C", "D"]);
+  });
+
+  it("keeps the section's blocks distinct when the wrapper sits between section breaks", () => {
+    const h = host(`
+      <p>intro</p>
+      <div class="sobree-section-break" contenteditable="false"></div>
+      <div class="sobree-cols">
+        <div class="sobree-col"><p>col one</p></div>
+        <div class="sobree-col"><p>col two</p></div>
+      </div>
+      <div class="sobree-section-break" contenteditable="false"></div>
+      <p>outro</p>`);
+    const body = serializeHostsToDocument([h]).body;
+    expect(body.map((b) => b.kind)).toEqual([
+      "paragraph",
+      "section_break",
+      "paragraph",
+      "paragraph",
+      "section_break",
+      "paragraph",
+    ]);
+    expect(body.filter((b) => b.kind === "paragraph").map(bodyText)).toEqual([
+      "intro",
+      "col one",
+      "col two",
+      "outro",
+    ]);
+  });
+
+  it("falls back to direct children for a pristine wrapper (no tracks yet)", () => {
+    const h = host(`<div class="sobree-cols"><p>X</p><p>Y</p></div>`);
+    expect(serializeHostsToDocument([h]).body.map(bodyText)).toEqual(["X", "Y"]);
+  });
+});
