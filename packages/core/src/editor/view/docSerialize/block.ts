@@ -16,6 +16,17 @@ export interface BlockSerializeContext {
    */
   currentList: { numId: number; ordered: boolean } | null;
   /**
+   * Running count of section breaks seen so far (across all hosts). The Nth
+   * section break transitions to section N — matching the renderer's
+   * order-based section assignment — so the count IS the break's
+   * `toSectionIndex`. Reconstructing it is load-bearing: the renderer reads
+   * a break's page-break-vs-continuous behaviour from `sections[toSectionIndex]`,
+   * so a wrong index (e.g. a hardcoded 0) makes a continuous break re-render
+   * as a forced page break, exploding the layout on the next re-render
+   * (undo/redo/remote).
+   */
+  sectionBreaks: number;
+  /**
    * Capture each paragraph's effective base run style (from the rendered
    * `<p>`'s inline font) into `ParagraphProperties.runDefaults`.
    *
@@ -30,19 +41,36 @@ export interface BlockSerializeContext {
    * styles, which must stay style-linked across edits.
    */
   captureRunDefaults?: boolean;
+  /**
+   * Optional sink for each emitted block's source DOM element (or `null`
+   * for a bare text node), kept strictly parallel to the returned blocks.
+   * The editor reads each element's stable `data-block-id` to match a
+   * re-read block back to its previous AST block — so block-level
+   * properties (spacing, table style, …) survive a read-back across plain
+   * typing AND structural edits, where positional matching can't. Left
+   * unset for callers that don't need provenance (frame read-back, tests).
+   */
+  sources?: (HTMLElement | null)[];
 }
 
 export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeContext): Block[] {
   const out: Block[] = [];
+  // Emit a block AND record its source element in lock-step, so the
+  // `ctx.sources` sink can never drift out of alignment with `out`. The
+  // column-unwrap recursion below appends to the same `ctx.sources` via its
+  // own emits, then spreads its returned blocks here — order is preserved.
+  const emit = (block: Block, source: HTMLElement | null) => {
+    out.push(block);
+    ctx.sources?.push(source);
+  };
   for (const node of nodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent ?? "";
       if (text.trim() === "") continue;
-      out.push({
-        kind: "paragraph",
-        properties: {},
-        runs: [{ kind: "text", text, properties: {} }],
-      });
+      emit(
+        { kind: "paragraph", properties: {}, runs: [{ kind: "text", text, properties: {} }] },
+        null,
+      );
       continue;
     }
     if (!(node instanceof HTMLElement)) continue;
@@ -52,7 +80,8 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
     // `contenteditable="false"` skip below, since the marker is also
     // contenteditable=false but carries semantic meaning.
     if (node.classList.contains("sobree-section-break")) {
-      out.push({ kind: "section_break", toSectionIndex: 0 });
+      ctx.sectionBreaks += 1;
+      emit({ kind: "section_break", toSectionIndex: ctx.sectionBreaks }, node);
       ctx.currentList = null;
       continue;
     }
@@ -68,8 +97,10 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
     // section's paragraphs and destroying its content on the first edit.
     if (node.classList.contains("sobree-cols")) {
       const tracks = Array.from(node.querySelectorAll<HTMLElement>(":scope > .sobree-col"));
-      const sources = tracks.length > 0 ? tracks : [node];
-      for (const src of sources) {
+      const trackSources = tracks.length > 0 ? tracks : [node];
+      for (const src of trackSources) {
+        // Recurse with the same ctx so the inner emits append to `ctx.sources`
+        // in document order; spread the returned blocks into `out` to match.
         out.push(...blocksFromNodes(Array.from(src.childNodes), ctx));
       }
       continue;
@@ -98,7 +129,7 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
           runs: serializeInlineChildren(li),
         };
         if (ctx.captureRunDefaults) applyRunDefaults(paragraph.properties, li);
-        out.push(paragraph);
+        emit(paragraph, li);
       }
       ctx.currentList = null;
       continue;
@@ -107,20 +138,23 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
     ctx.currentList = null;
 
     if (tag === "table") {
-      out.push(tableFromElement(node));
+      emit(tableFromElement(node), node);
       continue;
     }
 
     if (tag === "hr" || node.hasAttribute("data-page-break")) {
-      out.push({
-        kind: "paragraph",
-        properties: {
-          borders: {
-            bottom: { style: "single", sizeEighthsOfPt: 6, color: "auto", spaceTwips: 1 },
+      emit(
+        {
+          kind: "paragraph",
+          properties: {
+            borders: {
+              bottom: { style: "single", sizeEighthsOfPt: 6, color: "auto", spaceTwips: 1 },
+            },
           },
+          runs: [],
         },
-        runs: [],
-      });
+        node,
+      );
       continue;
     }
 
@@ -131,7 +165,7 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
         const para = paragraphFromElement(child, "Quote");
         if (para) {
           if (ctx.captureRunDefaults) applyRunDefaults(para.properties, child);
-          out.push(para);
+          emit(para, child);
         }
       }
       continue;
@@ -140,7 +174,7 @@ export function blocksFromNodes(nodes: readonly Node[], ctx: BlockSerializeConte
     const para = paragraphFromElement(node);
     if (para) {
       if (ctx.captureRunDefaults) applyRunDefaults(para.properties, node);
-      out.push(para);
+      emit(para, node);
     }
   }
   return out;

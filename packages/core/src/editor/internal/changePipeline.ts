@@ -18,16 +18,17 @@
  */
 
 import { type BlockRef, type EditResult, ok } from "../../doc/api";
-import type { SobreeDocument } from "../../doc/types";
+import type { Block, SobreeDocument } from "../../doc/types";
 import { applyDocumentToYDoc, projectYDoc } from "../../ydoc";
 import type { EditorContext } from "../context";
 import type { EditorEvents } from "../events";
 import * as parts from "../ops/parts";
 import { renderSobreeDocument } from "../view/docRenderer/index";
-import { serializeHostsToDocument } from "../view/docSerialize/index";
+import { serializeHostsWithSources } from "../view/docSerialize/index";
 import type { FrameController } from "./frames";
 import type { Mutation } from "./mutations";
 import { applySelectionToDom } from "./positionMap";
+import { mergeReadbackBlocks } from "./readbackMerge";
 
 export class ChangePipeline {
   private revision = 0;
@@ -155,25 +156,60 @@ export class ChangePipeline {
     // frame edit (domDirty false) must NOT re-serialise the body: that
     // would churn the registry and risk clobbering AST-only properties.
     if (this.domDirty) {
-      const serialised = serializeHostsToDocument(this.ctx.getContentHosts());
+      const { document: serialised, sources } = serializeHostsWithSources(
+        this.ctx.getContentHosts(),
+      );
       const prevCount = this.ctx.registry.length();
       const newCount = serialised.body.length;
 
+      // The contentEditable DOM is a LOSSY projection — it carries run text
+      // and inline marks, but NOT block-level properties (paragraph
+      // spacing/indent/borders, table style-id/look/cell-margins,
+      // section-break targets). A text or structural edit changes a block's
+      // CONTENT, never those properties, so re-deriving the whole AST from
+      // the DOM strips them and the doc falls apart on the next re-render
+      // (undo / redo / remote). Match each re-read block to its previous AST
+      // block by stable id (`data-block-id`, stamped by the renderer, read
+      // off the source element here) and overlay only the re-read content —
+      // properties survive across typing AND structural edits alike.
+      const prevById = new Map<string, Block>();
+      const prevIds = this.allBlockIds();
+      this.ctx.doc.body.forEach((b, i) => {
+        const id = prevIds[i];
+        if (id) prevById.set(id, b);
+      });
+      const body = mergeReadbackBlocks(serialised.body, (i) => {
+        const id = sources[i]?.dataset.blockId;
+        return id ? prevById.get(id) : undefined;
+      });
+
       if (newCount !== prevCount) {
-        // Structural change (user pressed Enter / Backspace, paste inserted
-        // blocks): we can't preserve ids across structural shifts cheaply,
-        // so re-stamp. Agents that held stale refs will see lock failures.
+        // Structural change (Enter / Backspace, paste inserted blocks):
+        // re-stamp the registry. Agents that held stale refs see lock
+        // failures. The id-keyed merge above already carried each surviving
+        // block's properties across the shift.
         this.ctx.registry.reset(newCount);
+        // Re-stamp the live DOM's `data-block-id` to the fresh registry ids
+        // (positional now that the body is rebuilt) WITHOUT a re-render —
+        // which would clobber the caret mid-edit. This keeps the DOM ids in
+        // step with the registry, so a subsequent un-rendered edit can still
+        // match blocks by id instead of silently re-deriving (lossily).
+        const newIds = this.allBlockIds();
+        sources.forEach((el, i) => {
+          const id = newIds[i];
+          if (el && id) el.dataset.blockId = id;
+        });
+        this.lastSerialisedBlocks = body.map((b) => JSON.stringify(b));
       } else {
-        // Same count: detect which blocks' serialised JSON changed.
-        const newJson = serialised.body.map((b) => JSON.stringify(b));
+        // Same count: bump the versions of blocks whose merged JSON changed.
+        const newJson = body.map((b) => JSON.stringify(b));
         const changed: boolean[] = newJson.map((j, i) => j !== this.lastSerialisedBlocks[i]);
         this.lastSerialisedBlocks = newJson;
         this.ctx.registry.bumpChanged(changed);
       }
       this.ctx.setDoc({
         ...this.ctx.doc,
-        body: serialised.body,
+        body,
         numbering: serialised.numbering,
       });
       this.domDirty = false;
