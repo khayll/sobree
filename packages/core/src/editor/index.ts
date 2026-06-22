@@ -40,7 +40,7 @@ import { EditorSelection } from "./selection";
 import { EditorStyles } from "./styles";
 import { EditorTable } from "./table";
 import { renderSobreeDocument } from "./view/docRenderer/index";
-import { wireEditorDom } from "./wiring";
+import { type EditorDomHooks, wireEditorDom } from "./wiring";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
 // re-exported here so the public surface (and HeadlessSobree) is unchanged.
 export { EditorCommands } from "./commands";
@@ -269,62 +269,29 @@ export class Editor {
     this.host = host;
     this.debounceMs = options.changeDebounceMs ?? 200;
     this.getContentHosts = options.contentHosts ?? (() => [host]);
-    if (options.trackChanges) {
-      // Seed silently — no listeners can exist yet, so no event needed.
-      this.trackChanges = { ...options.trackChanges };
-    }
+    // Seed track-changes silently — no listeners can exist yet.
+    if (options.trackChanges) this.trackChanges = { ...options.trackChanges };
 
     // Y.Doc backing — either user-provided (for providers / shared docs)
     // or freshly created. The BlockRegistry's id prefix incorporates the
     // Y.Doc's clientID so two peers don't both mint `b5` for different
     // blocks (Phase 1b: collision-safe across peers).
     this.ydoc = options.ydoc ?? new Y.Doc();
-    this.registry = new BlockRegistry({
-      idPrefix: `${this.ydoc.clientID.toString(36)}_`,
-    });
-
-    // Optional content-hashed blob layer. The cache's `onResolved`
-    // callback patches `this.doc.rawParts` and fires `change` so the
-    // renderer picks up a freshly-arrived blob without an explicit
-    // refresh from the embedder.
+    this.registry = new BlockRegistry({ idPrefix: `${this.ydoc.clientID.toString(36)}_` });
     this.blobStore = options.blobStore ?? null;
-    this.blobCache = this.blobStore
-      ? new BlobCache({
-          store: this.blobStore,
-          onResolved: (hash) => parts.onBlobResolved(this.ctx, hash),
-        })
-      : null;
+    this.blobCache = this.createBlobCache();
 
     this.selection = new EditorSelection(this);
     this.table = new EditorTable(this);
     this.commands = new EditorCommands();
-
-    // History orchestrator — Phase 1b.6: backed by Y.UndoManager. The
-    // UndoManager observes the body / meta / parts top-level Y types
-    // and tracks operations whose origin matches `localOrigin`. Local
-    // edits (mirrored by `mirrorToYDoc()` with origin "local") create
-    // stack items; remote-provider edits (any other origin) don't —
-    // so `Cmd+Z` reverses only this peer's own edits.
-    //
-    // Selection is captured per stack-item-added (the post-edit
-    // selection — the pre-edit selection capture is handled by the
-    // beforeInput listener stashing) and restored on stack-item-popped
-    // after the Y observer has re-projected and re-rendered.
-    this.history = new History({
-      ydoc: this.ydoc,
-      localOrigin: "local",
-      captureSelection: () => this.frames.captureSelectionForHistory(),
-      capturePreEditSelection: () => this.frames.capturePreEditSelection(),
-      restoreSelection: (sel) => this.frames.restoreCapturedSelection(sel),
-      onGroupSettled: () => this.frames.clearPendingPreEditSelection(),
-    });
+    this.history = this.createHistory();
 
     this.ctx = this.buildContext();
     // Frame controller + change pipeline operate over the context seam.
     // Built after `ctx` (they take it) but before `initDocumentState`,
     // which drives the pipeline's baseline + Y.Doc seed. The `History`
-    // callbacks above reference `this.frames` lazily, so the ordering is
-    // safe (no undo can fire before construction completes).
+    // callbacks reference `this.frames` lazily, so the ordering is safe
+    // (no undo can fire before construction completes).
     this.frames = new FrameController(this.ctx);
     this.pipeline = new ChangePipeline(this.ctx, this.events, this.frames, this.debounceMs);
     this.sections = new EditorSections(this.ctx);
@@ -337,6 +304,48 @@ export class Editor {
     // so headless callers and Cmd+Z share one dispatch surface.
     registerCoreCommands(this.commands, this, this.history);
 
+    this.mountHost(options);
+    // All host/document listeners + image-resize + the remote-Y.Doc
+    // subscription live in `wireEditorDom`, which returns one teardown.
+    this.domTeardown = wireEditorDom(this.buildDomHooks());
+  }
+
+  /**
+   * Optional content-hashed blob layer. The cache's `onResolved` callback
+   * patches `doc.rawParts` and fires `change` so the renderer picks up a
+   * freshly-arrived blob without an explicit refresh from the embedder.
+   */
+  private createBlobCache(): BlobCache | null {
+    if (!this.blobStore) return null;
+    return new BlobCache({
+      store: this.blobStore,
+      onResolved: (hash) => parts.onBlobResolved(this.ctx, hash),
+    });
+  }
+
+  /**
+   * History orchestrator — Phase 1b.6: backed by Y.UndoManager, which
+   * observes the body / meta / parts top-level Y types and tracks
+   * operations whose origin matches `localOrigin`. Local edits (mirrored
+   * with origin "local") create stack items; remote-provider edits don't —
+   * so `Cmd+Z` reverses only this peer's own edits. Selection capture /
+   * restore is delegated to the {@link FrameController} (referenced lazily;
+   * it's built right after this).
+   */
+  private createHistory(): History {
+    return new History({
+      ydoc: this.ydoc,
+      localOrigin: "local",
+      captureSelection: () => this.frames.captureSelectionForHistory(),
+      capturePreEditSelection: () => this.frames.capturePreEditSelection(),
+      restoreSelection: (sel) => this.frames.restoreCapturedSelection(sel),
+      onGroupSettled: () => this.frames.clearPendingPreEditSelection(),
+    });
+  }
+
+  /** Editor-attribute setup + the initial render of the seeded document. */
+  private mountHost(options: EditorOptions): void {
+    const { host } = this;
     host.classList.add("sobree-editor");
     host.contentEditable = "true";
     host.setAttribute("role", "textbox");
@@ -347,28 +356,33 @@ export class Editor {
     this.fontFaces.sync(this.doc.fonts, this.doc.rawParts);
     renderSobreeDocument(this.doc, firstHost, this.pipeline.blockIdsArray());
     if (options.showHiddenText) this.setShowHiddenText(true);
+  }
 
-    // All host/document listeners + image-resize + the remote-Y.Doc
-    // subscription live in `wireEditorDom`, which returns one teardown.
-    this.domTeardown = wireEditorDom({
-      host,
+  /** The hooks `wireEditorDom` calls — each forwards to the owning module. */
+  private buildDomHooks(): EditorDomHooks {
+    return {
+      host: this.host,
       ctx: this.ctx,
       ydoc: this.ydoc,
       history: this.history,
       trackedInput: this.trackedInput,
       isTrackedEnabled: () => this.trackChanges.enabled,
       onBeforeInput: () => this.frames.onBeforeInput(),
-      onInput: () => {
-        // Route the edit: a caret inside an editable textbox frame reads
-        // back into that frame's body, NOT the document body. Everything
-        // else is an ordinary body edit.
-        if (!this.frames.routeInput()) this.pipeline.markBodyDirty();
-        this.pipeline.scheduleChange();
-      },
+      onInput: () => this.handleInput(),
       fireSelection: () => this.fireSelection(),
       fireKeyDown: (e) => this.fireKeyDown(e),
       adoptYDocState: () => this.pipeline.adoptYDocState(),
-    });
+    };
+  }
+
+  /**
+   * Route an `input` event. A caret inside an editable textbox frame reads
+   * back into that frame's body (not the document body); everything else is
+   * an ordinary body edit. Either way, schedule a debounced change.
+   */
+  private handleInput(): void {
+    if (!this.frames.routeInput()) this.pipeline.markBodyDirty();
+    this.pipeline.scheduleChange();
   }
 
   /**
