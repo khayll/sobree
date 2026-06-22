@@ -268,8 +268,7 @@ export class Editor {
   constructor(host: HTMLElement, options: EditorOptions = {}) {
     this.host = host;
     this.debounceMs = options.changeDebounceMs ?? 200;
-    const soleHost = (): HTMLElement[] => [host];
-    this.getContentHosts = options.contentHosts ?? soleHost;
+    this.getContentHosts = options.contentHosts ?? (() => [host]);
     // Seed track-changes silently — no listeners can exist yet.
     if (options.trackChanges) this.trackChanges = { ...options.trackChanges };
 
