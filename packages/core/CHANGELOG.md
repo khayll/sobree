@@ -1,5 +1,62 @@
 # @sobree/core
 
+## 0.1.28
+
+### Patch Changes
+
+- 6036711: Fix content loss when editing inside a multi-column section.
+
+  A multi-column section is laid out by restructuring its blocks into
+  per-page column tracks (`.sobree-cols` > `.sobree-col`) for the snaking
+  flow. The DOM→AST read-back had no case for that layout wrapper, so on any
+  edit it serialised the entire column container as a single merged
+  paragraph — collapsing the section's paragraphs and dropping their
+  structure (a two-column body of four paragraphs became one). Undo masked
+  it; redo restored the corruption, so insert/undo/redo degraded the
+  document.
+
+  The read-back now un-wraps `.sobree-cols` — the exact inverse of the
+  render-side flow — recursing into each `.sobree-col` track in document
+  order (blocks move whole, never split across columns). Editing a column
+  now round-trips the section's blocks intact.
+
+- 623e1cf: Stop body edits from silently stripping block-level formatting.
+
+  The contentEditable DOM is a lossy projection of the document: it carries
+  run text and inline marks, but not block-level properties — paragraph
+  spacing / indent / borders, table style-id / look / cell shading,
+  section-break targets. The editor re-derived the whole AST from the DOM on
+  every edit, so each keystroke quietly dropped those properties; the live
+  DOM hid the loss, but the next re-render from the model (undo, redo, or a
+  remote update) repainted the degraded document — a styled table lost its
+  banded rows, a spaced layout collapsed, a one-page doc blew up across
+  pages.
+
+  The read-back now matches each re-read block to its previous AST block by
+  stable id (the renderer's `data-block-id`) and overlays only the re-read
+  content, so block properties survive — across plain typing AND structural
+  edits (Enter / Backspace / paste / reorder), where positional matching
+  can't. After a structural shift the live block ids are re-stamped so a
+  subsequent un-rendered edit still matches by id instead of re-deriving.
+  Editing a richly-formatted document and undoing / redoing now preserves
+  every block's formatting.
+
+- 623e1cf: Fix a multi-column / multi-section document exploding into one page per
+  section on undo/redo.
+
+  The DOM→AST read-back stamped every section break with `toSectionIndex: 0`.
+  The renderer reads a break's page-break-vs-continuous behaviour from
+  `sections[toSectionIndex]`, so on the next re-render (undo, redo, or a
+  remote update) every continuous section break resolved to section 0 (which
+  defaults to a forced page break) and split the document — a one-page
+  field-almanac with two continuous section breaks blew up to three pages,
+  its two-column body torn apart. The live edit hid it because the DOM isn't
+  rebuilt on a keystroke; redo, which re-renders from the Y.Doc, exposed it.
+
+  The read-back now reconstructs each break's real target index by counting
+  breaks in document order (the Nth break transitions to section N, matching
+  the renderer's order-based section assignment).
+
 ## 0.1.27
 
 ### Patch Changes
