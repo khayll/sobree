@@ -268,7 +268,8 @@ export class Editor {
   constructor(host: HTMLElement, options: EditorOptions = {}) {
     this.host = host;
     this.debounceMs = options.changeDebounceMs ?? 200;
-    this.getContentHosts = options.contentHosts ?? (() => [host]);
+    const soleHost = (): HTMLElement[] => [host];
+    this.getContentHosts = options.contentHosts ?? soleHost;
     // Seed track-changes silently — no listeners can exist yet.
     if (options.trackChanges) this.trackChanges = { ...options.trackChanges };
 
@@ -277,7 +278,8 @@ export class Editor {
     // Y.Doc's clientID so two peers don't both mint `b5` for different
     // blocks (Phase 1b: collision-safe across peers).
     this.ydoc = options.ydoc ?? new Y.Doc();
-    this.registry = new BlockRegistry({ idPrefix: `${this.ydoc.clientID.toString(36)}_` });
+    const clientId = this.ydoc.clientID.toString(36);
+    this.registry = new BlockRegistry({ idPrefix: `${clientId}_` });
     this.blobStore = options.blobStore ?? null;
     this.blobCache = this.createBlobCache();
 
