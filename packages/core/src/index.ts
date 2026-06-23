@@ -46,7 +46,7 @@ export type {
 export { Editor } from "./editor";
 // Rendered-document lookup surface (`editor.renderedDocument`) — the
 // typed bridge plugins use instead of hardcoding renderer DOM selectors.
-export { RenderedDocument } from "./editor";
+export { RenderedDocument } from "./editor/renderedDocument";
 export type {
   RenderedBlockLookup,
   RenderedCommentLookup,
@@ -55,7 +55,7 @@ export type {
   RenderedRevisionKind,
   RenderedRevisionLookup,
   RenderedRevisionMark,
-} from "./editor";
+} from "./editor/renderedDocument";
 export type {
   ApiRangeType,
   RevisionSpan,

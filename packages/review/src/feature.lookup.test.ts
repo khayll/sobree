@@ -1,10 +1,17 @@
-import { type SobreeHandle, createSobree, emptyDocument, paragraph, text } from "@sobree/core";
+import {
+  type SobreeContent,
+  type SobreeHandle,
+  createSobree,
+  emptyDocument,
+  paragraph,
+  text,
+} from "@sobree/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { review } from "./index";
 
 const handles: SobreeHandle[] = [];
 
-function mount(content: Parameters<typeof createSobree>[1]["content"]): SobreeHandle {
+function mount(content: SobreeContent): SobreeHandle {
   const host = document.createElement("div");
   Object.assign(host.style, { width: "1200px", height: "800px" });
   document.body.appendChild(host);
