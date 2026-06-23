@@ -13,11 +13,13 @@ import type {
 } from "../doc/types";
 
 /**
- * Minimal slice of `Editor` that `EditorTable` actually needs. Defining
- * it here (rather than `import type { Editor } from "./"`) keeps this
- * module a leaf in the editor/* import graph — no cycle with index.ts.
+ * Minimal slice of an editor-like peer that `TableApi` needs. Both the
+ * browser `Editor` and the no-DOM `HeadlessSobree` satisfy it structurally,
+ * so the same table surface drives `editor.table` and `headless.table`.
+ * Defining it here (rather than `import type { Editor } from "./"`) keeps
+ * this module a leaf in the editor/* import graph — no cycle with index.ts.
  */
-export interface EditorTableHost {
+export interface TableHost {
   getDocument(): SobreeDocument;
   getBlockById(id: string): { kind: string; index: number } | null;
   replaceBlock(target: BlockRef, block: Block): EditResult<BlockRef>;
@@ -72,19 +74,23 @@ export interface MergeCellsOpts {
 const DEFAULT_COLUMN_WIDTH_TWIPS = 2400;
 
 /**
- * Ergonomic table mutation surface. Lives on `editor.table`.
+ * Ergonomic table mutation surface. Lives on `editor.table` (browser) and
+ * `headless.table` (no-DOM peer / LLM agents) — same code, via {@link TableHost}.
  *
  * Every method does the same three steps under the hood:
  *   1. Resolve the target table by `BlockRef` (inherits optimistic-lock
- *      checking from `editor.replaceBlock`).
+ *      checking from the host's `replaceBlock`).
  *   2. Clone and mutate the table immutably.
- *   3. Delegate to `editor.replaceBlock(ref, nextTable)`.
+ *   3. Delegate to the host's `replaceBlock(ref, nextTable)`.
  *
  * No new plumbing; lock semantics, affected-block tracking, and event
- * emission come from the underlying core.
+ * emission come from the underlying core. Because every edit ultimately
+ * round-trips the whole table block, callers never hand-build a `Table`
+ * just to tweak one cell — but at the Y.Doc layer it is still a
+ * whole-table write (per-cell CRDT is a separate, future change).
  */
-export class EditorTable {
-  constructor(private readonly editor: EditorTableHost) {}
+export class TableApi {
+  constructor(private readonly host: TableHost) {}
 
   // === row operations ===
 
@@ -115,7 +121,7 @@ export class EditorTable {
     // the merge visually breaks.
     patchVMergeAcrossInsertedRow(rows, insertAt);
 
-    return this.editor.replaceBlock(ref, { ...table, rows });
+    return this.host.replaceBlock(ref, { ...table, rows });
   }
 
   deleteRow(ref: BlockRef, index: number): EditResult<BlockRef> {
@@ -135,7 +141,7 @@ export class EditorTable {
       // An empty table is invalid; keep at least one row.
       rows.push({ cells: defaultRowCells(columnCount(table)) });
     }
-    return this.editor.replaceBlock(ref, { ...table, rows });
+    return this.host.replaceBlock(ref, { ...table, rows });
   }
 
   // === column operations ===
@@ -155,7 +161,7 @@ export class EditorTable {
     grid.splice(at, 0, width);
 
     const rows = table.rows.map((row) => insertColumnInRow(row, at, !!opts.split));
-    return this.editor.replaceBlock(ref, { ...table, grid, rows });
+    return this.host.replaceBlock(ref, { ...table, grid, rows });
   }
 
   deleteColumn(ref: BlockRef, index: number): EditResult<BlockRef> {
@@ -175,7 +181,7 @@ export class EditorTable {
     const grid = table.grid.slice();
     grid.splice(index, 1);
     const rows = table.rows.map((row) => deleteColumnFromRow(row, index));
-    return this.editor.replaceBlock(ref, { ...table, grid, rows });
+    return this.host.replaceBlock(ref, { ...table, grid, rows });
   }
 
   // === merge operations ===
@@ -225,7 +231,7 @@ export class EditorTable {
       if (r < opts.row || r >= opts.row + rowSpan) return row;
       return applyMergeToRow(row, r === opts.row, opts.col, colSpan, rowSpan);
     });
-    return this.editor.replaceBlock(ref, { ...table, rows });
+    return this.host.replaceBlock(ref, { ...table, rows });
   }
 
   unmergeCell(cell: CellRef): EditResult<BlockRef> {
@@ -254,7 +260,7 @@ export class EditorTable {
       return unmergeContinuationRow(row, cell.col, gridSpan);
     });
 
-    return this.editor.replaceBlock(cell.table, { ...table, rows });
+    return this.host.replaceBlock(cell.table, { ...table, rows });
   }
 
   // === cell ops ===
@@ -283,7 +289,7 @@ export class EditorTable {
     }
     const grid = table.grid.slice();
     grid[col] = widthTwips;
-    return this.editor.replaceBlock(ref, { ...table, grid });
+    return this.host.replaceBlock(ref, { ...table, grid });
   }
 
   toggleHeaderRow(ref: BlockRef, row: number): EditResult<BlockRef> {
@@ -296,13 +302,13 @@ export class EditorTable {
       if (i !== row) return r;
       return r.isHeader ? { ...r, isHeader: false } : { ...r, isHeader: true };
     });
-    return this.editor.replaceBlock(ref, { ...table, rows });
+    return this.host.replaceBlock(ref, { ...table, rows });
   }
 
   setProperties(ref: BlockRef, patch: Partial<TableProperties>): EditResult<BlockRef> {
     const table = this.getTable(ref);
     if (!table) return fail({ code: "invalid-state", details: "target is not a table" });
-    return this.editor.replaceBlock(ref, {
+    return this.host.replaceBlock(ref, {
       ...table,
       properties: { ...table.properties, ...patch },
     });
@@ -311,8 +317,8 @@ export class EditorTable {
   // === internals ===
 
   private getTable(ref: BlockRef): Table | null {
-    const doc = this.editor.getDocument();
-    const info = this.editor.getBlockById(ref.id);
+    const doc = this.host.getDocument();
+    const info = this.host.getBlockById(ref.id);
     if (!info || info.kind !== "table") return null;
     const block = doc.body[info.index];
     if (!block || block.kind !== "table") return null;
@@ -330,7 +336,7 @@ export class EditorTable {
     const newCells = target.cells.slice();
     newCells[hit.cellIndex] = transform(hit.cell);
     rows[cell.row] = { ...target, cells: newCells };
-    return this.editor.replaceBlock(cell.table, { ...table, rows });
+    return this.host.replaceBlock(cell.table, { ...table, rows });
   }
 }
 

@@ -46,6 +46,7 @@ class HeadlessSobree {
   readonly ydoc: Y.Doc;
   readonly commands: CommandBus;
   readonly history: History;
+  readonly table: TableApi; // same granular table surface as `editor.table`
   readonly origin: string;
 
   // Reads
@@ -142,6 +143,13 @@ Each method mirrors the browser `Editor`'s equivalent:
 - **`applyBlockProperties(targets, patch)`** — merge a property
   patch into one or more paragraphs. `undefined` in the patch
   removes a field; everything else overwrites.
+- **`table.*`** — the same granular table surface as `editor.table`
+  (`insertRow` / `deleteRow` / `insertColumn` / `deleteColumn`,
+  `mergeCells` / `unmergeCell`, `setCellContent` / `setCellProperties`,
+  `setColumnWidth` / `toggleHeaderRow` / `setProperties`). So an agent
+  styles a cell or adds a row without rebuilding the whole `Table`. Each
+  op still round-trips the whole table block under the hood and inherits
+  the same optimistic-lock check.
 - **`setDocument(doc)`** — wholesale replace. Use for `loadDocx`-
   style "open a different document" flows. Loses the current
   document's CRDT identity — all blocks are fresh, no merging.
@@ -156,20 +164,19 @@ works the same as in the browser editor. See the
 
 ## What's not exposed
 
-`HeadlessSobree` covers block-level mutations. The richer
-range-based / table-level surface lives on the browser `Editor` and
-is not mirrored here:
+`HeadlessSobree` covers block-level and table mutations. The richer
+**range-based** surface — inline edits addressed by character offset —
+lives on the browser `Editor` and is not mirrored here:
 
 - `applyRunProperties(range, patch)` — apply run marks to a range
 - `wrapRange(range, tag)`
 - `insertRun(at, run)` / `insertImage(at, bytes, opts)`
 - `deleteRange(range)`
-- The `editor.table.*` sub-API
 
 For these, an agent can drop down to direct Y.Doc manipulation OR
 build a new block by hand and pass it to `replaceBlock`. The MCP
-wrapper ([`@sobree/mcp`](/api/mcp/)) exposes the same block-level
-surface and does not cover these range / table mutations either.
+wrapper ([`@sobree/mcp`](/api/mcp/)) exposes the block-level surface
+and does not cover these range mutations either.
 
 ## Examples
 

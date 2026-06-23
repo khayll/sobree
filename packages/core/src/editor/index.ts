@@ -39,7 +39,7 @@ import { RenderedDocument, type RenderedDocumentIndex } from "./renderedDocument
 import { EditorSections } from "./sections";
 import { EditorSelection } from "./selection";
 import { EditorStyles } from "./styles";
-import { EditorTable } from "./table";
+import { TableApi } from "./table";
 import { renderSobreeDocument } from "./view/docRenderer/index";
 import { type EditorDomHooks, wireEditorDom } from "./wiring";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
@@ -141,7 +141,7 @@ export class Editor {
    * unmerge, cell-level properties. Every method returns an `EditResult`
    * and inherits optimistic-lock checking via `replaceBlock`.
    */
-  readonly table: EditorTable;
+  readonly table: TableApi;
   /**
    * Section-level edit operations — page size / margins, columns,
    * header/footer references, vertical alignment. Grouped here (rather
@@ -302,7 +302,7 @@ export class Editor {
       roots: () => this.getContentHosts(),
       registry: () => this.registry,
     });
-    this.table = new EditorTable(this);
+    this.table = new TableApi(this);
     this.commands = new EditorCommands();
     this.history = this.createHistory();
 
