@@ -1,10 +1,20 @@
-import { deleteBlockTool, insertParagraphAfterTool, insertParagraphBeforeTool, replaceParagraphTool } from "./blocks";
+import {
+  deleteBlockTool,
+  insertParagraphAfterTool,
+  insertParagraphBeforeTool,
+  replaceParagraphTool,
+} from "./blocks";
 import { setParagraphAlignmentTool } from "./formatting";
 import { redoTool, undoTool } from "./history";
 import { getDocumentTool, getOutlineTool } from "./reads";
 import type { ToolDefinition } from "./types";
 
-export { deleteBlockTool, insertParagraphAfterTool, insertParagraphBeforeTool, replaceParagraphTool };
+export {
+  deleteBlockTool,
+  insertParagraphAfterTool,
+  insertParagraphBeforeTool,
+  replaceParagraphTool,
+};
 export { setParagraphAlignmentTool };
 export { redoTool, undoTool };
 export { getDocumentTool, getOutlineTool };
