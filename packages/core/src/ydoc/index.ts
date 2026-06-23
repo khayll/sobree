@@ -23,15 +23,18 @@ export {
   Y_PARTREFS_KEY,
   Y_PARTS_KEY,
 } from "./schema";
+export { seedYDoc } from "./seed";
 export {
-  seedYDoc,
-  buildBlockYMap,
-  buildSkeletonBlockYMap,
-  populateBlockContent,
-  populateParagraphContent,
-  populateParagraphYMap,
-} from "./seed";
-export { projectYDoc, projectBlock } from "./project";
+  buildBlockSkeleton,
+  buildContent,
+  populateBlock,
+  populateContent,
+  projectBlock,
+  projectContent,
+  updateBlockYMap,
+  updateContent,
+} from "./blockCodec";
+export { projectYDoc } from "./project";
 export {
   applyDocumentToYDoc,
   applyPartRefsToYDoc,

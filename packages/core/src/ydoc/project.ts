@@ -1,5 +1,4 @@
 import type * as Y from "yjs";
-import * as YModule from "yjs";
 import type {
   AnchoredFrame,
   Block,
@@ -7,18 +6,12 @@ import type {
   FontDeclaration,
   NamedStyle,
   NumberingDefinition,
-  Paragraph,
-  ParagraphProperties,
   SectionProperties,
   SobreeDocument,
 } from "../doc/types";
-import { type DeltaOp, deltaToRuns } from "./runs";
+import { projectBlock } from "./blockCodec";
 import {
-  Y_BLOCK_AST_KEY,
   Y_BLOCK_ID_KEY,
-  Y_BLOCK_KIND_KEY,
-  Y_BLOCK_PROPS_KEY,
-  Y_BLOCK_TEXT_KEY,
   Y_BODY_KEY,
   Y_META_FIELDS,
   Y_META_KEY,
@@ -125,46 +118,6 @@ export function projectYDoc(ydoc: Y.Doc): {
     ids,
     partRefs,
   };
-}
-
-/**
- * Read a single block Y.Map into a Block. Returns `null` if the map
- * is empty / unrecognizable (defensive — projectYDoc skips nulls).
- */
-export function projectBlock(map: Y.Map<unknown>): Block | null {
-  // Phase 1b.5+: paragraph blocks have `kind === "paragraph"` and a
-  // Y.Text under `text`.
-  const kind = map.get(Y_BLOCK_KIND_KEY) as string | undefined;
-  if (kind === "paragraph") {
-    return projectParagraph(map);
-  }
-  // Phase 1a fallback: JSON-encoded block under `_ast`.
-  const ast = map.get(Y_BLOCK_AST_KEY) as string | undefined;
-  if (ast) {
-    try {
-      return JSON.parse(ast) as Block;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function projectParagraph(map: Y.Map<unknown>): Paragraph | null {
-  const textObj = map.get(Y_BLOCK_TEXT_KEY);
-  if (!(textObj instanceof YModule.Text)) return null;
-  const propsStr = map.get(Y_BLOCK_PROPS_KEY) as string | undefined;
-  let properties: ParagraphProperties = {};
-  if (propsStr) {
-    try {
-      properties = JSON.parse(propsStr) as ParagraphProperties;
-    } catch {
-      properties = {};
-    }
-  }
-  const delta = textObj.toDelta() as DeltaOp[];
-  const runs = deltaToRuns(delta);
-  return { kind: "paragraph", properties, runs };
 }
 
 function parseMeta<T>(meta: Y.Map<string>, key: string, fallback: T): T {

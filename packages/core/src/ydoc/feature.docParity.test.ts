@@ -86,9 +86,22 @@ function mergeAdjacentText(runs: readonly InlineRun[]): InlineRun[] {
 }
 
 function normalizeBlocks(blocks: readonly Block[]): Block[] {
-  return blocks.map((b) =>
-    b.kind === "paragraph" ? { ...b, runs: mergeAdjacentText(b.runs) } : b,
-  );
+  return blocks.map((b) => {
+    if (b.kind === "paragraph") return { ...b, runs: mergeAdjacentText(b.runs) };
+    // Tables now store cell content as nested Y structure, so cell paragraphs
+    // coalesce adjacent same-property runs exactly like body paragraphs —
+    // recurse so the comparison tolerates the same (lossless) normalization.
+    if (b.kind === "table") {
+      return {
+        ...b,
+        rows: b.rows.map((row) => ({
+          ...row,
+          cells: row.cells.map((cell) => ({ ...cell, content: normalizeBlocks(cell.content) })),
+        })),
+      };
+    }
+    return b;
+  });
 }
 
 describe("Y.Doc parity — import → seed → project is lossless", () => {
