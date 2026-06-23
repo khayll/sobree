@@ -47,9 +47,9 @@ export interface BlockToolsOptions {
  * Floating block-tools orchestrator. Owns the left-gutter indicator and
  * the floating toolbar that opens above the active block.
  *
- * B1 landed the indicator + zone-edit hand-off. B2 adds the toolbar
- * shell with positioning + open/close animation. B3+ wire actual tools
- * into the shell per block kind.
+ * The indicator, zone-edit hand-off, positioning, animation, and
+ * per-kind tools stay coordinated here so block-level UI remains an
+ * opt-in plugin instead of leaking into the core editor.
  */
 export class BlockTools {
   private readonly stackRoot: HTMLElement;
