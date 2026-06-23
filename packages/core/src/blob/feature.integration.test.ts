@@ -76,7 +76,7 @@ describe("Phase 3.2 — BlobStore integration", () => {
     // mirrorToYDoc the same way insertImage does in the browser
     // editor.
     //
-    // NOTE: HeadlessSobree v0 doesn't automatically migrate parts;
+    // NOTE: HeadlessSobree does not automatically migrate parts;
     // only the browser Editor does, since the migration path runs
     // in `insertImage` / `embedFont`. The headless peer can drive
     // this manually via `applyPartRefsToYDoc`. The two browser-side
