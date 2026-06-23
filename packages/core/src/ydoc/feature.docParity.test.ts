@@ -27,7 +27,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import type { Block, InlineRun, SobreeDocument } from "../doc/types";
+import type { AnchoredFrame, Block, InlineRun, SobreeDocument } from "../doc/types";
 import { importDocx } from "../docx/import";
 import { projectYDoc } from "./project";
 import { seedYDoc } from "./seed";
@@ -86,9 +86,41 @@ function mergeAdjacentText(runs: readonly InlineRun[]): InlineRun[] {
 }
 
 function normalizeBlocks(blocks: readonly Block[]): Block[] {
-  return blocks.map((b) =>
-    b.kind === "paragraph" ? { ...b, runs: mergeAdjacentText(b.runs) } : b,
-  );
+  return blocks.map((b) => {
+    if (b.kind === "paragraph") return { ...b, runs: mergeAdjacentText(b.runs) };
+    // Tables now store cell content as nested Y structure, so cell paragraphs
+    // coalesce adjacent same-property runs exactly like body paragraphs —
+    // recurse so the comparison tolerates the same (lossless) normalization.
+    if (b.kind === "table") {
+      return {
+        ...b,
+        rows: b.rows.map((row) => ({
+          ...row,
+          cells: row.cells.map((cell) => ({ ...cell, content: normalizeBlocks(cell.content) })),
+        })),
+      };
+    }
+    return b;
+  });
+}
+
+// Floating-layer frames now store textbox bodies as nested Y, so their
+// paragraphs coalesce adjacent same-property runs just like body / cell
+// paragraphs — recurse the same normalization (and through group children).
+function normalizeFrames(frames: readonly AnchoredFrame[]): AnchoredFrame[] {
+  return frames.map((f) => {
+    const c = f.content;
+    if (c.kind === "textbox") return { ...f, content: { ...c, body: normalizeBlocks(c.body) } };
+    if (c.kind === "group")
+      return { ...f, content: { ...c, children: normalizeFrames(c.children) } };
+    return f;
+  });
+}
+
+function normalizeHfFrames(hf: Record<string, AnchoredFrame[]>): Record<string, AnchoredFrame[]> {
+  const out: Record<string, AnchoredFrame[]> = {};
+  for (const [zone, frames] of Object.entries(hf)) out[zone] = normalizeFrames(frames);
+  return out;
 }
 
 describe("Y.Doc parity — import → seed → project is lossless", () => {
@@ -104,13 +136,18 @@ describe("Y.Doc parity — import → seed → project is lossless", () => {
       const { doc: out } = projectYDoc(ydoc);
 
       expect(j(normalizeBlocks(out.body))).toEqual(j(normalizeBlocks(doc.body)));
+      // Floating layer — normalize the (now coalescing) frame textbox bodies.
+      expect(j(normalizeFrames(out.anchoredFrames ?? [])), "anchoredFrames").toEqual(
+        j(normalizeFrames(doc.anchoredFrames ?? [])),
+      );
+      expect(j(normalizeHfFrames(out.headerFooterFrames ?? {})), "headerFooterFrames").toEqual(
+        j(normalizeHfFrames(doc.headerFooterFrames ?? {})),
+      );
       const meta: Array<[keyof SobreeDocument, unknown]> = [
         ["sections", []],
         ["styles", []],
         ["numbering", []],
         ["headerFooterBodies", {}],
-        ["headerFooterFrames", {}],
-        ["anchoredFrames", []],
         ["footnotes", {}],
         ["comments", {}],
         ["settings", {}],

@@ -10,12 +10,17 @@
  * ```
  * ydoc
  * ├── getArray("body")  : Y.Array<Y.Map>     — block list, one Y.Map per block
+ * ├── getArray("anchoredFrames")   : Y.Array<frameMap>      — body floating layer
+ * │                                            (per-frame CRDT; `./frameCodec.ts`).
+ * ├── getMap("headerFooterFrames") : Y.Map<zoneId, Y.Array> — per-zone floating
+ * │                                            layers (per-frame CRDT).
  * ├── getMap("meta")    : Y.Map              — sections, styles, numbering,
  * │                                            headerFooterBodies, fonts.
  * │                                            Stored as JSON-encoded values
  * │                                            (rarely edited concurrently).
- * │                                            Phase 1c may split fields into
- * │                                            per-key Y types.
+ * │                                            Legacy `anchoredFrames` /
+ * │                                            `headerFooterFrames` keys are read
+ * │                                            only as a migration fallback.
  * ├── getMap("parts")    : Y.Map<Uint8Array>  — inline binary parts
  * │                                              (legacy / no-BlobStore path).
  * └── getMap("partRefs") : Y.Map<string>       — partPath → SHA-256 hex hash
@@ -49,15 +54,47 @@
  *
  * # Block Y.Map shape — non-paragraphs
  *
- * Section breaks and tables stay JSON-encoded — neither has inline
- * text content with concurrent-edit demand. Tables get their own
- * structural CRDT in a future Phase 1c (per-cell Y.Map<body Y.Array>).
+ * Section breaks stay fully JSON-encoded — no editable inline content:
  *
  * ```
- * otherBlockMap
+ * sectionBreakMap
  * ├── get("id")    : string             — stable block id
  * └── get("_ast")  : string (JSON)      — JSON-encoded Block
  * ```
+ *
+ * # Composite blocks — per-part CRDT (Phase 1c)
+ *
+ * Tables and textbox inline-frames hold nested editable `Block[]`, so
+ * their content lives in nested Y structures (not one opaque `_ast`):
+ * concurrent edits to *different* cells / frame paragraphs merge, and
+ * cell text merges char-level like body paragraphs. The block-Y.Map ↔
+ * `Block` mapping is recursive (`./blockCodec.ts`) — a `content` /
+ * `body` array holds the same block-Y.Map shape used at the top level.
+ *
+ * ```
+ * tableMap
+ * ├── get("id")    : string             — stable block id
+ * ├── get("kind")  : "table"            — discriminator
+ * ├── get("grid")  : string (JSON)      — number[] column widths (per-table LWW)
+ * ├── get("props") : string (JSON)      — TableProperties (per-table LWW)
+ * └── get("rows")  : Y.Array<rowMap>
+ *       rowMap.get("props")  : string (JSON)  — { isHeader? } (per-row LWW)
+ *       rowMap.get("cells")  : Y.Array<cellMap>
+ *         cellMap.get("props")   : string (JSON)  — gridSpan/vMerge/shading/… (per-CELL LWW)
+ *         cellMap.get("content") : Y.Array<blockMap>  — recurse
+ *
+ * inlineFrameMap
+ * ├── get("id")    : string             — stable block id
+ * ├── get("kind")  : "inline_frame"     — discriminator
+ * ├── get("_ast")  : string (JSON)      — the frame MINUS textbox.body (geometry/props)
+ * └── get("body")  : Y.Array<blockMap>  — textbox body, recurse
+ * ```
+ *
+ * Migration: a pre-Phase-1c table/frame is one whole-block `_ast` (no
+ * `rows`/`body` array). Projection reads that fallback; the first edit
+ * rebuilds it in the nested shape. Nested content arrays diff
+ * positionally (cell content is typically one paragraph); the body
+ * array stays id-matched.
  *
  * # Y.Text mark conventions
  *
@@ -112,9 +149,34 @@ export const Y_BLOCK_KIND_KEY = "kind";
 export const Y_BLOCK_TEXT_KEY = "text";
 /** Phase 1b.5+: JSON-encoded ParagraphProperties on paragraph blocks. */
 export const Y_BLOCK_PROPS_KEY = "props";
-/** Phase 1a: JSON-encoded Block on non-paragraph blocks (and on
- *  Phase 1a-shaped paragraph blocks for backwards compat). */
+/** JSON-encoded Block on leaf non-paragraph blocks (section_break), on
+ *  Phase 1a-shaped blocks for backwards compat, and — for inline-frame
+ *  composites — the frame MINUS its textbox body (geometry / props). */
 export const Y_BLOCK_AST_KEY = "_ast";
+
+// --- Phase 1c composite (table / inline-frame) nested-content keys ---
+/** Table: JSON-encoded `number[]` column-width grid. */
+export const Y_TABLE_GRID_KEY = "grid";
+/** Table: `Y.Array` of row Y.Maps. */
+export const Y_TABLE_ROWS_KEY = "rows";
+/** Table row: `Y.Array` of cell Y.Maps. */
+export const Y_ROW_CELLS_KEY = "cells";
+/** Table cell: `Y.Array` of block Y.Maps (the cell's content). */
+export const Y_CELL_CONTENT_KEY = "content";
+/** Textbox frame: `Y.Array` of block Y.Maps (the frame's editable body). */
+export const Y_FRAME_BODY_KEY = "body";
+/** Group frame: `Y.Array` of child frame Y.Maps (recurse). */
+export const Y_FRAME_CHILDREN_KEY = "children";
+
+// --- Phase 1c floating layer: anchored frames as nested Y (not meta JSON) ---
+/** Top-level `Y.Array<frameMap>` — the body floating layer (`anchoredFrames`).
+ *  Replaces the `meta.anchoredFrames` JSON blob; that meta key is read only
+ *  as a migration fallback for docs seeded before this. */
+export const Y_ANCHORED_FRAMES_KEY = "anchoredFrames";
+/** Top-level `Y.Map<zoneId, Y.Array<frameMap>>` — per header/footer zone
+ *  floating layers (`headerFooterFrames`). Migration fallback: the
+ *  `meta.headerFooterFrames` JSON blob. */
+export const Y_HEADER_FOOTER_FRAMES_KEY = "headerFooterFrames";
 
 /** Keys stored on the `meta` Y.Map. */
 export const Y_META_FIELDS = {

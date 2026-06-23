@@ -37,11 +37,11 @@
  *     contentEditable event handling, image-resize handles, paste
  *     parsing, etc. HeadlessSobree skips all that — if you need
  *     them, mount a real Editor.
- *   - A *table editor*. The browser `Editor` has a rich table API
- *     (`editor.table.insertRow`, etc.). HeadlessSobree keeps table
- *     edits at the block boundary today — operate on `Table` blocks
- *     directly via `replaceBlock` unless a dedicated headless table
- *     API is added.
+ *
+ * It DOES share the granular table surface: `headless.table.*` is the
+ * same {@link TableApi} as `editor.table.*` (insert/delete rows and
+ * columns, merge/unmerge, set cell content + properties), so agents
+ * never hand-build a `Table` block just to tweak one cell.
  *
  * # Origin tagging
  *
@@ -94,6 +94,7 @@ import type {
   SectionPropertiesPatch,
 } from "./editor";
 import { BlockRegistry } from "./editor/internal/blockRegistry";
+import { TableApi } from "./editor/table";
 import { History } from "./history";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "./ydoc";
 
@@ -147,6 +148,8 @@ export class HeadlessSobree {
   readonly ydoc: Y.Doc;
   readonly commands: CommandBus;
   readonly history: History;
+  /** Granular table mutations — same {@link TableApi} as `editor.table`. */
+  readonly table: TableApi;
   readonly origin: string;
   /** Optional content-hashed blob layer. Mirrors the browser `Editor`'s
    *  `blobStore` field — null when no store is configured. */
@@ -167,6 +170,7 @@ export class HeadlessSobree {
     this.ydoc = ydoc;
     this.origin = opts.origin ?? "headless";
     this.commands = new EditorCommands();
+    this.table = new TableApi(this);
     this.registry = new BlockRegistry({
       idPrefix: opts.idPrefix ?? `${ydoc.clientID.toString(36)}_`,
     });

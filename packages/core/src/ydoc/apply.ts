@@ -1,20 +1,17 @@
 import * as Y from "yjs";
-import type { Block, Paragraph, SobreeDocument } from "../doc/types";
-import { runsToDelta } from "./runs";
+import type { AnchoredFrame, Block, SobreeDocument } from "../doc/types";
+import { buildBlockSkeleton, populateBlock, updateBlockYMap } from "./blockCodec";
+import { buildFrames, updateFrames } from "./frameCodec";
 import {
-  Y_BLOCK_AST_KEY,
+  Y_ANCHORED_FRAMES_KEY,
   Y_BLOCK_ID_KEY,
-  Y_BLOCK_KIND_KEY,
-  Y_BLOCK_PROPS_KEY,
-  Y_BLOCK_TEXT_KEY,
   Y_BODY_KEY,
+  Y_HEADER_FOOTER_FRAMES_KEY,
   Y_META_FIELDS,
   Y_META_KEY,
   Y_PARTREFS_KEY,
   Y_PARTS_KEY,
 } from "./schema";
-import { buildSkeletonBlockYMap, populateBlockContent, populateParagraphContent } from "./seed";
-import { diffApplyText } from "./textDiff";
 
 /**
  * Apply a new SobreeDocument to a Y.Doc, diffing against the current
@@ -39,8 +36,13 @@ import { diffApplyText } from "./textDiff";
  *     JSON blob on the Y.Map's `props` field. Concurrent property
  *     edits clobber. Phase 1c may split into per-key Y.Map.
  *
- *   - **Non-paragraph blocks (section_break, table):** stored as
- *     JSON-encoded `_ast`. Concurrent edits clobber.
+ *   - **Tables:** nested per-cell — `rows`/`cells`/`content` Y.Arrays
+ *     with per-cell JSON props (see `./blockCodec.ts`). Concurrent edits
+ *     to *different* cells merge; cell text merges char-level. A legacy
+ *     whole-table `_ast` migrates to the nested shape on first edit.
+ *
+ *   - **Section breaks / inline frames:** JSON-encoded `_ast` leaf.
+ *     Concurrent edits clobber.
  *
  *   - **Document meta (sections, styles, numbering, fonts,
  *     headerFooterBodies):** JSON-encoded on a `meta` Y.Map.
@@ -82,12 +84,40 @@ export function applyDocumentToYDoc(
   const body = ydoc.getArray<Y.Map<unknown>>(Y_BODY_KEY);
   const meta = ydoc.getMap<string>(Y_META_KEY);
   const parts = ydoc.getMap<Uint8Array>(Y_PARTS_KEY);
+  const frames = ydoc.getArray<Y.Map<unknown>>(Y_ANCHORED_FRAMES_KEY);
+  const hfFrames = ydoc.getMap<Y.Array<Y.Map<unknown>>>(Y_HEADER_FOOTER_FRAMES_KEY);
 
   ydoc.transact(() => {
     diffBody(body, newDoc.body, newIds);
+    diffFrames(frames, newDoc.anchoredFrames ?? []);
+    diffHeaderFooterFrames(hfFrames, newDoc.headerFooterFrames ?? {});
     diffMeta(meta, newDoc);
     diffParts(parts, newDoc.rawParts, opts.skipPartPaths);
   }, origin);
+}
+
+// === floating layer diff (per-frame CRDT) ===
+
+function diffFrames(frames: Y.Array<Y.Map<unknown>>, next: readonly AnchoredFrame[]): void {
+  updateFrames(frames, next);
+}
+
+function diffHeaderFooterFrames(
+  hfFrames: Y.Map<Y.Array<Y.Map<unknown>>>,
+  next: Record<string, AnchoredFrame[]>,
+): void {
+  // Drop zones no longer present.
+  for (const zone of [...hfFrames.keys()]) {
+    if (!(zone in next)) hfFrames.delete(zone);
+  }
+  for (const [zone, zoneFrames] of Object.entries(next)) {
+    let arr = hfFrames.get(zone);
+    if (!(arr instanceof Y.Array)) {
+      arr = buildFrames([]);
+      hfFrames.set(zone, arr);
+    }
+    updateFrames(arr, zoneFrames);
+  }
 }
 
 // === body diff ===
@@ -125,7 +155,7 @@ function diffBody(
     const currentId = current ? ((current.get(Y_BLOCK_ID_KEY) as string | undefined) ?? "") : "";
 
     if (current && currentId === desiredId) {
-      updateBlockInPlace(current, desiredBlock);
+      updateBlockYMap(current, desiredBlock);
       continue;
     }
 
@@ -151,84 +181,6 @@ function diffBody(
 }
 
 /**
- * Update an existing block Y.Map in-place to reflect a new Block.
- *
- * Branches by the Y.Map's current shape vs the new block's kind:
- *
- *   - both paragraph → diff text via Y.Text.diffApplyText; update
- *     props via JSON-set-if-changed
- *   - both non-paragraph → JSON-set-if-changed on `_ast`
- *   - kind change (paragraph ↔ other) → wipe + repopulate as the new
- *     shape (loses CRDT identity; uncommon)
- */
-function updateBlockInPlace(map: Y.Map<unknown>, block: Block): void {
-  const currentKind = map.get(Y_BLOCK_KIND_KEY) as string | undefined;
-  const isCurrentParagraph =
-    currentKind === "paragraph" || map.get(Y_BLOCK_TEXT_KEY) instanceof Y.Text;
-  const isNewParagraph = block.kind === "paragraph";
-
-  if (isCurrentParagraph && isNewParagraph) {
-    updateParagraphInPlace(map, block);
-    return;
-  }
-
-  if (!isCurrentParagraph && !isNewParagraph) {
-    // Both non-paragraph: JSON-set if changed.
-    const desiredAst = JSON.stringify(block);
-    const currentAst = map.get(Y_BLOCK_AST_KEY) as string | undefined;
-    if (currentAst !== desiredAst) map.set(Y_BLOCK_AST_KEY, desiredAst);
-    return;
-  }
-
-  // Kind change. Wipe everything except `id` and rebuild. Order
-  // matters: clear before re-populating, since a non-paragraph
-  // Y.Map will have `_ast` and a paragraph Y.Map will have `text`/
-  // `props`/`kind`.
-  const id = (map.get(Y_BLOCK_ID_KEY) as string | undefined) ?? "";
-  for (const key of [...map.keys()]) {
-    if (key === Y_BLOCK_ID_KEY) continue;
-    map.delete(key);
-  }
-  if (isNewParagraph) {
-    // Set kind discriminator + create the Y.Text. The map IS
-    // integrated (we're inside a transact running against a
-    // body Y.Array), so the new Y.Text integrates immediately.
-    map.set(Y_BLOCK_KIND_KEY, "paragraph");
-    map.set(Y_BLOCK_TEXT_KEY, new Y.Text());
-    populateParagraphContent(map, block);
-  } else {
-    map.set(Y_BLOCK_AST_KEY, JSON.stringify(block));
-  }
-  // Re-set id in case it was somehow cleared.
-  if (!map.has(Y_BLOCK_ID_KEY)) map.set(Y_BLOCK_ID_KEY, id);
-}
-
-function updateParagraphInPlace(map: Y.Map<unknown>, paragraph: Paragraph): void {
-  // Make sure the kind discriminator is set (forward-migration from
-  // Phase 1a paragraph shape that didn't write a kind).
-  if (map.get(Y_BLOCK_KIND_KEY) !== "paragraph") {
-    map.set(Y_BLOCK_KIND_KEY, "paragraph");
-  }
-
-  // Text content via smart diff. The map is integrated (we're inside
-  // a transact on body), so a freshly created Y.Text integrates
-  // immediately on map.set — no "Invalid access" warnings.
-  let text = map.get(Y_BLOCK_TEXT_KEY);
-  if (!(text instanceof Y.Text)) {
-    // First time on this map (e.g. migrating from Phase 1a `_ast`).
-    text = new Y.Text();
-    map.set(Y_BLOCK_TEXT_KEY, text);
-    if (map.has(Y_BLOCK_AST_KEY)) map.delete(Y_BLOCK_AST_KEY);
-  }
-  diffApplyText(text as Y.Text, runsToDelta(paragraph.runs));
-
-  // Properties via JSON-set if changed.
-  const desiredProps = JSON.stringify(paragraph.properties);
-  const currentProps = map.get(Y_BLOCK_PROPS_KEY) as string | undefined;
-  if (currentProps !== desiredProps) map.set(Y_BLOCK_PROPS_KEY, desiredProps);
-}
-
-/**
  * Insert a fresh block at `index`, two-phase: skeleton in, then
  * content. The skeleton is integrated by the body.insert call, so
  * the subsequent populate operates on integrated Y types (no
@@ -240,9 +192,9 @@ function insertFreshBlock(
   id: string,
   block: Block,
 ): void {
-  const skeleton = buildSkeletonBlockYMap(id, block);
+  const skeleton = buildBlockSkeleton(id, block);
   body.insert(index, [skeleton]);
-  populateBlockContent(skeleton, block);
+  populateBlock(skeleton, block);
 }
 
 function findIdAtOrAfter(body: Y.Array<Y.Map<unknown>>, id: string, startIdx: number): number {
@@ -258,12 +210,11 @@ function findIdAtOrAfter(body: Y.Array<Y.Map<unknown>>, id: string, startIdx: nu
 function diffMeta(meta: Y.Map<string>, doc: SobreeDocument): void {
   setIfChanged(meta, Y_META_FIELDS.sections, JSON.stringify(doc.sections));
   setIfChanged(meta, Y_META_FIELDS.headerFooterBodies, JSON.stringify(doc.headerFooterBodies));
-  setIfChanged(meta, Y_META_FIELDS.anchoredFrames, JSON.stringify(doc.anchoredFrames ?? []));
-  setIfChanged(
-    meta,
-    Y_META_FIELDS.headerFooterFrames,
-    JSON.stringify(doc.headerFooterFrames ?? {}),
-  );
+  // The floating layer moved to nested Y roots (per-frame CRDT). Clear any
+  // legacy `meta` blob so a migrated doc doesn't keep a stale duplicate that
+  // projection's fallback could read after the roots are populated.
+  if (meta.has(Y_META_FIELDS.anchoredFrames)) meta.delete(Y_META_FIELDS.anchoredFrames);
+  if (meta.has(Y_META_FIELDS.headerFooterFrames)) meta.delete(Y_META_FIELDS.headerFooterFrames);
   setIfChanged(meta, Y_META_FIELDS.footnotes, JSON.stringify(doc.footnotes ?? {}));
   setIfChanged(meta, Y_META_FIELDS.comments, JSON.stringify(doc.comments ?? {}));
   setIfChanged(meta, Y_META_FIELDS.settings, JSON.stringify(doc.settings ?? {}));

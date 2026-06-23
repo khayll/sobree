@@ -98,9 +98,12 @@ const editor = createSobree("#editor", { ydoc });  // editor reads from / writes
 **Paragraph blocks** are backed by `Y.Text` (char-level CRDT) — runs
 flatten into the Y.Text with marks for run properties and embeds for
 breaks / tabs / fields / drawings. Concurrent edits to different
-positions of the same paragraph merge correctly. **Other blocks**
-(section breaks, tables) are JSON-encoded — they have no inline
-content to merge concurrently.
+positions of the same paragraph merge correctly. **Tables** are nested
+Y structure (per-cell): two peers editing *different cells* — content
+or styling — merge, and cell text merges char-level. The **floating
+layer** (anchored textbox frames) is the same: each frame is its own
+Y.Map, so edits to different frames merge. **Section breaks** are a
+JSON leaf — they have no inline content to merge.
 
 `BlockRegistry` ids are prefixed by `ydoc.clientID` so two peers can't
 mint the same id. A Y observer watches for remote-origin updates and
