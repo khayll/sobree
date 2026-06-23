@@ -1,5 +1,59 @@
 # @sobree/core
 
+## 0.1.30
+
+### Patch Changes
+
+- 8a9dbf7: Expose the granular table API on `HeadlessSobree` as `headless.table` —
+  the same surface as `editor.table` (insert/delete rows and columns,
+  merge/unmerge cells, set cell content + properties, column width, header
+  row, table properties). No-DOM peers and LLM agents can now style a cell
+  or restructure a table without hand-building a whole `Table` block and
+  calling `replaceBlock`. The surface is shared verbatim with the browser
+  editor via the `TableHost` interface, so the two never drift, and it
+  inherits the same optimistic-lock checking.
+- 7569c8a: Centralize rendered-DOM lookup for plugins behind a typed `editor.renderedDocument` surface.
+
+  Plugins previously hardcoded the renderer's private DOM selectors
+  (`data-block-id`, `data-block-revision`, `ins[data-revision-author]`,
+  `.sobree-comment-range`, …) to map rendered elements back to document
+  concepts. That made the attribute names an undocumented inter-module
+  protocol duplicated across `@sobree/block-tools` and `@sobree/review`, so a
+  renderer rename silently broke plugins (AGENTS.md Rule 0).
+
+  `@sobree/core` now exposes `editor.renderedDocument` — a typed
+  `RenderedDocumentIndex` that answers "given a rendered element, what Sobree
+  document concept does it represent?" and the inverse: block lookup
+  (`elementForBlock` / `blockRefFromElement`), revision-mark discovery
+  (`revisionMarks` / `nearestRevisionMark`), and comment-range discovery
+  (`commentRanges` / `nearestCommentRange`). The protocol attribute/class
+  names now live in one core module that both the renderer (writer) and the
+  lookup (reader) import.
+
+  `block-tools` and `review` were migrated onto this surface; their behaviour
+  and the renderer's DOM output are unchanged (existing attributes remain for
+  CSS and tooling). Third-party plugins should use `editor.renderedDocument`
+  instead of querying renderer attributes directly.
+
+- 8a9dbf7: Per-part CRDT for composite content (tables + floating textbox frames). Both
+  used to ride in the Y.Doc as one opaque JSON blob — a table as a single `_ast`
+  string, the floating layer as a `meta.anchoredFrames` JSON string — so any
+  concurrent edit clobbered the whole table / whole frame layer (last-writer-wins).
+
+  Now:
+  - **Tables** store cell content as nested Y structure (`rows`/`cells`/`content`
+    Y.Arrays, per-cell JSON props, cell paragraphs backed by `Y.Text`).
+  - **Anchored frames** (textbox "pills", brochure panels, grouped drawings) each
+    become their own Y.Map in dedicated `anchoredFrames` / `headerFooterFrames`
+    roots, with textbox bodies reusing the same nested content codec.
+
+  Result: concurrent edits to **different cells**, or to **different frames**,
+  merge instead of clobbering; text inside a cell or frame merges char-level like
+  body paragraphs. The block↔Y.Map mapping is a single recursive codec used at
+  the top level and at any nesting depth. Legacy documents (whole-table `_ast`,
+  `meta`-blob frames) project via a fallback and migrate to the nested shape on
+  first edit — no data loss, verified by corpus-wide round-trip parity.
+
 ## 0.1.29
 
 ### Patch Changes
