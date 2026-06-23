@@ -54,16 +54,25 @@
 
 import type * as Y from "yjs";
 import { BlobCache, type BlobStore } from "./blob";
-import {
-  type BlockRef,
-  type EditError,
-  type EditResult,
-  type Selection,
-  fail,
-  lockConflict,
-  ok,
-} from "./doc/api";
+import { type BlockRef, type EditError, type EditResult, type Selection, ok } from "./doc/api";
 import { emptyDocument } from "./doc/builders";
+import {
+  type DocumentMutationResult,
+  type Mutation,
+  type MutationInput,
+  applyBlockPropertiesMutation,
+  applySectionPropertiesMutation,
+  defineNumberingMutation,
+  defineStyleMutation,
+  deleteBlockMutation,
+  insertBlockAfterMutation,
+  insertBlockBeforeMutation,
+  removeNumberingMutation,
+  removeStyleMutation,
+  replaceBlockMutation,
+  updateNumberingMutation,
+  updateStyleMutation,
+} from "./doc/mutations";
 import { runsLength } from "./doc/runs";
 import type {
   Block,
@@ -84,14 +93,6 @@ import type {
   SectionPropertiesPatch,
 } from "./editor";
 import { BlockRegistry } from "./editor/internal/blockRegistry";
-import {
-  type Mutation,
-  mergeNamedStyle,
-  mergeParagraphProps,
-  mergeSectionProps,
-  mergeSectionsAcross,
-  removedSectionIndex,
-} from "./editor/internal/mutations";
 import { History } from "./history";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "./ydoc";
 
@@ -310,152 +311,66 @@ export class HeadlessSobree {
 
   /** Replace the block at `target`'s index with `block`. */
   replaceBlock(target: BlockRef, block: Block): EditResult<BlockRef> {
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const next = this.doc.body.slice();
-    const wasSectionBreak = next[index]?.kind === "section_break";
-    next[index] = block;
-    const update: Partial<SobreeDocument> = { body: next };
-    if (wasSectionBreak && block.kind !== "section_break") {
-      update.sections = mergeSectionsAcross(
-        this.doc.sections,
-        removedSectionIndex(this.doc.body, index),
-      );
-    }
-    return this.commit(update, [{ type: "bump", index }]);
+    return this.applyPatch(replaceBlockMutation(this.mutationInput(), target, block));
   }
 
   /** Insert `block` before the target block. */
   insertBlockBefore(target: BlockRef, block: Block): EditResult<BlockRef> {
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const next = this.doc.body.slice();
-    next.splice(index, 0, block);
-    return this.commit({ body: next }, [{ type: "insert", index }]);
+    return this.applyPatch(insertBlockBeforeMutation(this.mutationInput(), target, block));
   }
 
   /** Insert `block` after the target block. */
   insertBlockAfter(target: BlockRef, block: Block): EditResult<BlockRef> {
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const next = this.doc.body.slice();
-    next.splice(index + 1, 0, block);
-    return this.commit({ body: next }, [{ type: "insert", index: index + 1 }]);
+    return this.applyPatch(insertBlockAfterMutation(this.mutationInput(), target, block));
   }
 
   /** Delete the target block. */
   deleteBlock(target: BlockRef): EditResult<void> {
-    const lockCheck = this.checkRefs([target]);
-    if (lockCheck) return lockCheck;
-    const index = this.registry.indexOf(target.id);
-    const wasSectionBreak = this.doc.body[index]?.kind === "section_break";
-    const next = this.doc.body.slice();
-    next.splice(index, 1);
-    if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
-    const update: Partial<SobreeDocument> = { body: next };
-    if (wasSectionBreak) {
-      update.sections = mergeSectionsAcross(
-        this.doc.sections,
-        removedSectionIndex(this.doc.body, index),
-      );
-    }
-    return this.commit(update, [{ type: "remove", index }]);
+    return this.applyPatch(deleteBlockMutation(this.mutationInput(), target));
   }
 
   /** Merge a patch into each target paragraph's properties. */
   applyBlockProperties(targets: BlockRef[], patch: ParagraphPropertiesPatch): EditResult<void> {
-    const lockCheck = this.checkRefs(targets);
-    if (lockCheck) return lockCheck;
-    const next = this.doc.body.slice();
-    const bumps: Mutation[] = [];
-    for (const ref of targets) {
-      const index = this.registry.indexOf(ref.id);
-      const block = next[index];
-      if (!block) continue;
-      if (block.kind !== "paragraph") {
-        return fail({
-          code: "invalid-state",
-          details: `block ${ref.id} is not a paragraph`,
-        });
-      }
-      next[index] = {
-        ...block,
-        properties: mergeParagraphProps(block.properties, patch),
-      };
-      bumps.push({ type: "bump", index });
-    }
-    return this.commit({ body: next }, bumps);
+    return this.applyPatch(applyBlockPropertiesMutation(this.mutationInput(), targets, patch));
   }
 
   /** Merge a patch into a section's properties (page geometry, columns,
    *  header/footer refs, vertical alignment). `sectionIndex` is the
    *  section's position in the document's `sections` array. */
   applySectionProperties(sectionIndex: number, patch: SectionPropertiesPatch): EditResult<void> {
-    const section = this.doc.sections[sectionIndex];
-    if (!Number.isInteger(sectionIndex) || section === undefined) {
-      return fail({
-        code: "invalid-state",
-        details: `no section at index ${sectionIndex} (document has ${this.doc.sections.length})`,
-      });
-    }
-    const next = this.doc.sections.slice();
-    next[sectionIndex] = mergeSectionProps(section, patch);
-    return this.commit({ sections: next }, []);
+    return this.applyPatch(
+      applySectionPropertiesMutation(this.mutationInput(), sectionIndex, patch),
+    );
   }
 
   /** Add a new named style. Fails if `style.id` already exists. */
   defineStyle(style: NamedStyle): EditResult<void> {
-    if (this.doc.styles.some((s) => s.id === style.id)) {
-      return fail({ code: "invalid-state", details: `style "${style.id}" already exists` });
-    }
-    return this.commit({ styles: [...this.doc.styles, style] }, []);
+    return this.applyPatch(defineStyleMutation(this.mutationInput(), style));
   }
 
   /** Merge a patch into the style with `id`. Fails if no such style. */
   updateStyle(id: string, patch: NamedStylePatch): EditResult<void> {
-    const styles = this.doc.styles;
-    const index = styles.findIndex((s) => s.id === id);
-    if (index < 0) return fail({ code: "invalid-state", details: `no style "${id}"` });
-    const next = styles.slice();
-    next[index] = mergeNamedStyle(styles[index] as NamedStyle, patch);
-    return this.commit({ styles: next }, []);
+    return this.applyPatch(updateStyleMutation(this.mutationInput(), id, patch));
   }
 
   /** Remove the style with `id`. Fails if no such style. */
   removeStyle(id: string): EditResult<void> {
-    if (!this.doc.styles.some((s) => s.id === id)) {
-      return fail({ code: "invalid-state", details: `no style "${id}"` });
-    }
-    return this.commit({ styles: this.doc.styles.filter((s) => s.id !== id) }, []);
+    return this.applyPatch(removeStyleMutation(this.mutationInput(), id));
   }
 
   /** Add a new numbering definition. Fails if `def.numId` already exists. */
   defineNumbering(def: NumberingDefinition): EditResult<void> {
-    if (this.doc.numbering.some((n) => n.numId === def.numId)) {
-      return fail({ code: "invalid-state", details: `numbering ${def.numId} already exists` });
-    }
-    return this.commit({ numbering: [...this.doc.numbering, def] }, []);
+    return this.applyPatch(defineNumberingMutation(this.mutationInput(), def));
   }
 
   /** Replace the levels of the definition with `numId`. Fails if missing. */
   updateNumbering(numId: number, levels: NumberingLevel[]): EditResult<void> {
-    const numbering = this.doc.numbering;
-    const index = numbering.findIndex((n) => n.numId === numId);
-    if (index < 0) return fail({ code: "invalid-state", details: `no numbering ${numId}` });
-    const next = numbering.slice();
-    next[index] = { numId, abstractFormat: { levels } };
-    return this.commit({ numbering: next }, []);
+    return this.applyPatch(updateNumberingMutation(this.mutationInput(), numId, levels));
   }
 
   /** Remove the definition with `numId`. Fails if missing. */
   removeNumbering(numId: number): EditResult<void> {
-    if (!this.doc.numbering.some((n) => n.numId === numId)) {
-      return fail({ code: "invalid-state", details: `no numbering ${numId}` });
-    }
-    return this.commit({ numbering: this.doc.numbering.filter((n) => n.numId !== numId) }, []);
+    return this.applyPatch(removeNumberingMutation(this.mutationInput(), numId));
   }
 
   // === events ===
@@ -545,20 +460,18 @@ export class HeadlessSobree {
     this.resolveCachedPartRefsInto(this.doc);
   }
 
-  private checkRefs(refs: readonly BlockRef[]): EditResult<never> | null {
-    for (const ref of refs) {
-      const current = this.registry.refById(ref.id);
-      if (!current) {
-        return fail({
-          code: "invalid-position",
-          details: `block id ${ref.id} not found`,
-        });
-      }
-      if (current.version !== ref.version) {
-        return lockConflict([{ blockId: ref.id, expected: ref.version, actual: current.version }]);
-      }
-    }
-    return null;
+  /** Build the engine input from this peer's live state. The
+   *  `BlockRegistry` satisfies `BlockRegistryView` directly. */
+  private mutationInput(): MutationInput {
+    return { doc: this.doc, registry: this.registry };
+  }
+
+  /** Apply a mutation engine result through `commit`, or pass the failure
+   *  through unchanged. */
+  private applyPatch<T>(result: DocumentMutationResult<T>): EditResult<T> {
+    if (!result.ok) return result;
+    const { update, mutations, value } = result.value;
+    return this.commit(update, mutations, value);
   }
 
   private commit<T = void>(

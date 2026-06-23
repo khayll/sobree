@@ -1,8 +1,8 @@
 // Paragraph-property mutations.
 
+import type { ParagraphPropertiesPatch } from "../../editor/types";
 import { type BlockRef, fail } from "../api";
 import type { ParagraphProperties } from "../types";
-import type { ParagraphPropertiesPatch } from "../../editor/types";
 import {
   type DocumentMutationResult,
   type Mutation,

@@ -11,9 +11,15 @@
  * `bulletDefinition` / `orderedDefinition` builders.
  */
 
-import { type EditResult, fail } from "../doc/api";
+import type { EditResult } from "../doc/api";
+import {
+  defineNumberingMutation,
+  removeNumberingMutation,
+  updateNumberingMutation,
+} from "../doc/mutations";
 import type { NumberingDefinition, NumberingLevel } from "../doc/types";
 import type { EditorContext } from "./context";
+import { applyMutation, mutationInput } from "./internal/applyMutation";
 
 export class EditorNumbering {
   constructor(private readonly ctx: EditorContext) {}
@@ -21,32 +27,19 @@ export class EditorNumbering {
   /** Add a new numbering definition. Fails if `def.numId` already exists. */
   define(def: NumberingDefinition): EditResult<void> {
     this.ctx.ensureCurrent();
-    const numbering = this.ctx.doc.numbering;
-    if (numbering.some((n) => n.numId === def.numId)) {
-      return fail({ code: "invalid-state", details: `numbering ${def.numId} already exists` });
-    }
-    return this.ctx.commit({ numbering: [...numbering, def] }, []);
+    return applyMutation(this.ctx, defineNumberingMutation(mutationInput(this.ctx), def));
   }
 
   /** Replace the levels of the definition with `numId`. Fails if missing. */
   update(numId: number, levels: NumberingLevel[]): EditResult<void> {
     this.ctx.ensureCurrent();
-    const numbering = this.ctx.doc.numbering;
-    const index = numbering.findIndex((n) => n.numId === numId);
-    if (index < 0) return fail({ code: "invalid-state", details: `no numbering ${numId}` });
-    const next = numbering.slice();
-    next[index] = { numId, abstractFormat: { levels } };
-    return this.ctx.commit({ numbering: next }, []);
+    return applyMutation(this.ctx, updateNumberingMutation(mutationInput(this.ctx), numId, levels));
   }
 
   /** Remove the definition with `numId`. Fails if missing. Paragraphs that
    *  still reference it render without a marker. */
   remove(numId: number): EditResult<void> {
     this.ctx.ensureCurrent();
-    const numbering = this.ctx.doc.numbering;
-    if (!numbering.some((n) => n.numId === numId)) {
-      return fail({ code: "invalid-state", details: `no numbering ${numId}` });
-    }
-    return this.ctx.commit({ numbering: numbering.filter((n) => n.numId !== numId) }, []);
+    return applyMutation(this.ctx, removeNumberingMutation(mutationInput(this.ctx), numId));
   }
 }

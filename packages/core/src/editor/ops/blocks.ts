@@ -1,19 +1,22 @@
-import { type BlockRef, type EditResult, fail } from "../../doc/api";
-import type { Block, RevisionMark, SobreeDocument } from "../../doc/types";
-import type { EditorContext } from "../context";
+import type { BlockRef, EditResult } from "../../doc/api";
 import {
-  type Mutation,
-  mergeParagraphProps,
-  mergeSectionsAcross,
-  removedSectionIndex,
-} from "../internal/mutations";
+  applyBlockPropertiesMutation,
+  deleteBlockMutation,
+  insertBlockAfterMutation,
+  insertBlockBeforeMutation,
+  replaceBlockMutation,
+} from "../../doc/mutations";
+import type { Block, RevisionMark } from "../../doc/types";
+import type { EditorContext } from "../context";
+import { applyMutation, mutationInput } from "../internal/applyMutation";
 import type { ParagraphPropertiesPatch } from "../types";
 
 /**
  * Block-level mutations: replace / insert / delete whole blocks and
- * patch paragraph properties. All enforce optimistic locking via
- * `ctx.checkRefs` and route through `ctx.commit`. Section-break removal
- * merges the two sections it delimited. Track-changes mode stamps
+ * patch paragraph properties. The plain document transform lives in the
+ * shared `doc/mutations` engine (lock check + body splice + section-break
+ * merge); these wrappers add the browser-only track-changes behaviour and
+ * apply the engine's patch through `ctx.commit`. Track-changes mode stamps
  * paragraph insert/delete markers instead of moving content outright.
  */
 
@@ -24,23 +27,7 @@ export function replaceBlock(
   block: Block,
 ): EditResult<BlockRef> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRefs([target]);
-  if (lockCheck) return lockCheck;
-  const index = ctx.registry.indexOf(target.id);
-  const next = ctx.doc.body.slice();
-  const wasSectionBreak = next[index]?.kind === "section_break";
-  next[index] = block;
-  // If a SectionBreak was the previous block here and the replacement
-  // isn't one, the two sections it separated must merge — there's
-  // nothing left to delimit them. The earlier section's properties survive.
-  const update: Partial<SobreeDocument> = { body: next };
-  if (wasSectionBreak && block.kind !== "section_break") {
-    update.sections = mergeSectionsAcross(
-      ctx.doc.sections,
-      removedSectionIndex(ctx.doc.body, index),
-    );
-  }
-  return ctx.commit(update, [{ type: "bump", index }]);
+  return applyMutation(ctx, replaceBlockMutation(mutationInput(ctx), target, block));
 }
 
 /**
@@ -57,13 +44,8 @@ export function insertBlockBefore(
   block: Block,
 ): EditResult<BlockRef> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRefs([target]);
-  if (lockCheck) return lockCheck;
-  const index = ctx.registry.indexOf(target.id);
   const stamped = stampInsertedBlockIfTracked(ctx, block);
-  const next = ctx.doc.body.slice();
-  next.splice(index, 0, stamped);
-  return ctx.commit({ body: next }, [{ type: "insert", index }]);
+  return applyMutation(ctx, insertBlockBeforeMutation(mutationInput(ctx), target, stamped));
 }
 
 /**
@@ -76,13 +58,8 @@ export function insertBlockAfter(
   block: Block,
 ): EditResult<BlockRef> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRefs([target]);
-  if (lockCheck) return lockCheck;
-  const index = ctx.registry.indexOf(target.id);
   const stamped = stampInsertedBlockIfTracked(ctx, block);
-  const next = ctx.doc.body.slice();
-  next.splice(index + 1, 0, stamped);
-  return ctx.commit({ body: next }, [{ type: "insert", index: index + 1 }]);
+  return applyMutation(ctx, insertBlockAfterMutation(mutationInput(ctx), target, stamped));
 }
 
 /**
@@ -95,46 +72,36 @@ export function insertBlockAfter(
  * `ins` marker (a paragraph the user themselves just created), the block
  * is removed outright — cancelling an un-committed insert, matching the
  * inline `deleteRange` semantics. Non-paragraph blocks (tables, section
- * breaks) bypass tracking in v1 — they remove plainly.
+ * breaks) bypass tracking in v1 — they remove plainly via the engine.
  */
 export function deleteBlock(ctx: EditorContext, target: BlockRef): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRefs([target]);
-  if (lockCheck) return lockCheck;
-  const index = ctx.registry.indexOf(target.id);
-  const current = ctx.doc.body[index];
-
-  if (ctx.trackChanges.enabled && current?.kind === "paragraph") {
-    const existing = current.properties.revision;
-    // Cancelling own pending ins → actually remove.
-    if (existing?.type === "ins" && existing.author === ctx.trackChanges.author) {
-      // fall through to plain remove below
-    } else {
-      const revision: RevisionMark =
-        ctx.trackChanges.author === undefined
-          ? { type: "del" }
-          : { type: "del", author: ctx.trackChanges.author };
-      const next = ctx.doc.body.slice();
-      next[index] = {
-        ...current,
-        properties: { ...current.properties, revision },
-      };
-      return ctx.commit({ body: next }, [{ type: "bump", index }]);
+  if (ctx.trackChanges.enabled) {
+    const lockCheck = ctx.checkRefs([target]);
+    if (lockCheck) return lockCheck;
+    const index = ctx.registry.indexOf(target.id);
+    const current = ctx.doc.body[index];
+    // Stamp a tracked deletion, UNLESS this is the author cancelling their
+    // own pending insert — then fall through to the engine's plain remove.
+    if (current?.kind === "paragraph") {
+      const existing = current.properties.revision;
+      const cancellingOwnInsert =
+        existing?.type === "ins" && existing.author === ctx.trackChanges.author;
+      if (!cancellingOwnInsert) {
+        const revision: RevisionMark =
+          ctx.trackChanges.author === undefined
+            ? { type: "del" }
+            : { type: "del", author: ctx.trackChanges.author };
+        const next = ctx.doc.body.slice();
+        next[index] = {
+          ...current,
+          properties: { ...current.properties, revision },
+        };
+        return ctx.commit({ body: next }, [{ type: "bump", index }]);
+      }
     }
   }
-
-  const wasSectionBreak = current?.kind === "section_break";
-  const next = ctx.doc.body.slice();
-  next.splice(index, 1);
-  if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
-  const update: Partial<SobreeDocument> = { body: next };
-  if (wasSectionBreak) {
-    update.sections = mergeSectionsAcross(
-      ctx.doc.sections,
-      removedSectionIndex(ctx.doc.body, index),
-    );
-  }
-  return ctx.commit(update, [{ type: "remove", index }]);
+  return applyMutation(ctx, deleteBlockMutation(mutationInput(ctx), target));
 }
 
 /**
@@ -160,22 +127,5 @@ export function applyBlockProperties(
   patch: ParagraphPropertiesPatch,
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRefs(targets);
-  if (lockCheck) return lockCheck;
-  const next = ctx.doc.body.slice();
-  const bumps: Mutation[] = [];
-  for (const ref of targets) {
-    const index = ctx.registry.indexOf(ref.id);
-    const block = next[index];
-    if (!block) continue;
-    if (block.kind !== "paragraph") {
-      return fail({
-        code: "invalid-state",
-        details: `block ${ref.id} is not a paragraph`,
-      });
-    }
-    next[index] = { ...block, properties: mergeParagraphProps(block.properties, patch) };
-    bumps.push({ type: "bump", index });
-  }
-  return ctx.commit({ body: next }, bumps);
+  return applyMutation(ctx, applyBlockPropertiesMutation(mutationInput(ctx), targets, patch));
 }

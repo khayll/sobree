@@ -9,9 +9,9 @@ import {
   type InlinePosition,
   type Selection,
   fail,
-  lockConflict,
 } from "../doc/api";
 import { emptyDocument } from "../doc/builders";
+import { checkRefs } from "../doc/mutations";
 import type { RunPropertiesPatch } from "../doc/runs";
 import type { Block, InlineRun, SobreeDocument } from "../doc/types";
 import type { EmbedFontFaces, EmbedFontOptions } from "../fonts";
@@ -912,18 +912,7 @@ export class Editor {
   // === internals ===
 
   private checkRefs(refs: readonly BlockRef[]): EditResult<never> | null {
-    const conflicts: Array<{ blockId: string; expected: number; actual: number | null }> = [];
-    for (const ref of refs) {
-      const live = this.registry.refById(ref.id);
-      if (!live) {
-        conflicts.push({ blockId: ref.id, expected: ref.version, actual: null });
-        continue;
-      }
-      if (live.version !== ref.version) {
-        conflicts.push({ blockId: ref.id, expected: ref.version, actual: live.version });
-      }
-    }
-    return conflicts.length > 0 ? lockConflict(conflicts) : null;
+    return checkRefs(this.registry, refs);
   }
 
   private checkRange(

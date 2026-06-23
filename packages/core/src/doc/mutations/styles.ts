@@ -1,8 +1,8 @@
 // Named-style CRUD mutations.
 
+import type { NamedStylePatch } from "../../editor/types";
 import { fail } from "../api";
 import type { NamedStyle } from "../types";
-import type { NamedStylePatch } from "../../editor/types";
 import { type DocumentMutationResult, type MutationInput, okPatch } from "./types";
 
 /** Merge a {@link NamedStylePatch} onto an existing style. Each present

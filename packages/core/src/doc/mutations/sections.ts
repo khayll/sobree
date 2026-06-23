@@ -1,8 +1,8 @@
 // Section mutations: section-break merge helpers and section-property edits.
 
+import type { SectionPropertiesPatch } from "../../editor/types";
 import { fail } from "../api";
 import type { Block, SectionProperties } from "../types";
-import type { SectionPropertiesPatch } from "../../editor/types";
 import { type DocumentMutationResult, type MutationInput, okPatch } from "./types";
 
 /**
