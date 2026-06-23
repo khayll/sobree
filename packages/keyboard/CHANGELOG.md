@@ -1,5 +1,12 @@
 # @sobree/keyboard
 
+## 0.1.31
+
+### Patch Changes
+
+- Updated dependencies [0648ac9]
+  - @sobree/core@0.1.31
+
 ## 0.1.30
 
 ### Patch Changes
