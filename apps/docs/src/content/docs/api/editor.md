@@ -46,6 +46,7 @@ interface EditorOptions {
 | `editor.selection`   | Read / write selection in model terms.                         |
 | `editor.table`       | Row / column / merge / split / per-cell ops.                   |
 | `editor.commands`    | Named-command registry (see [plugin model](/concepts/plugins/)).|
+| `editor.renderedDocument` | Typed DOM ↔ document-concept lookup for plugins (see [rendered-document lookup](/api/rendered-document/)). |
 
 ## Mutations
 

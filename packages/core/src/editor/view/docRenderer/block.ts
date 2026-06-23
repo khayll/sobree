@@ -6,6 +6,12 @@ import type {
   ParagraphProperties,
   SectionProperties,
 } from "../../../doc/types";
+import {
+  BLOCK_ID_ATTR,
+  BLOCK_REVISION_ATTR,
+  BLOCK_REVISION_AUTHOR_ATTR,
+  BLOCK_REVISION_DATE_ATTR,
+} from "../../renderedDocument/selectors";
 import { appendInlineRuns } from "./inline";
 import { renderInlineFrameBlock } from "./inlineFrame";
 import { applyListItemLevel, createListContainer, paragraphListInfo } from "./lists";
@@ -145,7 +151,7 @@ export function renderBlocks(
         currentList = { el: listEl, numId: listInfo.numId };
       }
       const li = document.createElement("li");
-      if (id) li.dataset.blockId = id;
+      if (id) li.setAttribute(BLOCK_ID_ATTR, id);
       li.dataset.sectionIndex = String(sectionIndex);
       li.dataset.blockIndex = String(i);
       applyParagraphProps(li, (block as Paragraph).properties, styles);
@@ -165,7 +171,7 @@ export function renderBlocks(
       block.kind === "section_break" ? sections[block.toSectionIndex] : undefined;
     const rendered = renderBlock(block, numbering, styles, rawParts, nextSectionForBreak);
     if (rendered) {
-      if (id) rendered.dataset.blockId = id;
+      if (id) rendered.setAttribute(BLOCK_ID_ATTR, id);
       rendered.dataset.sectionIndex = String(sectionIndex);
       rendered.dataset.blockIndex = String(i);
       if (block.kind === "paragraph") {
@@ -286,11 +292,11 @@ function renderSectionBreak(nextSection?: SectionProperties): HTMLElement {
 function stampBlockRevision(el: HTMLElement, props: ParagraphProperties): void {
   const rev = props.revision;
   if (!rev) return;
-  el.dataset.blockRevision = rev.type;
+  el.setAttribute(BLOCK_REVISION_ATTR, rev.type);
   if (rev.author !== undefined) {
-    el.dataset.blockRevisionAuthor = rev.author;
+    el.setAttribute(BLOCK_REVISION_AUTHOR_ATTR, rev.author);
   }
   if (rev.date !== undefined) {
-    el.dataset.blockRevisionDate = rev.date;
+    el.setAttribute(BLOCK_REVISION_DATE_ATTR, rev.date);
   }
 }

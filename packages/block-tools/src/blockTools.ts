@@ -91,7 +91,7 @@ export class BlockTools {
       });
 
     this.toolbar = new FloatingToolbar({
-      stackRoot: this.stackRoot,
+      editor: this.editor,
       renderingArea: opts.renderingArea,
       viewport: opts.viewport ?? null,
     });

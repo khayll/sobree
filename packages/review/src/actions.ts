@@ -19,7 +19,7 @@
  * locking against a doc that moved since the last paginate.
  */
 
-import type { EditResult, Editor, RevisionSpan } from "@sobree/core";
+import type { EditResult, Editor, RenderedRevisionMark, RevisionSpan } from "@sobree/core";
 import { ICON_ACCEPT, ICON_REJECT } from "./icons";
 
 /** How long to keep the popover alive after the pointer leaves the
@@ -84,52 +84,36 @@ export class RevisionActions {
   // ---- hover handling ----
 
   private handleOver(e: Event): void {
-    // Priority order — checked from most specific to least:
-    //   1. Inline ins/del (`.sobree-revision`) — wraps a tracked run.
-    //   2. Format-change (`.sobree-revision-format`) — wraps a run
-    //      whose properties were tracked-changed.
-    //   3. Paragraph-mark (`[data-block-revision]`) — the whole
-    //      paragraph element when its mark is tracked.
-    // Specificity matters because the wrappers nest: an inserted +
-    // format-changed run is wrapped in BOTH; the inline `ins`/`del`
-    // wins because accepting it covers both the insertion and any
-    // format changes inside it.
+    // `nearestRevisionMark` resolves the most-specific mark at the
+    // pointer (inline > format > paragraph) — the same specificity the
+    // renderer's wrapper nesting implies, so an inserted + format-changed
+    // run resolves to the inline `ins`/`del` (accepting it covers both).
     const target = e.target as HTMLElement | null;
     if (!target) return;
-    const inline = target.closest<HTMLElement>(".sobree-revision");
-    if (inline) {
-      const span = this.resolveInlineSpan(inline);
-      if (span) {
-        this.openOn(inline, span);
-      }
-      return;
-    }
-    const formatEl = target.closest<HTMLElement>(".sobree-revision-format");
-    if (formatEl) {
-      const span = this.resolveFormatSpan(formatEl);
-      if (span) {
-        this.openOn(formatEl, span);
-      }
-      return;
-    }
-    const paraEl = target.closest<HTMLElement>("[data-block-revision]");
-    if (paraEl) {
-      const span = this.resolveParagraphSpan(paraEl);
-      if (span) {
-        this.openOn(paraEl, span);
-      }
-    }
+    const mark = this.editor.renderedDocument.nearestRevisionMark(target);
+    if (!mark) return;
+    const span = this.resolveSpan(mark);
+    if (span) this.openOn(mark.element, span);
   }
 
   private handleOut(e: Event): void {
     const target = e.target as HTMLElement | null;
     if (!target) return;
-    if (
-      target.closest(".sobree-revision") ||
-      target.closest(".sobree-revision-format") ||
-      target.closest("[data-block-revision]")
-    ) {
+    if (this.editor.renderedDocument.nearestRevisionMark(target)) {
       this.scheduleHide();
+    }
+  }
+
+  /** Dispatch a rendered mark to the span resolver for its level. */
+  private resolveSpan(mark: RenderedRevisionMark): RevisionSpan | null {
+    switch (mark.kind) {
+      case "inline-insert":
+      case "inline-delete":
+        return this.resolveInlineSpan(mark);
+      case "format":
+        return this.resolveFormatSpan(mark);
+      case "paragraph":
+        return this.resolveParagraphSpan(mark);
     }
   }
 
@@ -234,11 +218,10 @@ export class RevisionActions {
    * compute the mark's character offset within its block, then pick the
    * inline-level span whose range covers it.
    */
-  private resolveInlineSpan(mark: HTMLElement): RevisionSpan | null {
-    const block = mark.closest<HTMLElement>("[data-block-id]");
-    const blockId = block?.dataset.blockId;
-    if (!block || !blockId) return null;
-    const offset = textLengthBefore(block, mark);
+  private resolveInlineSpan(mark: RenderedRevisionMark): RevisionSpan | null {
+    const located = this.locate(mark);
+    if (!located) return null;
+    const { blockId, offset } = located;
     for (const span of this.editor.getRevisions()) {
       if (span.level !== "inline" && span.level !== undefined) continue;
       if (
@@ -256,11 +239,10 @@ export class RevisionActions {
    * Map a hovered format-changed run wrapper to its `RevisionSpan`.
    * Same offset-lookup as inline, but we accept the `format` level.
    */
-  private resolveFormatSpan(mark: HTMLElement): RevisionSpan | null {
-    const block = mark.closest<HTMLElement>("[data-block-id]");
-    const blockId = block?.dataset.blockId;
-    if (!block || !blockId) return null;
-    const offset = textLengthBefore(block, mark);
+  private resolveFormatSpan(mark: RenderedRevisionMark): RevisionSpan | null {
+    const located = this.locate(mark);
+    if (!located) return null;
+    const { blockId, offset } = located;
     for (const span of this.editor.getRevisions()) {
       if (span.level !== "format") continue;
       if (
@@ -275,18 +257,31 @@ export class RevisionActions {
   }
 
   /**
-   * Map a paragraph element with `data-block-revision` to its
-   * paragraph-level `RevisionSpan`. The whole block is the target;
-   * no offset math needed — just match by block id.
+   * Map a paragraph-mark revision to its paragraph-level `RevisionSpan`.
+   * The whole block is the target; no offset math needed — just match by
+   * block id.
    */
-  private resolveParagraphSpan(blockEl: HTMLElement): RevisionSpan | null {
-    const blockId = blockEl.dataset.blockId;
+  private resolveParagraphSpan(mark: RenderedRevisionMark): RevisionSpan | null {
+    const blockId = mark.blockRef?.id;
     if (!blockId) return null;
     for (const span of this.editor.getRevisions()) {
       if (span.level !== "paragraph") continue;
       if (span.range.from.block.id === blockId) return span;
     }
     return null;
+  }
+
+  /**
+   * Resolve the block id + the mark's character offset within that block
+   * — the two coordinates the offset-lookup resolvers need. Returns
+   * `null` if the mark isn't inside a live, rendered block.
+   */
+  private locate(mark: RenderedRevisionMark): { blockId: string; offset: number } | null {
+    const blockId = mark.blockRef?.id;
+    if (!blockId) return null;
+    const block = this.editor.renderedDocument.elementForBlockId(blockId);
+    if (!block) return null;
+    return { blockId, offset: textLengthBefore(block, mark.element) };
   }
 }
 

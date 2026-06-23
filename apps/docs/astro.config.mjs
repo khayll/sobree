@@ -49,6 +49,7 @@ export default defineConfig({
             { label: "createSobree()", link: "/api/create-sobree/" },
             { label: "Sobree (façade)", link: "/api/sobree/" },
             { label: "Editor", link: "/api/editor/" },
+            { label: "Rendered-document lookup", link: "/api/rendered-document/" },
             { label: "HeadlessSobree", link: "/api/headless/" },
             { label: "MCP server (LLM tools)", link: "/api/mcp/" },
             { label: "BlobStore (binary parts)", link: "/api/blob/" },

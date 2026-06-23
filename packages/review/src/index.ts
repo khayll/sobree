@@ -29,6 +29,7 @@ import type {
   FloatingCornerPlacement,
   InlineRun,
   PluginContext,
+  RenderedDocumentIndex,
   SobreePlugin,
   SobreeUnsubscribe,
 } from "@sobree/core";
@@ -103,7 +104,6 @@ class ReviewController {
         ? new ReviewDock({
             host: ctx.host,
             editor: this.editor,
-            stackRoot: this.stackRoot,
             ...(opts.dockPlacement !== undefined ? { placement: opts.dockPlacement } : {}),
           })
         : null;
@@ -153,7 +153,7 @@ class ReviewController {
   }
 
   private refresh(): void {
-    colourMarks(this.stackRoot);
+    colourMarks(this.editor.renderedDocument);
     if (this.showComments) {
       const comments = this.editor.getDocument().comments ?? {};
       renderComments(this.stackRoot, comments, this.editor);
@@ -169,23 +169,21 @@ class ReviewController {
     if (this.timerId !== null) clearTimeout(this.timerId);
     this.revisionActions.destroy();
     this.dock?.destroy();
-    // Leave core's neutral marks intact; just clear what we added.
-    for (const el of Array.from(
-      this.stackRoot.querySelectorAll<HTMLElement>(
-        "ins[data-revision-author], del[data-revision-author]",
-      ),
-    )) {
-      el.style.removeProperty("--author-color");
-    }
-    for (const el of Array.from(
-      this.stackRoot.querySelectorAll<HTMLElement>("[data-block-revision]"),
-    )) {
-      el.style.removeProperty("--sobree-block-revision-color");
-    }
-    for (const el of Array.from(
-      this.stackRoot.querySelectorAll<HTMLElement>("span.sobree-revision-format"),
-    )) {
-      el.style.removeProperty("--sobree-format-revision-color");
+    // Leave core's neutral marks intact; just clear the per-author CSS
+    // vars we set. Kind tells us which var lives on each mark.
+    for (const mark of this.editor.renderedDocument.revisionMarks()) {
+      switch (mark.kind) {
+        case "inline-insert":
+        case "inline-delete":
+          mark.element.style.removeProperty("--author-color");
+          break;
+        case "paragraph":
+          mark.element.style.removeProperty("--sobree-block-revision-color");
+          break;
+        case "format":
+          mark.element.style.removeProperty("--sobree-format-revision-color");
+          break;
+      }
     }
     for (const slot of Array.from(
       this.stackRoot.querySelectorAll<HTMLElement>(".paper-comments"),
@@ -198,34 +196,31 @@ class ReviewController {
 
 // ---------- inline marks ----------
 
-/** Apply per-author colour to every tracked-change mark in `root`. */
-function colourMarks(root: HTMLElement): void {
-  // Inline ins/del runs.
-  const marks = root.querySelectorAll<HTMLElement>(
-    "ins[data-revision-author], del[data-revision-author]",
-  );
-  for (const mark of Array.from(marks)) {
-    mark.style.setProperty("--author-color", colorForAuthor(mark.dataset.revisionAuthor));
-  }
-  // Paragraph-mark revisions — `data-block-revision="ins"|"del"` lives
-  // on the paragraph element; the `::after` pseudo in core reads
-  // `--sobree-block-revision-color`, which we set per-author here.
-  const blockMarks = root.querySelectorAll<HTMLElement>("[data-block-revision]");
-  for (const mark of Array.from(blockMarks)) {
-    mark.style.setProperty(
-      "--sobree-block-revision-color",
-      colorForAuthor(mark.dataset.blockRevisionAuthor),
-    );
-  }
-  // Format-change revisions — the wrapping `<span.sobree-revision-format>`
-  // reads `--sobree-format-revision-color` to colour the dashed
-  // underline core ships as the neutral visual hint.
-  const formatMarks = root.querySelectorAll<HTMLElement>("span.sobree-revision-format");
-  for (const mark of Array.from(formatMarks)) {
-    mark.style.setProperty(
-      "--sobree-format-revision-color",
-      colorForAuthor(mark.dataset.revisionFormatAuthor),
-    );
+/**
+ * Apply per-author colour to every tracked-change mark, keyed by kind:
+ *   - inline ins/del → `--author-color`
+ *   - paragraph mark → `--sobree-block-revision-color` (core's `::after`
+ *     pseudo reads it to tint the trailing ¶ glyph)
+ *   - format change  → `--sobree-format-revision-color` (the dashed
+ *     underline core ships as the neutral hint)
+ * The kind + author come from the typed lookup, so the per-author colour
+ * is decoupled from the renderer's attribute names.
+ */
+function colourMarks(rendered: RenderedDocumentIndex): void {
+  for (const mark of rendered.revisionMarks()) {
+    const color = colorForAuthor(mark.author);
+    switch (mark.kind) {
+      case "inline-insert":
+      case "inline-delete":
+        mark.element.style.setProperty("--author-color", color);
+        break;
+      case "paragraph":
+        mark.element.style.setProperty("--sobree-block-revision-color", color);
+        break;
+      case "format":
+        mark.element.style.setProperty("--sobree-format-revision-color", color);
+        break;
+    }
   }
 }
 
@@ -261,21 +256,22 @@ function renderComments(
     slot.replaceChildren();
 
     // Collect (commentId, anchorTopPx) for top-level comments whose
-    // range starts on this paper, in document order.
+    // range starts on this paper, in document order. The comment-range
+    // elements + their ids come from the typed lookup (no selector here);
+    // the `.paper-comments` slot navigation above is review's own card
+    // layout, not a document concept.
     const placements: { id: number; top: number }[] = [];
     const seen = new Set<number>();
-    const anchors = paper.querySelectorAll<HTMLElement>(".sobree-comment-range");
-    for (const anchor of Array.from(anchors)) {
-      const raw = anchor.dataset.commentIds ?? "";
-      for (const part of raw.split(",")) {
-        const id = Number(part.trim());
+    for (const anchor of editor.renderedDocument.commentRanges(paper)) {
+      for (const idStr of anchor.commentIds) {
+        const id = Number(idStr);
         if (!Number.isFinite(id) || seen.has(id)) continue;
         const c = comments[id];
         // Skip replies (they ride their parent card). `!= null` so a
         // YDoc-materialised `null` still counts as "top-level".
         if (!c || c.replyToId != null) continue;
         seen.add(id);
-        placements.push({ id, top: offsetWithin(anchor, paper) });
+        placements.push({ id, top: offsetWithin(anchor.element, paper) });
       }
     }
     if (placements.length === 0) {

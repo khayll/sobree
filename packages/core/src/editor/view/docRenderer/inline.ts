@@ -6,6 +6,16 @@ import type {
   RunProperties,
   TextRun,
 } from "../../../doc/types";
+import {
+  CLS_COMMENT_RANGE,
+  CLS_REVISION,
+  CLS_REVISION_FORMAT,
+  COMMENT_IDS_ATTR,
+  REVISION_AUTHOR_ATTR,
+  REVISION_DATE_ATTR,
+  REVISION_FORMAT_AUTHOR_ATTR,
+  REVISION_FORMAT_DATE_ATTR,
+} from "../../renderedDocument/selectors";
 import { resolveFontFace } from "./fontFallback";
 
 /**
@@ -171,12 +181,12 @@ function renderTextRun(run: TextRun, styles: readonly NamedStyle[] = []): Node {
   // both inserted AND format-changed still hovers each independently.
   if (p.revisionFormat) {
     const wrapper = document.createElement("span");
-    wrapper.className = "sobree-revision-format";
+    wrapper.className = CLS_REVISION_FORMAT;
     if (p.revisionFormat.author) {
-      wrapper.dataset.revisionFormatAuthor = p.revisionFormat.author;
+      wrapper.setAttribute(REVISION_FORMAT_AUTHOR_ATTR, p.revisionFormat.author);
     }
     if (p.revisionFormat.date) {
-      wrapper.dataset.revisionFormatDate = p.revisionFormat.date;
+      wrapper.setAttribute(REVISION_FORMAT_DATE_ATTR, p.revisionFormat.date);
     }
     wrapper.appendChild(node);
     node = wrapper;
@@ -190,9 +200,9 @@ function renderTextRun(run: TextRun, styles: readonly NamedStyle[] = []): Node {
   if (p.revision) {
     const tag = p.revision.type === "ins" ? "ins" : "del";
     const wrapper = document.createElement(tag);
-    wrapper.className = `sobree-revision sobree-revision-${p.revision.type}`;
-    if (p.revision.author) wrapper.dataset.revisionAuthor = p.revision.author;
-    if (p.revision.date) wrapper.dataset.revisionDate = p.revision.date;
+    wrapper.className = `${CLS_REVISION} ${CLS_REVISION}-${p.revision.type}`;
+    if (p.revision.author) wrapper.setAttribute(REVISION_AUTHOR_ATTR, p.revision.author);
+    if (p.revision.date) wrapper.setAttribute(REVISION_DATE_ATTR, p.revision.date);
     wrapper.appendChild(node);
     node = wrapper;
   }
@@ -203,8 +213,8 @@ function renderTextRun(run: TextRun, styles: readonly NamedStyle[] = []): Node {
   // comment cards.
   if (p.commentIds && p.commentIds.length > 0) {
     const wrapper = document.createElement("span");
-    wrapper.className = "sobree-comment-range";
-    wrapper.dataset.commentIds = p.commentIds.join(",");
+    wrapper.className = CLS_COMMENT_RANGE;
+    wrapper.setAttribute(COMMENT_IDS_ATTR, p.commentIds.join(","));
     wrapper.appendChild(node);
     node = wrapper;
   }

@@ -35,6 +35,8 @@ import * as review from "./ops/review";
 import * as runs from "./ops/runs";
 import { type TrackedInput, createTrackedInput } from "./ops/trackedInput";
 import * as query from "./query";
+import { RenderedDocument } from "./renderedDocument";
+import type { RenderedDocumentIndex } from "./renderedDocument";
 import { EditorSections } from "./sections";
 import { EditorSelection } from "./selection";
 import { EditorStyles } from "./styles";
@@ -105,6 +107,19 @@ export type {
 export { runsLength } from "../doc/runs";
 export type { RunPropertiesPatch };
 
+// Rendered-document lookup surface — the typed bridge plugins use
+// instead of hardcoding renderer DOM selectors.
+export { RenderedDocument } from "./renderedDocument";
+export type {
+  RenderedBlockLookup,
+  RenderedCommentLookup,
+  RenderedCommentRange,
+  RenderedDocumentIndex,
+  RenderedRevisionKind,
+  RenderedRevisionLookup,
+  RenderedRevisionMark,
+} from "./renderedDocument";
+
 // === Editor ===
 
 /**
@@ -168,6 +183,16 @@ export class Editor {
    * keyboard / toolbar / agent / MCP all dispatch through `execute()`.
    */
   readonly commands: CommandBus;
+
+  /**
+   * Typed lookup over the rendered DOM — maps rendered elements to
+   * document concepts (blocks, revision marks, comment ranges) and back.
+   * The sanctioned bridge between the renderer's private DOM shape and
+   * plugins (`block-tools`, `review`, third-party): plugins call this
+   * instead of hardcoding renderer selectors, so the DOM can evolve
+   * without breaking them. See `./renderedDocument`.
+   */
+  readonly renderedDocument: RenderedDocumentIndex;
 
   /**
    * Y.Doc backing the document. The Editor's `this.doc` field is a
@@ -292,6 +317,12 @@ export class Editor {
     this.blobCache = this.createBlobCache();
 
     this.selection = new EditorSelection(this);
+    // Rendered-DOM lookup seam — searches the editor's content hosts and
+    // resolves versions through the registry. Both are ready by now.
+    this.renderedDocument = new RenderedDocument({
+      roots: () => this.getContentHosts(),
+      registry: () => this.registry,
+    });
     this.table = new EditorTable(this);
     this.commands = new EditorCommands();
     this.history = this.createHistory();
