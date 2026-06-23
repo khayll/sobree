@@ -1,8 +1,8 @@
 // The top-level `SobreeDocument` shape and document-level `Comment`.
 
 import type { FontDeclaration } from "../../fonts/types";
-import type { Block } from "./block";
-import type { AnchoredFrame, InlineFrame } from "./drawing";
+import type { Block, InlineFrame } from "./block";
+import type { AnchoredFrame } from "./drawing";
 import type { NumberingDefinition } from "./numbering";
 import type { SectionProperties } from "./sections";
 import type { NamedStyle } from "./styles";

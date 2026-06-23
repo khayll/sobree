@@ -1,9 +1,9 @@
 // Named styles — the paragraph / run / table cascade definitions.
 
 import type { TableStyleDefinition } from "../tableStyle.types";
+import type { TableProperties } from "./block";
 import type { ParagraphProperties } from "./paragraph";
 import type { RunProperties } from "./runs";
-import type { TableProperties } from "./table";
 
 export interface NamedStyle {
   id: string;

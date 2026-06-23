@@ -50,4 +50,3 @@ export type * from "./revisions";
 export type * from "./runs";
 export type * from "./sections";
 export type * from "./styles";
-export type * from "./table";
