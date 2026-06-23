@@ -1,5 +1,5 @@
 ---
-"@sobree/core": minor
+"@sobree/core": patch
 ---
 
 Per-part CRDT for composite content (tables + floating textbox frames). Both

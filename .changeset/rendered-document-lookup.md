@@ -1,5 +1,5 @@
 ---
-"@sobree/core": minor
+"@sobree/core": patch
 "@sobree/block-tools": patch
 "@sobree/review": patch
 ---
