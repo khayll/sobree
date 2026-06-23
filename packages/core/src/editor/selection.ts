@@ -29,7 +29,7 @@ export class EditorSelection {
 
   /** Apply a model selection to the DOM. */
   set(sel: Selection): boolean {
-    return applySelectionToDom(this.editor._hosts(), this.editor._registry(), sel);
+    return applySelectionToDom(this.editor._hosts(), sel);
   }
 
   /** Shortcut: current selection as a `Range`, or `null` when collapsed/absent. */

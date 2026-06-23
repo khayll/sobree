@@ -13,8 +13,27 @@ function setupHost(html: string): { host: HTMLElement; registry: BlockRegistry }
   const host = document.createElement("div");
   host.innerHTML = html.trim();
   document.body.appendChild(host);
+  // Stamp `data-block-id` / `data-block-index` like the renderer does — one
+  // per top-level block, expanding `<ul>`/`<ol>` to one per `<li>`. positionMap
+  // locates blocks by these stamps (robust to paper / column nesting), not by
+  // walking host children, so the test DOM must carry them.
+  const blockEls: HTMLElement[] = [];
+  for (const child of Array.from(host.children)) {
+    const tag = child.tagName.toLowerCase();
+    if (tag === "ul" || tag === "ol") {
+      for (const li of Array.from(child.children)) {
+        if (li instanceof HTMLElement && li.tagName.toLowerCase() === "li") blockEls.push(li);
+      }
+    } else if (child instanceof HTMLElement) {
+      blockEls.push(child);
+    }
+  }
   const registry = new BlockRegistry();
-  registry.reset(countBlocks([host]));
+  registry.reset(blockEls.length);
+  blockEls.forEach((el, i) => {
+    el.setAttribute("data-block-id", registry.refAt(i).id);
+    el.setAttribute("data-block-index", String(i));
+  });
   return { host, registry };
 }
 
@@ -116,7 +135,7 @@ describe("domPointFromPosition round-trip", () => {
   it("finds a (node, offset) equivalent to the requested char offset", () => {
     const { host, registry } = setupHost("<p>hello</p>");
     const pos = { block: registry.refAt(0), offset: 3 };
-    const pt = domPointFromPosition([host], registry, pos);
+    const pt = domPointFromPosition([host], pos);
     expect(pt?.node.nodeType).toBe(Node.TEXT_NODE);
     expect((pt?.node as Text).data).toBe("hello");
     expect(pt?.offset).toBe(3);
@@ -125,7 +144,7 @@ describe("domPointFromPosition round-trip", () => {
   it("walks past wrappers to reach the right text node", () => {
     const { host, registry } = setupHost("<p>hi <strong>bold</strong> now</p>");
     const pos = { block: registry.refAt(0), offset: 5 };
-    const pt = domPointFromPosition([host], registry, pos);
+    const pt = domPointFromPosition([host], pos);
     expect(pt?.node.nodeType).toBe(Node.TEXT_NODE);
     expect((pt?.node as Text).data).toBe("bold");
     expect(pt?.offset).toBe(2);
@@ -134,12 +153,12 @@ describe("domPointFromPosition round-trip", () => {
   it("places the caret beside an atom for edge offsets", () => {
     const { host, registry } = setupHost("<p>a<br>b</p>");
     // offset=1 → the caret is between 'a' and '<br>'.
-    const pt = domPointFromPosition([host], registry, { block: registry.refAt(0), offset: 1 });
+    const pt = domPointFromPosition([host], { block: registry.refAt(0), offset: 1 });
     expect(pt?.node.nodeType).toBe(Node.TEXT_NODE);
     expect((pt?.node as Text).data).toBe("a");
     expect(pt?.offset).toBe(1);
 
-    const pt2 = domPointFromPosition([host], registry, { block: registry.refAt(0), offset: 2 });
+    const pt2 = domPointFromPosition([host], { block: registry.refAt(0), offset: 2 });
     // offset=2 → between <br> and 'b'. Acceptable results: (p, index-of-br+1) or (b-text, 0).
     // Either way the caret lands at the start of the "b" text node.
     if (pt2?.node.nodeType === Node.TEXT_NODE) {
@@ -152,7 +171,7 @@ describe("domPointFromPosition round-trip", () => {
 
   it("returns a (block, childCount) point for offset past the end", () => {
     const { host, registry } = setupHost("<p>hi</p>");
-    const pt = domPointFromPosition([host], registry, { block: registry.refAt(0), offset: 10 });
+    const pt = domPointFromPosition([host], { block: registry.refAt(0), offset: 10 });
     expect(pt?.node).toBe(host.querySelector("p"));
     expect(pt?.offset).toBe(host.querySelector("p")!.childNodes.length);
   });
@@ -183,5 +202,116 @@ describe("rangeFromDomRange", () => {
     expect(api?.from.offset).toBe(1);
     expect(api?.to.block.id).toBe("b2");
     expect(api?.to.offset).toBe(2);
+  });
+});
+
+describe("positionMap — blocks nested in paper / column layout", () => {
+  // The paginator nests body blocks inside `.paper` → `.paper-content` →
+  // `.sobree-cols` → `.sobree-col`, so a block is NEVER a direct host child.
+  // The old positional walk treated the column wrapper as one block, so every
+  // selection mapping in a multi-column section landed on the wrong block —
+  // that's what made undo / caret restore jump to the following paragraph.
+  function setupColumns(): { host: HTMLElement; registry: BlockRegistry; ps: HTMLElement[] } {
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <div class="paper"><div class="paper-content">
+        <p>intro</p>
+        <div class="sobree-cols sobree-section-cols">
+          <div class="sobree-col"><p>The three storeys</p><p>body one</p></div>
+          <div class="sobree-col"><p>Reading the weather</p></div>
+        </div>
+      </div></div>`.trim();
+    document.body.appendChild(host);
+    const ps = Array.from(host.querySelectorAll("p")) as HTMLElement[];
+    const registry = new BlockRegistry();
+    registry.reset(ps.length);
+    ps.forEach((el, i) => {
+      el.setAttribute("data-block-id", registry.refAt(i).id);
+      el.setAttribute("data-block-index", String(i));
+    });
+    return { host, registry, ps };
+  }
+
+  it("counts every nested block (not the column wrapper as one)", () => {
+    const { host } = setupColumns();
+    expect(countBlocks([host])).toBe(4); // intro + 2 (col 1) + 1 (col 2)
+  });
+
+  it("resolves a column-nested heading by index and id, both directions", () => {
+    const { host, registry, ps } = setupColumns();
+    const heading = ps[1]!; // "The three storeys" — deep inside .sobree-col
+
+    // index → element
+    expect(blockElementAtIndex([host], 1)).toBe(heading);
+
+    // DOM → model: a caret in the heading resolves to ITS block, not the wrapper
+    const pos = positionFromDomPoint([host], registry, heading.firstChild!, 3);
+    expect(pos?.block.id).toBe(registry.refAt(1).id);
+    expect(pos?.offset).toBe(3);
+
+    // model → DOM: round-trips back into the same nested heading
+    const pt = domPointFromPosition([host], { block: registry.refAt(1), offset: 3 });
+    expect(pt && heading.contains(pt.node)).toBe(true);
+  });
+
+  it("maps the second column's block too", () => {
+    const { host, registry, ps } = setupColumns();
+    const weather = ps[3]!; // "Reading the weather" in column 2
+    const pos = positionFromDomPoint([host], registry, weather.firstChild!, 0);
+    expect(pos?.block.id).toBe(registry.refAt(3).id);
+    expect(domPointFromPosition([host], { block: registry.refAt(3), offset: 0 })).not.toBeNull();
+  });
+});
+
+describe("positionMap — table cell addressing", () => {
+  // A table is ONE registered block, but its cells hold their own content.
+  // A caret in a cell must capture (and restore) the cell address so undo
+  // lands back in the cell, not at the table boundary.
+  function setupTable(): { host: HTMLElement; registry: BlockRegistry } {
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <table data-block-id="b1" data-block-index="0"><tbody>
+        <tr><td><p>Genus</p></td><td><p>Storey</p></td></tr>
+        <tr><td><p>Cirrus</p></td><td><p>High</p></td></tr>
+      </tbody></table>`.trim();
+    document.body.appendChild(host);
+    const registry = new BlockRegistry();
+    registry.reset(1); // one block: the table (id "b1")
+    return { host, registry };
+  }
+
+  function cellOf(host: HTMLElement, text: string): HTMLElement {
+    return [...host.querySelectorAll("td")].find((td) => td.textContent === text) as HTMLElement;
+  }
+
+  it("captures the cell address (row / col / blockIndex) for a caret in a cell", () => {
+    const { host, registry } = setupTable();
+    const cirrus = cellOf(host, "Cirrus");
+    const pos = positionFromDomPoint([host], registry, cirrus.querySelector("p")!.firstChild!, 6);
+    expect(pos?.block.id).toBe("b1");
+    expect(pos?.cell).toEqual({ row: 1, col: 0, blockIndex: 0 });
+    expect(pos?.offset).toBe(6);
+  });
+
+  it("restores a cell caret to the SAME cell (round-trip), not the table start", () => {
+    const { host, registry } = setupTable();
+    const pt = domPointFromPosition([host], {
+      block: registry.refAt(0),
+      offset: 4,
+      cell: { row: 1, col: 1, blockIndex: 0 },
+    });
+    const node = pt?.node ?? null;
+    const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element | null);
+    const cell = el?.closest("td");
+    expect(cell?.textContent).toBe("High");
+    expect(pt?.offset).toBe(4); // end of "High"
+  });
+
+  it("without a cell address, a table position resolves to the table element", () => {
+    const { host, registry } = setupTable();
+    const pt = domPointFromPosition([host], { block: registry.refAt(0), offset: 0 });
+    expect((pt?.node as HTMLElement)?.tagName ?? (pt?.node as Node)?.nodeName).toBeTruthy();
+    // round-trips to somewhere inside the table (no crash, no null)
+    expect(pt).not.toBeNull();
   });
 });

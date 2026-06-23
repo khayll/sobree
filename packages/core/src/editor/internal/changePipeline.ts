@@ -127,7 +127,7 @@ export class ChangePipeline {
     renderSobreeDocument(this.ctx.doc, firstHost, this.blockIdsArray());
 
     // Best-effort selection restore (block must still exist + offset still valid).
-    if (savedSelection) applySelectionToDom(this.ctx._hosts(), this.ctx.registry, savedSelection);
+    if (savedSelection) applySelectionToDom(this.ctx._hosts(), savedSelection);
 
     this.domDirty = false;
     this.mirrorToYDoc();
