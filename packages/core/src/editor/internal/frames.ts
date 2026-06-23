@@ -210,7 +210,7 @@ export class FrameController {
       applyFrameSelection(frame, { start: sel.start, end: sel.end }, this.ctx.host.ownerDocument);
       return;
     }
-    if (sel) applySelectionToDom(this.ctx._hosts(), this.ctx.registry, sel);
+    if (sel) applySelectionToDom(this.ctx._hosts(), sel);
   }
 
   /**

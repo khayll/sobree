@@ -1,4 +1,5 @@
 import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api";
+import { BLOCK_ID_ATTR, BLOCK_ID_SELECTOR, blockIdSelector } from "../renderedDocument/selectors";
 import type { BlockRegistry } from "./blockRegistry";
 
 /**
@@ -45,10 +46,6 @@ const WRAPPER_TAGS = new Set([
 
 const ATOM_TAGS = new Set(["br", "img", "hr"]);
 
-const BLOCK_TAGS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "dl"]);
-
-const LIST_TAGS = new Set(["ul", "ol"]);
-
 // === reading: DOM → model ===
 
 /**
@@ -66,17 +63,13 @@ export function positionFromDomPoint(
 ): InlinePosition | null {
   if (!hosts.some((h) => h.contains(node) || h === node)) return null;
 
-  const { blockEl, blockIndex } = findBlockElement(node, hosts);
-  if (!blockEl || blockIndex < 0) return null;
+  const { blockEl, blockId } = findBlockElement(node, hosts);
+  if (!blockEl || !blockId) return null;
+  const ref = registry.refById(blockId);
+  if (!ref) return null;
 
-  let offset: number;
-  if (isInsideTable(blockEl)) {
-    offset = 0;
-  } else {
-    offset = charOffsetToPoint(blockEl, node, domOffset);
-  }
-
-  return { block: registry.refAt(blockIndex), offset };
+  const offset = isInsideTable(blockEl) ? 0 : charOffsetToPoint(blockEl, node, domOffset);
+  return { block: ref, offset };
 }
 
 /** Build an API `Range` from a live DOM `Range`. */
@@ -107,25 +100,20 @@ export function selectionFromDom(
 
 // === writing: model → DOM ===
 
-/** Resolve an `InlinePosition` to a DOM `{ node, offset }` point. */
+/** Resolve an `InlinePosition` to a DOM `{ node, offset }` point. Locates the
+ *  block by its stable `data-block-id` — robust to paper / column / list
+ *  nesting, where the block is never a direct host child. */
 export function domPointFromPosition(
   hosts: readonly HTMLElement[],
-  registry: BlockRegistry,
   pos: InlinePosition,
 ): { node: Node; offset: number } | null {
-  const index = registry.indexOf(pos.block.id);
-  if (index < 0) return null;
-  const blockEl = blockElementAtIndex(hosts, index);
+  const blockEl = blockElementById(hosts, pos.block.id);
   if (!blockEl) return null;
   return findPointAtOffset(blockEl, pos.offset);
 }
 
 /** Apply a model `Selection` to `window.getSelection()`. */
-export function applySelectionToDom(
-  hosts: readonly HTMLElement[],
-  registry: BlockRegistry,
-  selection: Selection,
-): boolean {
+export function applySelectionToDom(hosts: readonly HTMLElement[], selection: Selection): boolean {
   const sel = window.getSelection();
   if (!sel) return false;
   if (!selection) {
@@ -133,7 +121,7 @@ export function applySelectionToDom(
     return true;
   }
   if (selection.kind === "caret") {
-    const pt = domPointFromPosition(hosts, registry, selection.at);
+    const pt = domPointFromPosition(hosts, selection.at);
     if (!pt) return false;
     const range = document.createRange();
     range.setStart(pt.node, pt.offset);
@@ -142,8 +130,8 @@ export function applySelectionToDom(
     sel.addRange(range);
     return true;
   }
-  const from = domPointFromPosition(hosts, registry, selection.range.from);
-  const to = domPointFromPosition(hosts, registry, selection.range.to);
+  const from = domPointFromPosition(hosts, selection.range.from);
+  const to = domPointFromPosition(hosts, selection.range.to);
   if (!from || !to) return false;
   const range = document.createRange();
   range.setStart(from.node, from.offset);
@@ -162,111 +150,68 @@ export function blockLength(blockEl: Element): number {
 
 // === block index helpers ===
 
-/**
- * Enumerate blocks across all content hosts in document order,
- * expanding `<ul>`/`<ol>` children as one block each. Returns the
- * total block count.
- */
-export function countBlocks(hosts: readonly HTMLElement[]): number {
-  let n = 0;
-  for (const host of hosts) {
-    for (const child of Array.from(host.children)) n += blocksInTopChild(child);
-  }
-  return n;
-}
+// Block elements are NOT direct children of a content host — the paginator
+// nests them inside papers, multi-column tracks (`.sobree-cols > .sobree-col`)
+// and list containers. So we locate a block by the stable `data-block-id` the
+// renderer stamps on EVERY block element (the same anchor paperStack uses),
+// never by walking `host.children` — a column wrapper would hide them.
 
-/**
- * Return the DOM element that hosts a given block index. For list-item
- * blocks this is the `<li>`; for everything else it's the direct host
- * child.
- */
-export function blockElementAtIndex(
-  hosts: readonly HTMLElement[],
-  index: number,
-): HTMLElement | null {
-  let remaining = index;
+/** The DOM element bearing block `id`, searched across all hosts. When a block
+ *  is split across a page boundary, both fragments share the id; the first
+ *  (document-order) fragment wins. */
+function blockElementById(hosts: readonly HTMLElement[], id: string): HTMLElement | null {
+  const selector = blockIdSelector(id);
   for (const host of hosts) {
-    for (const child of Array.from(host.children)) {
-      const span = blocksInTopChild(child);
-      if (remaining < span) {
-        if (LIST_TAGS.has(child.tagName.toLowerCase())) {
-          const items = Array.from(child.children).filter(
-            (c): c is HTMLElement => c instanceof HTMLElement && c.tagName.toLowerCase() === "li",
-          );
-          return items[remaining] ?? null;
-        }
-        return child instanceof HTMLElement ? child : null;
-      }
-      remaining -= span;
-    }
+    const el = host.querySelector<HTMLElement>(selector);
+    if (el) return el;
   }
   return null;
 }
 
-function blocksInTopChild(el: Element): number {
-  const tag = el.tagName.toLowerCase();
-  if (LIST_TAGS.has(tag)) {
-    return Array.from(el.children).filter((c) => c.tagName.toLowerCase() === "li").length;
+/** The DOM element for body block `index` via the positional `data-block-index`
+ *  stamp. Valid against a freshly-rendered DOM (index === body position). */
+export function blockElementAtIndex(
+  hosts: readonly HTMLElement[],
+  index: number,
+): HTMLElement | null {
+  for (const host of hosts) {
+    const el = host.querySelector<HTMLElement>(`[data-block-index="${index}"]`);
+    if (el) return el;
   }
-  return 1;
+  return null;
 }
 
+/** Count distinct blocks in the rendered DOM. Dedups by id so a block split
+ *  across a page boundary (two fragments, one id) counts once. */
+export function countBlocks(hosts: readonly HTMLElement[]): number {
+  const ids = new Set<string>();
+  for (const host of hosts) {
+    for (const el of Array.from(host.querySelectorAll<HTMLElement>(BLOCK_ID_SELECTOR))) {
+      const id = el.getAttribute(BLOCK_ID_ATTR);
+      if (id) ids.add(id);
+    }
+  }
+  return ids.size;
+}
+
+/** The nearest block-element ancestor of `node` (the one carrying a
+ *  `data-block-id`) within the hosts, plus its id. */
 function findBlockElement(
   node: Node,
   hosts: readonly HTMLElement[],
-): { blockEl: HTMLElement | null; blockIndex: number } {
-  // Walk up from node. Stop at either:
-  //   - an element whose parent is a content host → top-level block
-  //   - an <li> whose grand-parent is a host → list-item block
+): { blockEl: HTMLElement | null; blockId: string | null } {
   let cur: Node | null = node;
   while (cur) {
-    if (cur instanceof HTMLElement) {
-      const tag = cur.tagName.toLowerCase();
-      const parent = cur.parentElement;
-      if (
-        parent &&
-        hosts.includes(parent) &&
-        (BLOCK_TAGS.has(tag) || LIST_TAGS.has(tag) || tag === "table" || tag === "div")
-      ) {
-        // Top-level (non-list) block.
-        if (LIST_TAGS.has(tag)) {
-          // Caret landed on the `<ul>` itself somehow — degenerate case.
-          // Resolve to the first list-item index.
-          return {
-            blockEl: cur.children[0] instanceof HTMLElement ? cur.children[0] : null,
-            blockIndex: indexOfElement(cur, hosts),
-          };
-        }
-        return { blockEl: cur, blockIndex: indexOfElement(cur, hosts) };
-      }
-      if (tag === "li" && parent && parent.parentElement && hosts.includes(parent.parentElement)) {
-        return { blockEl: cur, blockIndex: indexOfElement(cur, hosts) };
-      }
+    if (
+      cur instanceof HTMLElement &&
+      cur.hasAttribute(BLOCK_ID_ATTR) &&
+      hosts.some((h) => h.contains(cur))
+    ) {
+      return { blockEl: cur, blockId: cur.getAttribute(BLOCK_ID_ATTR) };
     }
     cur = cur.parentNode;
   }
-  return { blockEl: null, blockIndex: -1 };
-}
-
-function indexOfElement(target: Element, hosts: readonly HTMLElement[]): number {
-  let index = 0;
-  for (const host of hosts) {
-    for (const child of Array.from(host.children)) {
-      const tag = child.tagName.toLowerCase();
-      if (LIST_TAGS.has(tag)) {
-        const items = Array.from(child.children).filter(
-          (c): c is HTMLElement => c instanceof HTMLElement && c.tagName.toLowerCase() === "li",
-        );
-        if (items.includes(target as HTMLElement))
-          return index + items.indexOf(target as HTMLElement);
-        index += items.length;
-        continue;
-      }
-      if (child === target) return index;
-      index += 1;
-    }
-  }
-  return -1;
+  return { blockEl: null, blockId: null };
 }
 
 function isInsideTable(blockEl: Element): boolean {
