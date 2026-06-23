@@ -38,9 +38,10 @@
  *     parsing, etc. HeadlessSobree skips all that — if you need
  *     them, mount a real Editor.
  *   - A *table editor*. The browser `Editor` has a rich table API
- *     (`editor.table.insertRow`, etc.). HeadlessSobree v0 doesn't
- *     wrap that — operate on `Table` blocks directly via
- *     `replaceBlock` until Phase 4.x adds a parallel table API.
+ *     (`editor.table.insertRow`, etc.). HeadlessSobree keeps table
+ *     edits at the block boundary today — operate on `Table` blocks
+ *     directly via `replaceBlock` unless a dedicated headless table
+ *     API is added.
  *
  * # Origin tagging
  *
