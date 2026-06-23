@@ -26,6 +26,7 @@ export interface IndicatorOptions {
  */
 export class BlockIndicator {
   private readonly stackRoot: HTMLElement;
+  private readonly editor: Editor;
   private readonly onActivate: (target: BlockTarget) => void;
   private readonly root: HTMLButtonElement;
   private current: BlockTarget | null = null;
@@ -38,6 +39,7 @@ export class BlockIndicator {
 
   constructor(opts: IndicatorOptions) {
     this.stackRoot = opts.stackRoot;
+    this.editor = opts.editor;
     this.onActivate = opts.onActivate;
 
     this.root = document.createElement("button");
@@ -105,9 +107,7 @@ export class BlockIndicator {
     if (!this.current) return;
     // Re-resolve element if the body was re-rendered under us.
     if (this.current.blockId && !document.contains(this.current.element)) {
-      const fresh = this.stackRoot.querySelector(
-        `[data-block-id="${this.current.blockId}"]`,
-      ) as HTMLElement | null;
+      const fresh = this.editor.renderedDocument.elementForBlockId(this.current.blockId);
       if (fresh) {
         const paper = fresh.closest(".paper") as HTMLElement | null;
         if (paper) this.current = { ...this.current, element: fresh, paper };
@@ -127,7 +127,7 @@ export class BlockIndicator {
     if (!this.enabled) return;
     const target = e.target as HTMLElement;
     if (this.root.contains(target)) return;
-    const block = blockTargetFrom(target, this.stackRoot);
+    const block = blockTargetFrom(target, this.stackRoot, this.editor.renderedDocument);
     if (block) this.setTarget(block);
   }
 
@@ -138,7 +138,7 @@ export class BlockIndicator {
     const anchor = sel.anchorNode;
     if (!anchor) return;
     if (!this.stackRoot.contains(anchor)) return;
-    const block = blockTargetFromNode(anchor, this.stackRoot);
+    const block = blockTargetFromNode(anchor, this.stackRoot, this.editor.renderedDocument);
     if (block) this.setTarget(block);
   }
 

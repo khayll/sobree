@@ -35,6 +35,7 @@ import * as review from "./ops/review";
 import * as runs from "./ops/runs";
 import { type TrackedInput, createTrackedInput } from "./ops/trackedInput";
 import * as query from "./query";
+import { RenderedDocument, type RenderedDocumentIndex } from "./renderedDocument";
 import { EditorSections } from "./sections";
 import { EditorSelection } from "./selection";
 import { EditorStyles } from "./styles";
@@ -169,6 +170,11 @@ export class Editor {
    */
   readonly commands: CommandBus;
 
+  /** Typed lookup mapping rendered DOM elements ↔ document concepts
+   *  (blocks, revision marks, comment ranges) — the bridge plugins use
+   *  instead of hardcoding renderer selectors. See `./renderedDocument`. */
+  readonly renderedDocument: RenderedDocumentIndex;
+
   /**
    * Y.Doc backing the document. The Editor's `this.doc` field is a
    * cached projection of this Y.Doc — every local mutation mirrors
@@ -292,6 +298,10 @@ export class Editor {
     this.blobCache = this.createBlobCache();
 
     this.selection = new EditorSelection(this);
+    this.renderedDocument = new RenderedDocument({
+      roots: () => this.getContentHosts(),
+      registry: () => this.registry,
+    });
     this.table = new EditorTable(this);
     this.commands = new EditorCommands();
     this.history = this.createHistory();

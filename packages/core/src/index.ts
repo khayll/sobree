@@ -44,6 +44,18 @@ export type {
 
 // === editor + AST + commands ===
 export { Editor } from "./editor";
+// Rendered-document lookup surface (`editor.renderedDocument`) — the
+// typed bridge plugins use instead of hardcoding renderer DOM selectors.
+export { RenderedDocument } from "./editor/renderedDocument";
+export type {
+  RenderedBlockLookup,
+  RenderedCommentLookup,
+  RenderedCommentRange,
+  RenderedDocumentIndex,
+  RenderedRevisionKind,
+  RenderedRevisionLookup,
+  RenderedRevisionMark,
+} from "./editor/renderedDocument";
 export type {
   ApiRangeType,
   RevisionSpan,

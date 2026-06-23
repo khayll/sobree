@@ -38,10 +38,9 @@ const FLASH_MS = 700;
 export interface ReviewDockOptions {
   /** Element to anchor against. Typically `ctx.host` (rendering area). */
   host: HTMLElement;
-  /** Editor for `getRevisions` + `accept/rejectAllRevisions` + DOM lookup. */
+  /** Editor for `getRevisions` + `accept/rejectAllRevisions` + DOM lookup
+   *  (revision marks to scroll/flash, via `editor.renderedDocument`). */
   editor: Editor;
-  /** Stack root — where we look for revision marks to scroll/flash. */
-  stackRoot: HTMLElement;
   /** Which corner to dock in. Defaults to `top-right`. */
   placement?: FloatingCornerPlacement;
 }
@@ -49,7 +48,6 @@ export interface ReviewDockOptions {
 export class ReviewDock {
   private readonly host: HTMLElement;
   private readonly editor: Editor;
-  private readonly stackRoot: HTMLElement;
   private readonly placement: FloatingCornerPlacement;
   private readonly root: HTMLElement;
   private cursorIndex = 0;
@@ -59,7 +57,6 @@ export class ReviewDock {
   constructor(opts: ReviewDockOptions) {
     this.host = opts.host;
     this.editor = opts.editor;
-    this.stackRoot = opts.stackRoot;
     this.placement = opts.placement ?? "top-right";
 
     this.root = document.createElement("div");
@@ -184,20 +181,18 @@ export class ReviewDock {
    * span is on a not-yet-paginated block, or the doc just changed).
    */
   private findMarkForSpan(span: ReturnType<Editor["getRevisions"]>[number]): HTMLElement | null {
-    const blockId = span.range.from.block.id;
-    const block = this.stackRoot.querySelector<HTMLElement>(
-      `[data-block-id="${cssEscape(blockId)}"]`,
-    );
+    const block = this.editor.renderedDocument.elementForBlockId(span.range.from.block.id);
     if (!block) return null;
     if (span.level === "paragraph") return block;
-    const selector =
-      span.level === "format"
-        ? "span.sobree-revision-format"
-        : "ins[data-revision-author], del[data-revision-author]";
-    // First matching descendant — good enough; refinement by exact
-    // character range would need text-node walking which the popover
-    // doesn't bother with either.
-    return block.querySelector<HTMLElement>(selector);
+    const wantFormat = span.level === "format";
+    // First matching mark within the block — good enough; refinement by
+    // exact character range would need text-node walking which the
+    // popover doesn't bother with either.
+    for (const mark of this.editor.renderedDocument.revisionMarks(block)) {
+      const isInline = mark.kind === "inline-insert" || mark.kind === "inline-delete";
+      if (wantFormat ? mark.kind === "format" : isInline) return mark.element;
+    }
+    return null;
   }
 
   private scrollIntoViewAndFlash(mark: HTMLElement): void {
@@ -263,15 +258,3 @@ const ICON_PREV = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 const ICON_NEXT = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
 const ICON_CHECK = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 const ICON_CROSS = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>`;
-
-/**
- * Minimal CSS.escape fallback for environments without it (jsdom,
- * older browsers). Block IDs are alphanumeric + underscore in
- * practice, so a tight regex suffices.
- */
-function cssEscape(s: string): string {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return CSS.escape(s);
-  }
-  return s.replace(/[^a-zA-Z0-9_-]/g, (ch) => `\\${ch}`);
-}

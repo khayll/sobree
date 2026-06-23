@@ -1,12 +1,12 @@
-import type { Viewport } from "@sobree/core";
+import type { Editor, Viewport } from "@sobree/core";
 import type { BlockTarget } from "./blockKinds";
 
 export interface FloatingToolbarOptions {
   /**
-   * Stack root — used to re-resolve the target element by `data-block-id`
-   * after a commit replaces the body DOM.
+   * Editor — re-resolves the target element via `renderedDocument` after
+   * a commit replaces the body DOM.
    */
-  stackRoot: HTMLElement;
+  editor: Editor;
   /**
    * Rendering area — the element inside which the toolbar must fit.
    * Typically the demo viewport (`.demo-viewport`). Used for Case-A
@@ -33,14 +33,14 @@ export interface FloatingToolbarOptions {
  */
 export class FloatingToolbar {
   readonly root: HTMLElement;
-  private readonly stackRoot: HTMLElement;
+  private readonly editor: Editor;
   private readonly renderingArea: HTMLElement;
   private readonly viewport: Viewport | null;
   private target: BlockTarget | null = null;
   private readonly onScrollOrResizeFn = () => this.reposition();
 
   constructor(opts: FloatingToolbarOptions) {
-    this.stackRoot = opts.stackRoot;
+    this.editor = opts.editor;
     this.renderingArea = opts.renderingArea;
     this.viewport = opts.viewport ?? null;
 
@@ -136,11 +136,9 @@ export class FloatingToolbar {
   reposition(): void {
     if (!this.target) return;
     // Re-resolve the target element if it was detached by a commit that
-    // rebuilt the body DOM. `data-block-id` is stamped by the renderer.
+    // rebuilt the body DOM, via the typed rendered-document lookup.
     if (this.target.blockId && !document.contains(this.target.element)) {
-      const fresh = this.stackRoot.querySelector(
-        `[data-block-id="${this.target.blockId}"]`,
-      ) as HTMLElement | null;
+      const fresh = this.editor.renderedDocument.elementForBlockId(this.target.blockId);
       if (fresh) {
         const paper = fresh.closest(".paper") as HTMLElement | null;
         if (paper) this.target = { ...this.target, element: fresh, paper };

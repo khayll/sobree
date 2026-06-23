@@ -5,6 +5,8 @@
  * state colour.
  */
 
+import type { RenderedDocumentIndex } from "@sobree/core";
+
 export type BlockKind =
   | "paragraph"
   | "heading"
@@ -62,9 +64,10 @@ export interface BlockTarget {
   /** Enclosing `.paper` element. */
   paper: HTMLElement;
   /**
-   * Stable block id (registry) if available — stamped by the renderer as
-   * `data-block-id`. Lets the toolbar re-resolve the DOM element after
-   * a commit rebuilds the body (header/footer zones have no id).
+   * Stable block id (registry) if available — resolved via
+   * `editor.renderedDocument`. Lets the toolbar re-resolve the DOM
+   * element after a commit rebuilds the body (header/footer zones have
+   * no id).
    */
   blockId?: string;
 }
@@ -72,8 +75,13 @@ export interface BlockTarget {
 /**
  * Walk from a DOM node up to find its containing block inside the
  * paper stack. Returns `null` if the node is outside the stack.
+ * `rendered` maps the resolved element back to its document block id.
  */
-export function blockTargetFrom(node: Node, stackRoot: HTMLElement): BlockTarget | null {
+export function blockTargetFrom(
+  node: Node,
+  stackRoot: HTMLElement,
+  rendered: RenderedDocumentIndex,
+): BlockTarget | null {
   if (!stackRoot.contains(node)) return null;
   const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
   if (!el) return null;
@@ -92,45 +100,52 @@ export function blockTargetFrom(node: Node, stackRoot: HTMLElement): BlockTarget
     // Walk up to the enclosing block element to keep the indicator at
     // block-left rather than image-left.
     const host = image.closest("p, h1, h2, h3, h4, h5, h6, li, blockquote") as HTMLElement | null;
-    if (host) return withBlockId({ kind: "image", element: host, paper });
+    if (host) return withBlockId(rendered, { kind: "image", element: host, paper });
   }
 
   const sectionBreak = el.closest(".sobree-section-break") as HTMLElement | null;
   if (sectionBreak && paper.contains(sectionBreak)) {
-    return withBlockId({ kind: "sectionBreak", element: sectionBreak, paper });
+    return withBlockId(rendered, { kind: "sectionBreak", element: sectionBreak, paper });
   }
 
   const table = el.closest("table") as HTMLElement | null;
-  if (table && paper.contains(table)) return withBlockId({ kind: "table", element: table, paper });
+  if (table && paper.contains(table))
+    return withBlockId(rendered, { kind: "table", element: table, paper });
 
   const heading = el.closest("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
   if (heading && paper.contains(heading))
-    return withBlockId({ kind: "heading", element: heading, paper });
+    return withBlockId(rendered, { kind: "heading", element: heading, paper });
 
   const bq = el.closest("blockquote") as HTMLElement | null;
-  if (bq && paper.contains(bq)) return withBlockId({ kind: "blockquote", element: bq, paper });
+  if (bq && paper.contains(bq))
+    return withBlockId(rendered, { kind: "blockquote", element: bq, paper });
 
   const li = el.closest("li") as HTMLElement | null;
   if (li && paper.contains(li)) {
     const parent = li.parentElement;
     const kind: BlockKind = parent?.tagName.toLowerCase() === "ol" ? "listOrdered" : "list";
-    return withBlockId({ kind, element: li, paper });
+    return withBlockId(rendered, { kind, element: li, paper });
   }
 
   const p = el.closest("p") as HTMLElement | null;
-  if (p && paper.contains(p)) return withBlockId({ kind: "paragraph", element: p, paper });
+  if (p && paper.contains(p))
+    return withBlockId(rendered, { kind: "paragraph", element: p, paper });
 
   return null;
 }
 
-function withBlockId(t: BlockTarget): BlockTarget {
-  const id = t.element.dataset.blockId;
+function withBlockId(rendered: RenderedDocumentIndex, t: BlockTarget): BlockTarget {
+  const id = rendered.blockIdFromElement(t.element);
   if (id) t.blockId = id;
   return t;
 }
 
 /** Same lookup by arbitrary `Node` (handles TEXT_NODE). */
-export function blockTargetFromNode(node: Node | null, stackRoot: HTMLElement): BlockTarget | null {
+export function blockTargetFromNode(
+  node: Node | null,
+  stackRoot: HTMLElement,
+  rendered: RenderedDocumentIndex,
+): BlockTarget | null {
   if (!node) return null;
-  return blockTargetFrom(node, stackRoot);
+  return blockTargetFrom(node, stackRoot, rendered);
 }
