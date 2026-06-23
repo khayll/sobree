@@ -10,9 +10,12 @@ import type {
   SobreeDocument,
 } from "../doc/types";
 import { projectBlock } from "./blockCodec";
+import { projectFrames } from "./frameCodec";
 import {
+  Y_ANCHORED_FRAMES_KEY,
   Y_BLOCK_ID_KEY,
   Y_BODY_KEY,
+  Y_HEADER_FOOTER_FRAMES_KEY,
   Y_META_FIELDS,
   Y_META_KEY,
   Y_PARTREFS_KEY,
@@ -75,12 +78,27 @@ export function projectYDoc(ydoc: Y.Doc): {
     Y_META_FIELDS.headerFooterBodies,
     {},
   );
-  const anchoredFrames = parseMeta<AnchoredFrame[]>(meta, Y_META_FIELDS.anchoredFrames, []);
-  const headerFooterFrames = parseMeta<Record<string, AnchoredFrame[]>>(
-    meta,
-    Y_META_FIELDS.headerFooterFrames,
-    {},
-  );
+  // Floating layer: nested Y roots (per-frame CRDT). A doc seeded before
+  // Phase 1c has empty roots and the legacy `meta` JSON — fall back to that.
+  const framesRoot = ydoc.getArray<Y.Map<unknown>>(Y_ANCHORED_FRAMES_KEY);
+  const anchoredFrames =
+    framesRoot.length > 0
+      ? projectFrames(framesRoot)
+      : parseMeta<AnchoredFrame[]>(meta, Y_META_FIELDS.anchoredFrames, []);
+  const hfFramesRoot = ydoc.getMap<Y.Array<Y.Map<unknown>>>(Y_HEADER_FOOTER_FRAMES_KEY);
+  let headerFooterFrames: Record<string, AnchoredFrame[]>;
+  if (hfFramesRoot.size > 0) {
+    headerFooterFrames = {};
+    hfFramesRoot.forEach((arr, zone) => {
+      headerFooterFrames[zone] = projectFrames(arr);
+    });
+  } else {
+    headerFooterFrames = parseMeta<Record<string, AnchoredFrame[]>>(
+      meta,
+      Y_META_FIELDS.headerFooterFrames,
+      {},
+    );
+  }
   const footnotes = parseMeta<Record<number, Block[]>>(meta, Y_META_FIELDS.footnotes, {});
   const comments = parseMeta<Record<number, Comment>>(meta, Y_META_FIELDS.comments, {});
   const settings = parseMeta<{ defaultTabStopTwips?: number }>(meta, Y_META_FIELDS.settings, {});

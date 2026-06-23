@@ -1,9 +1,12 @@
-import type * as Y from "yjs";
-import type { Block, SobreeDocument } from "../doc/types";
+import * as Y from "yjs";
+import type { AnchoredFrame, Block, SobreeDocument } from "../doc/types";
 import { buildBlockSkeleton, populateBlock, updateBlockYMap } from "./blockCodec";
+import { buildFrames, updateFrames } from "./frameCodec";
 import {
+  Y_ANCHORED_FRAMES_KEY,
   Y_BLOCK_ID_KEY,
   Y_BODY_KEY,
+  Y_HEADER_FOOTER_FRAMES_KEY,
   Y_META_FIELDS,
   Y_META_KEY,
   Y_PARTREFS_KEY,
@@ -81,12 +84,40 @@ export function applyDocumentToYDoc(
   const body = ydoc.getArray<Y.Map<unknown>>(Y_BODY_KEY);
   const meta = ydoc.getMap<string>(Y_META_KEY);
   const parts = ydoc.getMap<Uint8Array>(Y_PARTS_KEY);
+  const frames = ydoc.getArray<Y.Map<unknown>>(Y_ANCHORED_FRAMES_KEY);
+  const hfFrames = ydoc.getMap<Y.Array<Y.Map<unknown>>>(Y_HEADER_FOOTER_FRAMES_KEY);
 
   ydoc.transact(() => {
     diffBody(body, newDoc.body, newIds);
+    diffFrames(frames, newDoc.anchoredFrames ?? []);
+    diffHeaderFooterFrames(hfFrames, newDoc.headerFooterFrames ?? {});
     diffMeta(meta, newDoc);
     diffParts(parts, newDoc.rawParts, opts.skipPartPaths);
   }, origin);
+}
+
+// === floating layer diff (per-frame CRDT) ===
+
+function diffFrames(frames: Y.Array<Y.Map<unknown>>, next: readonly AnchoredFrame[]): void {
+  updateFrames(frames, next);
+}
+
+function diffHeaderFooterFrames(
+  hfFrames: Y.Map<Y.Array<Y.Map<unknown>>>,
+  next: Record<string, AnchoredFrame[]>,
+): void {
+  // Drop zones no longer present.
+  for (const zone of [...hfFrames.keys()]) {
+    if (!(zone in next)) hfFrames.delete(zone);
+  }
+  for (const [zone, zoneFrames] of Object.entries(next)) {
+    let arr = hfFrames.get(zone);
+    if (!(arr instanceof Y.Array)) {
+      arr = buildFrames([]);
+      hfFrames.set(zone, arr);
+    }
+    updateFrames(arr, zoneFrames);
+  }
 }
 
 // === body diff ===
@@ -179,12 +210,11 @@ function findIdAtOrAfter(body: Y.Array<Y.Map<unknown>>, id: string, startIdx: nu
 function diffMeta(meta: Y.Map<string>, doc: SobreeDocument): void {
   setIfChanged(meta, Y_META_FIELDS.sections, JSON.stringify(doc.sections));
   setIfChanged(meta, Y_META_FIELDS.headerFooterBodies, JSON.stringify(doc.headerFooterBodies));
-  setIfChanged(meta, Y_META_FIELDS.anchoredFrames, JSON.stringify(doc.anchoredFrames ?? []));
-  setIfChanged(
-    meta,
-    Y_META_FIELDS.headerFooterFrames,
-    JSON.stringify(doc.headerFooterFrames ?? {}),
-  );
+  // The floating layer moved to nested Y roots (per-frame CRDT). Clear any
+  // legacy `meta` blob so a migrated doc doesn't keep a stale duplicate that
+  // projection's fallback could read after the roots are populated.
+  if (meta.has(Y_META_FIELDS.anchoredFrames)) meta.delete(Y_META_FIELDS.anchoredFrames);
+  if (meta.has(Y_META_FIELDS.headerFooterFrames)) meta.delete(Y_META_FIELDS.headerFooterFrames);
   setIfChanged(meta, Y_META_FIELDS.footnotes, JSON.stringify(doc.footnotes ?? {}));
   setIfChanged(meta, Y_META_FIELDS.comments, JSON.stringify(doc.comments ?? {}));
   setIfChanged(meta, Y_META_FIELDS.settings, JSON.stringify(doc.settings ?? {}));

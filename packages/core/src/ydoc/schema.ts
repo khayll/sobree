@@ -10,12 +10,17 @@
  * ```
  * ydoc
  * ├── getArray("body")  : Y.Array<Y.Map>     — block list, one Y.Map per block
+ * ├── getArray("anchoredFrames")   : Y.Array<frameMap>      — body floating layer
+ * │                                            (per-frame CRDT; `./frameCodec.ts`).
+ * ├── getMap("headerFooterFrames") : Y.Map<zoneId, Y.Array> — per-zone floating
+ * │                                            layers (per-frame CRDT).
  * ├── getMap("meta")    : Y.Map              — sections, styles, numbering,
  * │                                            headerFooterBodies, fonts.
  * │                                            Stored as JSON-encoded values
  * │                                            (rarely edited concurrently).
- * │                                            Phase 1c may split fields into
- * │                                            per-key Y types.
+ * │                                            Legacy `anchoredFrames` /
+ * │                                            `headerFooterFrames` keys are read
+ * │                                            only as a migration fallback.
  * ├── getMap("parts")    : Y.Map<Uint8Array>  — inline binary parts
  * │                                              (legacy / no-BlobStore path).
  * └── getMap("partRefs") : Y.Map<string>       — partPath → SHA-256 hex hash
@@ -158,8 +163,20 @@ export const Y_TABLE_ROWS_KEY = "rows";
 export const Y_ROW_CELLS_KEY = "cells";
 /** Table cell: `Y.Array` of block Y.Maps (the cell's content). */
 export const Y_CELL_CONTENT_KEY = "content";
-/** Inline-frame textbox: `Y.Array` of block Y.Maps (the frame body). */
+/** Textbox frame: `Y.Array` of block Y.Maps (the frame's editable body). */
 export const Y_FRAME_BODY_KEY = "body";
+/** Group frame: `Y.Array` of child frame Y.Maps (recurse). */
+export const Y_FRAME_CHILDREN_KEY = "children";
+
+// --- Phase 1c floating layer: anchored frames as nested Y (not meta JSON) ---
+/** Top-level `Y.Array<frameMap>` — the body floating layer (`anchoredFrames`).
+ *  Replaces the `meta.anchoredFrames` JSON blob; that meta key is read only
+ *  as a migration fallback for docs seeded before this. */
+export const Y_ANCHORED_FRAMES_KEY = "anchoredFrames";
+/** Top-level `Y.Map<zoneId, Y.Array<frameMap>>` — per header/footer zone
+ *  floating layers (`headerFooterFrames`). Migration fallback: the
+ *  `meta.headerFooterFrames` JSON blob. */
+export const Y_HEADER_FOOTER_FRAMES_KEY = "headerFooterFrames";
 
 /** Keys stored on the `meta` Y.Map. */
 export const Y_META_FIELDS = {
