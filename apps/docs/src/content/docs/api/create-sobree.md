@@ -359,22 +359,36 @@ paragraphMap
 └── get("props") : string (JSON)  — ParagraphProperties (alignment, indent, …)
 ```
 
-**Other blocks** (section breaks, tables) — JSON-encoded:
+**Tables** are nested Y structure — `rows` / `cells` / `content`
+Y.Arrays, per-cell JSON props, and cell paragraphs backed by their own
+`Y.Text`. **Section breaks** are a JSON leaf:
 
 ```
-otherBlockMap
+tableMap
+├── get("id")    : string         — stable block id
+├── get("kind")  : "table"
+├── get("grid")  : string (JSON)  — column widths
+├── get("props") : string (JSON)  — table properties
+└── get("rows")  : Y.Array        — rows → cells → per-cell { props, content }
+
+sectionBreakMap
 ├── get("id")    : string         — stable block id
 └── get("_ast")  : string (JSON)  — JSON-encoded Block
 ```
 
-Two peers concurrently editing different positions of the same
-paragraph **merge correctly**. The smart Y.Text diff in
-`applyDocumentToYDoc` emits minimal `insert` / `delete` / `format`
-operations — Yjs's CRDT handles the rest.
+The **floating layer** (anchored textbox frames) lives in dedicated
+`anchoredFrames` / `headerFooterFrames` Y roots — one Y.Map per frame,
+textbox bodies reusing the cell content structure.
 
-Tables and section breaks remain JSON-encoded — they have no inline
-content to merge concurrently. Tables are not yet backed by their own
-per-cell CRDT type.
+Two peers concurrently editing different positions of the same
+paragraph **merge correctly** — the smart Y.Text diff in
+`applyDocumentToYDoc` emits minimal `insert` / `delete` / `format`
+operations and Yjs's CRDT handles the rest. The same holds for
+**different table cells** and **different frames**: content, styling,
+and text all merge; only a *same*-cell / *same*-frame property edit
+falls back to last-writer-wins. (Legacy documents stored tables and
+frames as one JSON blob; they project via a fallback and migrate to the
+nested shape on first edit — no data loss.)
 
 ### Multi-peer collaboration
 
