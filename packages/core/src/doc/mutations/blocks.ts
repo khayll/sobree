@@ -7,7 +7,13 @@
 import type { BlockRef } from "../api";
 import type { Block, SobreeDocument } from "../types";
 import { mergeSectionsAcross, removedSectionIndex } from "./sections";
-import { type DocumentMutationResult, type MutationInput, checkRefs, okPatch } from "./types";
+import {
+  type DocumentMutationResult,
+  type Mutation,
+  type MutationInput,
+  checkRefs,
+  okPatch,
+} from "./types";
 
 /** Replace the block at `target`'s index with `block`. If a section_break
  *  is replaced by a non-break, the two sections it delimited merge (the
@@ -73,7 +79,15 @@ export function deleteBlockMutation(
   const wasSectionBreak = input.doc.body[index]?.kind === "section_break";
   const next = input.doc.body.slice();
   next.splice(index, 1);
-  if (next.length === 0) next.push({ kind: "paragraph", properties: {}, runs: [] });
+  const mutations: Mutation[] = [{ type: "remove", index }];
+  // Never leave an empty body: a fresh empty paragraph replaces the last
+  // block. It's a NEW block, so the registry gets an `insert` (a fresh id +
+  // version) — without it the registry would be one entry short of the body
+  // and the renderer's id lookup would walk off the end.
+  if (next.length === 0) {
+    next.push({ kind: "paragraph", properties: {}, runs: [] });
+    mutations.push({ type: "insert", index: 0 });
+  }
   const update: Partial<SobreeDocument> = { body: next };
   if (wasSectionBreak) {
     update.sections = mergeSectionsAcross(
@@ -81,5 +95,5 @@ export function deleteBlockMutation(
       removedSectionIndex(input.doc.body, index),
     );
   }
-  return okPatch(update, [{ type: "remove", index }]);
+  return okPatch(update, mutations);
 }
