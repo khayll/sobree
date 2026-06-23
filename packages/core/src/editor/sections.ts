@@ -9,9 +9,10 @@
  * no block versions are bumped, since a section is not a block.
  */
 
-import { type EditResult, fail } from "../doc/api";
+import type { EditResult } from "../doc/api";
+import { applySectionPropertiesMutation } from "../doc/mutations";
 import type { EditorContext } from "./context";
-import { mergeSectionProps } from "./internal/mutations";
+import { applyMutation, mutationInput } from "./internal/applyMutation";
 import type { SectionPropertiesPatch } from "./types";
 
 export class EditorSections {
@@ -26,16 +27,9 @@ export class EditorSections {
    */
   setProperties(index: number, patch: SectionPropertiesPatch): EditResult<void> {
     this.ctx.ensureCurrent();
-    const sections = this.ctx.doc.sections;
-    const section = sections[index];
-    if (!Number.isInteger(index) || section === undefined) {
-      return fail({
-        code: "invalid-state",
-        details: `no section at index ${index} (document has ${sections.length})`,
-      });
-    }
-    const next = sections.slice();
-    next[index] = mergeSectionProps(section, patch);
-    return this.ctx.commit({ sections: next }, []);
+    return applyMutation(
+      this.ctx,
+      applySectionPropertiesMutation(mutationInput(this.ctx), index, patch),
+    );
   }
 }

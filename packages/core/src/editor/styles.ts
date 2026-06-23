@@ -11,10 +11,11 @@
  * undo). Use the `namedStyle()` builder to construct a style to `define`.
  */
 
-import { type EditResult, fail } from "../doc/api";
+import type { EditResult } from "../doc/api";
+import { defineStyleMutation, removeStyleMutation, updateStyleMutation } from "../doc/mutations";
 import type { NamedStyle } from "../doc/types";
 import type { EditorContext } from "./context";
-import { mergeNamedStyle } from "./internal/mutations";
+import { applyMutation, mutationInput } from "./internal/applyMutation";
 import type { NamedStylePatch } from "./types";
 
 export class EditorStyles {
@@ -24,33 +25,19 @@ export class EditorStyles {
    *  (use {@link update} to change one). */
   define(style: NamedStyle): EditResult<void> {
     this.ctx.ensureCurrent();
-    const styles = this.ctx.doc.styles;
-    if (styles.some((s) => s.id === style.id)) {
-      return fail({ code: "invalid-state", details: `style "${style.id}" already exists` });
-    }
-    return this.ctx.commit({ styles: [...styles, style] }, []);
+    return applyMutation(this.ctx, defineStyleMutation(mutationInput(this.ctx), style));
   }
 
   /** Merge a patch into the style with `id`. Fails if no such style. */
   update(id: string, patch: NamedStylePatch): EditResult<void> {
     this.ctx.ensureCurrent();
-    const styles = this.ctx.doc.styles;
-    const index = styles.findIndex((s) => s.id === id);
-    if (index < 0) return fail({ code: "invalid-state", details: `no style "${id}"` });
-    const next = styles.slice();
-    // biome-ignore lint/style/noNonNullAssertion: index came from findIndex.
-    next[index] = mergeNamedStyle(styles[index]!, patch);
-    return this.ctx.commit({ styles: next }, []);
+    return applyMutation(this.ctx, updateStyleMutation(mutationInput(this.ctx), id, patch));
   }
 
   /** Remove the style with `id`. Fails if no such style. Content that
    *  still references it falls back to the cascade's defaults. */
   remove(id: string): EditResult<void> {
     this.ctx.ensureCurrent();
-    const styles = this.ctx.doc.styles;
-    if (!styles.some((s) => s.id === id)) {
-      return fail({ code: "invalid-state", details: `no style "${id}"` });
-    }
-    return this.ctx.commit({ styles: styles.filter((s) => s.id !== id) }, []);
+    return applyMutation(this.ctx, removeStyleMutation(mutationInput(this.ctx), id));
   }
 }

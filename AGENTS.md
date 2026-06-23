@@ -156,7 +156,7 @@ Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime 
 
 ### HeadlessSobree (Tier 2)
 
-- `packages/core/src/headless.ts` is the no-DOM counterpart of `Editor`. Adds a new mutation method to the browser editor? Mirror it on HeadlessSobree if it makes sense for headless callers (LLM agents, automation). Pure mutation helpers (`mergeSectionsAcross`, `mergeParagraphProps`, etc.) live in `packages/core/src/editor/internal/mutations.ts` so both classes share them — extend that module rather than duplicating.
+- `packages/core/src/headless.ts` is the no-DOM counterpart of `Editor`. Adds a new mutation method to the browser editor? Mirror it on HeadlessSobree if it makes sense for headless callers (LLM agents, automation). The shared AST-level mutation logic (block replace/insert/delete, paragraph/section/style/numbering edits, optimistic-lock `checkRefs`, the `merge*` helpers) lives in the **pure** `packages/core/src/doc/mutations/` engine — both classes call it and apply the returned patch through their own commit path. Extend that engine rather than duplicating; keep it free of DOM / Y.Doc / renderer / command-bus imports. Browser/headless parity is pinned by `packages/core/src/editor/feature.browserHeadlessParity.test.ts` (in-memory + Y.Doc reload).
 - `api/headless.md` documents the public surface.
 - Tests in `packages/core/src/headless.test.ts`.
 

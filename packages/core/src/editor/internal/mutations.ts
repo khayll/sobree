@@ -1,151 +1,29 @@
 /**
- * Pure helpers shared between `Editor` (DOM-backed) and `HeadlessSobree`
- * (no-DOM peer for LLMs / agents / automation).
+ * Editor-side mutation helpers.
  *
- * These functions don't touch DOM, don't carry state, and don't depend
- * on Y.js — they operate on `SobreeDocument` shapes. Both editors share
- * the same logic for block-level mutations so a headless peer's edits
- * land in the Y.Doc with identical semantics to a browser peer's.
+ * The pure document mutation helpers (`Mutation`, the `merge*` functions,
+ * the section-break merge math) now live in the shared engine at
+ * `doc/mutations` so the browser `Editor` and `HeadlessSobree` use one
+ * implementation. They're re-exported here so existing
+ * `editor/internal/mutations` imports keep resolving.
+ *
+ * What stays here is editor-/parts-oriented and not part of the document
+ * mutation engine: the toolbar wrap-tag mapping and the media-part helpers
+ * used by image embedding.
  */
 
 import type { RunPropertiesPatch } from "../../doc/runs";
-import type {
-  Block,
-  NamedStyle,
-  ParagraphProperties,
-  RunProperties,
-  SectionProperties,
-  SobreeDocument,
-} from "../../doc/types";
-import type {
-  NamedStylePatch,
-  ParagraphPropertiesPatch,
-  SectionPropertiesPatch,
-  WrapTag,
-} from "../types";
+import type { SobreeDocument } from "../../doc/types";
+import type { WrapTag } from "../types";
 
-/**
- * One registry-level operation produced by a mutation. The caller
- * applies these to the BlockRegistry after committing the new doc:
- * `insert` adds an id, `remove` drops one, `bump` keeps the same id
- * but increments its version.
- */
-export type Mutation =
-  | { type: "bump"; index: number }
-  | { type: "insert"; index: number }
-  | { type: "remove"; index: number };
-
-/**
- * Index in `sections` of the section that ENDS at the section_break at
- * `breakIndex`. Sections are 1:1 with section_breaks; the first
- * section ends at the first break (or at the end of `body` if there's
- * no break).
- *
- *   body = [p, p, break, p, break, p]
- *   sections = [s0, s1, s2]
- *
- *   breakIndex = 2 → 0 (the first break ends section 0)
- *   breakIndex = 4 → 1 (the second break ends section 1)
- */
-export function removedSectionIndex(body: readonly Block[], breakIndex: number): number {
-  let count = 0;
-  for (let i = 0; i < breakIndex; i++) {
-    if (body[i]?.kind === "section_break") count++;
-  }
-  return count;
-}
-
-/**
- * Drop the section at `endingIndex + 1` from `sections` — that's the
- * section the now-removed break STARTED. The section ENDED by the
- * removed break (at `endingIndex`) absorbs whatever content used to
- * belong to its successor. Properties of the surviving section are
- * preserved verbatim; nothing about the removed section's settings is
- * carried over.
- *
- * If `sections` doesn't have a successor (the removed break was the
- * last one and there's only one section), the array is returned
- * unchanged.
- */
-export function mergeSectionsAcross(
-  sections: readonly SectionProperties[],
-  endingIndex: number,
-): SectionProperties[] {
-  const next = sections.slice();
-  if (endingIndex + 1 >= next.length) return next;
-  next.splice(endingIndex + 1, 1);
-  return next;
-}
-
-/**
- * Merge a `ParagraphPropertiesPatch` into existing properties.
- * `undefined` in the patch removes a field; everything else
- * overwrites.
- */
-export function mergeParagraphProps(
-  prev: ParagraphProperties,
-  patch: ParagraphPropertiesPatch,
-): ParagraphProperties {
-  const out: ParagraphProperties = { ...prev };
-  for (const [k, v] of Object.entries(patch)) {
-    if (v === undefined) delete (out as Record<string, unknown>)[k];
-    else (out as Record<string, unknown>)[k] = v;
-  }
-  return out;
-}
-
-/**
- * Merge a {@link SectionPropertiesPatch} onto existing section properties.
- * `pageSize` / `pageMargins` are FIELD-merged (a partial stays valid); the
- * other fields replace wholesale. For the optional fields (`columns`,
- * `titlePage`, `type`, `vAlign`) an explicit `undefined` clears them, while
- * the required `headerRefs` / `footerRefs` only replace when present.
- */
-export function mergeSectionProps(
-  prev: SectionProperties,
-  patch: SectionPropertiesPatch,
-): SectionProperties {
-  const out: SectionProperties = { ...prev };
-  if (patch.pageSize) out.pageSize = { ...out.pageSize, ...patch.pageSize };
-  if (patch.pageMargins) out.pageMargins = { ...out.pageMargins, ...patch.pageMargins };
-  if (patch.headerRefs !== undefined) out.headerRefs = patch.headerRefs;
-  if (patch.footerRefs !== undefined) out.footerRefs = patch.footerRefs;
-  assignOptional(out, "columns", patch, "columns");
-  assignOptional(out, "titlePage", patch, "titlePage");
-  assignOptional(out, "type", patch, "type");
-  assignOptional(out, "vAlign", patch, "vAlign");
-  return out;
-}
-
-/** Merge a {@link NamedStylePatch} onto an existing style. Each present
- *  field replaces the style's field wholesale; an explicit `undefined`
- *  clears an OPTIONAL field. The required `type` / `displayName` are never
- *  cleared (an undefined for them is ignored). */
-export function mergeNamedStyle(prev: NamedStyle, patch: NamedStylePatch): NamedStyle {
-  const out = { ...prev } as unknown as Record<string, unknown>;
-  for (const [k, v] of Object.entries(patch)) {
-    if (v === undefined) {
-      if (k !== "type" && k !== "displayName") delete out[k];
-    } else {
-      out[k] = v;
-    }
-  }
-  return out as unknown as NamedStyle;
-}
-
-/** Apply an optional field from `patch` onto `out` when the key is present:
- *  `undefined` deletes it, any other value sets it. Absent ⇒ untouched. */
-function assignOptional<T extends object, P extends object>(
-  out: T,
-  outKey: keyof T,
-  patch: P,
-  patchKey: keyof P,
-): void {
-  if (!(patchKey in patch)) return;
-  const value = patch[patchKey];
-  if (value === undefined) delete out[outKey];
-  else (out as Record<string, unknown>)[outKey as string] = value;
-}
+export type { Mutation } from "../../doc/mutations";
+export {
+  mergeNamedStyle,
+  mergeParagraphProps,
+  mergeSectionProps,
+  mergeSectionsAcross,
+  removedSectionIndex,
+} from "../../doc/mutations";
 
 /**
  * Map a semantic "wrap" tag to the run-property patch that achieves it.
@@ -193,6 +71,3 @@ export function allocateMediaPath(doc: SobreeDocument, ext: string): string {
 export function pxToEmu(px: number): number {
   return Math.round((px / 96) * 914400);
 }
-
-// Suppress unused warnings — these types are referenced for JSDoc / future use.
-export type { RunProperties };
