@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
@@ -22,15 +22,7 @@ const forbiddenFrameworks = [
 ];
 const forbiddenLockfiles = ["package-lock.json", "yarn.lock"];
 const longFileLineLimit = 300;
-const sourceExtensions = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".css",
-]);
+const sourceExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css"]);
 const ignoredDirNames = new Set([
   "node_modules",
   "dist",
@@ -86,9 +78,7 @@ function collectDeps(pkg) {
 }
 
 function importRegex(packageName) {
-  const escaped = packageName
-    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/\\\*/g, "[^'\"]*");
+  const escaped = packageName.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, "[^'\"]*");
   return new RegExp(
     `(?:from\\s+|import\\s+|import\\s*\\(\\s*|require\\(\\s*)["']${escaped}(?:/[^"']*)?["']`,
     "g",
