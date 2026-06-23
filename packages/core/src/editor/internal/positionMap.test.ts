@@ -262,3 +262,56 @@ describe("positionMap — blocks nested in paper / column layout", () => {
     expect(domPointFromPosition([host], { block: registry.refAt(3), offset: 0 })).not.toBeNull();
   });
 });
+
+describe("positionMap — table cell addressing", () => {
+  // A table is ONE registered block, but its cells hold their own content.
+  // A caret in a cell must capture (and restore) the cell address so undo
+  // lands back in the cell, not at the table boundary.
+  function setupTable(): { host: HTMLElement; registry: BlockRegistry } {
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <table data-block-id="b1" data-block-index="0"><tbody>
+        <tr><td><p>Genus</p></td><td><p>Storey</p></td></tr>
+        <tr><td><p>Cirrus</p></td><td><p>High</p></td></tr>
+      </tbody></table>`.trim();
+    document.body.appendChild(host);
+    const registry = new BlockRegistry();
+    registry.reset(1); // one block: the table (id "b1")
+    return { host, registry };
+  }
+
+  function cellOf(host: HTMLElement, text: string): HTMLElement {
+    return [...host.querySelectorAll("td")].find((td) => td.textContent === text) as HTMLElement;
+  }
+
+  it("captures the cell address (row / col / blockIndex) for a caret in a cell", () => {
+    const { host, registry } = setupTable();
+    const cirrus = cellOf(host, "Cirrus");
+    const pos = positionFromDomPoint([host], registry, cirrus.querySelector("p")!.firstChild!, 6);
+    expect(pos?.block.id).toBe("b1");
+    expect(pos?.cell).toEqual({ row: 1, col: 0, blockIndex: 0 });
+    expect(pos?.offset).toBe(6);
+  });
+
+  it("restores a cell caret to the SAME cell (round-trip), not the table start", () => {
+    const { host, registry } = setupTable();
+    const pt = domPointFromPosition([host], {
+      block: registry.refAt(0),
+      offset: 4,
+      cell: { row: 1, col: 1, blockIndex: 0 },
+    });
+    const node = pt?.node ?? null;
+    const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element | null);
+    const cell = el?.closest("td");
+    expect(cell?.textContent).toBe("High");
+    expect(pt?.offset).toBe(4); // end of "High"
+  });
+
+  it("without a cell address, a table position resolves to the table element", () => {
+    const { host, registry } = setupTable();
+    const pt = domPointFromPosition([host], { block: registry.refAt(0), offset: 0 });
+    expect((pt?.node as HTMLElement)?.tagName ?? (pt?.node as Node)?.nodeName).toBeTruthy();
+    // round-trips to somewhere inside the table (no crash, no null)
+    expect(pt).not.toBeNull();
+  });
+});

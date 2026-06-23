@@ -68,8 +68,10 @@ export function positionFromDomPoint(
   const ref = registry.refById(blockId);
   if (!ref) return null;
 
-  const offset = isInsideTable(blockEl) ? 0 : charOffsetToPoint(blockEl, node, domOffset);
-  return { block: ref, offset };
+  if (isInsideTable(blockEl)) {
+    return { block: ref, ...tableCellPosition(blockEl, node, domOffset) };
+  }
+  return { block: ref, offset: charOffsetToPoint(blockEl, node, domOffset) };
 }
 
 /** Build an API `Range` from a live DOM `Range`. */
@@ -109,6 +111,11 @@ export function domPointFromPosition(
 ): { node: Node; offset: number } | null {
   const blockEl = blockElementById(hosts, pos.block.id);
   if (!blockEl) return null;
+  if (pos.cell) {
+    const cellBlock = cellContentBlock(blockEl, pos.cell);
+    if (!cellBlock) return null;
+    return findPointAtOffset(cellBlock, pos.offset);
+  }
   return findPointAtOffset(blockEl, pos.offset);
 }
 
@@ -169,13 +176,16 @@ function blockElementById(hosts: readonly HTMLElement[], id: string): HTMLElemen
 }
 
 /** The DOM element for body block `index` via the positional `data-block-index`
- *  stamp. Valid against a freshly-rendered DOM (index === body position). */
+ *  stamp. Requires `data-block-id` too, so table cell paragraphs (which carry a
+ *  cell-internal `data-block-index` but no id) can't shadow a body block. Valid
+ *  against a freshly-rendered DOM (index === body position). */
 export function blockElementAtIndex(
   hosts: readonly HTMLElement[],
   index: number,
 ): HTMLElement | null {
+  const selector = `[${BLOCK_ID_ATTR}][data-block-index="${index}"]`;
   for (const host of hosts) {
-    const el = host.querySelector<HTMLElement>(`[data-block-index="${index}"]`);
+    const el = host.querySelector<HTMLElement>(selector);
     if (el) return el;
   }
   return null;
@@ -216,6 +226,63 @@ function findBlockElement(
 
 function isInsideTable(blockEl: Element): boolean {
   return blockEl.tagName.toLowerCase() === "table";
+}
+
+// === table cell addressing ===
+//
+// A table is one registered block, but its cells hold their own content. To
+// land a caret back in the SAME cell on restore (undo), a table position
+// carries a `cell` address (rendered `<tr>` / cell / content-block indices) and
+// measures `offset` within that content block — symmetric across the table's
+// deterministic re-render.
+
+type CellAddress = NonNullable<InlinePosition["cell"]>;
+
+function isCellEl(el: Element): boolean {
+  const t = el.tagName.toLowerCase();
+  return t === "td" || t === "th";
+}
+
+/** The `<tr>` rows belonging directly to `tableEl` (excludes nested tables). */
+function tableRows(tableEl: Element): HTMLElement[] {
+  return Array.from(tableEl.querySelectorAll<HTMLElement>("tr")).filter(
+    (tr) => tr.closest("table") === tableEl,
+  );
+}
+
+/** Compute the cell address + in-cell offset for a caret inside a table. */
+function tableCellPosition(
+  tableEl: Element,
+  node: Node,
+  domOffset: number,
+): { offset: number; cell: CellAddress } {
+  const start = node instanceof Element ? node : node.parentElement;
+  const td = start?.closest("td,th") as HTMLElement | null;
+  if (!td || !tableEl.contains(td)) {
+    return { offset: 0, cell: { row: 0, col: 0, blockIndex: 0 } };
+  }
+  const tr = td.closest("tr");
+  const row = tr ? tableRows(tableEl).indexOf(tr as HTMLElement) : 0;
+  const cells = tr ? (Array.from(tr.children).filter(isCellEl) as HTMLElement[]) : [];
+  const col = cells.indexOf(td);
+  const blocks = Array.from(td.children) as HTMLElement[];
+  let blockIndex = blocks.findIndex((b) => b.contains(node));
+  if (blockIndex < 0) blockIndex = 0;
+  const contentBlock = blocks[blockIndex] ?? td;
+  return {
+    offset: charOffsetToPoint(contentBlock, node, domOffset),
+    cell: { row: Math.max(0, row), col: Math.max(0, col), blockIndex },
+  };
+}
+
+/** The rendered content-block element for a cell address, or null. */
+function cellContentBlock(tableEl: Element, cell: CellAddress): HTMLElement | null {
+  const tr = tableRows(tableEl)[cell.row];
+  if (!tr) return null;
+  const td = (Array.from(tr.children).filter(isCellEl) as HTMLElement[])[cell.col];
+  if (!td) return null;
+  const blocks = Array.from(td.children) as HTMLElement[];
+  return blocks[cell.blockIndex] ?? td;
 }
 
 // === atom counting ===

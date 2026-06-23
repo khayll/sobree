@@ -46,6 +46,8 @@ Addresses a point *inside* a block's content.
 interface InlinePosition {
   block: BlockRef;
   offset: number;
+  // present only when the point is inside a table cell
+  cell?: { row: number; col: number; blockIndex: number };
 }
 ```
 
@@ -56,6 +58,11 @@ each. A caret always lives inside a block — "before block N" is
 `{ block: N, offset: blockLength }`. To insert a **new** block next to an
 existing one, use `insertBlockBefore` / `insertBlockAfter` (they take a
 `BlockRef`, not a position).
+
+When the point is inside a **table cell**, `block` is the table and `cell`
+carries the rendered cell address (`row` / `col` / which content block),
+with `offset` measured within that cell block — so caret capture and
+restore (e.g. undo) land back in the same cell.
 
 Helper: `inlineAt(block, offset)`.
 

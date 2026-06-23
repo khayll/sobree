@@ -57,6 +57,16 @@ export type BlockExpectations = Record<string, number>;
 export interface InlinePosition {
   block: BlockRef;
   offset: number;
+  /**
+   * Set when the position is inside a table cell: the rendered cell address
+   * the `offset` is measured within — `row` (the cell's `<tr>` index in the
+   * table), `col` (its cell index in that row), `blockIndex` (which content
+   * block inside the cell). Absent for ordinary block positions, where
+   * `offset` is the character offset into `block` itself. Lets caret capture
+   * / restore (e.g. undo) land back in the same cell instead of collapsing to
+   * the table boundary.
+   */
+  cell?: { row: number; col: number; blockIndex: number };
 }
 
 /**
