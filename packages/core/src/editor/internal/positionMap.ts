@@ -61,17 +61,49 @@ export function positionFromDomPoint(
   node: Node,
   domOffset: number,
 ): InlinePosition | null {
-  if (!hosts.some((h) => h.contains(node) || h === node)) return null;
+  const d = blockPointFromDom(hosts, node, domOffset);
+  if (!d) return null;
+  const ref = registry.refById(d.blockId);
+  if (!ref) return null;
+  return { block: ref, offset: d.offset, ...(d.cell ? { cell: d.cell } : {}) };
+}
 
+/**
+ * Registry-free `(node, offset)` → block descriptor (`blockId` + offset, plus a
+ * cell address inside a table). The id-based core of {@link positionFromDomPoint},
+ * also used to save/restore a selection across a DOM rebuild (repagination)
+ * where raw node references don't survive.
+ */
+interface BlockPoint {
+  blockId: string;
+  offset: number;
+  cell?: CellAddress;
+}
+
+function blockPointFromDom(
+  hosts: readonly HTMLElement[],
+  node: Node,
+  domOffset: number,
+): BlockPoint | null {
+  if (!hosts.some((h) => h.contains(node) || h === node)) return null;
   const { blockEl, blockId } = findBlockElement(node, hosts);
   if (!blockEl || !blockId) return null;
-  const ref = registry.refById(blockId);
-  if (!ref) return null;
-
   if (isInsideTable(blockEl)) {
-    return { block: ref, ...tableCellPosition(blockEl, node, domOffset) };
+    const { offset, cell } = tableCellPosition(blockEl, node, domOffset);
+    return { blockId, offset, cell };
   }
-  return { block: ref, offset: charOffsetToPoint(blockEl, node, domOffset) };
+  return { blockId, offset: charOffsetToPoint(blockEl, node, domOffset) };
+}
+
+function domPointFromBlockPoint(
+  hosts: readonly HTMLElement[],
+  p: BlockPoint,
+): { node: Node; offset: number } | null {
+  return domPointFromPosition(hosts, {
+    block: { id: p.blockId, version: 0 },
+    offset: p.offset,
+    ...(p.cell ? { cell: p.cell } : {}),
+  });
 }
 
 /** Build an API `Range` from a live DOM `Range`. */
@@ -143,6 +175,54 @@ export function applySelectionToDom(hosts: readonly HTMLElement[], selection: Se
   const range = document.createRange();
   range.setStart(from.node, from.offset);
   range.setEnd(to.node, to.offset);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
+}
+
+// === selection save/restore across a DOM rebuild (repagination) ===
+//
+// Repagination rebuilds the paper DOM (and re-renders tables that split across
+// pages), so raw `(node, offset)` references don't survive — restoring them
+// silently drops the caret to the top of the page. A descriptor captures the
+// selection in MODEL terms (`data-block-id` + offset + cell address), which
+// re-resolves against the rebuilt DOM by id.
+
+export interface SelectionDescriptor {
+  start: BlockPoint;
+  end: BlockPoint;
+  collapsed: boolean;
+}
+
+/** Capture the live selection as a {@link SelectionDescriptor}, or null. */
+export function captureSelectionDescriptor(
+  hosts: readonly HTMLElement[],
+): SelectionDescriptor | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const start = blockPointFromDom(hosts, range.startContainer, range.startOffset);
+  if (!start) return null;
+  const end = sel.isCollapsed
+    ? start
+    : (blockPointFromDom(hosts, range.endContainer, range.endOffset) ?? start);
+  return { start, end, collapsed: sel.isCollapsed };
+}
+
+/** Restore a {@link SelectionDescriptor} to the live DOM (after a rebuild). */
+export function applySelectionDescriptor(
+  hosts: readonly HTMLElement[],
+  desc: SelectionDescriptor | null,
+): boolean {
+  if (!desc) return false;
+  const startPt = domPointFromBlockPoint(hosts, desc.start);
+  const endPt = desc.collapsed ? startPt : domPointFromBlockPoint(hosts, desc.end);
+  if (!startPt || !endPt) return false;
+  const sel = window.getSelection();
+  if (!sel) return false;
+  const range = document.createRange();
+  range.setStart(startPt.node, startPt.offset);
+  range.setEnd(endPt.node, endPt.offset);
   sel.removeAllRanges();
   sel.addRange(range);
   return true;

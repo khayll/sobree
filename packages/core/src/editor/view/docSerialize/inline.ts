@@ -168,7 +168,15 @@ export function mergeStyleAttribute(base: RunProperties, styleAttr: string | nul
       if (val === "italic") out.italic = true;
     } else if (key === "text-decoration") {
       if (val.includes("underline")) out.underline = "single";
-      if (val.includes("line-through")) out.strike = true;
+      // `line-through double` is doubleStrike; plain `line-through` is strike.
+      if (val.includes("line-through")) {
+        if (val.includes("double")) out.doubleStrike = true;
+        else out.strike = true;
+      }
+    } else if (key === "text-transform") {
+      if (val === "uppercase") out.caps = true;
+    } else if (key === "font-variant-caps" || key === "font-variant") {
+      if (val.includes("small-caps")) out.smallCaps = true;
     }
   }
   return out;

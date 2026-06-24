@@ -6,9 +6,12 @@ import type {
   NumberingDefinition,
   SectionProperties,
 } from "../doc/types";
+import {
+  applySelectionDescriptor,
+  captureSelectionDescriptor,
+} from "../editor/internal/positionMap";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
-import { restoreSelection, saveSelection } from "../util/selection";
 import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
 import {
   type PageSetup,
@@ -251,7 +254,7 @@ export class PaperStack {
       return;
     }
 
-    const saved = saveSelection();
+    const saved = captureSelectionDescriptor(this.contentHosts);
     const baselineBudgetPx = this.pageContentHeightPx();
     // Iterative paginate with per-page budget. The paginator gets a
     // `pageHeights[]` array — entry `i` is page `i`'s budget after
@@ -281,7 +284,7 @@ export class PaperStack {
       if (stable && overflowPx <= OVERFLOW_TOLERANCE_PX) break;
     }
 
-    restoreSelection(saved);
+    applySelectionDescriptor(this.contentHosts, saved);
     this.renderAllZones();
     this.applyPerSectionSettings();
     this.emitPaginate();
