@@ -8,7 +8,7 @@ import type {
   SobreeDocument,
 } from "../../doc/types";
 import { mountFontTableFromZip } from "../../fonts";
-import { type ThemePalette, parseThemeXml } from "../shared/drawingColor";
+import { type ThemePalette, parseThemeXml } from "../drawing";
 import { parseXml } from "../shared/xml";
 import type { DocxImportResult } from "../types";
 import { parseAnchoredFrames, parseVmlFloatingFrames } from "./anchoredFrames";
