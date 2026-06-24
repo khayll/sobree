@@ -25,7 +25,7 @@
  *     `<a:xfrm>`.
  *
  * What we do NOT parse:
- *   - `<wp:anchor>` drawings (absolute-positioned) — `anchoredFrames.ts`
+ *   - `<wp:anchor>` drawings (absolute-positioned) — `anchored.ts`
  *     handles those.
  *   - Inline drawings with ONLY a picture (no group, no textbox) —
  *     those stay as `DrawingRun` in the paragraph's inline runs.
@@ -37,20 +37,12 @@
  */
 
 import type { Block, InlineFrame, InlineFrameTextbox } from "../../doc/types";
-import {
-  type ThemePalette,
-  directChildrenNS,
-  findAncestor,
-  firstChildNS,
-  firstNS,
-  numAttr,
-  numAttrOr,
-  readBlipEmbedPart,
-  readBorder,
-  readGeometry,
-  readSolidFill,
-} from "../drawing";
 import { NS } from "../shared/namespaces";
+import type { ThemePalette } from "./colors";
+import { directChildrenNS, findAncestor, firstChildNS, firstNS } from "./dom";
+import { numAttr, numAttrOr } from "./extents";
+import { readBlipEmbedPart } from "./relationships";
+import { readBorder, readGeometry, readSolidFill } from "./shapeProps";
 
 export interface InlineFramesContext {
   /** RelationshipId → part path lookup. */
@@ -127,7 +119,7 @@ export function parseInlineFrames(
   let counter = 0;
   for (const drawing of drawings) {
     const inline = firstChildNS(drawing, NS.wp, "inline");
-    if (!inline) continue; // Anchored drawings handled by anchoredFrames.ts
+    if (!inline) continue; // Anchored drawings handled by anchored.ts
 
     const graphicData = firstNS(inline, NS.a, "graphicData");
     if (!graphicData) continue;

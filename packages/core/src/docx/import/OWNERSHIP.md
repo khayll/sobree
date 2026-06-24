@@ -7,10 +7,12 @@ direction only: bytes → AST. The pipeline order in `index.ts` is the contract.
 
 - Document/body walk, paragraphs, runs, tables, sections, headers/footers,
   numbering, styles, comments, footnotes, settings (the per-concept files).
-- The **DrawingML import dispatch**: anchored frames, inline frames, and the
-  float/flow post-passes (`anchoredFrames.ts`, `inlineFrames.ts`,
-  `floatFrames.ts`, `flowFrames.ts`). The OOXML/DrawingML *concept* readers
-  these delegate to live under `docx/drawing/` — see that OWNERSHIP.
+- The **DrawingML import dispatch + flow post-passes**: `index.ts` wires the
+  anchored/inline frame parsers (which now live in `docx/drawing/anchored.ts`
+  and `docx/drawing/inline.ts`) into the pipeline, and `floatFrames.ts` /
+  `flowFrames.ts` move picture/textbox frames into the body flow. The
+  OOXML/DrawingML translation those parsers and their leaf readers perform is
+  owned by `docx/drawing/` — see that OWNERSHIP.
 
 ## Pipeline order (load-bearing)
 
@@ -53,11 +55,11 @@ first import and vanishes on refresh. This is a HARD requirement (`AGENTS.md`).
 
 ## Tests that should change with this module
 
-Per-concept: `anchoredFrames.test.ts`, `inlineFrames.test.ts`,
-`floatFrames.test.ts`, `flowFrames.test.ts`, `paragraphs.test.ts`,
-`runs.test.ts`, `styles.test.ts`, `tables.test.ts`, `headers.test.ts`, plus
-the oracle snapshot `feature.fixtures.oracle.test.ts`. DrawingML concept
-readers are tested under `docx/drawing/`.
+Per-concept: `floatFrames.test.ts`, `flowFrames.test.ts`,
+`paragraphs.test.ts`, `runs.test.ts`, `styles.test.ts`, `tables.test.ts`,
+`headers.test.ts`, plus the oracle snapshot `feature.fixtures.oracle.test.ts`.
+The anchored/inline frame parsers and the DrawingML concept readers are
+tested under `docx/drawing/` (`anchored.test.ts`, `inline.test.ts`, …).
 
 ## Relevant corpus checks
 

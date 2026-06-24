@@ -9,16 +9,16 @@ import type {
 } from "../../doc/types";
 import { mountFontTableFromZip } from "../../fonts";
 import { type ThemePalette, parseThemeXml } from "../drawing";
+import { parseAnchoredFrames, parseVmlFloatingFrames } from "../drawing/anchored";
+import { parseInlineFrames } from "../drawing/inline";
 import { parseXml } from "../shared/xml";
 import type { DocxImportResult } from "../types";
-import { parseAnchoredFrames, parseVmlFloatingFrames } from "./anchoredFrames";
 import { parseCommentsXml } from "./comments";
 import { convertBlocksFromContainer, convertDocumentXml } from "./document";
 import { floatWrappingImages } from "./floatFrames";
 import { flowDisplacingTextboxes } from "./flowFrames";
 import { parseFootnotesXml } from "./footnotes";
 import { readSection } from "./headers";
-import { parseInlineFrames } from "./inlineFrames";
 import { parseNumberingXml } from "./numbering";
 import { convertParagraph } from "./paragraph";
 import { parseRels } from "./rels";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAnchoredFrames, parseVmlFloatingFrames } from "./anchoredFrames";
+import { parseAnchoredFrames, parseVmlFloatingFrames } from "./anchored";
 
 function xml(source: string): Document {
   const wrapped = `<?xml version="1.0" encoding="UTF-8"?>

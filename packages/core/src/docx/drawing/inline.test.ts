@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Block } from "../../doc/types";
-import { parseInlineFrames } from "./inlineFrames";
+import { parseInlineFrames } from "./inline";
 
 function xml(source: string): Document {
   const wrapped = `<?xml version="1.0" encoding="UTF-8"?>

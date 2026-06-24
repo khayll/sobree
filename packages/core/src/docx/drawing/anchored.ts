@@ -29,24 +29,16 @@
  */
 
 import type { AnchorOrigin, AnchoredContent, AnchoredFrame, Block } from "../../doc/types";
-import {
-  type ThemePalette,
-  coerceHRelativeFrom,
-  coerceVRelativeFrom,
-  firstChildNS,
-  normalizePartPath,
-  numAttr,
-  readBlipEmbedPart,
-  readBorder,
-  readGeometry,
-  readPosOffset,
-  readSolidFill,
-  readTextDistances,
-  readWrapText,
-  readWrapType,
-} from "../drawing";
 import { NS } from "../shared/namespaces";
+import type { ThemePalette } from "./colors";
 import { parseCustomGeometry } from "./customGeometry";
+import { firstChildNS } from "./dom";
+import { numAttr } from "./extents";
+import { readTextDistances } from "./margins";
+import { coerceHRelativeFrom, coerceVRelativeFrom, readPosOffset } from "./position";
+import { normalizePartPath, readBlipEmbedPart } from "./relationships";
+import { readBorder, readGeometry, readSolidFill } from "./shapeProps";
+import { readWrapText, readWrapType } from "./wrap";
 
 export interface AnchoredFramesContext {
   /** RelationshipId → part path lookup, e.g. `"rId4" → "media/image1.png"`. */
@@ -62,7 +54,7 @@ export interface AnchoredFramesContext {
   bodyParagraphIndexByElement?: Map<Element, number>;
   /**
    * Recursive body walker for `<w:txbxContent>`, injected by the caller
-   * to avoid an `anchoredFrames ↔ document` import cycle. When present,
+   * to avoid an `anchored ↔ document` import cycle. When present,
    * textbox bodies parse through the SAME pipeline as the document body
    * — real run formatting, paragraph spacing, lists, tables — so a
    * frame whose content flows into the body (see `flowFrames`) keeps
