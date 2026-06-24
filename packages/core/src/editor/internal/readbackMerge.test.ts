@@ -161,7 +161,8 @@ describe("mergeReadbackPreservingProps — run-property preservation", () => {
     const prev: Block[] = [para("Field Almanac", { smallCaps: true })];
     const next: Block[] = [para("Field Almanac", {})]; // re-read lost smallCaps
     const [p] = mergeReadbackPreservingProps(prev, next) as [Paragraph];
-    expect(p.runs[0]!.properties).toEqual({ smallCaps: true });
+    const run = p.runs[0] as { kind: "text"; text: string; properties: Record<string, unknown> };
+    expect(run.properties).toEqual({ smallCaps: true });
   });
 
   it("takes the re-read runs when the text actually changed", () => {
