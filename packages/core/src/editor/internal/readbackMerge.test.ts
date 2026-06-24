@@ -145,3 +145,30 @@ describe("mergeReadbackBlocks — id-keyed (structural edits)", () => {
     expect((merged[1] as Paragraph).properties.spacing).toEqual({ afterTwips: 120 });
   });
 });
+
+describe("mergeReadbackPreservingProps — run-property preservation", () => {
+  const para = (txt: string, runProps: Record<string, unknown> = {}): Paragraph => ({
+    kind: "paragraph",
+    properties: {},
+    runs: [{ kind: "text", text: txt, properties: runProps }],
+  });
+
+  it("keeps run properties on an UNCHANGED paragraph (lossy re-read drops them)", () => {
+    // The masthead kicker: smallCaps. A keystroke elsewhere triggers a full
+    // body read-back; the DOM read-back of THIS unchanged block dropped
+    // smallCaps — preservation must keep the previous runs since the text
+    // didn't change.
+    const prev: Block[] = [para("Field Almanac", { smallCaps: true })];
+    const next: Block[] = [para("Field Almanac", {})]; // re-read lost smallCaps
+    const [p] = mergeReadbackPreservingProps(prev, next) as [Paragraph];
+    expect(p.runs[0]!.properties).toEqual({ smallCaps: true });
+  });
+
+  it("takes the re-read runs when the text actually changed", () => {
+    const prev: Block[] = [para("hello", { bold: true })];
+    const next: Block[] = [para("hello world", {})];
+    const [p] = mergeReadbackPreservingProps(prev, next) as [Paragraph];
+    const run = p.runs[0] as { kind: "text"; text: string };
+    expect(run.text).toBe("hello world");
+  });
+});
