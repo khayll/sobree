@@ -8,7 +8,6 @@ import type {
 } from "../doc/types";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
-import { restoreSelection, saveSelection } from "../util/selection";
 import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
 import {
   type PageSetup,
@@ -19,6 +18,7 @@ import {
 import { paginateBlocks } from "./paginationAdapter";
 import { flowColumnSections } from "./paginationAdapter/columnFlow";
 import { Paper } from "./paper";
+import { type RepaginationHost, repaginate as runRepagination } from "./repagination";
 
 /**
  * Sourced from `SobreeDocument`: the rich AST + the dependencies
@@ -50,21 +50,6 @@ export interface RichZonesSource extends AnchorRenderDeps {
 }
 
 const MM_TO_PX = 96 / 25.4;
-
-/** Cap on iterative repagination retries. Each iteration shrinks the
- *  budget by the observed overflow, so convergence is exponential —
- *  3 is plenty for any realistic doc and prevents accidental infinite
- *  loops on pathological content. */
-const MAX_REPAGINATE_RETRIES = 3;
-
-/** "Is this page actually overflowing enough to warrant a re-pack?"
- *  Set to ~one body line — sub-line overflows are visually
- *  imperceptible and re-paginating to fix them tends to shift page
- *  breaks by a full line elsewhere, drifting AWAY from Word/LibreOffice
- *  break points rather than toward them. We only iterate when the
- *  overflow exceeds a typical line height. (~28px ≈ 21pt at 12pt
- *  body — covers the common case where split-slippage adds a line.) */
-const OVERFLOW_TOLERANCE_PX = 28;
 
 /**
  * Stack of Paper elements. The stack's root is the single contentEditable
@@ -242,49 +227,28 @@ export class PaperStack {
    * flow instead of accumulating inter-fragment margins.
    */
   repaginate(): void {
-    const initialBlocks = this.collectAllBlocks();
+    // The retry loop lives in `repagination/run.ts`; this method is the
+    // DOM-owning host it drives. The adapter literal binds each host
+    // method to a private PaperStack operation, so the orchestrator never
+    // touches the DOM directly and stays unit-testable with a fake host.
+    runRepagination(this.repaginationHost);
+  }
 
-    if (initialBlocks.length === 0) {
-      this.ensurePaperCount(1);
-      this.renderAllZones();
-      this.emitPaginate();
-      return;
-    }
-
-    const saved = saveSelection();
-    const baselineBudgetPx = this.pageContentHeightPx();
-    // Iterative paginate with per-page budget. The paginator gets a
-    // `pageHeights[]` array — entry `i` is page `i`'s budget after
-    // subtracting whatever space its footnote zone occupies. Pages
-    // without footnotes use the full baseline budget. Each iteration:
-    //
-    //   1. paginate body with current `pageHeights`
-    //   2. distribute footnotes — populates per-page zones based on
-    //      where the refs landed
-    //   3. rebuild `pageHeights` from observed footnote zone heights
-    //   4. if any page's body now overflows its new (smaller) budget,
-    //      retry with the updated array
-    //
-    // Bounded by `MAX_REPAGINATE_RETRIES`; each iteration is exponential
-    // so 3 is plenty for any realistic doc.
-    let pageHeights: number[] = [];
-    for (let attempt = 0; attempt <= MAX_REPAGINATE_RETRIES; attempt++) {
-      this.runPaginationOnce(baselineBudgetPx, pageHeights);
-      distributeFootnotes(this.papers);
-      const newHeights = footnotePageHeights(this.papers, baselineBudgetPx);
-      const stable = arraysEqual(newHeights, pageHeights);
-      pageHeights = newHeights;
-      // Stable + no overflow → done. Stable + overflow shouldn't
-      // happen (the shrunken budget already reserved footnote space),
-      // but guard with the existing overflow check anyway.
-      const overflowPx = this.maxPaperOverflowPx();
-      if (stable && overflowPx <= OVERFLOW_TOLERANCE_PX) break;
-    }
-
-    restoreSelection(saved);
-    this.renderAllZones();
-    this.applyPerSectionSettings();
-    this.emitPaginate();
+  /** Adapter exposing the DOM-owning steps the repagination orchestrator
+   *  needs, without making PaperStack's internals public. */
+  private get repaginationHost(): RepaginationHost {
+    return {
+      collectAllBlocks: () => this.collectAllBlocks(),
+      ensurePaperCount: (count) => this.ensurePaperCount(count),
+      pageContentHeightPx: () => this.pageContentHeightPx(),
+      runPaginationOnce: (budget, pageHeights) => this.runPaginationOnce(budget, pageHeights),
+      distributeFootnotes: () => distributeFootnotes(this.papers),
+      footnotePageHeights: (budget) => footnotePageHeights(this.papers, budget),
+      maxPaperOverflowPx: () => this.maxPaperOverflowPx(),
+      renderAllZones: () => this.renderAllZones(),
+      applyPerSectionSettings: () => this.applyPerSectionSettings(),
+      emitPaginate: () => this.emitPaginate(),
+    };
   }
 
   /**
@@ -920,14 +884,6 @@ function isVisuallyEmptyBlock(el: HTMLElement): boolean {
     ) !== null
   ) {
     return false;
-  }
-  return true;
-}
-
-function arraysEqual(a: readonly number[], b: readonly number[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
   }
   return true;
 }
