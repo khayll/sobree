@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseThemeXml, readDrawingColor } from "./drawingColor";
+import { parseThemeXml, readDrawingColor } from "./colors";
 
 const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 

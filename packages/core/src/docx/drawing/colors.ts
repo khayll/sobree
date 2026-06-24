@@ -18,8 +18,8 @@
  *   - `tint`  — scale toward white (val/100000).
  */
 
-import { NS } from "./namespaces";
-import { parseXml } from "./xml";
+import { NS } from "../shared/namespaces";
+import { parseXml } from "../shared/xml";
 
 /** Theme slot → `#RRGGBB`. Slots: dk1/lt1/dk2/lt2/accent1-6/hlink/folHlink. */
 export type ThemePalette = Record<string, string>;

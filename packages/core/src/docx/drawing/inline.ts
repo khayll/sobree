@@ -25,7 +25,7 @@
  *     `<a:xfrm>`.
  *
  * What we do NOT parse:
- *   - `<wp:anchor>` drawings (absolute-positioned) — `anchoredFrames.ts`
+ *   - `<wp:anchor>` drawings (absolute-positioned) — `anchored.ts`
  *     handles those.
  *   - Inline drawings with ONLY a picture (no group, no textbox) —
  *     those stay as `DrawingRun` in the paragraph's inline runs.
@@ -36,9 +36,13 @@
  * the body-paragraph walker (which lives in `paragraph.ts`).
  */
 
-import type { Block, FrameBorder, InlineFrame, InlineFrameTextbox } from "../../doc/types";
-import { type ThemePalette, readDrawingColor } from "../shared/drawingColor";
+import type { Block, InlineFrame, InlineFrameTextbox } from "../../doc/types";
 import { NS } from "../shared/namespaces";
+import type { ThemePalette } from "./colors";
+import { directChildrenNS, findAncestor, firstChildNS, firstNS } from "./dom";
+import { numAttr, numAttrOr } from "./extents";
+import { readBlipEmbedPart } from "./relationships";
+import { readBorder, readGeometry, readSolidFill } from "./shapeProps";
 
 export interface InlineFramesContext {
   /** RelationshipId → part path lookup. */
@@ -115,7 +119,7 @@ export function parseInlineFrames(
   let counter = 0;
   for (const drawing of drawings) {
     const inline = firstChildNS(drawing, NS.wp, "inline");
-    if (!inline) continue; // Anchored drawings handled by anchoredFrames.ts
+    if (!inline) continue; // Anchored drawings handled by anchored.ts
 
     const graphicData = firstNS(inline, NS.a, "graphicData");
     if (!graphicData) continue;
@@ -279,11 +283,8 @@ function buildInlineFrame(
       } else if (child.namespaceURI === NS.pic && child.localName === "pic") {
         const blip = child.getElementsByTagNameNS(NS.a, "blip")[0];
         if (!blip) continue;
-        const rId = blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
-        if (!rId) continue;
-        const target = ctx.rels.get(rId);
-        if (!target) continue;
-        const partPath = normalizePartPath(target);
+        const partPath = readBlipEmbedPart(blip, ctx.rels);
+        if (!partPath) continue;
         const { off, ext: picExt } = readShapeXfrm(child);
         if (picExt.cx <= 0 || picExt.cy <= 0) continue;
         const cNvPr = child.getElementsByTagNameNS(NS.pic, "cNvPr")[0];
@@ -376,61 +377,6 @@ function readShapeXfrm(shape: Element): {
   };
 }
 
-function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" | "line" {
-  const prstGeom = wsp.getElementsByTagNameNS(NS.a, "prstGeom")[0];
-  const prst = prstGeom?.getAttribute("prst");
-  switch (prst) {
-    case "ellipse":
-      return "ellipse";
-    case "roundRect":
-      return "roundedRect";
-    case "line":
-    case "straightConnector1":
-      return "line";
-    default:
-      return "rect";
-  }
-}
-
-function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
-  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
-  if (!spPr) return undefined;
-  for (const fill of Array.from(spPr.children)) {
-    if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
-      return readDrawingColor(fill, theme);
-    }
-  }
-  return undefined;
-}
-
-function readBorder(shape: Element, theme?: ThemePalette): FrameBorder | undefined {
-  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
-  if (!spPr) return undefined;
-  const ln = firstChildNS(spPr, NS.a, "ln");
-  if (!ln) return undefined;
-  const widthEmu = numAttr(ln, "w");
-  const solidFill = firstChildNS(ln, NS.a, "solidFill");
-  const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
-  if (!color) return undefined;
-  const prstDash = firstChildNS(ln, NS.a, "prstDash");
-  const style = coerceBorderStyle(prstDash?.getAttribute("val"));
-  return { color, widthEmu: widthEmu || 0, style };
-}
-
-function coerceBorderStyle(v: string | null | undefined): "solid" | "dashed" | "dotted" | "double" {
-  switch (v) {
-    case "dash":
-    case "lgDash":
-    case "sysDash":
-      return "dashed";
-    case "dot":
-    case "sysDot":
-      return "dotted";
-    default:
-      return "solid";
-  }
-}
-
 function hasLastRenderedPageBreakSkippingTxbx(root: Element): boolean {
   // Walk descendants of `root`, returning true if any is a
   // `<w:lastRenderedPageBreak/>`. Skips into `<w:txbxContent>` are
@@ -449,54 +395,4 @@ function hasLastRenderedPageBreakSkippingTxbx(root: Element): boolean {
     }
   }
   return false;
-}
-
-function numAttr(el: Element | undefined | null, name: string): number {
-  if (!el) return 0;
-  const n = Number(el.getAttribute(name) ?? "0");
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** Read a numeric attribute, falling back to `fallback` when absent —
- *  used for `<wps:bodyPr>` insets whose OOXML defaults are non-zero. */
-function numAttrOr(el: Element, name: string, fallback: number): number {
-  const raw = el.getAttribute(name);
-  if (raw === null) return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function firstChildNS(parent: Element, ns: string, local: string): Element | null {
-  for (const child of Array.from(parent.children)) {
-    if (child.namespaceURI === ns && child.localName === local) return child;
-  }
-  return null;
-}
-
-function firstNS(root: Element, ns: string, local: string): Element | null {
-  const found = root.getElementsByTagNameNS(ns, local)[0];
-  return found ?? null;
-}
-
-function directChildrenNS(parent: Element, ns: string, local: string): Element[] {
-  const out: Element[] = [];
-  for (const child of Array.from(parent.children)) {
-    if (child.namespaceURI === ns && child.localName === local) out.push(child);
-  }
-  return out;
-}
-
-function findAncestor(start: Element, ns: string, local: string): Element | null {
-  let el: Element | null = start.parentElement;
-  while (el) {
-    if (el.namespaceURI === ns && el.localName === local) return el;
-    el = el.parentElement;
-  }
-  return null;
-}
-
-function normalizePartPath(target: string): string {
-  if (target.startsWith("/")) return target.slice(1);
-  if (target.startsWith("word/")) return target;
-  return `word/${target}`;
 }

@@ -29,9 +29,16 @@
  */
 
 import type { AnchorOrigin, AnchoredContent, AnchoredFrame, Block } from "../../doc/types";
-import { type ThemePalette, readDrawingColor } from "../shared/drawingColor";
 import { NS } from "../shared/namespaces";
+import type { ThemePalette } from "./colors";
 import { parseCustomGeometry } from "./customGeometry";
+import { firstChildNS } from "./dom";
+import { numAttr } from "./extents";
+import { readTextDistances } from "./margins";
+import { coerceHRelativeFrom, coerceVRelativeFrom, readPosOffset } from "./position";
+import { normalizePartPath, readBlipEmbedPart } from "./relationships";
+import { readBorder, readGeometry, readSolidFill } from "./shapeProps";
+import { readWrapText, readWrapType } from "./wrap";
 
 export interface AnchoredFramesContext {
   /** RelationshipId → part path lookup, e.g. `"rId4" → "media/image1.png"`. */
@@ -47,7 +54,7 @@ export interface AnchoredFramesContext {
   bodyParagraphIndexByElement?: Map<Element, number>;
   /**
    * Recursive body walker for `<w:txbxContent>`, injected by the caller
-   * to avoid an `anchoredFrames ↔ document` import cycle. When present,
+   * to avoid an `anchored ↔ document` import cycle. When present,
    * textbox bodies parse through the SAME pipeline as the document body
    * — real run formatting, paragraph spacing, lists, tables — so a
    * frame whose content flows into the body (see `flowFrames`) keeps
@@ -267,76 +274,6 @@ function parseAnchoredFrame(
   return out;
 }
 
-/**
- * The text-wrap mode lives as a dedicated child of `<wp:anchor>`:
- * `<wp:wrapSquare>`, `<wp:wrapTopAndBottom>`, `<wp:wrapTight>`,
- * `<wp:wrapThrough>`, or `<wp:wrapNone>`. Returns the mapped enum or
- * `undefined` when no wrap element is present.
- */
-function readWrapType(anchor: Element): AnchoredFrame["wrap"] | undefined {
-  for (const child of Array.from(anchor.children)) {
-    if (child.namespaceURI !== NS.wp) continue;
-    switch (child.localName) {
-      case "wrapSquare":
-        return "square";
-      case "wrapTopAndBottom":
-        return "topAndBottom";
-      case "wrapTight":
-        return "tight";
-      case "wrapThrough":
-        return "through";
-      case "wrapNone":
-        return "none";
-    }
-  }
-  return undefined;
-}
-
-/**
- * `wrapText` (`bothSides` / `left` / `right` / `largest`) lives on the
- * displacing wrap child (`<wp:wrapSquare|Tight|Through>`) and says which
- * sides of the frame text flows on. `topAndBottom` / `none` don't carry it.
- */
-function readWrapText(anchor: Element): AnchoredFrame["wrapText"] | undefined {
-  for (const child of Array.from(anchor.children)) {
-    if (child.namespaceURI !== NS.wp) continue;
-    if (
-      child.localName === "wrapSquare" ||
-      child.localName === "wrapTight" ||
-      child.localName === "wrapThrough"
-    ) {
-      const v = child.getAttribute("wrapText");
-      if (v === "left" || v === "right" || v === "bothSides" || v === "largest") return v;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Text-distance insets (`distT/B/L/R`) are attributes of `<wp:anchor>`
- * itself (not the wrap child) — the clearance Word keeps between the frame
- * and the wrapped text. Absent ⇒ undefined (no clearance modelled).
- */
-function readTextDistances(anchor: Element): AnchoredFrame["textDistancesEmu"] | undefined {
-  const t = anchor.getAttribute("distT");
-  const b = anchor.getAttribute("distB");
-  const l = anchor.getAttribute("distL");
-  const r = anchor.getAttribute("distR");
-  if (t === null && b === null && l === null && r === null) return undefined;
-  return {
-    topEmu: emuAttr(t),
-    bottomEmu: emuAttr(b),
-    leftEmu: emuAttr(l),
-    rightEmu: emuAttr(r),
-  };
-}
-
-function emuAttr(v: string | null): number {
-  if (v === null) return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
 function parseGraphicData(
   graphicData: Element,
   ctx: AnchoredFramesContext,
@@ -553,11 +490,8 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
 function parsePicture(pic: Element, ctx: AnchoredFramesContext): AnchoredContent | null {
   const blip = pic.getElementsByTagNameNS(NS.a, "blip")[0];
   if (!blip) return null;
-  const rId = blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
-  if (!rId) return null;
-  const target = ctx.rels.get(rId);
-  if (!target) return null;
-  const partPath = normalizePartPath(target);
+  const partPath = readBlipEmbedPart(blip, ctx.rels);
+  if (!partPath) return null;
   // <pic:nvPicPr><pic:cNvPr descr="..."/>
   const cNvPr = pic.getElementsByTagNameNS(NS.pic, "cNvPr")[0];
   const altText = cNvPr?.getAttribute("descr");
@@ -635,14 +569,6 @@ function readAnchorOffset(anchor: Element): { x: number; y: number } {
   };
 }
 
-function readPosOffset(positionEl: Element | null): number {
-  if (!positionEl) return 0;
-  const posOffset = firstChildNS(positionEl, NS.wp, "posOffset");
-  if (!posOffset) return 0;
-  const n = Number(posOffset.textContent ?? "0");
-  return Number.isFinite(n) ? n : 0;
-}
-
 function readSpPrXfrm(shape: Element): {
   off?: { x: number; y: number };
   ext?: { cx: number; cy: number };
@@ -674,108 +600,4 @@ function readSpPrXfrm(shape: Element): {
   if (offEl) out.off = { x: numAttr(offEl, "x"), y: numAttr(offEl, "y") };
   if (extEl) out.ext = { cx: numAttr(extEl, "cx"), cy: numAttr(extEl, "cy") };
   return out;
-}
-
-function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" | "line" {
-  const prstGeom = wsp.getElementsByTagNameNS(NS.a, "prstGeom")[0];
-  const prst = prstGeom?.getAttribute("prst");
-  switch (prst) {
-    case "ellipse":
-      return "ellipse";
-    case "roundRect":
-      return "roundedRect";
-    case "line":
-    case "straightConnector1":
-      return "line";
-    default:
-      return "rect";
-  }
-}
-
-function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
-  // First `<a:solidFill>` inside the shape's spPr — literal srgbClr or a
-  // theme schemeClr (+ transforms), resolved by `readDrawingColor`.
-  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
-  if (!spPr) return undefined;
-  // Use direct descendant traversal so we don't pick up a fill nested
-  // deeper inside a child shape.
-  for (const fill of Array.from(spPr.children)) {
-    if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
-      return readDrawingColor(fill, theme);
-    }
-  }
-  return undefined;
-}
-
-function readBorder(
-  shape: Element,
-  theme?: ThemePalette,
-):
-  | { color: string; widthEmu: number; style: "solid" | "dashed" | "dotted" | "double" }
-  | undefined {
-  const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
-  if (!spPr) return undefined;
-  const ln = firstChildNS(spPr, NS.a, "ln");
-  if (!ln) return undefined;
-  const widthEmu = numAttr(ln, "w");
-  const solidFill = firstChildNS(ln, NS.a, "solidFill");
-  const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
-  if (!color) return undefined;
-  const prstDash = firstChildNS(ln, NS.a, "prstDash");
-  const style = coerceBorderStyle(prstDash?.getAttribute("val"));
-  return { color, widthEmu: widthEmu || 0, style };
-}
-
-function coerceBorderStyle(v: string | null | undefined): "solid" | "dashed" | "dotted" | "double" {
-  switch (v) {
-    case "dash":
-    case "lgDash":
-    case "sysDash":
-      return "dashed";
-    case "dot":
-    case "sysDot":
-      return "dotted";
-    default:
-      return "solid";
-  }
-}
-
-function coerceHRelativeFrom(v: string | null): "page" | "margin" | "column" {
-  switch (v) {
-    case "page":
-    case "margin":
-    case "column":
-      return v;
-    default:
-      return "page";
-  }
-}
-
-function coerceVRelativeFrom(v: string | null): "page" | "margin" | "paragraph" {
-  switch (v) {
-    case "page":
-    case "margin":
-    case "paragraph":
-      return v;
-    default:
-      return "page";
-  }
-}
-
-function numAttr(el: Element, name: string): number {
-  const n = Number(el.getAttribute(name) ?? "0");
-  return Number.isFinite(n) ? n : 0;
-}
-
-function firstChildNS(parent: Element, ns: string, local: string): Element | null {
-  for (const child of Array.from(parent.children)) {
-    if (child.namespaceURI === ns && child.localName === local) return child;
-  }
-  return null;
-}
-
-function normalizePartPath(target: string): string {
-  if (target.startsWith("/")) return target.slice(1);
-  if (target.startsWith("word/")) return target;
-  return `word/${target}`;
 }
