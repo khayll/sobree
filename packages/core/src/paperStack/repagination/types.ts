@@ -5,9 +5,16 @@
  * through this contract. Keeping the surface small and DOM-free here is
  * what lets the retry loop be unit-tested against a fake host.
  */
+import type { SelectionDescriptor } from "../../editor/internal/positionMap";
+
 export interface RepaginationHost {
   /** Every block element currently distributed across all papers. */
   collectAllBlocks(): HTMLElement[];
+  /** Snapshot the live caret/selection as a model descriptor (block id +
+   *  offset + cell) that survives the paper DOM rebuild, or null. */
+  captureSelection(): SelectionDescriptor | null;
+  /** Re-apply a snapshot captured by {@link captureSelection} after the rebuild. */
+  restoreSelection(saved: SelectionDescriptor | null): void;
   /** Create or remove papers so there are exactly `count` of them. */
   ensurePaperCount(count: number): void;
   /** The baseline per-page content height budget, in CSS px. */

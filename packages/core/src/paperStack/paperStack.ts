@@ -6,6 +6,10 @@ import type {
   NumberingDefinition,
   SectionProperties,
 } from "../doc/types";
+import {
+  applySelectionDescriptor,
+  captureSelectionDescriptor,
+} from "../editor/internal/positionMap";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
 import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
@@ -235,7 +239,9 @@ export class PaperStack {
   }
 
   /** Adapter exposing the DOM-owning steps the repagination orchestrator
-   *  needs, without making PaperStack's internals public. */
+   *  needs, without making PaperStack's internals public. Caret save/restore
+   *  is model-based (block id + offset + cell) so it survives the paper
+   *  rebuild — see `positionMap`'s selection descriptor. */
   private get repaginationHost(): RepaginationHost {
     return {
       collectAllBlocks: () => this.collectAllBlocks(),
@@ -245,6 +251,10 @@ export class PaperStack {
       distributeFootnotes: () => distributeFootnotes(this.papers),
       footnotePageHeights: (budget) => footnotePageHeights(this.papers, budget),
       maxPaperOverflowPx: () => this.maxPaperOverflowPx(),
+      captureSelection: () => captureSelectionDescriptor(this.contentHosts),
+      restoreSelection: (saved) => {
+        applySelectionDescriptor(this.contentHosts, saved);
+      },
       renderAllZones: () => this.renderAllZones(),
       applyPerSectionSettings: () => this.applyPerSectionSettings(),
       emitPaginate: () => this.emitPaginate(),

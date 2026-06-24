@@ -25,6 +25,9 @@ function makeHost(opts: {
       return Array.from({ length: opts.blockCount ?? 1 }, () => document.createElement("p"));
     },
     ensurePaperCount: (n) => log.push(`ensurePaperCount(${n})`),
+    // Orthogonal to the retry-loop sequence under test — kept out of `log`.
+    captureSelection: () => null,
+    restoreSelection: () => {},
     pageContentHeightPx: () => {
       log.push("pageContentHeightPx");
       return 1000;

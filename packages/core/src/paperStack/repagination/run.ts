@@ -8,7 +8,6 @@
  * what the corpus baselines were captured against). Do not reorder.
  */
 
-import { restoreSelection, saveSelection } from "../../util/selection";
 import type { RepaginationHost } from "./types";
 
 /** Cap on iterative repagination retries. Each iteration shrinks the
@@ -52,7 +51,7 @@ export function repaginate(host: RepaginationHost): void {
     return;
   }
 
-  const saved = saveSelection();
+  const saved = host.captureSelection();
   const baselineBudgetPx = host.pageContentHeightPx();
   let pageHeights: number[] = [];
   for (let attempt = 0; attempt <= MAX_REPAGINATE_RETRIES; attempt++) {
@@ -68,7 +67,7 @@ export function repaginate(host: RepaginationHost): void {
     if (stable && overflowPx <= OVERFLOW_TOLERANCE_PX) break;
   }
 
-  restoreSelection(saved);
+  host.restoreSelection(saved);
   host.renderAllZones();
   host.applyPerSectionSettings();
   host.emitPaginate();
