@@ -1,5 +1,16 @@
 # @sobree/zoom-controls
 
+## 0.1.34
+
+### Patch Changes
+
+- f176c9d: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [f176c9d]
+- Updated dependencies [f176c9d]
+- Updated dependencies [f176c9d]
+  - @sobree/core@0.1.34
+
 ## 0.1.33
 
 ### Patch Changes
