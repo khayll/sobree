@@ -208,6 +208,14 @@ export function fieldAlmanacSeed(): SobreeDocument {
       ),
     ]),
   );
+  appendBlock(
+    doc,
+    body([
+      text(
+        "Height decides almost everything else. The higher the cloud, the colder the air it forms in, and the more of it is ice rather than water — which in turn settles whether it drifts, drizzles, or pours. Fix the storey first and the name very nearly follows; miss it, and two clouds alike from the ground can mean opposite afternoons.",
+      ),
+    ]),
+  );
   appendBlock(doc, head("The high deck", 12, { beforeTwips: 60, afterTwips: 70 }));
   appendBlock(
     doc,
@@ -254,6 +262,36 @@ export function fieldAlmanacSeed(): SobreeDocument {
       [
         text(
           "Motion matters as much as form. Cloud crossing quickly while the wind at your back blows from a different quarter is an old, reliable sign of weather on the turn within a day. Watch the direction the highest clouds travel, not the lowest — the upper winds arrive first, and they bring the news.",
+        ),
+      ],
+      { afterTwips: 140 },
+      true,
+    ),
+  );
+  appendBlock(doc, head("Signs in the wind", 12, { beforeTwips: 60, afterTwips: 70 }));
+  appendBlock(
+    doc,
+    body([
+      text(
+        "Stand with your back to the wind and, in the northern hemisphere, low pressure lies to your left — Buys Ballot's law, and the reason a backing wind so often runs ahead of rain. A steady breeze that swings anticlockwise through the day is the front announcing itself hours before the first cloud thickens overhead.",
+      ),
+    ]),
+  );
+  appendBlock(
+    doc,
+    body([
+      text(
+        "Smell and sound carry the same news. Air grows heavy and earthy before rain as falling pressure lets the ground breathe out; distant noise sharpens as a damp, settling sky bends it back down. Neither is superstition — both are the lower air thickening, the very change the clouds above are drawing in shorthand.",
+      ),
+    ]),
+  );
+  appendBlock(doc, head("The colour of the light", 12, { beforeTwips: 60, afterTwips: 70 }));
+  appendBlock(
+    doc,
+    body(
+      [
+        text(
+          "Colour is the last tell. A hard, glassy blue means dry air and fair hours ahead; a milky, whitening sky is high ice moving in, the front's first scout. Save the reddest skies for dawn and dusk, when the low sun must travel furthest through the air — and read them, as every shepherd has, by which way the weather is already going.",
         ),
       ],
       { afterTwips: 0 },
