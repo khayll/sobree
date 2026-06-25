@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.35
+
+### Patch Changes
+
+- fa0e1b7: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [fa0e1b7]
+  - @sobree/core@0.1.35
+
 ## 0.1.34
 
 ### Patch Changes
