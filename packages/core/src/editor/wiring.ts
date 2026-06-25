@@ -16,6 +16,7 @@
 import type * as Y from "yjs";
 import type { History } from "../history";
 import type { EditorContext } from "./context";
+import * as clipboard from "./ops/clipboard";
 import * as runs from "./ops/runs";
 import type { TrackedInput } from "./ops/trackedInput";
 import { attachImageResize } from "./view/imageResize";
@@ -112,7 +113,17 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
   // shortcuts itself.
   listen(host, "keydown", (e) => hooks.fireKeyDown(e as KeyboardEvent));
 
-  listen(host, "paste", (e) => void hooks.trackedInput.onPaste(e as ClipboardEvent));
+  // Copy / cut selected whole blocks as a structured payload (+ text
+  // fallback); cut also removes them.
+  listen(host, "copy", (e) => clipboard.onCopy(hooks.ctx, e as ClipboardEvent));
+  listen(host, "cut", (e) => clipboard.onCut(hooks.ctx, e as ClipboardEvent));
+  // Paste: a structured block payload inserts real blocks below the caret;
+  // anything else (image, text, browser default) falls through to onPaste.
+  listen(host, "paste", (e) => {
+    if (!clipboard.tryPasteBlocks(hooks.ctx, e as ClipboardEvent)) {
+      void hooks.trackedInput.onPaste(e as ClipboardEvent);
+    }
+  });
   listen(host, "dragover", (e) => runs.onDragOver(hooks.ctx, e as DragEvent));
   listen(host, "drop", (e) => void runs.onDrop(hooks.ctx, e as DragEvent));
 
