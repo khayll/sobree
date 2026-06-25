@@ -129,6 +129,54 @@ describe("parseAnchoredFrames", () => {
     });
   });
 
+  it("resolves a ribbon shape's fill from its style fillRef (no spPr fill)", () => {
+    // The black step-banner: fill lives only in `<wps:style><a:fillRef>`,
+    // tinted with theme `dk1`. Without the style-ref fallback it imports
+    // fill-less and the white heading on top renders invisible.
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:anchor>
+        <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>
+        <wp:extent cx="6858000" cy="782053"/>
+        <a:graphic><a:graphicData>
+          <wps:wsp>
+            <wps:spPr><a:prstGeom prst="round2SameRect"/></wps:spPr>
+            <wps:style><a:fillRef idx="1"><a:schemeClr val="dk1"/></a:fillRef></wps:style>
+          </wps:wsp>
+        </a:graphicData></a:graphic>
+      </wp:anchor>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseAnchoredFrames(doc, { rels: new Map(), theme: { dk1: "#000000" } });
+    expect(frames[0]!.content).toEqual({
+      kind: "shape",
+      geometry: "roundedRect",
+      fill: "#000000",
+    });
+  });
+
+  it("expands a rightArrow preset into a custom path in the frame box", () => {
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:anchor>
+        <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>
+        <wp:extent cx="26" cy="16"/>
+        <a:graphic><a:graphicData>
+          <wps:wsp>
+            <wps:spPr><a:prstGeom prst="rightArrow"><a:avLst/></a:prstGeom></wps:spPr>
+            <wps:style><a:fillRef idx="1"><a:schemeClr val="dk1"/></a:fillRef></wps:style>
+          </wps:wsp>
+        </a:graphicData></a:graphic>
+      </wp:anchor>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseAnchoredFrames(doc, { rels: new Map(), theme: { dk1: "#000000" } });
+    expect(frames[0]!.content).toEqual({
+      kind: "shape",
+      geometry: "custom",
+      fill: "#000000",
+      path: { widthEmu: 26, heightEmu: 16, d: "M0 4 L18 4 L18 0 L26 8 L18 16 L18 12 L0 12 Z" },
+    });
+  });
+
   it("parses a textbox shape and extracts its paragraph text", () => {
     const doc = xml(`<w:body><w:p><w:r><w:drawing>
       <wp:anchor>

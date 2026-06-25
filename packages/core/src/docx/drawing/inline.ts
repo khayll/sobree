@@ -74,6 +74,19 @@ export interface InlineFramesContext {
   /** Theme colour palette (from `word/theme/theme1.xml`) so textbox /
    *  shape fills declared as `<a:schemeClr>` resolve instead of vanishing. */
   theme?: ThemePalette;
+  /**
+   * Body content width in EMU (page width − left/right margins). Needed
+   * only to lay out a paragraph that holds MORE THAN ONE inline drawing
+   * (a tab-separated row of "Place Illustration here" boxes): the boxes
+   * are merged into one frame whose coordinate system IS the content
+   * column, so each box's x is a true fraction of the column. Absent ⇒
+   * single-drawing paragraphs only, no row layout.
+   */
+  contentWidthEmu?: number;
+  /** `<w:defaultTabStop>` in twips — the grid a `<w:tab>` advances to when
+   *  the paragraph declares no explicit `<w:tabs>`. Drives the column
+   *  positions of a multi-drawing row. Absent ⇒ Word's 720-twip default. */
+  defaultTabStopTwips?: number;
 }
 
 /**
@@ -116,6 +129,7 @@ export function parseInlineFrames(
 ): ParsedInlineFrame[] {
   const out: ParsedInlineFrame[] = [];
   const drawings = Array.from(xmlDoc.getElementsByTagNameNS(NS.w, "drawing"));
+  const inlineCountByParagraph = countInlineDrawingsByParagraph(drawings);
   let counter = 0;
   for (const drawing of drawings) {
     const inline = firstChildNS(drawing, NS.wp, "inline");
@@ -143,14 +157,26 @@ export function parseInlineFrames(
       continue;
     }
 
-    // No group: a BARE `<wps:wsp>` shape directly under graphicData — a
-    // coloured rectangle used as decoration (e.g. a photo placeholder
-    // square). Claim it only when it carries NO textbox: pure shapes
-    // have no other rendering path (the legacy DrawingRun reader needs
-    // an image blip and drops them), while textbox-bearing bare shapes
-    // stay with the legacy lifter.
+    // No group: a BARE `<wps:wsp>` directly under graphicData.
     const bareWsp = firstChildNS(graphicData, NS.wps, "wsp");
-    if (bareWsp && firstChildNS(bareWsp, NS.wps, "txbx") === null) {
+    if (!bareWsp) continue;
+    if (firstChildNS(bareWsp, NS.wps, "txbx") !== null) {
+      // A bare inline TEXTBOX. A lone one (its own paragraph) flows fine
+      // through the legacy lifter as a body paragraph — claiming it would
+      // pin it to a fixed-height box and clip long instructional text, so
+      // leave it. Only claim when the paragraph holds a ROW of them
+      // (multiple inline drawings, tab-separated "Place Illustration here"
+      // boxes) — the case the lifter drops; `mergeRowsByHostParagraph`
+      // lays them across the column.
+      if ((inlineCountByParagraph.get(hostP) ?? 0) < 2) continue;
+      const frame = buildBareTextboxFrame(inline, bareWsp, hostP, ctx);
+      if (frame) {
+        out.push({ frame, drawingEl: drawing, hostParagraphEl: hostP });
+        counter++;
+      }
+    } else {
+      // A pure decoration rectangle (a photo-placeholder square). Claim it —
+      // the legacy DrawingRun reader needs an image blip and drops it.
       const frame = buildBareShapeFrame(inline, bareWsp, hostP, ctx);
       if (frame) {
         out.push({ frame, drawingEl: drawing, hostParagraphEl: hostP });
@@ -158,6 +184,13 @@ export function parseInlineFrames(
       }
     }
   }
+
+  // Collapse multiple inline drawings that share ONE host paragraph into
+  // a single row frame (e.g. three tab-separated "Place Illustration here"
+  // boxes). Must run BEFORE the claim pass — the row layout reads the
+  // paragraph's `<w:tab>` runs, which are still interleaved with the (not
+  // yet removed) drawings. One-drawing paragraphs pass through untouched.
+  const merged = mergeRowsByHostParagraph(out, ctx);
 
   // Claim pass: remove each successfully-parsed drawing AFTER the
   // whole walk so we don't disturb live DOM iteration. The host
@@ -170,7 +203,160 @@ export function parseInlineFrames(
     }
   }
 
+  return merged;
+}
+
+/** Count inline drawings per host paragraph (nearest `<w:p>` ancestor).
+ *  A drawing nested inside a textbox maps to its OWN inner paragraph, not
+ *  the outer host — so a single box whose content holds an image still
+ *  counts as one. Drives the "is this a row?" test for bare textboxes. */
+function countInlineDrawingsByParagraph(drawings: Element[]): Map<Element, number> {
+  const counts = new Map<Element, number>();
+  for (const drawing of drawings) {
+    if (!firstChildNS(drawing, NS.wp, "inline")) continue;
+    const p = findAncestor(drawing, NS.w, "p");
+    if (p) counts.set(p, (counts.get(p) ?? 0) + 1);
+  }
+  return counts;
+}
+
+const EMU_PER_TWIP = 635; // 914400 EMU/inch ÷ 1440 twips/inch
+
+/**
+ * Merge inline frames that share a host paragraph into one row frame.
+ *
+ * Word lays a row of inline drawings out with the paragraph's tab stops:
+ * `[box] <tab> [box] <tab> [box]`. Each box is its own `<wp:inline>`
+ * drawing, so the per-drawing pass produced one frame each — but they all
+ * map to the SAME host paragraph and the block model allows only one frame
+ * there. We walk the paragraph's runs in document order, advancing an EMU
+ * cursor by each box's width and snapping it to the next tab stop on each
+ * `<w:tab>`, then stack every box into ONE frame whose coordinate system is
+ * the content column. Groups of one frame are returned unchanged.
+ */
+function mergeRowsByHostParagraph(
+  parsed: ParsedInlineFrame[],
+  ctx: InlineFramesContext,
+): ParsedInlineFrame[] {
+  const byHost = new Map<Element, ParsedInlineFrame[]>();
+  for (const p of parsed) {
+    const list = byHost.get(p.hostParagraphEl);
+    if (list) list.push(p);
+    else byHost.set(p.hostParagraphEl, [p]);
+  }
+  const out: ParsedInlineFrame[] = [];
+  for (const [hostP, group] of byHost) {
+    if (group.length === 1) {
+      out.push(group[0]!);
+      continue;
+    }
+    out.push({
+      frame: composeRowFrame(hostP, group, ctx),
+      // Any of the group's drawings serves as the claim/host anchor; the
+      // importer keys the replacement on the paragraph, and the claim pass
+      // removes every drawing element regardless.
+      drawingEl: group[0]!.drawingEl,
+      hostParagraphEl: hostP,
+    });
+  }
   return out;
+}
+
+/** Lay a group of single-drawing frames across the content column at the
+ *  paragraph's tab positions, returning one combined row frame. */
+function composeRowFrame(
+  hostP: Element,
+  group: ParsedInlineFrame[],
+  ctx: InlineFramesContext,
+): InlineFrame {
+  const columnEmu = ctx.contentWidthEmu && ctx.contentWidthEmu > 0 ? ctx.contentWidthEmu : null;
+  const tabStopsEmu = readCustomTabStopsEmu(hostP);
+  const defaultTabEmu = (ctx.defaultTabStopTwips ?? 720) * EMU_PER_TWIP;
+
+  const textboxes: InlineFrameTextbox[] = [];
+  const shapes: Array<InlineFrame["shapes"][number]> = [];
+  const pictures: Array<InlineFrame["pictures"][number]> = [];
+  let cursorEmu = 0;
+  let rowHeightEmu = 0;
+  let next = 0; // index into `group`, consumed in run order
+
+  for (const run of directChildrenNS(hostP, NS.w, "r")) {
+    if (run.getElementsByTagNameNS(NS.w, "drawing").length > 0 && next < group.length) {
+      const f = group[next++]!.frame;
+      shiftFrameInto(f, cursorEmu, { textboxes, shapes, pictures });
+      cursorEmu += f.sizeEmu.wEmu;
+      rowHeightEmu = Math.max(rowHeightEmu, f.sizeEmu.hEmu);
+    } else if (firstChildNS(run, NS.w, "tab") !== null) {
+      cursorEmu = nextTabStopEmu(cursorEmu, tabStopsEmu, defaultTabEmu);
+    }
+  }
+
+  // The frame's coordinate system spans the content column so each box's
+  // offset/width reads as a true fraction of it. Without a known column
+  // width, fall back to the consumed row width (boxes still ordered, but
+  // the row stretches to the full body width on render).
+  const widthEmu = columnEmu ?? Math.max(cursorEmu, 1);
+  return {
+    kind: "inline_frame",
+    groupExtentEmu: { wEmu: widthEmu, hEmu: rowHeightEmu },
+    sizeEmu: { wEmu: widthEmu, hEmu: rowHeightEmu },
+    textboxes,
+    pictures,
+    shapes,
+  };
+}
+
+/** Copy a single-drawing frame's regions into the row accumulators,
+ *  translated right by `dxEmu` (its column position). */
+function shiftFrameInto(
+  f: InlineFrame,
+  dxEmu: number,
+  acc: {
+    textboxes: InlineFrameTextbox[];
+    shapes: Array<InlineFrame["shapes"][number]>;
+    pictures: Array<InlineFrame["pictures"][number]>;
+  },
+): void {
+  for (const tb of f.textboxes) {
+    acc.textboxes.push({
+      ...tb,
+      offsetEmu: { xEmu: tb.offsetEmu.xEmu + dxEmu, yEmu: tb.offsetEmu.yEmu },
+    });
+  }
+  for (const s of f.shapes) {
+    acc.shapes.push({
+      ...s,
+      offsetEmu: { xEmu: s.offsetEmu.xEmu + dxEmu, yEmu: s.offsetEmu.yEmu },
+    });
+  }
+  for (const p of f.pictures) {
+    acc.pictures.push({
+      ...p,
+      offsetEmu: { xEmu: p.offsetEmu.xEmu + dxEmu, yEmu: p.offsetEmu.yEmu },
+    });
+  }
+}
+
+/** Read explicit `<w:pPr><w:tabs><w:tab w:pos>` stops, ascending EMU. */
+function readCustomTabStopsEmu(hostP: Element): number[] {
+  const pPr = firstChildNS(hostP, NS.w, "pPr");
+  const tabs = pPr ? firstChildNS(pPr, NS.w, "tabs") : null;
+  if (!tabs) return [];
+  const out: number[] = [];
+  for (const tab of directChildrenNS(tabs, NS.w, "tab")) {
+    const pos = tab.getAttributeNS(NS.w, "pos") ?? tab.getAttribute("w:pos");
+    const n = pos ? Number(pos) : Number.NaN;
+    if (Number.isFinite(n)) out.push(n * EMU_PER_TWIP);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** First tab stop strictly past `xEmu` — an explicit stop if one lies
+ *  ahead, else the next cell on the default grid. */
+function nextTabStopEmu(xEmu: number, customEmu: number[], defaultEmu: number): number {
+  for (const stop of customEmu) if (stop > xEmu + 1) return stop;
+  if (defaultEmu <= 0) return xEmu;
+  return (Math.floor(xEmu / defaultEmu) + 1) * defaultEmu;
 }
 
 // === implementation ===
@@ -234,36 +420,8 @@ function buildInlineFrame(
           // hold several (a "Project: X" entry has a title textbox AND a
           // details textbox); capture ALL of them in document order so the
           // renderer can show every one.
-          const txbxContent = firstChildNS(txbx, NS.w, "txbxContent");
-          if (!txbxContent) continue;
-          const { off, ext: shapeExt } = readShapeXfrm(child);
-          const textbox: InlineFrameTextbox = {
-            offsetEmu: { xEmu: off.x, yEmu: off.y },
-            sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
-            body: ctx.parseBlockBody(txbxContent),
-          };
-          const fill = readSolidFill(child, ctx.theme);
-          if (fill !== undefined) textbox.fill = fill;
-          const border = readBorder(child, ctx.theme);
-          if (border !== undefined) textbox.border = border;
-          // `<wps:bodyPr>` carries the text insets + vertical anchor. Word
-          // centers a single heading line by top-anchoring it inside a
-          // short textbox whose insets + centered placement land the line
-          // at the pill's middle; dropping the insets floats it too high.
-          const bodyPr = firstChildNS(child, NS.wps, "bodyPr");
-          if (bodyPr) {
-            textbox.padding = {
-              leftEmu: numAttrOr(bodyPr, "lIns", 91440),
-              topEmu: numAttrOr(bodyPr, "tIns", 45720),
-              rightEmu: numAttrOr(bodyPr, "rIns", 91440),
-              bottomEmu: numAttrOr(bodyPr, "bIns", 45720),
-            };
-            const anchor = bodyPr.getAttribute("anchor");
-            if (anchor === "ctr") textbox.vAlign = "center";
-            else if (anchor === "b") textbox.vAlign = "bottom";
-            else textbox.vAlign = "top";
-          }
-          textboxes.push(textbox);
+          const textbox = readInlineTextbox(child, ctx);
+          if (textbox) textboxes.push(textbox);
         } else {
           // Shape-without-textbox → decoration.
           const { off, ext: shapeExt } = readShapeXfrm(child);
@@ -311,6 +469,86 @@ function buildInlineFrame(
   };
   if (pageBreakBefore) out.pageBreakBefore = true;
   if (keepNext) out.keepNext = true;
+  return out;
+}
+
+/**
+ * Read a `<wps:wsp>` carrying a `<wps:txbx>` into an `InlineFrameTextbox`
+ * — body content, fill, border, and the `<wps:bodyPr>` insets + vertical
+ * anchor. Shared by the grouped path (a "Project: X" entry) and the bare
+ * path (a standalone "Place Illustration here" box). Returns `null` when
+ * the shape has no resolvable textbox content.
+ */
+function readInlineTextbox(wsp: Element, ctx: InlineFramesContext): InlineFrameTextbox | null {
+  const txbx = firstChildNS(wsp, NS.wps, "txbx");
+  const txbxContent = txbx ? firstChildNS(txbx, NS.w, "txbxContent") : null;
+  if (!txbxContent) return null;
+  const { off, ext: shapeExt } = readShapeXfrm(wsp);
+  const textbox: InlineFrameTextbox = {
+    offsetEmu: { xEmu: off.x, yEmu: off.y },
+    sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
+    body: ctx.parseBlockBody(txbxContent),
+  };
+  const fill = readSolidFill(wsp, ctx.theme);
+  if (fill !== undefined) textbox.fill = fill;
+  const border = readBorder(wsp, ctx.theme);
+  if (border !== undefined) textbox.border = border;
+  // `<wps:bodyPr>` carries the text insets + vertical anchor. Word
+  // centers a single heading line by top-anchoring it inside a short
+  // textbox whose insets + centered placement land the line at the pill's
+  // middle; dropping the insets floats it too high.
+  const bodyPr = firstChildNS(wsp, NS.wps, "bodyPr");
+  if (bodyPr) {
+    textbox.padding = {
+      leftEmu: numAttrOr(bodyPr, "lIns", 91440),
+      topEmu: numAttrOr(bodyPr, "tIns", 45720),
+      rightEmu: numAttrOr(bodyPr, "rIns", 91440),
+      bottomEmu: numAttrOr(bodyPr, "bIns", 45720),
+    };
+    const anchor = bodyPr.getAttribute("anchor");
+    if (anchor === "ctr") textbox.vAlign = "center";
+    else if (anchor === "b") textbox.vAlign = "bottom";
+    else textbox.vAlign = "top";
+  }
+  return textbox;
+}
+
+/**
+ * Build an `InlineFrame` for a BARE `<wps:wsp>` TEXTBOX (no `<wpg:wgp>`
+ * group) — a single bordered box flowing inline, e.g. a "Place
+ * Illustration here" placeholder. The frame's coordinate space is the
+ * inline `<wp:extent>`; the textbox fills it (its own xfrm size when
+ * present, else the full extent).
+ */
+function buildBareTextboxFrame(
+  inline: Element,
+  wsp: Element,
+  hostP: Element,
+  ctx: InlineFramesContext,
+): InlineFrame | null {
+  const extent = firstChildNS(inline, NS.wp, "extent");
+  const wEmu = numAttr(extent, "cx");
+  const hEmu = numAttr(extent, "cy");
+  if (wEmu <= 0 || hEmu <= 0) return null;
+
+  const textbox = readInlineTextbox(wsp, ctx);
+  if (!textbox) return null;
+  // A bare textbox has no intra-group xfrm of its own — it fills the
+  // inline extent. Fall back to the extent for any size the shape omitted.
+  if (textbox.sizeEmu.wEmu <= 0) textbox.sizeEmu.wEmu = wEmu;
+  if (textbox.sizeEmu.hEmu <= 0) textbox.sizeEmu.hEmu = hEmu;
+
+  const pPr = firstChildNS(hostP, NS.w, "pPr");
+  const out: InlineFrame = {
+    kind: "inline_frame",
+    groupExtentEmu: { wEmu, hEmu },
+    sizeEmu: { wEmu, hEmu },
+    textboxes: [textbox],
+    pictures: [],
+    shapes: [],
+  };
+  if (pPr && firstChildNS(pPr, NS.w, "pageBreakBefore") !== null) out.pageBreakBefore = true;
+  if (pPr && firstChildNS(pPr, NS.w, "keepNext") !== null) out.keepNext = true;
   return out;
 }
 

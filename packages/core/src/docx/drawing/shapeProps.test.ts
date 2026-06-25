@@ -13,6 +13,14 @@ describe("shapeProps — geometry", () => {
     expect(geom("rect")).toBe("rect");
     expect(geom("hexagon")).toBe("rect");
   });
+
+  it("approximates round2SameRect (two rounded corners) as a rounded rect", () => {
+    expect(
+      readGeometry(
+        el(`<wps:wsp><wps:spPr><a:prstGeom prst="round2SameRect"/></wps:spPr></wps:wsp>`),
+      ),
+    ).toBe("roundedRect");
+  });
 });
 
 describe("shapeProps — solid fill", () => {
@@ -26,6 +34,30 @@ describe("shapeProps — solid fill", () => {
   it("returns undefined when there is no spPr or no fill", () => {
     expect(readSolidFill(el("<wps:wsp/>"))).toBeUndefined();
     expect(readSolidFill(el("<wps:wsp><wps:spPr/></wps:wsp>"))).toBeUndefined();
+  });
+
+  it("falls back to the shape-style fillRef when spPr carries no fill", () => {
+    // Ribbon-inserted shapes record their fill only as a theme fillRef.
+    const wsp = el(
+      `<wps:wsp><wps:spPr><a:prstGeom prst="rect"/></wps:spPr>` +
+        `<wps:style><a:fillRef idx="1"><a:schemeClr val="dk1"/></a:fillRef></wps:style></wps:wsp>`,
+    );
+    expect(readSolidFill(wsp, { dk1: "#000000" })).toBe("#000000");
+  });
+
+  it("treats fillRef idx 0 as the explicit no-fill slot", () => {
+    const wsp = el(
+      `<wps:wsp><wps:spPr/><wps:style><a:fillRef idx="0"><a:schemeClr val="dk1"/></a:fillRef></wps:style></wps:wsp>`,
+    );
+    expect(readSolidFill(wsp, { dk1: "#000000" })).toBeUndefined();
+  });
+
+  it("prefers a direct spPr fill over the style fillRef", () => {
+    const wsp = el(
+      `<wps:wsp><wps:spPr><a:solidFill><a:srgbClr val="E7E6E6"/></a:solidFill></wps:spPr>` +
+        `<wps:style><a:fillRef idx="1"><a:schemeClr val="dk1"/></a:fillRef></wps:style></wps:wsp>`,
+    );
+    expect(readSolidFill(wsp, { dk1: "#000000" })).toBe("#E7E6E6");
   });
 });
 

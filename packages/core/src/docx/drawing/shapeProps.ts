@@ -13,8 +13,10 @@ import { firstChildNS } from "./dom";
 import { numAttr } from "./extents";
 
 /** Map `<a:prstGeom prst>` to the AST's preset geometry enum; unknown
- *  presets fall back to `rect`. (Custom geometry is handled separately by
- *  the anchored reader via `customGeometry`.) */
+ *  presets fall back to `rect`. Only the box-expressible presets live
+ *  here — those a CSS rectangle (± border-radius) can draw. Presets that
+ *  need a real outline (arrows, callouts) are expanded to an SVG path by
+ *  `presetGeometry`, and `<a:custGeom>` by `customGeometry`. */
 export function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" | "line" {
   const prstGeom = wsp.getElementsByTagNameNS(NS.a, "prstGeom")[0];
   const prst = prstGeom?.getAttribute("prst");
@@ -22,6 +24,10 @@ export function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" |
     case "ellipse":
       return "ellipse";
     case "roundRect":
+    // `round2SameRect` rounds only the two top corners; we approximate it
+    // with an all-corners rounded rect — close enough for banners, and a
+    // CSS box can't express "two corners" without a path anyway.
+    case "round2SameRect":
       return "roundedRect";
     case "line":
     case "straightConnector1":
@@ -39,13 +45,36 @@ export function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" |
  */
 export function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
   const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
-  if (!spPr) return undefined;
-  for (const fill of Array.from(spPr.children)) {
-    if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
-      return readDrawingColor(fill, theme);
+  if (spPr) {
+    for (const fill of Array.from(spPr.children)) {
+      if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
+        return readDrawingColor(fill, theme);
+      }
     }
   }
-  return undefined;
+  // No DIRECT fill: fall back to the shape-STYLE reference. Word's shape
+  // gallery records a shape's fill nowhere in `spPr` — only as
+  // `<wps:style><a:fillRef idx>` (a slot in the theme's fill-style list)
+  // plus the colour to tint that slot with. This is the default for any
+  // shape inserted from the ribbon; without it every gallery shape (the
+  // black step banner, the header pills, the footer arrow) imports
+  // fill-less and renders invisible.
+  return readStyleRefFill(shape, theme);
+}
+
+/**
+ * Resolve a shape's fill from its `<wps:style><a:fillRef>`. `idx="0"` is
+ * the theme's explicit "no fill" slot → undefined; any other slot we
+ * model as a solid fill of the referenced colour (idx 1 = the solidFill
+ * entry, which is what the ribbon emits). The `<a:schemeClr>` /
+ * `<a:srgbClr>` child carries the colour, resolved by `readDrawingColor`.
+ */
+function readStyleRefFill(shape: Element, theme?: ThemePalette): string | undefined {
+  const style = firstChildNS(shape, NS.wps, "style");
+  if (!style) return undefined;
+  const fillRef = firstChildNS(style, NS.a, "fillRef");
+  if (!fillRef || fillRef.getAttribute("idx") === "0") return undefined;
+  return readDrawingColor(fillRef, theme);
 }
 
 /** Read the shape outline `<a:ln>` (width + colour + dash) into a

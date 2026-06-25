@@ -366,6 +366,15 @@ export class ChangePipeline {
    * remote provider applies an update we didn't initiate.
    */
   adoptYDocState(): void {
+    // Preserve the caret across the rebuild. A provider update (collab
+    // peer, or y-indexeddb's async load completing) lands here with a
+    // non-local origin WHILE the user may be typing — without this, the
+    // `replaceChildren()` below drops the live selection and the browser
+    // resets it to the document start (the caret jumps to the top). The
+    // caret's block keeps its id through `adoptIds` (ids are preserved by
+    // projection), so a block-ref restore lands it back where it was.
+    // Mirrors `commit()`.
+    const savedSelection = this.ctx.selection.get();
     const projected = projectYDoc(this.ctx.ydoc);
     this.ctx.setDoc(projected.doc);
     this.ctx.registry.adoptIds(projected.ids);
@@ -387,6 +396,9 @@ export class ChangePipeline {
     const firstHost = hosts[0] ?? this.ctx.host;
     this.ctx.fontFaces.sync(this.ctx.doc.fonts, this.ctx.doc.rawParts);
     renderSobreeDocument(this.ctx.doc, firstHost, this.blockIdsArray());
+    // Best-effort restore (no-op when the caret's block was removed by the
+    // update). Runs before repagination, which captures/restores its own.
+    if (savedSelection) applySelectionToDom(this.ctx._hosts(), savedSelection);
     this.domDirty = false;
     this.emitChangeNow();
   }

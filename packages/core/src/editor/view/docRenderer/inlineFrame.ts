@@ -26,7 +26,7 @@ import type {
 } from "../../../doc/types";
 import { partPathToUrl } from "./inline";
 import { applyParagraphProps } from "./properties";
-import { emuToMm } from "./units";
+import { emuToMm, emuToPx } from "./units";
 
 /** The recursive block renderer, injected to break the import cycle. */
 export type RenderBody = (
@@ -182,6 +182,13 @@ export function renderInlineFrameBlock(
     region.style.justifyContent =
       tb.vAlign === "center" ? "center" : tb.vAlign === "bottom" ? "flex-end" : "flex-start";
     if (tb.fill) region.style.background = tb.fill;
+    if (tb.border) {
+      // A textbox outline (the "Place Illustration here" placeholder boxes)
+      // — same px-snapped conversion the anchored layer uses so a hairline
+      // 0.75pt stroke still resolves to a visible 1px.
+      const widthPx = Math.max(1, Math.round(emuToPx(tb.border.widthEmu)));
+      region.style.border = `${widthPx}px ${tb.border.style} ${tb.border.color}`;
+    }
     if (tb.padding) {
       const p = tb.padding;
       region.style.padding =

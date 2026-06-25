@@ -298,6 +298,51 @@ describe("parseInlineFrames", () => {
     expect(f.pictures[0]!.partPath).toContain("arrow.png");
   });
 
+  it("leaves a LONE bare inline textbox to the legacy lifter (not claimed)", () => {
+    // A single bare textbox in its own paragraph flows fine as a body
+    // paragraph; claiming it would pin it to a fixed-height box and clip
+    // long text. So the parser returns nothing for it.
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:inline>
+        <wp:extent cx="914400" cy="914400"/>
+        <a:graphic><a:graphicData>
+          <wps:wsp>
+            <wps:spPr><a:prstGeom prst="rect"/></wps:spPr>
+            <wps:txbx><w:txbxContent><w:p>Place Illustration here</w:p></w:txbxContent></wps:txbx>
+          </wps:wsp>
+        </a:graphicData></a:graphic>
+      </wp:inline>
+    </w:drawing></w:r></w:p></w:body>`);
+    expect(parseInlineFrames(doc, emptyCtx)).toEqual([]);
+  });
+
+  it("merges a tab-separated ROW of bare inline textboxes into one frame", () => {
+    // Three 1in placeholder boxes separated by tabs — the lifter drops
+    // these, so the parser claims them and lays them across the content
+    // column at the default tab grid (boxes at 0, 1.5in, 3in).
+    const box = `<w:r><w:drawing><wp:inline><wp:extent cx="914400" cy="914400"/>
+      <a:graphic><a:graphicData><wps:wsp>
+        <wps:spPr><a:prstGeom prst="rect"/></wps:spPr>
+        <wps:txbx><w:txbxContent><w:p>Box</w:p></w:txbxContent></wps:txbx>
+      </wps:wsp></a:graphicData></a:graphic>
+    </wp:inline></w:drawing></w:r>`;
+    const tab = "<w:r><w:tab/></w:r>";
+    const doc = xml(`<w:body><w:p>${box}${tab}${box}${tab}${box}</w:p></w:body>`);
+    const frames = parseInlineFrames(doc, {
+      ...emptyCtx,
+      contentWidthEmu: 6400800,
+      defaultTabStopTwips: 720,
+    });
+    expect(frames).toHaveLength(1);
+    const f = frames[0]!.frame;
+    expect(f.textboxes).toHaveLength(3);
+    expect(f.textboxes.map((t) => t.offsetEmu.xEmu)).toEqual([0, 1371600, 2743200]);
+    expect(f.textboxes.every((t) => t.sizeEmu.wEmu === 914400)).toBe(true);
+    // The frame's coordinate system spans the content column so each box
+    // reads as a true fraction of it.
+    expect(f.groupExtentEmu).toEqual({ wEmu: 6400800, hEmu: 914400 });
+  });
+
   it("multiple inline frames retain document order", () => {
     const doc = xml(`<w:body>
       <w:p>

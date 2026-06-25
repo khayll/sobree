@@ -80,6 +80,44 @@ describe("Editor — Y.Doc mirror (Phase 1a)", () => {
     expect(doc.body.length).toBe(2);
   });
 
+  it("preserves the caret when a remote Y.Doc update rebuilds the DOM", () => {
+    const initial = emptyDocument();
+    appendBlock(initial, heading(1, [text("Title")]));
+    appendBlock(initial, paragraph([text("Second block body here")]));
+    const editor = new Editor(host, { initialDocument: initial });
+
+    // Put the caret inside the SECOND content block's text.
+    const blockEl = [...host.querySelectorAll<HTMLElement>("[data-block-id]")].find((e) =>
+      /Second block body/.test(e.textContent ?? ""),
+    );
+    const textNode = findFirstText(blockEl!);
+    const targetId = blockEl!.getAttribute("data-block-id");
+    const range = document.createRange();
+    range.setStart(textNode, 7);
+    range.collapse(true);
+    const sel = window.getSelection();
+    if (!sel) throw new Error("no Selection in test env");
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    // A provider applies an update with a non-local origin (collab peer, or
+    // y-indexeddb's async load) → `adoptYDocState` rebuilds the whole DOM.
+    editor.ydoc.transact(() => {
+      editor.ydoc.getMap("__probe").set("x", 1);
+    }, "remote-peer");
+
+    // Caret must be restored INTO the rebuilt DOM at the same spot — not
+    // left on a detached node or collapsed to the document start.
+    const after = window.getSelection();
+    expect(after?.anchorNode?.isConnected).toBe(true);
+    const anchorEl =
+      after?.anchorNode?.nodeType === 3
+        ? after.anchorNode.parentElement
+        : (after?.anchorNode as Element | null);
+    expect(anchorEl?.closest("[data-block-id]")?.getAttribute("data-block-id")).toBe(targetId);
+    expect(after?.anchorOffset).toBe(7);
+  });
+
   it("the same Y.Doc can be observed by external code", () => {
     const editor = new Editor(host);
     const updates: number[] = [];
@@ -96,4 +134,12 @@ describe("Editor — Y.Doc mirror (Phase 1a)", () => {
 function appendOne(editor: Editor, block: Block): void {
   const last = editor.getBlock(editor.getDocument().body.length - 1);
   editor.insertBlockAfter({ id: last.id, version: last.version }, block);
+}
+
+/** First text node under `el` (the caret target for the selection test). */
+function findFirstText(el: HTMLElement): Text {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const node = walker.nextNode();
+  if (!node) throw new Error("no text node in block");
+  return node as Text;
 }

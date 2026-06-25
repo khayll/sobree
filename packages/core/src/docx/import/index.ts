@@ -99,11 +99,21 @@ export async function importDocx(
   const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   const lrpbCount = xml.getElementsByTagNameNS(W_NS, "lastRenderedPageBreak").length;
   const honorLastRenderedPageBreaks = lrpbCount >= 10;
+  // Settings (read here so the InlineFrame parser can lay a tab-separated
+  // row of inline drawings out on the doc's tab grid) and the body
+  // section's content width (so each box in that row sizes as a fraction
+  // of the text column).
+  const settings = parseSettingsXml(unzipped.text["word/settings.xml"]);
+  const contentWidthEmu = readBodyContentWidthEmu(xml, rels);
   const parsedInlineFrames = parseInlineFrames(xml, {
     rels,
     parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     honorLastRenderedPageBreaks,
     ...(theme ? { theme } : {}),
+    ...(contentWidthEmu !== undefined ? { contentWidthEmu } : {}),
+    ...(settings.defaultTabStopTwips !== undefined
+      ? { defaultTabStopTwips: settings.defaultTabStopTwips }
+      : {}),
   });
   const inlineFrames: InlineFrame[] = parsedInlineFrames.map((p) => p.frame);
   // Build the replacement map BEFORE the lifter / body walker run.
@@ -189,11 +199,10 @@ export async function importDocx(
   // on demand. Round-trip is byte-faithful when nothing changes.
   const fonts = mountFontTableFromZip(unzipped.text, parseRels);
 
-  // Read settings.xml first — `compatibilityMode` + auto-spacing flag
-  // gate whether parseStylesXml injects Word's implicit Normal-style
-  // baseline (line ≈ 1.08, after = 8pt). See settings.ts for the
-  // exact rule.
-  const settings = parseSettingsXml(unzipped.text["word/settings.xml"]);
+  // `settings` was read above (before the InlineFrame parse). Its
+  // `compatibilityMode` + auto-spacing flag also gate whether
+  // parseStylesXml injects Word's implicit Normal-style baseline
+  // (line ≈ 1.08, after = 8pt). See settings.ts for the exact rule.
   // Pull the actual style catalogue from `word/styles.xml` so the
   // imported doc's typography (Calibri / Cambria heading, etc.)
   // survives. Only fall back to Sobree's synthesised defaults when
@@ -340,6 +349,26 @@ function mergeRels(
  * stripping Fallback first, the walker descends into BOTH and the
  * content (e.g. text-box paragraphs) duplicates.
  */
+/**
+ * Body text-column width in EMU — page width minus left/right margins,
+ * from the body's final `<w:sectPr>`. The InlineFrame parser uses it to
+ * lay a tab-separated row of inline drawings out as fractions of the
+ * column. `undefined` when the body declares no section (defaults apply).
+ */
+function readBodyContentWidthEmu(doc: Document, rels: Map<string, string>): number | undefined {
+  const sectPrs = doc.getElementsByTagNameNS(
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "sectPr",
+  );
+  const bodySectPr = sectPrs[sectPrs.length - 1];
+  if (!bodySectPr) return undefined;
+  const section = readSection(bodySectPr, rels);
+  const { wTwips } = section.pageSize;
+  const { leftTwips, rightTwips } = section.pageMargins;
+  const contentTwips = wTwips - leftTwips - rightTwips;
+  return contentTwips > 0 ? contentTwips * 635 : undefined; // 914400 EMU/in ÷ 1440 twip/in
+}
+
 /**
  * Walk the document body's direct `<w:p>` children in document order
  * and return an element→index map. Used by the anchored-frames parser
