@@ -20,7 +20,7 @@
 
 import type { Block, InlineRun } from "../../doc/types";
 import type { EditorContext } from "../context";
-import { insertBlockAfter } from "./blocks";
+import { deleteBlock, insertBlockAfter } from "./blocks";
 
 /** Clipboard MIME for a Sobree block payload. The `+json` suffix and the
  *  `web ` prefix browsers add for custom types both round-trip our reader. */
@@ -89,6 +89,14 @@ function paragraphLength(block: Block): number {
  * block-level (a caret, or a partial selection inside one block).
  */
 export function selectedWholeBlocks(ctx: EditorContext): Block[] | null {
+  const range = coveredBlockIndices(ctx);
+  if (!range) return null;
+  return ctx.doc.body.slice(range.lo, range.hi + 1).map(cloneBlock);
+}
+
+/** Body-index range `[lo, hi]` the selection covers as WHOLE blocks, or
+ *  `null` when the selection is a caret / a partial in-block range. */
+function coveredBlockIndices(ctx: EditorContext): { lo: number; hi: number } | null {
   const sel = ctx.selection.get();
   if (!sel || sel.kind !== "range") return null;
   const fromIdx = ctx.registry.indexOf(sel.range.from.block.id);
@@ -96,29 +104,52 @@ export function selectedWholeBlocks(ctx: EditorContext): Block[] | null {
   if (fromIdx < 0 || toIdx < 0) return null;
   const lo = Math.min(fromIdx, toIdx);
   const hi = Math.max(fromIdx, toIdx);
-  const body = ctx.doc.body;
 
-  // Spanning several blocks → take them whole.
-  if (lo !== hi) return body.slice(lo, hi + 1).map(cloneBlock);
+  // Spanning several blocks → whole-block range.
+  if (lo !== hi) return { lo, hi };
 
   // One block → only when the range covers it end-to-end.
-  const block = body[lo];
+  const block = ctx.doc.body[lo];
   if (!block) return null;
   const len = paragraphLength(block);
   const a = Math.min(sel.range.from.offset, sel.range.to.offset);
   const b = Math.max(sel.range.from.offset, sel.range.to.offset);
-  if (len >= 0 && a === 0 && b >= len) return [cloneBlock(block)];
-  return null;
+  return len >= 0 && a === 0 && b >= len ? { lo, hi } : null;
 }
 
-/** `copy` handler: write the covered whole blocks (structured + text), or
- *  let the browser run its default plain-text copy when none are covered. */
-export function onCopy(ctx: EditorContext, e: ClipboardEvent): void {
-  const blocks = selectedWholeBlocks(ctx);
-  if (!blocks || !e.clipboardData) return;
+/** Write `blocks` to the clipboard (structured payload + text fallback). */
+function writeBlocks(e: ClipboardEvent, blocks: readonly Block[]): void {
+  if (!e.clipboardData) return;
   e.preventDefault();
   e.clipboardData.setData(BLOCKS_MIME, serializeBlocks(blocks));
   e.clipboardData.setData("text/plain", blocks.map(blockText).join("\n"));
+}
+
+/** `copy` handler: write the covered whole blocks, or let the browser run
+ *  its default plain-text copy when none are covered. */
+export function onCopy(ctx: EditorContext, e: ClipboardEvent): void {
+  const blocks = selectedWholeBlocks(ctx);
+  if (blocks) writeBlocks(e, blocks);
+}
+
+/** `cut` handler: copy the covered whole blocks AND remove them (in
+ *  track-changes mode `deleteBlock` marks them instead). A partial in-block
+ *  selection falls through to the browser's default text cut. */
+export function onCut(ctx: EditorContext, e: ClipboardEvent): void {
+  const range = coveredBlockIndices(ctx);
+  if (!range || !e.clipboardData) return;
+  writeBlocks(e, ctx.doc.body.slice(range.lo, range.hi + 1).map(cloneBlock));
+  // Capture refs up front — deleting shifts indices, but ref ids are stable.
+  const refs: ReturnType<EditorContext["registry"]["refAt"]>[] = [];
+  for (let i = range.lo; i <= range.hi; i++) refs.push(ctx.registry.refAt(i));
+  for (const ref of refs) {
+    if (!deleteBlock(ctx, ref).ok) break;
+  }
+  // Caret to the block now at the cut site (or the last surviving block).
+  const idx = Math.min(range.lo, ctx.doc.body.length - 1);
+  if (idx >= 0) {
+    ctx.selection.set({ kind: "caret", at: { block: ctx.registry.refAt(idx), offset: 0 } });
+  }
 }
 
 /**

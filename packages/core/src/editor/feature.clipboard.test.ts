@@ -23,7 +23,7 @@ function makeClipboard() {
   };
 }
 
-function fire(host: HTMLElement, type: "copy" | "paste", clipboardData: object): Event {
+function fire(host: HTMLElement, type: "copy" | "cut" | "paste", clipboardData: object): Event {
   const ev = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperty(ev, "clipboardData", { value: clipboardData, configurable: true });
   host.dispatchEvent(ev);
@@ -146,6 +146,58 @@ describe("clipboard — copy a block, paste it below", () => {
     expect(parsed).toHaveLength(2);
     expect((parsed![0] as Paragraph).runs[0]).toMatchObject({ text: "First line." });
     expect((parsed![1] as Paragraph).runs[0]).toMatchObject({ text: "Duplicate me." });
+    editor.destroy();
+  });
+
+  it("cut removes the block and carries it on the clipboard", () => {
+    const editor = editorWith();
+    const clip = makeClipboard();
+    selectWholeBlock(host, "Duplicate me.");
+    const cutEv = fire(host, "cut", clip);
+
+    expect(cutEv.defaultPrevented).toBe(true);
+    expect(parseBlocks(clip._store.get(BLOCKS_MIME))).toHaveLength(1);
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    expect(texts).toEqual(["First line.", "Last line."]); // the cut block is gone
+    editor.destroy();
+  });
+
+  it("cut then paste moves the block", () => {
+    const editor = editorWith();
+    const clip = makeClipboard();
+    selectWholeBlock(host, "Duplicate me.");
+    fire(host, "cut", clip);
+    // Caret lands on the block now at the cut site; paste re-inserts after it.
+    fire(host, "paste", clip);
+
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    expect(texts).toContain("Duplicate me.");
+    expect(texts).toHaveLength(3); // back to three blocks, just reordered
+    editor.destroy();
+  });
+
+  it("a partial in-block selection cuts via the browser default, not a block", () => {
+    const editor = editorWith();
+    const blockEl = [...host.querySelectorAll<HTMLElement>("[data-block-id]")].find((e) =>
+      (e.textContent ?? "").includes("Duplicate me."),
+    )!;
+    const tn = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn, 0);
+    range.setEnd(tn, 4);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const clip = makeClipboard();
+    const cutEv = fire(host, "cut", clip);
+    expect(cutEv.defaultPrevented).toBe(false);
+    expect(clip._store.get(BLOCKS_MIME)).toBeUndefined();
+    expect(editor.getDocument().body).toHaveLength(3); // no block removed
     editor.destroy();
   });
 });

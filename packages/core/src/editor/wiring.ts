@@ -113,8 +113,10 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
   // shortcuts itself.
   listen(host, "keydown", (e) => hooks.fireKeyDown(e as KeyboardEvent));
 
-  // Copy selected whole blocks as a structured payload (+ text fallback).
+  // Copy / cut selected whole blocks as a structured payload (+ text
+  // fallback); cut also removes them.
   listen(host, "copy", (e) => clipboard.onCopy(hooks.ctx, e as ClipboardEvent));
+  listen(host, "cut", (e) => clipboard.onCut(hooks.ctx, e as ClipboardEvent));
   // Paste: a structured block payload inserts real blocks below the caret;
   // anything else (image, text, browser default) falls through to onPaste.
   listen(host, "paste", (e) => {
