@@ -36,6 +36,7 @@ import { firstChildNS } from "./dom";
 import { numAttr } from "./extents";
 import { readTextDistances } from "./margins";
 import { coerceHRelativeFrom, coerceVRelativeFrom, readPosOffset } from "./position";
+import { expandPresetGeometry } from "./presetGeometry";
 import { normalizePartPath, readBlipEmbedPart } from "./relationships";
 import { readBorder, readGeometry, readSolidFill } from "./shapeProps";
 import { readWrapText, readWrapType } from "./wrap";
@@ -249,7 +250,7 @@ function parseAnchoredFrame(
 
   const graphicData = anchor.getElementsByTagNameNS(NS.a, "graphicData")[0];
   if (!graphicData) return null;
-  const content = parseGraphicData(graphicData, ctx, nextId);
+  const content = parseGraphicData(graphicData, ctx, nextId, { widthEmu, heightEmu });
   if (!content) return null;
 
   const behindAttr = anchor.getAttribute("behindDoc");
@@ -278,6 +279,9 @@ function parseGraphicData(
   graphicData: Element,
   ctx: AnchoredFramesContext,
   nextId: () => string,
+  // The frame's extent — only a geometric shape needs it (to expand a
+  // preset outline into a path in its own coordinate box).
+  dims: { widthEmu: number; heightEmu: number },
 ): AnchoredContent | null {
   // Three possible shapes:
   //   1. <wpg:wgp>        → group of children
@@ -288,7 +292,7 @@ function parseGraphicData(
   if (wpg) return parseGroup(wpg, ctx, nextId);
 
   const wsp = firstChildNS(graphicData, NS.wps, "wsp");
-  if (wsp) return parseShape(wsp, ctx);
+  if (wsp) return parseShape(wsp, ctx, dims);
 
   const pic = firstChildNS(graphicData, NS.pic, "pic");
   if (pic) return parsePicture(pic, ctx);
@@ -350,7 +354,7 @@ function synthFrameFromShape(
 ): AnchoredFrame | null {
   const { off, ext } = readSpPrXfrm(wsp);
   if (!ext) return null;
-  const content = parseShape(wsp, ctx);
+  const content = parseShape(wsp, ctx, { widthEmu: ext.cx, heightEmu: ext.cy });
   return {
     id: nextId(),
     anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page" },
@@ -439,7 +443,11 @@ function readBodyPrInsets(
   };
 }
 
-function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
+function parseShape(
+  wsp: Element,
+  ctx: AnchoredFramesContext,
+  dims: { widthEmu: number; heightEmu: number },
+): AnchoredContent {
   // Textbox if there's `<wps:txbx><w:txbxContent>`. Otherwise a
   // geometric shape — `<wps:spPr><a:prstGeom prst="...">` carries
   // the shape kind.
@@ -478,6 +486,15 @@ function parseShape(wsp: Element, ctx: AnchoredFramesContext): AnchoredContent {
     if (path) {
       out.geometry = "custom";
       out.path = path;
+    }
+  } else {
+    // A preset the CSS box can't draw (arrow, callout): expand it to a
+    // path in the frame's own coordinate box. `readGeometry` already
+    // returned its `rect` fallback above — replace it when we have a path.
+    const preset = expandPresetGeometry(wsp, dims);
+    if (preset) {
+      out.geometry = "custom";
+      out.path = preset;
     }
   }
   const fill = readSolidFill(wsp, ctx.theme);
