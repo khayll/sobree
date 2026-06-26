@@ -125,6 +125,34 @@ describe("flowColumnSections — equal widths", () => {
   });
 });
 
+describe("flowColumnSections — fill vs balance (data-col-fill)", () => {
+  it("FILLS column 0 to the page bottom, then column 1, when fill-first", () => {
+    // Same 4 blocks under the budget that balance 2/2 above — but a
+    // fill-first section (ended by a hard page break in Word) packs column 0
+    // first: 4/0, not balanced.
+    installColHeightModel();
+    const root = equalRoot(2, "5", Array(4).fill(100));
+    wrappers(root)[0]!.dataset.colFill = "1";
+    flowColumnSections(root, 1000);
+    const c = cols(root);
+    expect(c[0]!.childElementCount).toBe(4);
+    expect(c[1]!.childElementCount).toBe(0);
+  });
+
+  it("fill-first still respects the page budget (col0 to budget, col1 rest)", () => {
+    installColHeightModel();
+    // 12×100; budget 700 → col0 packs 7 (700), col1 takes the other 5. A
+    // balanced section would split 6/6 — so the 7/5 split proves fill-first.
+    const root = equalRoot(2, "5", Array(12).fill(100));
+    wrappers(root)[0]!.dataset.colFill = "1";
+    flowColumnSections(root, 700);
+    const c = cols(root);
+    expect(wrappers(root).length).toBe(1); // one page, no spurious chunk
+    expect(c[0]!.childElementCount).toBe(7);
+    expect(c[1]!.childElementCount).toBe(5);
+  });
+});
+
 describe("flowColumnSections — snaking across pages", () => {
   it("splits a section taller than one page into per-page wrappers", () => {
     installColHeightModel();

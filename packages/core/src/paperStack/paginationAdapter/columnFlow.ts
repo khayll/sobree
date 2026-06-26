@@ -222,6 +222,11 @@ function balanceLastPage(page: HTMLElement, pageHeightPx: number): void {
  *  deep offset back into its page; the result is the space remaining for
  *  the section's first chunk. */
 function startSpaceUsed(wrapper: HTMLElement, root: HTMLElement, pageHeightPx: number): number {
+  // A section begun by a hard page break starts on a fresh page — the whole
+  // page is its first-chunk budget. The linear-offset modulo below can't see
+  // the break (it would charge the section for a short preceding page), so
+  // the renderer stamps `data-col-page-start` and we zero the used space.
+  if (wrapper.dataset.colPageStart === "1") return 0;
   const top = wrapper.getBoundingClientRect().top - root.getBoundingClientRect().top;
   if (!(top > 0)) return 0;
   return top % pageHeightPx;
@@ -260,8 +265,14 @@ function layoutSection(wrapper: HTMLElement, root: HTMLElement, pageHeightPx: nu
   }
 
   // Balance the final page's columns (a single-page section is its only
-  // page) under the full page budget.
-  balanceLastPage(pages[pages.length - 1]!, pageHeightPx);
+  // page) under the full page budget — UNLESS the section is fill-first
+  // (`data-col-fill`, stamped by the renderer when this section ends at a
+  // hard page break rather than a continuous one). Word only balances at a
+  // continuous section end; otherwise column 0 keeps its fill-to-the-bottom
+  // layout and column 1 takes the remainder.
+  if (wrapper.dataset.colFill !== "1") {
+    balanceLastPage(pages[pages.length - 1]!, pageHeightPx);
+  }
 }
 
 /**

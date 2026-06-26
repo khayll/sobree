@@ -70,7 +70,7 @@ export function renderBlocks(
    * section change we close it (revert to `host`) and re-evaluate for the
    * new section.
    */
-  let appendTarget: HTMLElement = openColumnContainerIfNeeded(host, sections[0], 0);
+  let appendTarget: HTMLElement = openColumnContainerIfNeeded(host, sections[0], 0, sections[1]);
 
   // Word's `<w:lastRenderedPageBreak/>` hints almost always land on
   // an EMPTY paragraph that the source author kept as a "end of
@@ -221,7 +221,12 @@ export function renderBlocks(
       // belongs to the section it ends, not to the next one.
       sectionIndex += 1;
       // Close any open column container and re-evaluate for the new section.
-      appendTarget = openColumnContainerIfNeeded(host, sections[sectionIndex], sectionIndex);
+      appendTarget = openColumnContainerIfNeeded(
+        host,
+        sections[sectionIndex],
+        sectionIndex,
+        sections[sectionIndex + 1],
+      );
     }
   }
   // After the walk, evict trailing empties from whatever the final

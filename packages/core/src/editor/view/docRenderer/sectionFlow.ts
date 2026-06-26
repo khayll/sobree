@@ -23,13 +23,20 @@ import { twipsToMm } from "./units";
  *   - `data-col-count`     — column count (every multi-column wrapper)
  *   - `data-pag-cid`       — stable section id, so the flow pass can
  *                            re-consolidate a section's per-page wrappers
+ *   - `data-col-fill`="1"  — fill column 0 to the page bottom, then column
+ *                            1 (newspaper) instead of balancing the last
+ *                            page; see `columnsFillNotBalance`
  *   - unequal: `data-col-widths-mm` + `data-col-gaps-mm` (explicit)
  *   - equal:   `data-col-gap-mm` (tracks sized by the flow pass)
+ *
+ * `nextSection` is the section that BEGINS immediately after this one; its
+ * break type is what TERMINATES this one, and so decides balance vs fill.
  */
 export function openColumnContainerIfNeeded(
   host: HTMLElement,
   section: SectionProperties | undefined,
   sectionIndex = 0,
+  nextSection?: SectionProperties | undefined,
 ): HTMLElement {
   const cols = section?.columns;
   if (!cols || cols.count <= 1) return host;
@@ -37,6 +44,12 @@ export function openColumnContainerIfNeeded(
   const wrapper = document.createElement("div");
   wrapper.dataset.colCount = String(cols.count);
   wrapper.dataset.pagCid = `cols-${sectionIndex}`;
+  if (columnsFillNotBalance(nextSection)) wrapper.dataset.colFill = "1";
+  // A section begun by a hard page break starts on a FRESH page, so its
+  // columns get the whole page as their first-chunk budget — the flow pass
+  // can't infer this from linear offsets (a short preceding page would
+  // otherwise shrink the budget; see `startSpaceUsed`).
+  if (sectionStartsOnFreshPage(section)) wrapper.dataset.colPageStart = "1";
 
   if (cols.equalWidth === false && cols.columns && cols.columns.length === cols.count) {
     // Unequal columns: explicit per-column widths + per-gap spacing.
@@ -54,6 +67,30 @@ export function openColumnContainerIfNeeded(
 
   host.appendChild(wrapper);
   return wrapper;
+}
+
+/**
+ * Whether a multi-column section should FILL column-first (column 0 to the
+ * page bottom, then column 1) rather than balance its last page.
+ *
+ * Word balances a multi-column section's columns only when the section ends
+ * at a CONTINUOUS section break (or the document end); a section terminated
+ * by a hard page break (`nextPage` / `evenPage` / `oddPage`) fills column by
+ * column instead, leaving the second column short when the text runs out.
+ * `nextSection` is the section that begins right after — its break `type` is
+ * this section's terminator. No next section ⇒ document end ⇒ balance.
+ * (OOXML's `<w:type>` default is `nextPage`, so an unset type fills.)
+ */
+export function columnsFillNotBalance(nextSection: SectionProperties | undefined): boolean {
+  return nextSection !== undefined && nextSection.type !== "continuous";
+}
+
+/** Whether `section` begins on a fresh page — its break `type` is a hard
+ *  page break (`nextPage` / `evenPage` / `oddPage`). A continuous (or unset)
+ *  section continues on the running page. */
+export function sectionStartsOnFreshPage(section: SectionProperties | undefined): boolean {
+  const t = section?.type;
+  return t === "nextPage" || t === "evenPage" || t === "oddPage";
 }
 
 /**

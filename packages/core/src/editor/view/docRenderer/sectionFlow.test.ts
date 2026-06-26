@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { SectionProperties } from "../../../doc/types";
 import {
   collapseSectionTrailerEmpty,
+  columnsFillNotBalance,
   evictTrailingEmptyParagraphs,
   openColumnContainerIfNeeded,
+  sectionStartsOnFreshPage,
 } from "./sectionFlow";
 
 const doc = window.document;
@@ -80,6 +82,60 @@ describe("openColumnContainerIfNeeded", () => {
     // 6576 twips → 116mm, 2928 → 52mm (rounded by twipsToMm)
     expect(wrapper.dataset.colWidthsMm).toBe("116,52");
     expect(wrapper.dataset.colGapsMm).toBe("13"); // one gap (n-1)
+  });
+
+  it("stamps data-col-fill when the section ends at a hard page break", () => {
+    // Next section starts with `nextPage` ⇒ this column section is fill-first.
+    const fill = openColumnContainerIfNeeded(
+      host,
+      section({ columns: { count: 2 } }),
+      1,
+      section({ type: "nextPage" }),
+    );
+    expect(fill.dataset.colFill).toBe("1");
+
+    // Next section is `continuous` ⇒ balance (no flag).
+    const balanced = openColumnContainerIfNeeded(
+      doc.createElement("div"),
+      section({ columns: { count: 2 } }),
+      1,
+      section({ type: "continuous" }),
+    );
+    expect(balanced.dataset.colFill).toBeUndefined();
+  });
+
+  it("stamps data-col-page-start when the section itself begins on a fresh page", () => {
+    const fresh = openColumnContainerIfNeeded(
+      host,
+      section({ columns: { count: 2 }, type: "nextPage" }),
+      1,
+    );
+    expect(fresh.dataset.colPageStart).toBe("1");
+
+    const continued = openColumnContainerIfNeeded(
+      doc.createElement("div"),
+      section({ columns: { count: 2 }, type: "continuous" }),
+      1,
+    );
+    expect(continued.dataset.colPageStart).toBeUndefined();
+  });
+});
+
+describe("column balance / fresh-page policy", () => {
+  it("columnsFillNotBalance — fill on a hard break, balance on continuous / doc end", () => {
+    expect(columnsFillNotBalance(section({ type: "nextPage" }))).toBe(true);
+    expect(columnsFillNotBalance(section({ type: "evenPage" }))).toBe(true);
+    expect(columnsFillNotBalance(section({ type: "oddPage" }))).toBe(true);
+    expect(columnsFillNotBalance(section({ type: "continuous" }))).toBe(false);
+    expect(columnsFillNotBalance(undefined)).toBe(false); // last section ⇒ balance
+  });
+
+  it("sectionStartsOnFreshPage — true only for hard page-break starts", () => {
+    expect(sectionStartsOnFreshPage(section({ type: "nextPage" }))).toBe(true);
+    expect(sectionStartsOnFreshPage(section({ type: "evenPage" }))).toBe(true);
+    expect(sectionStartsOnFreshPage(section({ type: "continuous" }))).toBe(false);
+    expect(sectionStartsOnFreshPage(section({}))).toBe(false);
+    expect(sectionStartsOnFreshPage(undefined)).toBe(false);
   });
 });
 
