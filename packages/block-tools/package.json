@@ -1,6 +1,6 @@
 {
   "name": "@sobree/block-tools",
-  "version": "0.1.35",
+  "version": "0.1.36",
   "publishConfig": {
     "access": "public",
     "exports": {
