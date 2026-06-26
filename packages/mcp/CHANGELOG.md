@@ -1,5 +1,14 @@
 # @sobree/mcp
 
+## 0.1.36
+
+### Patch Changes
+
+- fbb57b7: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [fbb57b7]
+  - @sobree/core@0.1.36
+
 ## 0.1.35
 
 ### Patch Changes
