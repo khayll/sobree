@@ -46,6 +46,7 @@ export function renderSobreeDocument(
     blockIds,
     doc.sections,
     frameAnchoredIndices,
+    doc.settings?.noColumnBalance ?? false,
   );
   if (doc.footnotes && Object.keys(doc.footnotes).length > 0) {
     renderFootnotesAside(doc, host);

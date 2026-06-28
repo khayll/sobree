@@ -46,11 +46,14 @@ interface ExplicitGeom {
   kind: "explicit";
   widthsMm: number[];
   gapsMm: number[];
+  /** Draw a rule between columns (`<w:cols w:sep>`). */
+  sep: boolean;
 }
 interface EqualGeom {
   kind: "equal";
   count: number;
   gapMm: number;
+  sep: boolean;
 }
 type ColGeom = ExplicitGeom | EqualGeom;
 
@@ -65,14 +68,15 @@ function parseMmList(value: string | undefined): number[] {
 /** Resolve a wrapper's column geometry from its stamped dataset, or
  *  `null` if it isn't a layable multi-column wrapper (< 2 columns). */
 function resolveGeometry(wrapper: HTMLElement): ColGeom | null {
+  const sep = wrapper.dataset.colSep === "1";
   const widthsMm = parseMmList(wrapper.dataset.colWidthsMm);
   if (widthsMm.length >= 2) {
-    return { kind: "explicit", widthsMm, gapsMm: parseMmList(wrapper.dataset.colGapsMm) };
+    return { kind: "explicit", widthsMm, gapsMm: parseMmList(wrapper.dataset.colGapsMm), sep };
   }
   const count = Number.parseInt(wrapper.dataset.colCount ?? "", 10);
   if (Number.isFinite(count) && count >= 2) {
     const gapMm = Number.parseFloat(wrapper.dataset.colGapMm ?? "0");
-    return { kind: "equal", count, gapMm: Number.isFinite(gapMm) ? gapMm : 0 };
+    return { kind: "equal", count, gapMm: Number.isFinite(gapMm) ? gapMm : 0, sep };
   }
   return null;
 }
@@ -83,10 +87,13 @@ function trackCount(geom: ColGeom): number {
 
 /** Build the `count` empty column tracks for one page of a section.
  *  Equal columns use `flex:1` so the browser sizes them; unequal columns
- *  carry an explicit `width`. A right margin supplies the inter-column
- *  gap on every track but the last. */
+ *  carry an explicit `width`. A right margin supplies the inter-column gap
+ *  on every track but the last; with `sep`, the gap is split either side of
+ *  a centred 1px rule (`<w:cols w:sep>`). */
 function buildTracks(geom: ColGeom): HTMLElement[] {
   const n = trackCount(geom);
+  const gapAfter = (i: number): number =>
+    geom.kind === "explicit" ? (geom.gapsMm[i] ?? 0) : geom.gapMm;
   const tracks: HTMLElement[] = [];
   for (let i = 0; i < n; i++) {
     const col = document.createElement("div");
@@ -94,12 +101,18 @@ function buildTracks(geom: ColGeom): HTMLElement[] {
     if (geom.kind === "explicit") {
       col.style.flex = "0 0 auto";
       col.style.width = `${geom.widthsMm[i]}mm`;
-      const gap = geom.gapsMm[i];
-      if (i < n - 1 && gap !== undefined && gap > 0) col.style.marginRight = `${gap}mm`;
     } else {
       col.style.flex = "1 1 0";
       col.style.minWidth = "0";
-      if (i < n - 1 && geom.gapMm > 0) col.style.marginRight = `${geom.gapMm}mm`;
+    }
+    const right = i < n - 1 ? gapAfter(i) : 0;
+    if (geom.sep) {
+      // Split each gap around a centred column rule.
+      if (right > 0) col.style.marginRight = `${right / 2}mm`;
+      if (i > 0 && gapAfter(i - 1) > 0) col.style.marginLeft = `${gapAfter(i - 1) / 2}mm`;
+      if (i < n - 1) col.style.borderRight = "1px solid var(--sobree-column-rule, #c4c0b6)";
+    } else if (right > 0) {
+      col.style.marginRight = `${right}mm`;
     }
     tracks.push(col);
   }

@@ -113,7 +113,7 @@ export function fieldAlmanacSeed(): SobreeDocument {
   const base = doc.sections[0]!;
   doc.sections = [
     base,
-    { ...base, type: "nextPage", columns: { count: 2, spaceTwips: 520 } },
+    { ...base, type: "nextPage", columns: { count: 2, spaceTwips: 520, separator: true } },
     { ...base, type: "nextPage" },
   ];
 

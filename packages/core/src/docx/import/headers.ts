@@ -279,6 +279,9 @@ export function readSection(sectPr: Element, rels: Map<string, string>): Section
       const sectionCols: SectionColumns = { count: num };
       const space = readTwipsAttr(cols, "space");
       if (space !== null && space > 0) sectionCols.spaceTwips = space;
+      // `w:sep="1"` draws a thin rule between columns.
+      const sep = cols.getAttributeNS(NS.w, "sep") ?? cols.getAttribute("w:sep");
+      if (sep === "1" || sep === "true") sectionCols.separator = true;
       // Unequal columns: `w:equalWidth="0"` plus one `<w:col w:w w:space>`
       // per column. Only take this path when BOTH the flag is explicitly
       // off AND a full set of `<w:col>` widths is present — a stray

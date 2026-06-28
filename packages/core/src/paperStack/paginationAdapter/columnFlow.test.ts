@@ -153,6 +153,30 @@ describe("flowColumnSections — fill vs balance (data-col-fill)", () => {
   });
 });
 
+describe("flowColumnSections — separator rule (data-col-sep)", () => {
+  it("draws a centred rule between columns and splits the gap", () => {
+    installColHeightModel();
+    const root = equalRoot(2, "10", Array(4).fill(100));
+    wrappers(root)[0]!.dataset.colSep = "1";
+    flowColumnSections(root, 1000);
+    const c = cols(root);
+    expect(c[0]!.style.borderRight).toContain("solid"); // rule on the non-last track
+    expect(c[1]!.style.borderRight).toBe(""); // none after the last
+    expect(c[0]!.style.marginRight).toBe("5mm"); // half the 10mm gap
+    expect(c[1]!.style.marginLeft).toBe("5mm"); // the other half
+  });
+
+  it("leaves a full right-margin gap and no rule without the flag", () => {
+    installColHeightModel();
+    const root = equalRoot(2, "10", Array(4).fill(100));
+    flowColumnSections(root, 1000);
+    const c = cols(root);
+    expect(c[0]!.style.borderRight).toBe("");
+    expect(c[0]!.style.marginRight).toBe("10mm");
+    expect(c[1]!.style.marginLeft).toBe("");
+  });
+});
+
 describe("flowColumnSections — snaking across pages", () => {
   it("splits a section taller than one page into per-page wrappers", () => {
     installColHeightModel();

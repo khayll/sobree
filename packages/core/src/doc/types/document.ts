@@ -68,6 +68,9 @@ export interface SobreeDocument {
    */
   settings?: {
     defaultTabStopTwips?: number;
+    /** `<w:noColumnBalance/>` — disable column balancing at continuous
+     *  section breaks document-wide (columns fill column-first). */
+    noColumnBalance?: boolean;
   };
   /**
    * NOTE: inline-drawing frames are emitted as `InlineFrame` BLOCKS

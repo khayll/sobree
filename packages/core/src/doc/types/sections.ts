@@ -43,6 +43,8 @@ export interface SectionColumns {
    *  (Word's `<w:cols w:equalWidth="0">`). Absent/`true` → equal columns,
    *  which the renderer flows with CSS multi-column. */
   equalWidth?: boolean;
+  /** `<w:cols w:sep="1">` — draw a thin vertical rule between columns. */
+  separator?: boolean;
   /** Per-column geometry from `<w:col w:w w:space>`, present only for the
    *  unequal case. `length === count`. Each entry's `spaceTwips` is the
    *  gap AFTER that column (the last column's is usually absent). The

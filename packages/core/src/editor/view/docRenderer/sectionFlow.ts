@@ -37,6 +37,7 @@ export function openColumnContainerIfNeeded(
   section: SectionProperties | undefined,
   sectionIndex = 0,
   nextSection?: SectionProperties | undefined,
+  noColumnBalance = false,
 ): HTMLElement {
   const cols = section?.columns;
   if (!cols || cols.count <= 1) return host;
@@ -44,12 +45,17 @@ export function openColumnContainerIfNeeded(
   const wrapper = document.createElement("div");
   wrapper.dataset.colCount = String(cols.count);
   wrapper.dataset.pagCid = `cols-${sectionIndex}`;
-  if (columnsFillNotBalance(nextSection)) wrapper.dataset.colFill = "1";
+  // Fill column-first instead of balancing when the section ends at a hard
+  // page break, OR the document opts out of balancing entirely
+  // (`<w:noColumnBalance/>`).
+  if (noColumnBalance || columnsFillNotBalance(nextSection)) wrapper.dataset.colFill = "1";
   // A section begun by a hard page break starts on a FRESH page, so its
   // columns get the whole page as their first-chunk budget — the flow pass
   // can't infer this from linear offsets (a short preceding page would
   // otherwise shrink the budget; see `startSpaceUsed`).
   if (sectionStartsOnFreshPage(section)) wrapper.dataset.colPageStart = "1";
+  // `<w:cols w:sep>` — draw a rule between columns (the flow pass styles it).
+  if (cols.separator) wrapper.dataset.colSep = "1";
 
   if (cols.equalWidth === false && cols.columns && cols.columns.length === cols.count) {
     // Unequal columns: explicit per-column widths + per-gap spacing.

@@ -227,11 +227,17 @@ export async function importDocx(
     fonts,
     ...(Object.keys(footnotes).length > 0 ? { footnotes } : {}),
     ...(Object.keys(comments).length > 0 ? { comments } : {}),
-    // Surface document-wide layout settings (e.g. defaultTabStop) so
-    // the renderer can apply per-document tab geometry instead of
-    // falling back to CSS's 8-char default.
-    ...(settings.defaultTabStopTwips !== undefined
-      ? { settings: { defaultTabStopTwips: settings.defaultTabStopTwips } }
+    // Surface document-wide layout settings (defaultTabStop, column-balance
+    // policy) so the renderer can apply them instead of CSS fallbacks.
+    ...(settings.defaultTabStopTwips !== undefined || settings.noColumnBalance
+      ? {
+          settings: {
+            ...(settings.defaultTabStopTwips !== undefined
+              ? { defaultTabStopTwips: settings.defaultTabStopTwips }
+              : {}),
+            ...(settings.noColumnBalance ? { noColumnBalance: true } : {}),
+          },
+        }
       : {}),
     ...(finalAnchoredFrames.length > 0 ? { anchoredFrames: finalAnchoredFrames } : {}),
     ...(Object.keys(headerFooterFrames).length > 0 ? { headerFooterFrames } : {}),
