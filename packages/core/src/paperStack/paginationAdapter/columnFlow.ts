@@ -190,6 +190,23 @@ function fillTrack(
     }
     queue.shift();
   }
+  // Keep-with-next: don't let the track END on a heading (or a paragraph
+  // marked `keepNext`) whose following content spilled to the next track —
+  // pull the trailing kept chain back so the heading travels with its body.
+  // Only when something actually spilled (`queue` non-empty); never empty
+  // the track (a lone over-tall kept block stays put).
+  while (queue.length > 0 && track.childElementCount > 1) {
+    const last = track.lastElementChild as HTMLElement;
+    if (!keepsWithNext(last)) break;
+    track.removeChild(last);
+    queue.unshift(last);
+  }
+}
+
+/** A block that must travel with the one after it: an explicit `keepNext`
+ *  paragraph (`data-keep-next`) or a heading (`<h1>`–`<h6>`). */
+function keepsWithNext(el: HTMLElement): boolean {
+  return el.hasAttribute("data-keep-next") || /^H[1-6]$/.test(el.tagName);
 }
 
 /**

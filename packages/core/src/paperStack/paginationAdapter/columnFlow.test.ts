@@ -153,6 +153,35 @@ describe("flowColumnSections — fill vs balance (data-col-fill)", () => {
   });
 });
 
+describe("flowColumnSections — keep-with-next", () => {
+  it("does not strand a keepNext block at the bottom of a column", () => {
+    installColHeightModel();
+    // body(150) heading(60, keepNext) body(200); fill budget 300. Column 0
+    // would otherwise pack [body, heading] and push the heading's body to
+    // column 1 — keep-with-next pulls the heading across with it.
+    const root = document.createElement("div");
+    const w = document.createElement("div");
+    w.className = "sobree-cols sobree-section-cols";
+    w.dataset.pagCid = "cols-0";
+    w.dataset.colCount = "2";
+    w.dataset.colGapMm = "5";
+    w.dataset.colFill = "1";
+    [150, 60, 200].forEach((h, i) => {
+      const p = document.createElement("p");
+      p.textContent = i === 1 ? "HEAD" : `b${i}`;
+      if (i === 1) p.setAttribute("data-keep-next", "");
+      stub(p, h);
+      w.appendChild(p);
+    });
+    root.appendChild(w);
+    flowColumnSections(root, 300);
+
+    const c = cols(root);
+    expect(c[0]!.lastElementChild!.textContent).not.toBe("HEAD");
+    expect(c[1]!.firstElementChild!.textContent).toBe("HEAD");
+  });
+});
+
 describe("flowColumnSections — separator rule (data-col-sep)", () => {
   it("draws a centred rule between columns and splits the gap", () => {
     installColHeightModel();

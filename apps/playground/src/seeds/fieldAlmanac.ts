@@ -59,6 +59,7 @@ function head(
 ): ReturnType<typeof paragraph> {
   return paragraph([text(label, { bold: true, fontSizePt, color: INK, fontFamily: SERIF })], {
     spacing,
+    keepNext: true, // a heading travels with the paragraph that follows it
   });
 }
 
