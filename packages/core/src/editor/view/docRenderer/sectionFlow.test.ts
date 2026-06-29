@@ -119,6 +119,32 @@ describe("openColumnContainerIfNeeded", () => {
     );
     expect(continued.dataset.colPageStart).toBeUndefined();
   });
+
+  it("stamps data-col-sep from the separator flag", () => {
+    const sep = openColumnContainerIfNeeded(
+      host,
+      section({ columns: { count: 2, separator: true } }),
+      0,
+    );
+    expect(sep.dataset.colSep).toBe("1");
+    const plain = openColumnContainerIfNeeded(
+      doc.createElement("div"),
+      section({ columns: { count: 2 } }),
+      0,
+    );
+    expect(plain.dataset.colSep).toBeUndefined();
+  });
+
+  it("noColumnBalance forces fill-first even with a continuous next section", () => {
+    const w = openColumnContainerIfNeeded(
+      host,
+      section({ columns: { count: 2 } }),
+      1,
+      section({ type: "continuous" }),
+      true,
+    );
+    expect(w.dataset.colFill).toBe("1");
+  });
 });
 
 describe("column balance / fresh-page policy", () => {

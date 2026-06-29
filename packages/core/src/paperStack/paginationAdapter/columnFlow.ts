@@ -46,11 +46,14 @@ interface ExplicitGeom {
   kind: "explicit";
   widthsMm: number[];
   gapsMm: number[];
+  /** Draw a rule between columns (`<w:cols w:sep>`). */
+  sep: boolean;
 }
 interface EqualGeom {
   kind: "equal";
   count: number;
   gapMm: number;
+  sep: boolean;
 }
 type ColGeom = ExplicitGeom | EqualGeom;
 
@@ -65,14 +68,15 @@ function parseMmList(value: string | undefined): number[] {
 /** Resolve a wrapper's column geometry from its stamped dataset, or
  *  `null` if it isn't a layable multi-column wrapper (< 2 columns). */
 function resolveGeometry(wrapper: HTMLElement): ColGeom | null {
+  const sep = wrapper.dataset.colSep === "1";
   const widthsMm = parseMmList(wrapper.dataset.colWidthsMm);
   if (widthsMm.length >= 2) {
-    return { kind: "explicit", widthsMm, gapsMm: parseMmList(wrapper.dataset.colGapsMm) };
+    return { kind: "explicit", widthsMm, gapsMm: parseMmList(wrapper.dataset.colGapsMm), sep };
   }
   const count = Number.parseInt(wrapper.dataset.colCount ?? "", 10);
   if (Number.isFinite(count) && count >= 2) {
     const gapMm = Number.parseFloat(wrapper.dataset.colGapMm ?? "0");
-    return { kind: "equal", count, gapMm: Number.isFinite(gapMm) ? gapMm : 0 };
+    return { kind: "equal", count, gapMm: Number.isFinite(gapMm) ? gapMm : 0, sep };
   }
   return null;
 }
@@ -83,10 +87,13 @@ function trackCount(geom: ColGeom): number {
 
 /** Build the `count` empty column tracks for one page of a section.
  *  Equal columns use `flex:1` so the browser sizes them; unequal columns
- *  carry an explicit `width`. A right margin supplies the inter-column
- *  gap on every track but the last. */
+ *  carry an explicit `width`. A right margin supplies the inter-column gap
+ *  on every track but the last; with `sep`, the gap is split either side of
+ *  a centred 1px rule (`<w:cols w:sep>`). */
 function buildTracks(geom: ColGeom): HTMLElement[] {
   const n = trackCount(geom);
+  const gapAfter = (i: number): number =>
+    geom.kind === "explicit" ? (geom.gapsMm[i] ?? 0) : geom.gapMm;
   const tracks: HTMLElement[] = [];
   for (let i = 0; i < n; i++) {
     const col = document.createElement("div");
@@ -94,16 +101,49 @@ function buildTracks(geom: ColGeom): HTMLElement[] {
     if (geom.kind === "explicit") {
       col.style.flex = "0 0 auto";
       col.style.width = `${geom.widthsMm[i]}mm`;
-      const gap = geom.gapsMm[i];
-      if (i < n - 1 && gap !== undefined && gap > 0) col.style.marginRight = `${gap}mm`;
     } else {
       col.style.flex = "1 1 0";
       col.style.minWidth = "0";
-      if (i < n - 1 && geom.gapMm > 0) col.style.marginRight = `${geom.gapMm}mm`;
+    }
+    const right = i < n - 1 ? gapAfter(i) : 0;
+    if (geom.sep) {
+      // Split each gap into two halves; a 1px rule element (added by
+      // `withColumnRules`) sits between them, so the line lands in the
+      // MIDDLE of the gap rather than against a column edge.
+      if (right > 0) col.style.marginRight = `${right / 2}mm`;
+      if (i > 0 && gapAfter(i - 1) > 0) col.style.marginLeft = `${gapAfter(i - 1) / 2}mm`;
+    } else if (right > 0) {
+      col.style.marginRight = `${right}mm`;
     }
     tracks.push(col);
   }
   return tracks;
+}
+
+/** A 1px full-height column rule (`<w:cols w:sep>`), centred in the gap by
+ *  the half-margins on the tracks either side. Not a `.sobree-col`, so the
+ *  block-collection selectors skip it. */
+function makeColumnRule(): HTMLElement {
+  const rule = document.createElement("div");
+  rule.className = "sobree-col-rule";
+  rule.style.flex = "0 0 auto";
+  rule.style.width = "1px";
+  rule.style.alignSelf = "stretch";
+  rule.style.background = "var(--sobree-column-rule, #c4c0b6)";
+  return rule;
+}
+
+/** Interleave a column rule between each pair of tracks (sep geometry only);
+ *  otherwise the tracks unchanged. The returned list is the wrapper's child
+ *  order — `fillTrack` still operates on the original `tracks`. */
+function withColumnRules(tracks: HTMLElement[], geom: ColGeom): HTMLElement[] {
+  if (!geom.sep) return tracks;
+  const out: HTMLElement[] = [];
+  tracks.forEach((t, i) => {
+    out.push(t);
+    if (i < tracks.length - 1) out.push(makeColumnRule());
+  });
+  return out;
 }
 
 /** Re-flatten a wrapper to its blocks in document order, whether it's
@@ -177,6 +217,23 @@ function fillTrack(
     }
     queue.shift();
   }
+  // Keep-with-next: don't let the track END on a heading (or a paragraph
+  // marked `keepNext`) whose following content spilled to the next track —
+  // pull the trailing kept chain back so the heading travels with its body.
+  // Only when something actually spilled (`queue` non-empty); never empty
+  // the track (a lone over-tall kept block stays put).
+  while (queue.length > 0 && track.childElementCount > 1) {
+    const last = track.lastElementChild as HTMLElement;
+    if (!keepsWithNext(last)) break;
+    track.removeChild(last);
+    queue.unshift(last);
+  }
+}
+
+/** A block that must travel with the one after it: an explicit `keepNext`
+ *  paragraph (`data-keep-next`) or a heading (`<h1>`–`<h6>`). */
+function keepsWithNext(el: HTMLElement): boolean {
+  return el.hasAttribute("data-keep-next") || /^H[1-6]$/.test(el.tagName);
 }
 
 /**
@@ -249,7 +306,7 @@ function layoutSection(wrapper: HTMLElement, root: HTMLElement, pageHeightPx: nu
   let budget = firstBudget;
   while (true) {
     const tracks = buildTracks(geom);
-    current.replaceChildren(...tracks);
+    current.replaceChildren(...withColumnRules(tracks, geom));
     for (let i = 0; i < tracks.length && queue.length > 0; i++) {
       // Each track fills to the page budget; `force` on the first track
       // guarantees ≥1 block per page so a single over-tall block still

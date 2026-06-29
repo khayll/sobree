@@ -37,6 +37,17 @@ describe("readSection — <w:cols>", () => {
     expect(section.columns).toEqual({ count: 3 });
   });
 
+  it("reads the separator flag from w:sep", () => {
+    const sectPr = new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:sectPr xmlns:w="${NS_W}">
+        <w:cols w:num="2" w:space="720" w:sep="1"/>
+      </w:sectPr>`,
+      "application/xml",
+    ).documentElement;
+    const section = readSection(sectPr, new Map());
+    expect(section.columns).toEqual({ count: 2, spaceTwips: 720, separator: true });
+  });
+
   it("reads unequal per-column widths from <w:col> when equalWidth=0", () => {
     const sectPr = new DOMParser().parseFromString(
       `<?xml version="1.0"?><w:sectPr xmlns:w="${NS_W}">

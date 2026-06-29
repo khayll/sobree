@@ -59,6 +59,7 @@ function head(
 ): ReturnType<typeof paragraph> {
   return paragraph([text(label, { bold: true, fontSizePt, color: INK, fontFamily: SERIF })], {
     spacing,
+    keepNext: true, // a heading travels with the paragraph that follows it
   });
 }
 
@@ -113,7 +114,7 @@ export function fieldAlmanacSeed(): SobreeDocument {
   const base = doc.sections[0]!;
   doc.sections = [
     base,
-    { ...base, type: "nextPage", columns: { count: 2, spaceTwips: 520 } },
+    { ...base, type: "nextPage", columns: { count: 2, spaceTwips: 520, separator: true } },
     { ...base, type: "nextPage" },
   ];
 

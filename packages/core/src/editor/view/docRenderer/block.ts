@@ -48,6 +48,9 @@ export function renderBlocks(
    *  as a valid target for a deferred page break even when its body flow is
    *  empty — a float-only brochure panel page is still a page. */
   frameAnchoredIndices: ReadonlySet<number> = new Set(),
+  /** `<w:noColumnBalance/>` — fill multi-column sections column-first even
+   *  at continuous breaks (document-wide opt-out of column balancing). */
+  noColumnBalance = false,
 ): void {
   // Outline numbers ("1", "1.1", …) for headings whose style links a
   // numbering definition — computed in one document-order pass, stamped as
@@ -70,7 +73,13 @@ export function renderBlocks(
    * section change we close it (revert to `host`) and re-evaluate for the
    * new section.
    */
-  let appendTarget: HTMLElement = openColumnContainerIfNeeded(host, sections[0], 0, sections[1]);
+  let appendTarget: HTMLElement = openColumnContainerIfNeeded(
+    host,
+    sections[0],
+    0,
+    sections[1],
+    noColumnBalance,
+  );
 
   // Word's `<w:lastRenderedPageBreak/>` hints almost always land on
   // an EMPTY paragraph that the source author kept as a "end of
@@ -226,6 +235,7 @@ export function renderBlocks(
         sections[sectionIndex],
         sectionIndex,
         sections[sectionIndex + 1],
+        noColumnBalance,
       );
     }
   }

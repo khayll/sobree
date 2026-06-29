@@ -35,6 +35,10 @@ export interface DocSettings {
    *  for tab advances in paragraphs that don't declare their own
    *  `<w:tabs>`. Word's factory default is 720 twips (0.5"). */
   defaultTabStopTwips?: number;
+  /** `<w:compat><w:noColumnBalance/>` — disable column balancing at
+   *  continuous section breaks document-wide (columns fill column-first
+   *  instead of equalising on the last page). */
+  noColumnBalance?: boolean;
 }
 
 export function parseSettingsXml(xml: string | undefined): DocSettings {
@@ -74,6 +78,9 @@ export function parseSettingsXml(xml: string | undefined): DocSettings {
   if (wFirst(doc, "doNotUseHTMLParagraphAutoSpacing")) {
     out.doNotUseHTMLParagraphAutoSpacing = true;
   }
+
+  // <w:noColumnBalance/> — disable column balancing at continuous breaks.
+  if (wFirst(doc, "noColumnBalance")) out.noColumnBalance = true;
 
   // <w:defaultTabStop w:val="720"/> — interval for tab advances when a
   // paragraph has no explicit `<w:tabs>` stops. Word's factory default

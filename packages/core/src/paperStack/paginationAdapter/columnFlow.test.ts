@@ -153,6 +153,62 @@ describe("flowColumnSections — fill vs balance (data-col-fill)", () => {
   });
 });
 
+describe("flowColumnSections — keep-with-next", () => {
+  it("does not strand a keepNext block at the bottom of a column", () => {
+    installColHeightModel();
+    // body(150) heading(60, keepNext) body(200); fill budget 300. Column 0
+    // would otherwise pack [body, heading] and push the heading's body to
+    // column 1 — keep-with-next pulls the heading across with it.
+    const root = document.createElement("div");
+    const w = document.createElement("div");
+    w.className = "sobree-cols sobree-section-cols";
+    w.dataset.pagCid = "cols-0";
+    w.dataset.colCount = "2";
+    w.dataset.colGapMm = "5";
+    w.dataset.colFill = "1";
+    [150, 60, 200].forEach((h, i) => {
+      const p = document.createElement("p");
+      p.textContent = i === 1 ? "HEAD" : `b${i}`;
+      if (i === 1) p.setAttribute("data-keep-next", "");
+      stub(p, h);
+      w.appendChild(p);
+    });
+    root.appendChild(w);
+    flowColumnSections(root, 300);
+
+    const c = cols(root);
+    expect(c[0]!.lastElementChild!.textContent).not.toBe("HEAD");
+    expect(c[1]!.firstElementChild!.textContent).toBe("HEAD");
+  });
+});
+
+describe("flowColumnSections — separator rule (data-col-sep)", () => {
+  it("draws a centred rule between columns and splits the gap", () => {
+    installColHeightModel();
+    const root = equalRoot(2, "10", Array(4).fill(100));
+    wrappers(root)[0]!.dataset.colSep = "1";
+    flowColumnSections(root, 1000);
+    const c = cols(root);
+    // A 1px rule element sits BETWEEN the two tracks, centred by the
+    // half-margins either side — not a border on a column edge.
+    const kids = [...wrappers(root)[0]!.children];
+    expect(kids.map((k) => k.className)).toEqual(["sobree-col", "sobree-col-rule", "sobree-col"]);
+    expect(c[0]!.style.borderRight).toBe("");
+    expect(c[0]!.style.marginRight).toBe("5mm"); // half the 10mm gap
+    expect(c[1]!.style.marginLeft).toBe("5mm"); // the other half
+  });
+
+  it("leaves a full right-margin gap and no rule without the flag", () => {
+    installColHeightModel();
+    const root = equalRoot(2, "10", Array(4).fill(100));
+    flowColumnSections(root, 1000);
+    const c = cols(root);
+    expect(root.querySelectorAll(".sobree-col-rule").length).toBe(0);
+    expect(c[0]!.style.marginRight).toBe("10mm");
+    expect(c[1]!.style.marginLeft).toBe("");
+  });
+});
+
 describe("flowColumnSections — snaking across pages", () => {
   it("splits a section taller than one page into per-page wrappers", () => {
     installColHeightModel();
