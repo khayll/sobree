@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.38
+
+### Patch Changes
+
+- f956167: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [f956167]
+  - @sobree/core@0.1.38
+
 ## 0.1.37
 
 ### Patch Changes
