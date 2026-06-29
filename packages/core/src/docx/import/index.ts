@@ -8,7 +8,7 @@ import type {
   SobreeDocument,
 } from "../../doc/types";
 import { mountFontTableFromZip } from "../../fonts";
-import { type ThemePalette, parseThemeXml } from "../drawing";
+import { type ThemePalette, parseThemeLineWidthsEmu, parseThemeXml } from "../drawing";
 import { parseAnchoredFrames, parseVmlFloatingFrames } from "../drawing/anchored";
 import { parseInlineFrames } from "../drawing/inline";
 import { parseXml } from "../shared/xml";
@@ -53,6 +53,11 @@ export async function importDocx(
   // `<a:schemeClr>` resolve against it (an accent-coloured rule would
   // otherwise import with no colour and render invisible).
   const theme = parseThemeXml(unzipped.text["word/theme/theme1.xml"]);
+  // Outline widths from the theme's `<a:lnStyleLst>`, indexed by a shape's
+  // `<a:lnRef idx>` — gallery shapes record their default outline only as a
+  // style reference, so without these their thin border imports width-less.
+  const themeLineWidthsEmu = parseThemeLineWidthsEmu(unzipped.text["word/theme/theme1.xml"]);
+  const themeLineWidths = themeLineWidthsEmu.length > 0 ? { themeLineWidthsEmu } : {};
   // Walk the body's direct paragraph children FIRST to build a stable
   // element → index map. The new floating-layer parser uses this to
   // attribute each anchored frame to the body paragraph that contained
@@ -69,13 +74,16 @@ export async function importDocx(
     // pagination depends on honest line heights.
     parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     ...(theme ? { theme } : {}),
+    ...themeLineWidths,
   });
   // Floating legacy-VML objects (`<w:pict>` watermarks / absolute-
   // positioned backgrounds) become picture frames in the same overlay,
   // claimed out of the flow so they don't render inline (which would
   // inflate flow height and displace body content). Appended after the
   // DrawingML anchors — both feed the one floating layer.
-  anchoredFrames.push(...parseVmlFloatingFrames(xml, { rels, ...(theme ? { theme } : {}) }));
+  anchoredFrames.push(
+    ...parseVmlFloatingFrames(xml, { rels, ...(theme ? { theme } : {}), ...themeLineWidths }),
+  );
   // Parse inline-drawing frames (`<w:drawing><wp:inline>` with
   // textbox payload) into the new InlineFrame model. Phase 1.1:
   // parser runs and results land on `doc.inlineFrames` for
@@ -110,6 +118,7 @@ export async function importDocx(
     parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     honorLastRenderedPageBreaks,
     ...(theme ? { theme } : {}),
+    ...themeLineWidths,
     ...(contentWidthEmu !== undefined ? { contentWidthEmu } : {}),
     ...(settings.defaultTabStopTwips !== undefined
       ? { defaultTabStopTwips: settings.defaultTabStopTwips }

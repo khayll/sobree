@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseThemeXml, readDrawingColor } from "./colors";
+import { parseThemeLineWidthsEmu, parseThemeXml, readDrawingColor } from "./colors";
 
 const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 
@@ -53,5 +53,25 @@ describe("drawingColor", () => {
 
   it("returns undefined for schemeClr with no palette", () => {
     expect(readDrawingColor(el(`<a:schemeClr val="accent1"/>`))).toBeUndefined();
+  });
+});
+
+describe("parseThemeLineWidthsEmu", () => {
+  // A typical `<a:fmtScheme>` line-style list: thin / medium / thick.
+  const THEME_LINES = `<?xml version="1.0"?>
+  <a:theme xmlns:a="${A}"><a:themeElements><a:fmtScheme name="t"><a:lnStyleLst>
+    <a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
+    <a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
+    <a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
+  </a:lnStyleLst></a:fmtScheme></a:themeElements></a:theme>`;
+
+  it("reads the lnStyleLst outline widths in order (idx is 1-based)", () => {
+    expect(parseThemeLineWidthsEmu(THEME_LINES)).toEqual([6350, 12700, 19050]);
+  });
+
+  it("returns [] for missing / malformed / list-less themes", () => {
+    expect(parseThemeLineWidthsEmu(undefined)).toEqual([]);
+    expect(parseThemeLineWidthsEmu("<not xml")).toEqual([]);
+    expect(parseThemeLineWidthsEmu(THEME)).toEqual([]); // clrScheme only
   });
 });

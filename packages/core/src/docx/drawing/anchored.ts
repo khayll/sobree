@@ -65,6 +65,9 @@ export interface AnchoredFramesContext {
   /** Theme colour palette (from `word/theme/theme1.xml`) so shape fills /
    *  strokes declared as `<a:schemeClr>` resolve instead of vanishing. */
   theme?: ThemePalette;
+  /** Theme `<a:lnStyleLst>` outline widths (EMU), indexed by a shape's
+   *  `<a:lnRef idx>` so a style-referenced border imports at full width. */
+  themeLineWidthsEmu?: number[];
 }
 
 /**
@@ -461,7 +464,7 @@ function parseShape(
       };
       const fill = readSolidFill(wsp, ctx.theme);
       if (fill !== undefined) out.fill = fill;
-      const border = readBorder(wsp, ctx.theme);
+      const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
       if (border !== undefined) out.border = border;
       // `<wps:bodyPr lIns/tIns/rIns/bIns>` are the textbox's internal
       // insets (EMU). They push the text in from the frame edge — Word
@@ -499,7 +502,7 @@ function parseShape(
   }
   const fill = readSolidFill(wsp, ctx.theme);
   if (fill !== undefined) out.fill = fill;
-  const border = readBorder(wsp, ctx.theme);
+  const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
   if (border !== undefined) out.border = border;
   return out;
 }

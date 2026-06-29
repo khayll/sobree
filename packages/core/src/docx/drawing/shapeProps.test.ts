@@ -82,4 +82,45 @@ describe("shapeProps — border", () => {
       readBorder(el(`<wps:wsp><wps:spPr><a:ln w="9525"/></wps:spPr></wps:wsp>`)),
     ).toBeUndefined();
   });
+
+  it("falls back to the shape-style lnRef: colour from the ref, width from the theme", () => {
+    // Gallery shapes carry no direct `<a:ln>`; their outline is a style ref
+    // whose idx selects the theme line width (idx 2 → second list entry).
+    const wsp = el(
+      `<wps:wsp><wps:spPr><a:prstGeom prst="rect"/></wps:spPr>` +
+        `<wps:style><a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef></wps:style></wps:wsp>`,
+    );
+    expect(readBorder(wsp, { accent1: "#85B9C9" }, [6350, 12700, 19050])).toEqual({
+      color: "#85B9C9",
+      widthEmu: 12700,
+      style: "solid",
+    });
+  });
+
+  it("treats lnRef idx 0 as the explicit no-line slot", () => {
+    const wsp = el(
+      `<wps:wsp><wps:spPr/><wps:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef></wps:style></wps:wsp>`,
+    );
+    expect(readBorder(wsp, { accent1: "#85B9C9" }, [6350])).toBeUndefined();
+  });
+
+  it("uses a 0 width when the theme line-style list is absent", () => {
+    // No theme widths: the border still resolves (renderer clamps to ≥1px).
+    const wsp = el(
+      `<wps:wsp><wps:spPr/><wps:style><a:lnRef idx="1"><a:srgbClr val="334455"/></a:lnRef></wps:style></wps:wsp>`,
+    );
+    expect(readBorder(wsp)).toEqual({ color: "#334455", widthEmu: 0, style: "solid" });
+  });
+
+  it("prefers a direct spPr outline over the style lnRef", () => {
+    const wsp = el(
+      `<wps:wsp><wps:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="0000FF"/></a:solidFill></a:ln></wps:spPr>` +
+        `<wps:style><a:lnRef idx="3"><a:schemeClr val="accent1"/></a:lnRef></wps:style></wps:wsp>`,
+    );
+    expect(readBorder(wsp, { accent1: "#85B9C9" }, [6350, 12700, 19050])).toEqual({
+      color: "#0000FF",
+      widthEmu: 9525,
+      style: "solid",
+    });
+  });
 });

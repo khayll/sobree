@@ -74,6 +74,9 @@ export interface InlineFramesContext {
   /** Theme colour palette (from `word/theme/theme1.xml`) so textbox /
    *  shape fills declared as `<a:schemeClr>` resolve instead of vanishing. */
   theme?: ThemePalette;
+  /** Theme `<a:lnStyleLst>` outline widths (EMU), indexed by a shape's
+   *  `<a:lnRef idx>` so a style-referenced border imports at full width. */
+  themeLineWidthsEmu?: number[];
   /**
    * Body content width in EMU (page width − left/right margins). Needed
    * only to lay out a paragraph that holds MORE THAN ONE inline drawing
@@ -428,7 +431,7 @@ function buildInlineFrame(
           if (shapeExt.cx <= 0 || shapeExt.cy <= 0) continue;
           const geom = readGeometry(child);
           const fill = readSolidFill(child, ctx.theme);
-          const border = readBorder(child, ctx.theme);
+          const border = readBorder(child, ctx.theme, ctx.themeLineWidthsEmu);
           const decoration: InlineFrame["shapes"][number] = {
             geometry: geom,
             offsetEmu: { xEmu: off.x, yEmu: off.y },
@@ -491,7 +494,7 @@ function readInlineTextbox(wsp: Element, ctx: InlineFramesContext): InlineFrameT
   };
   const fill = readSolidFill(wsp, ctx.theme);
   if (fill !== undefined) textbox.fill = fill;
-  const border = readBorder(wsp, ctx.theme);
+  const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
   if (border !== undefined) textbox.border = border;
   // `<wps:bodyPr>` carries the text insets + vertical anchor. Word
   // centers a single heading line by top-anchoring it inside a short
@@ -578,7 +581,7 @@ function buildBareShapeFrame(
   };
   const fill = readSolidFill(wsp, ctx.theme);
   if (fill !== undefined) shape.fill = fill;
-  const border = readBorder(wsp, ctx.theme);
+  const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
   if (border !== undefined) shape.border = border;
 
   const pPr = firstChildNS(hostP, NS.w, "pPr");

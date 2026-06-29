@@ -48,6 +48,31 @@ export function parseThemeXml(xml: string | undefined): ThemePalette | undefined
 }
 
 /**
+ * Parse the theme's `<a:fmtScheme><a:lnStyleLst>` outline widths (EMU), in
+ * order. A shape's `<a:lnRef idx="N">` references the Nth (1-based) entry
+ * for its outline WIDTH, while the lnRef's own colour child gives the
+ * stroke colour. Empty when the theme omits the list.
+ */
+export function parseThemeLineWidthsEmu(xml: string | undefined): number[] {
+  if (!xml) return [];
+  let doc: Document;
+  try {
+    doc = parseXml(xml);
+  } catch {
+    return [];
+  }
+  const lst = doc.getElementsByTagNameNS(NS.a, "lnStyleLst")[0];
+  if (!lst) return [];
+  const widths: number[] = [];
+  for (const ln of Array.from(lst.children)) {
+    if (ln.namespaceURI !== NS.a || ln.localName !== "ln") continue;
+    const w = Number.parseInt(ln.getAttribute("w") ?? "", 10);
+    widths.push(Number.isFinite(w) ? w : 0);
+  }
+  return widths;
+}
+
+/**
  * Resolve the colour child of `parent` (an `<a:solidFill>` or `<a:ln>`-
  * style container): literal `srgbClr` or theme `schemeClr`, transforms
  * applied. Returns `#RRGGBB` or undefined when no resolvable colour.
