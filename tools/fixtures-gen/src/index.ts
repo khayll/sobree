@@ -331,7 +331,16 @@ const FIXTURES: Fixture[] = [
             properties: {},
             children: [
               new Paragraph({ children: [new TextRun("Table below:")] }),
+              // `columnWidths` is load-bearing: without it the docx
+              // library emits a degenerate `<w:tblGrid>` of 100-twip
+              // columns (its default) that contradicts the 3000-twip
+              // `tcW` on every cell. LibreOffice honours the tiny grid
+              // and collapses the table to a text-less sliver, so the
+              // cell glyphs never reach the reference PDF and nine of
+              // eleven blocks have nothing to match. Pin the grid to the
+              // cell widths — what a real Word table always does.
               new Table({
+                columnWidths: [3000, 3000, 3000],
                 rows: [
                   row(["Header A", "Header B", "Header C"], true),
                   row(["Cell 1A", "Cell 1B", "Cell 1C"]),

@@ -14,7 +14,34 @@
           "y": 760.99,
           "width": 52.43,
           "height": 10,
-          "fontName": "g_d20_f1",
+          "fontName": "g_d0_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Header A Header B Header C",
+          "x": 77.75,
+          "y": 748.94,
+          "width": 341.34,
+          "height": 10,
+          "fontName": "g_d0_f2",
+          "fontSize": 10
+        },
+        {
+          "text": "Cell 1A Cell 1B Cell 1C",
+          "x": 77.75,
+          "y": 730.44,
+          "width": 330.79,
+          "height": 10,
+          "fontName": "g_d0_f1",
+          "fontSize": 10
+        },
+        {
+          "text": "Cell 2A Cell 2B Cell 2C",
+          "x": 77.75,
+          "y": 711.94,
+          "width": 330.79,
+          "height": 10,
+          "fontName": "g_d0_f1",
           "fontSize": 10
         },
         {
@@ -23,7 +50,7 @@
           "y": 693.44,
           "width": 85.66,
           "height": 10,
-          "fontName": "g_d20_f1",
+          "fontName": "g_d0_f1",
           "fontSize": 10
         }
       ]
