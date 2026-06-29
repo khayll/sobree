@@ -189,8 +189,11 @@ describe("flowColumnSections — separator rule (data-col-sep)", () => {
     wrappers(root)[0]!.dataset.colSep = "1";
     flowColumnSections(root, 1000);
     const c = cols(root);
-    expect(c[0]!.style.borderRight).toContain("solid"); // rule on the non-last track
-    expect(c[1]!.style.borderRight).toBe(""); // none after the last
+    // A 1px rule element sits BETWEEN the two tracks, centred by the
+    // half-margins either side — not a border on a column edge.
+    const kids = [...wrappers(root)[0]!.children];
+    expect(kids.map((k) => k.className)).toEqual(["sobree-col", "sobree-col-rule", "sobree-col"]);
+    expect(c[0]!.style.borderRight).toBe("");
     expect(c[0]!.style.marginRight).toBe("5mm"); // half the 10mm gap
     expect(c[1]!.style.marginLeft).toBe("5mm"); // the other half
   });
@@ -200,7 +203,7 @@ describe("flowColumnSections — separator rule (data-col-sep)", () => {
     const root = equalRoot(2, "10", Array(4).fill(100));
     flowColumnSections(root, 1000);
     const c = cols(root);
-    expect(c[0]!.style.borderRight).toBe("");
+    expect(root.querySelectorAll(".sobree-col-rule").length).toBe(0);
     expect(c[0]!.style.marginRight).toBe("10mm");
     expect(c[1]!.style.marginLeft).toBe("");
   });

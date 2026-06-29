@@ -107,16 +107,43 @@ function buildTracks(geom: ColGeom): HTMLElement[] {
     }
     const right = i < n - 1 ? gapAfter(i) : 0;
     if (geom.sep) {
-      // Split each gap around a centred column rule.
+      // Split each gap into two halves; a 1px rule element (added by
+      // `withColumnRules`) sits between them, so the line lands in the
+      // MIDDLE of the gap rather than against a column edge.
       if (right > 0) col.style.marginRight = `${right / 2}mm`;
       if (i > 0 && gapAfter(i - 1) > 0) col.style.marginLeft = `${gapAfter(i - 1) / 2}mm`;
-      if (i < n - 1) col.style.borderRight = "1px solid var(--sobree-column-rule, #c4c0b6)";
     } else if (right > 0) {
       col.style.marginRight = `${right}mm`;
     }
     tracks.push(col);
   }
   return tracks;
+}
+
+/** A 1px full-height column rule (`<w:cols w:sep>`), centred in the gap by
+ *  the half-margins on the tracks either side. Not a `.sobree-col`, so the
+ *  block-collection selectors skip it. */
+function makeColumnRule(): HTMLElement {
+  const rule = document.createElement("div");
+  rule.className = "sobree-col-rule";
+  rule.style.flex = "0 0 auto";
+  rule.style.width = "1px";
+  rule.style.alignSelf = "stretch";
+  rule.style.background = "var(--sobree-column-rule, #c4c0b6)";
+  return rule;
+}
+
+/** Interleave a column rule between each pair of tracks (sep geometry only);
+ *  otherwise the tracks unchanged. The returned list is the wrapper's child
+ *  order — `fillTrack` still operates on the original `tracks`. */
+function withColumnRules(tracks: HTMLElement[], geom: ColGeom): HTMLElement[] {
+  if (!geom.sep) return tracks;
+  const out: HTMLElement[] = [];
+  tracks.forEach((t, i) => {
+    out.push(t);
+    if (i < tracks.length - 1) out.push(makeColumnRule());
+  });
+  return out;
 }
 
 /** Re-flatten a wrapper to its blocks in document order, whether it's
@@ -279,7 +306,7 @@ function layoutSection(wrapper: HTMLElement, root: HTMLElement, pageHeightPx: nu
   let budget = firstBudget;
   while (true) {
     const tracks = buildTracks(geom);
-    current.replaceChildren(...tracks);
+    current.replaceChildren(...withColumnRules(tracks, geom));
     for (let i = 0; i < tracks.length && queue.length > 0; i++) {
       // Each track fills to the page budget; `force` on the first track
       // guarantees ≥1 block per page so a single over-tall block still
