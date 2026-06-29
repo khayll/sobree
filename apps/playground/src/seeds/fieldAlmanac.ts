@@ -113,7 +113,9 @@ export function fieldAlmanacSeed(): SobreeDocument {
   // columns, and a full-width reference page (the key + colophon).
   const base = doc.sections[0]!;
   doc.sections = [
-    base,
+    // Cover: centre the title block vertically so the short page reads as a
+    // composed title page instead of content stacked at the top.
+    { ...base, vAlign: "center" },
     { ...base, type: "nextPage", columns: { count: 2, spaceTwips: 520, separator: true } },
     { ...base, type: "nextPage" },
   ];
