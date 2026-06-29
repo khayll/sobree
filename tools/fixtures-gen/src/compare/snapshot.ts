@@ -26,6 +26,14 @@ export interface SnapshotBlock {
    * when no `line-height` was declared.
    */
   lineHeight: number | "normal" | null;
+  /**
+   * Editor chrome rather than document content — a section-break
+   * separator (`role="separator"` / `.sobree-section-break`) carries
+   * placeholder text ("Section break · next page") that has no
+   * counterpart in Word's render. Excluded from the matched-block
+   * denominator so multi-section docs aren't penalised for it.
+   */
+  isChrome: boolean;
 }
 
 interface RawBlock {
@@ -158,7 +166,17 @@ function parseBlock(block: RawBlock, index: number): SnapshotBlock {
     text: block.text ?? "",
     fontSizePt: parseFontSize(style),
     lineHeight: parseLineHeight(style),
+    isChrome: isChromeBlock(block),
   };
+}
+
+/** A non-content separator the editor draws between sections — its
+ *  placeholder caption isn't real document text. */
+function isChromeBlock(block: RawBlock): boolean {
+  const role = block.attrs?.role;
+  if (role === "separator") return true;
+  const cls = block.attrs?.class ?? "";
+  return cls.split(/\s+/).includes("sobree-section-break");
 }
 
 function parseFontSize(style: string): number | null {

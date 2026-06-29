@@ -9,6 +9,7 @@ const block = (index: number, text: string): SnapshotBlock => ({
   text,
   fontSizePt: null,
   lineHeight: null,
+  isChrome: false,
 });
 
 const line = (text: string): LineMetric => ({
@@ -50,5 +51,44 @@ describe("matchBlocksToLines: bounded prefix scan", () => {
     const blocks = [block(0, "Target")];
     const lines = [line("noise a"), line("noise b"), line("Target")];
     expect(matchBlocksToLines(blocks, lines)[0]!.matchType).toBe("prefix");
+  });
+});
+
+describe("matchBlocksToLines: column-interleave recovery (phase 2)", () => {
+  it("recovers a block stranded out of reading order (the two-column case)", () => {
+    // Sobree emits logical order [L1, L2, R1, R2]; LibreOffice extracts the
+    // two columns interleaved by Y and FUSES same-Y lines: [L1+R1, L2+R2].
+    // The linear pass matches the left column; phase 2 recovers the right.
+    const blocks = [
+      block(0, "Left one"),
+      block(1, "Left two"),
+      block(2, "Right one"),
+      block(3, "Right two"),
+    ];
+    const lines = [line("Left one Right one"), line("Left two Right two")];
+    const r = matchBlocksToLines(blocks, lines);
+    expect(r.map((m) => m.matchType)).toEqual(["prefix", "prefix", "substring", "substring"]);
+    // The recovered blocks point at the fused line that carries their text.
+    expect(r[2]!.pdfLines[0]!.text).toBe("Left one Right one");
+    expect(r[3]!.pdfLines[0]!.text).toBe("Left two Right two");
+  });
+
+  it("matches loosely — list markers, curly-quote spacing, glued glyphs", () => {
+    const blocks = [block(0, "header"), block(1, '"Basic Numbers" for lists')];
+    // PDF order puts the target behind a fused line (so the linear cursor
+    // skips it), with extraction's spacing artifacts around the quotes.
+    const lines = [line("x “ Basic Numbers ”for lists"), line("header")];
+    const r = matchBlocksToLines(blocks, lines);
+    expect(r[0]!.matchType).toBe("prefix");
+    expect(r[1]!.matchType).toBe("substring");
+  });
+
+  it("does not recover a coincidental match beyond the recovery window", () => {
+    const filler = Array.from({ length: 80 }, (_, i) => line(`filler ${i}`));
+    const blocks = [block(0, "filler 0"), block(1, "FarFarAway")];
+    const lines = [...filler, line("FarFarAway")];
+    const r = matchBlocksToLines(blocks, lines);
+    expect(r[0]!.matchType).toBe("prefix"); // anchors at line 0
+    expect(r[1]!.matchType).toBe("none"); // target 80 lines past the anchor
   });
 });
