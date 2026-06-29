@@ -36,3 +36,28 @@ describe("presetGeometry — rightArrow", () => {
     expect(expandPresetGeometry(el("<wps:wsp/>"), { widthEmu: 10, heightEmu: 10 })).toBeNull();
   });
 });
+
+describe("presetGeometry — arrow directions", () => {
+  // A 40×20 box keeps the default-50% maths integer for every direction.
+  const box = { widthEmu: 40, heightEmu: 20 };
+
+  it("leftArrow mirrors rightArrow — tip at the left edge", () => {
+    const path = expandPresetGeometry(shape("leftArrow"), box);
+    expect(path?.d).toBe("M40 5 L10 5 L10 0 L0 10 L10 20 L10 15 L40 15 Z");
+  });
+
+  it("upArrow points to the top centre (w/2, 0)", () => {
+    const path = expandPresetGeometry(shape("upArrow"), box);
+    expect(path?.d).toBe("M10 20 L10 10 L0 10 L20 0 L40 10 L30 10 L30 20 Z");
+  });
+
+  it("downArrow points to the bottom centre (w/2, h)", () => {
+    const path = expandPresetGeometry(shape("downArrow"), box);
+    expect(path?.d).toBe("M10 0 L10 10 L0 10 L20 20 L40 10 L30 10 L30 0 Z");
+  });
+
+  it("rightArrow in the same box stays the integer reference", () => {
+    const path = expandPresetGeometry(shape("rightArrow"), box);
+    expect(path?.d).toBe("M0 5 L30 5 L30 0 L40 10 L30 20 L30 15 L0 15 Z");
+  });
+});
