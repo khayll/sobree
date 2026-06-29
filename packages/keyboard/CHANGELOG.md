@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.39
+
+### Patch Changes
+
+- 0777f99: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [0777f99]
+  - @sobree/core@0.1.39
+
 ## 0.1.38
 
 ### Patch Changes
