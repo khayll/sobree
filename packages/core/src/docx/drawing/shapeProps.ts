@@ -79,18 +79,47 @@ function readStyleRefFill(shape: Element, theme?: ThemePalette): string | undefi
 
 /** Read the shape outline `<a:ln>` (width + colour + dash) into a
  *  `FrameBorder`; `undefined` when there's no outline or no stroke colour. */
-export function readBorder(shape: Element, theme?: ThemePalette): FrameBorder | undefined {
+export function readBorder(
+  shape: Element,
+  theme?: ThemePalette,
+  themeLineWidthsEmu?: number[],
+): FrameBorder | undefined {
   const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
-  if (!spPr) return undefined;
-  const ln = firstChildNS(spPr, NS.a, "ln");
-  if (!ln) return undefined;
-  const widthEmu = numAttr(ln, "w");
-  const solidFill = firstChildNS(ln, NS.a, "solidFill");
-  const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
+  const ln = spPr ? firstChildNS(spPr, NS.a, "ln") : null;
+  if (ln) {
+    const widthEmu = numAttr(ln, "w");
+    const solidFill = firstChildNS(ln, NS.a, "solidFill");
+    const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
+    if (!color) return undefined;
+    const prstDash = firstChildNS(ln, NS.a, "prstDash");
+    return {
+      color,
+      widthEmu: widthEmu || 0,
+      style: coerceBorderStyle(prstDash?.getAttribute("val")),
+    };
+  }
+  // No DIRECT outline: fall back to the shape-STYLE reference, the way
+  // ribbon-inserted gallery shapes record their default thin outline. The
+  // `<a:lnRef idx>` picks the WIDTH from the theme's line-style list; the
+  // ref's own colour child gives the stroke colour (`idx="0"` = no line).
+  return readStyleRefBorder(shape, theme, themeLineWidthsEmu);
+}
+
+/** Resolve a shape's outline from `<wps:style><a:lnRef>`: colour from the
+ *  ref's child, width from `themeLineWidthsEmu[idx-1]`. */
+function readStyleRefBorder(
+  shape: Element,
+  theme: ThemePalette | undefined,
+  themeLineWidthsEmu: number[] | undefined,
+): FrameBorder | undefined {
+  const style = firstChildNS(shape, NS.wps, "style");
+  const lnRef = style ? firstChildNS(style, NS.a, "lnRef") : null;
+  if (!lnRef) return undefined;
+  const idx = Number.parseInt(lnRef.getAttribute("idx") ?? "0", 10);
+  if (!Number.isFinite(idx) || idx <= 0) return undefined;
+  const color = readDrawingColor(lnRef, theme);
   if (!color) return undefined;
-  const prstDash = firstChildNS(ln, NS.a, "prstDash");
-  const style = coerceBorderStyle(prstDash?.getAttribute("val"));
-  return { color, widthEmu: widthEmu || 0, style };
+  return { color, widthEmu: themeLineWidthsEmu?.[idx - 1] ?? 0, style: "solid" };
 }
 
 function coerceBorderStyle(v: string | null | undefined): FrameBorder["style"] {
