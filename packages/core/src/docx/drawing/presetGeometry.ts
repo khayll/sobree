@@ -33,45 +33,76 @@ export function expandPresetGeometry(
   const spPr = firstChildNS(wsp, NS.wps, "spPr") ?? firstChildNS(wsp, NS.pic, "spPr");
   if (!spPr) return null;
   const prstGeom = firstChildNS(spPr, NS.a, "prstGeom");
-  switch (prstGeom?.getAttribute("prst")) {
-    case "rightArrow":
-      return rightArrowPath(dims, readAdjustments(prstGeom));
-    default:
-      return null;
-  }
+  const prst = prstGeom?.getAttribute("prst");
+  const dir = ARROW_DIRECTIONS[prst ?? ""];
+  if (dir && prstGeom) return arrowPath(dims, readAdjustments(prstGeom), dir);
+  return null;
 }
 
+type ArrowDir = "right" | "left" | "up" | "down";
+const ARROW_DIRECTIONS: Record<string, ArrowDir> = {
+  rightArrow: "right",
+  leftArrow: "left",
+  upArrow: "up",
+  downArrow: "down",
+};
+
 /**
- * Block right-arrow (ECMA-376 preset `rightArrow`): a centred shaft
- * leading into a triangular head. `adj1` is the shaft thickness as a
- * fraction of height; `adj2` the head length as a fraction of the
- * smaller side. Both default to 50%.
+ * Block arrow (ECMA-376 presets `rightArrow` / `leftArrow` / `upArrow` /
+ * `downArrow`): a centred shaft leading into a triangular head. `adj1` is
+ * the shaft thickness as a fraction of the cross axis; `adj2` the head
+ * length as a fraction of the smaller side. Both default to 50%.
+ *
+ * One parametrisation in "along-the-arrow / across" space, then mapped to
+ * `(x, y)` per direction — so all four arrows share the same geometry and
+ * adjustment handling instead of four hand-tuned point lists.
  */
-function rightArrowPath(
+function arrowPath(
   dims: { widthEmu: number; heightEmu: number },
   adj: Map<string, number>,
+  dir: ArrowDir,
 ): PresetPath {
   const w = dims.widthEmu;
   const h = dims.heightEmu;
+  const horizontal = dir === "right" || dir === "left";
+  const along = horizontal ? w : h; // length down the arrow
+  const cross = horizontal ? h : w; // perpendicular extent
   const ss = Math.min(w, h);
-  const vc = h / 2;
   const a1 = clamp(adj.get("adj1") ?? 50000, 0, 100000);
-  const maxAdj2 = ss > 0 ? (100000 * w) / ss : 0;
-  const a2 = clamp(adj.get("adj2") ?? 50000, 0, maxAdj2);
-  const dy = (h * a1) / 200000; // shaft half-height
-  const y1 = vc - dy;
-  const y2 = vc + dy;
-  const x2 = w - (ss * a2) / 100000; // where the head begins
-  const d = [
-    `M0 ${r(y1)}`,
-    `L${r(x2)} ${r(y1)}`,
-    `L${r(x2)} 0`,
-    `L${r(w)} ${r(vc)}`,
-    `L${r(x2)} ${r(h)}`,
-    `L${r(x2)} ${r(y2)}`,
-    `L0 ${r(y2)}`,
-    "Z",
-  ].join(" ");
+  const maxA2 = ss > 0 ? (100000 * along) / ss : 0;
+  const a2 = clamp(adj.get("adj2") ?? 50000, 0, maxA2);
+  const cc = cross / 2;
+  const dThick = (cross * a1) / 200000; // shaft half-thickness
+  const neck = along - (ss * a2) / 100000; // where the head meets the shaft
+
+  // Points pointing toward +along; the tip is at `along`, base at 0.
+  const pts: Array<[number, number]> = [
+    [0, cc - dThick],
+    [neck, cc - dThick],
+    [neck, 0],
+    [along, cc],
+    [neck, cross],
+    [neck, cc + dThick],
+    [0, cc + dThick],
+  ];
+  const map = (a: number, c: number): [number, number] => {
+    switch (dir) {
+      case "right":
+        return [a, c];
+      case "left":
+        return [w - a, c];
+      case "down":
+        return [c, a];
+      case "up":
+        return [c, h - a];
+    }
+  };
+  const d = `${pts
+    .map(([a, c], i) => {
+      const [x, y] = map(a, c);
+      return `${i === 0 ? "M" : "L"}${r(x)} ${r(y)}`;
+    })
+    .join(" ")} Z`;
   return { widthEmu: w, heightEmu: h, d };
 }
 
