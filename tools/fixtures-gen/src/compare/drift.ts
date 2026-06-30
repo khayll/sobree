@@ -52,7 +52,7 @@ function hasContent(block: SnapshotBlock): boolean {
 function buildBlockDrift(match: MatchResult, warnings: string[]): BlockDrift {
   const { block, pdfLines } = match;
   const matchedLineCount = pdfLines.length;
-  const pdfDeltaY = medianAdjacentDeltaY(pdfLines);
+  const pdfDeltaY = medianAdjacentDeltaY(columnConsistentLines(pdfLines, block.fontSizePt));
   const declaredFontSizePt = block.fontSizePt;
   const declaredLineHeight = block.lineHeight;
 
@@ -99,6 +99,46 @@ function medianAdjacentDeltaY(lines: { y: number }[]): number | null {
   deltas.sort((a, b) => a - b);
   const mid = Math.floor(deltas.length / 2);
   return deltas.length % 2 === 0 ? (deltas[mid - 1]! + deltas[mid]!) / 2 : deltas[mid]!;
+}
+
+/** How far (pt) a continuation line's x may sit from the block's first
+ *  line and still count as the same column. ~half a line — tight enough
+ *  to reject the other column / a mid-paragraph callout, loose enough to
+ *  tolerate justification jitter and a stripped list marker. */
+const SAME_COLUMN_TOL = 12;
+
+/**
+ * Keep only the lines that plausibly form ONE column of a paragraph, so
+ * the leading (Δy) measured across them is real.
+ *
+ * A block's `pdfLines` come from the matcher's reading-order gather. In a
+ * multi-column section that gather interleaves the OTHER column's lines
+ * (and a truncated block can even run its continuation across a column /
+ * page jump into a table). Measuring Δy over that raw set reports a
+ * leading that's half (a callout squeezed between two body lines) or many
+ * times the truth (a page jump). We anchor on the first line's x and keep
+ * each later line only when it stays in that column AND within a plausible
+ * pitch (≤ 3× font size — covers up to triple spacing, rejects a jump) of
+ * the previous kept line. Fewer than two survivors ⇒ the group is
+ * unreliable, so the caller measures no drift for this block rather than a
+ * bogus one.
+ */
+function columnConsistentLines(
+  lines: { x: number; y: number }[],
+  fontSizePt: number | null,
+): { y: number }[] {
+  if (lines.length < 2) return lines;
+  const maxPitch = (fontSizePt ?? 12) * 3;
+  const anchorX = lines[0]!.x;
+  const kept = [lines[0]!];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]!;
+    const prev = kept[kept.length - 1]!;
+    if (Math.abs(line.x - anchorX) <= SAME_COLUMN_TOL && Math.abs(line.y - prev.y) <= maxPitch) {
+      kept.push(line);
+    }
+  }
+  return kept;
 }
 
 function truncate(s: string, n = 40): string {
