@@ -1,5 +1,14 @@
 # @sobree/collab-providers
 
+## 0.1.43
+
+### Patch Changes
+
+- 2ee621e: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [2ee621e]
+  - @sobree/core@0.1.43
+
 ## 0.1.42
 
 ### Patch Changes
