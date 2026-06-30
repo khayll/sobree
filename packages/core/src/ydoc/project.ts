@@ -101,7 +101,11 @@ export function projectYDoc(ydoc: Y.Doc): {
   }
   const footnotes = parseMeta<Record<number, Block[]>>(meta, Y_META_FIELDS.footnotes, {});
   const comments = parseMeta<Record<number, Comment>>(meta, Y_META_FIELDS.comments, {});
-  const settings = parseMeta<{ defaultTabStopTwips?: number }>(meta, Y_META_FIELDS.settings, {});
+  const settings = parseMeta<NonNullable<SobreeDocument["settings"]>>(
+    meta,
+    Y_META_FIELDS.settings,
+    {},
+  );
   const styles = parseMeta<NamedStyle[]>(meta, Y_META_FIELDS.styles, []);
   const numbering = parseMeta<NumberingDefinition[]>(meta, Y_META_FIELDS.numbering, []);
   const fonts = parseMeta<FontDeclaration[]>(meta, Y_META_FIELDS.fonts, []);
@@ -127,7 +131,10 @@ export function projectYDoc(ydoc: Y.Doc): {
       ...(Object.keys(headerFooterFrames).length > 0 ? { headerFooterFrames } : {}),
       ...(Object.keys(footnotes).length > 0 ? { footnotes } : {}),
       ...(Object.keys(comments).length > 0 ? { comments } : {}),
-      ...(settings.defaultTabStopTwips !== undefined ? { settings } : {}),
+      // Attach settings when it carries ANY field (defaultTabStop,
+      // noColumnBalance, pageBackgroundColor, …) — gating on one specific
+      // key silently dropped the others on round-trip.
+      ...(Object.keys(settings).length > 0 ? { settings } : {}),
       styles,
       numbering,
       rawParts,

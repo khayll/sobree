@@ -10,3 +10,8 @@ plain white. The importer now reads the gated background colour onto
 `document.settings.pageBackgroundColor`, and the renderer paints every `.paper`
 with it (falling back to white when absent). Theme-colour and VML-fill
 backgrounds aren't modelled yet.
+
+Also fixes a Y.Doc round-trip gap: the projection only re-attached
+`document.settings` when `defaultTabStopTwips` was present, so a doc whose
+settings were a page background (or `noColumnBalance`) alone lost them on
+refresh / collab join. Settings now survive whenever any field is set.
