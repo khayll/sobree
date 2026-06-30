@@ -1,5 +1,14 @@
 # @sobree/review
 
+## 0.1.40
+
+### Patch Changes
+
+- 624ab1a: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [624ab1a]
+  - @sobree/core@0.1.40
+
 ## 0.1.39
 
 ### Patch Changes
