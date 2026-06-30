@@ -17,7 +17,7 @@ import { renderInlineFrameBlock } from "./inlineFrame";
 import { applyListItemLevel, createListContainer, paragraphListInfo } from "./lists";
 import { computeOutlineNumbers } from "./outlineNumbering";
 import { renderParagraph } from "./paragraph";
-import { applyParagraphProps } from "./properties";
+import { type ContextualNeighbors, applyParagraphProps } from "./properties";
 import {
   collapseSectionTrailerEmpty,
   evictTrailingEmptyParagraphs,
@@ -115,6 +115,17 @@ export function renderBlocks(
     currentList = null;
   };
 
+  // `<w:contextualSpacing/>` resolution needs the document sequence, which
+  // only this walker has. For each paragraph we record whether its
+  // immediate neighbours are same-style paragraphs; `applyParagraphProps`
+  // then drops the matching before/after margin. Adjacency is literal
+  // (a table or section break between two paragraphs breaks the run, same
+  // as Word).
+  const contextualNeighborsFor = (index: number): ContextualNeighbors => ({
+    prevSameStyle: sameParagraphStyle(blocks[index], blocks[index - 1]),
+    nextSameStyle: sameParagraphStyle(blocks[index], blocks[index + 1]),
+  });
+
   for (let i = 0; i < blocks.length; i++) {
     let block = blocks[i];
     if (!block) continue;
@@ -163,7 +174,12 @@ export function renderBlocks(
       if (id) li.setAttribute(BLOCK_ID_ATTR, id);
       li.dataset.sectionIndex = String(sectionIndex);
       li.dataset.blockIndex = String(i);
-      const liRunDefaults = applyParagraphProps(li, (block as Paragraph).properties, styles);
+      const liRunDefaults = applyParagraphProps(
+        li,
+        (block as Paragraph).properties,
+        styles,
+        contextualNeighborsFor(i),
+      );
       applyListItemLevel(li, block, numbering);
       stampBlockRevision(li, (block as Paragraph).properties);
       appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles, liRunDefaults);
@@ -178,7 +194,14 @@ export function renderBlocks(
     // stays section-array-agnostic.
     const nextSectionForBreak =
       block.kind === "section_break" ? sections[block.toSectionIndex] : undefined;
-    const rendered = renderBlock(block, numbering, styles, rawParts, nextSectionForBreak);
+    const rendered = renderBlock(
+      block,
+      numbering,
+      styles,
+      rawParts,
+      nextSectionForBreak,
+      block.kind === "paragraph" ? contextualNeighborsFor(i) : undefined,
+    );
     if (rendered) {
       if (id) rendered.setAttribute(BLOCK_ID_ATTR, id);
       rendered.dataset.sectionIndex = String(sectionIndex);
@@ -244,14 +267,28 @@ export function renderBlocks(
   evictTrailingEmptyParagraphs(appendTarget, host);
 }
 
+/**
+ * True when both blocks are paragraphs sharing the same paragraph style.
+ * "Same style" is keyed on `styleId` (defaulting to "Normal" for a bare
+ * paragraph), matching Word's `<w:contextualSpacing/>` rule which compares
+ * paragraph styles, not direct formatting. A non-paragraph block (table,
+ * section break) is never "same style", so it ends a contextual run.
+ */
+function sameParagraphStyle(a: Block | undefined, b: Block | undefined): boolean {
+  if (a?.kind !== "paragraph" || b?.kind !== "paragraph") return false;
+  return (a.properties.styleId ?? "Normal") === (b.properties.styleId ?? "Normal");
+}
+
 function renderBlock(
   block: Block,
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
   nextSection?: SectionProperties,
+  contextualNeighbors?: ContextualNeighbors,
 ): HTMLElement | null {
-  if (block.kind === "paragraph") return renderParagraph(block, styles, rawParts);
+  if (block.kind === "paragraph")
+    return renderParagraph(block, styles, rawParts, contextualNeighbors);
   if (block.kind === "table") return renderTable(block, renderBlocks, numbering, styles, rawParts);
   if (block.kind === "section_break") return renderSectionBreak(nextSection);
   if (block.kind === "inline_frame") {

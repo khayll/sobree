@@ -1,7 +1,7 @@
 import { NS } from "../shared/namespaces";
 import { readShading } from "../shared/shading";
 import { ooxmlLineHeightToCss } from "../shared/units";
-import { wChildren, wFirst, wVal } from "../shared/xml";
+import { wChildren, wFirst, wOnOff, wVal } from "../shared/xml";
 import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
 import { readRunProperties } from "./runProperties";
@@ -340,6 +340,12 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
       if (Number.isFinite(n)) format.spacingBeforeTwips = n;
     }
   }
+
+  // <w:contextualSpacing/> — CT_OnOff toggle. Read with the explicit-off
+  // form (`w:val="0"`) so a style turning it OFF on a specific paragraph
+  // doesn't read as ON. The renderer suppresses before/after only when an
+  // adjacent paragraph shares this one's style.
+  if (wOnOff(pPr, "contextualSpacing")) format.contextualSpacing = true;
 
   const numPr = wFirst(pPr, "numPr");
   if (numPr) {

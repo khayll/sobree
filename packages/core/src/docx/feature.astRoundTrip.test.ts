@@ -30,6 +30,15 @@ describe("AST-native DOCX round-trip (Phase N2)", () => {
     expect(heading1?.runs[0]).toMatchObject({ kind: "text", text: "Chapter" });
   });
 
+  it("preserves the contextualSpacing flag through OOXML", async () => {
+    const doc = emptyDocument();
+    const p = paragraph([text("tight")]);
+    p.properties.contextualSpacing = true;
+    doc.body = [p];
+    const result = await roundTrip(doc);
+    expect((result.body[0] as Paragraph).properties.contextualSpacing).toBe(true);
+  });
+
   it("preserves bold + italic run properties through OOXML", async () => {
     const doc = emptyDocument();
     doc.body = [paragraph([text("bold+italic", { bold: true, italic: true })])];

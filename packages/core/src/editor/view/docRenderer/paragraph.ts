@@ -9,12 +9,13 @@ import type { NamedStyle, Paragraph } from "../../../doc/types";
 import { headingLevelOf } from "../../../doc/walk";
 import { resolveFontFace } from "./fontFallback";
 import { appendInlineRuns } from "./inline";
-import { applyParagraphProps } from "./properties";
+import { type ContextualNeighbors, applyParagraphProps } from "./properties";
 
 export function renderParagraph(
   p: Paragraph,
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
+  contextualNeighbors?: ContextualNeighbors,
 ): HTMLElement {
   const level = headingLevelOf(p);
   // Empty heading paragraphs (no text, no image runs) demote to plain
@@ -28,7 +29,7 @@ export function renderParagraph(
   const isEmpty = p.runs.length === 0 || p.runs.every((r) => (r.kind === "text" ? !r.text : false));
   const tag = level && !isEmpty ? `h${level}` : "p";
   const el = document.createElement(tag);
-  const paraRunDefaults = applyParagraphProps(el, p.properties, styles);
+  const paraRunDefaults = applyParagraphProps(el, p.properties, styles, contextualNeighbors);
   // Cascade the dominant text run's font onto the paragraph itself when
   // the paragraph has no explicit font from style cascade. CSS unitless
   // line-height computes against the element's own font-size — if the

@@ -36,6 +36,9 @@ export interface ParagraphFormat {
   spacingAfterTwips?: number;
   /** Explicit `<w:spacing w:before>` in twips. */
   spacingBeforeTwips?: number;
+  /** `<w:contextualSpacing/>` toggle — omit before/after spacing between
+   *  same-style neighbours (ECMA-376 §17.3.1.9). */
+  contextualSpacing?: boolean;
   /** Raw numbering reference (`numId`, `ilvl`) if this para is part of a list. */
   numId?: number;
   numLevel?: number;
