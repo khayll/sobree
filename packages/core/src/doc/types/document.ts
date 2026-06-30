@@ -71,6 +71,10 @@ export interface SobreeDocument {
     /** `<w:noColumnBalance/>` — disable column balancing at continuous
      *  section breaks document-wide (columns fill column-first). */
     noColumnBalance?: boolean;
+    /** Document `<w:background w:color>` (e.g. `#FFCC99`), as a CSS colour
+     *  — painted as the page background when `<w:displayBackgroundShape/>`
+     *  is set. Undefined when the doc has no shown page background. */
+    pageBackgroundColor?: string;
   };
   /**
    * NOTE: inline-drawing frames are emitted as `InlineFrame` BLOCKS

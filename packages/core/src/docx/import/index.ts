@@ -112,6 +112,12 @@ export async function importDocx(
   // section's content width (so each box in that row sizes as a fraction
   // of the text column).
   const settings = parseSettingsXml(unzipped.text["word/settings.xml"]);
+  // Document page background: `<w:background w:color>` (a sibling of
+  // `<w:body>`), painted only when `<w:displayBackgroundShape/>` gates it
+  // on — Word's print-layout rule. A bare 6-hex value becomes `#RRGGBB`.
+  const pageBackgroundColor = settings.displayBackgroundShape
+    ? readPageBackgroundColor(xml)
+    : undefined;
   const contentWidthEmu = readBodyContentWidthEmu(xml, rels);
   const parsedInlineFrames = parseInlineFrames(xml, {
     rels,
@@ -238,13 +244,16 @@ export async function importDocx(
     ...(Object.keys(comments).length > 0 ? { comments } : {}),
     // Surface document-wide layout settings (defaultTabStop, column-balance
     // policy) so the renderer can apply them instead of CSS fallbacks.
-    ...(settings.defaultTabStopTwips !== undefined || settings.noColumnBalance
+    ...(settings.defaultTabStopTwips !== undefined ||
+    settings.noColumnBalance ||
+    pageBackgroundColor !== undefined
       ? {
           settings: {
             ...(settings.defaultTabStopTwips !== undefined
               ? { defaultTabStopTwips: settings.defaultTabStopTwips }
               : {}),
             ...(settings.noColumnBalance ? { noColumnBalance: true } : {}),
+            ...(pageBackgroundColor !== undefined ? { pageBackgroundColor } : {}),
           },
         }
       : {}),
@@ -382,6 +391,22 @@ function readBodyContentWidthEmu(doc: Document, rels: Map<string, string>): numb
   const { leftTwips, rightTwips } = section.pageMargins;
   const contentTwips = wTwips - leftTwips - rightTwips;
   return contentTwips > 0 ? contentTwips * 635 : undefined; // 914400 EMU/in ÷ 1440 twip/in
+}
+
+/**
+ * Read the document `<w:background w:color>` as a CSS colour. The element
+ * is a direct child of `<w:document>` (a sibling of `<w:body>`) and, for
+ * the common page-colour case, carries a 6-hex `w:color`. Returns
+ * `#RRGGBB`; `undefined` when absent, `auto`, or not a plain hex (theme /
+ * VML-fill backgrounds aren't modelled yet).
+ */
+function readPageBackgroundColor(doc: Document): string | undefined {
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const bg = doc.getElementsByTagNameNS(W, "background")[0];
+  if (!bg) return undefined;
+  const color = bg.getAttributeNS(W, "color") ?? bg.getAttribute("w:color");
+  if (!color || !/^[0-9A-Fa-f]{6}$/.test(color)) return undefined;
+  return `#${color.toUpperCase()}`;
 }
 
 /**
