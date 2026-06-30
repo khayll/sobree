@@ -19,6 +19,7 @@ import { floatWrappingImages } from "./floatFrames";
 import { flowDisplacingTextboxes } from "./flowFrames";
 import { parseFootnotesXml } from "./footnotes";
 import { readSection } from "./headers";
+import { groupAnchoredPictureBands } from "./imageBands";
 import { parseNumberingXml } from "./numbering";
 import { convertParagraph } from "./paragraph";
 import { parseRels } from "./rels";
@@ -182,14 +183,24 @@ export async function importDocx(
     sections,
   );
 
+  // A horizontal BAND of anchored pictures sharing one (empty) anchor
+  // paragraph — a banner strip of photos across the page — coalesces into a
+  // single in-flow InlineFrame so the row keeps its layout and body text
+  // flows below it. Runs FIRST so its pictures don't reach the float pass
+  // (which would scatter them to opposite margins).
+  const { body: bandedBody, frames: bandedFrames } = groupAnchoredPictureBands(
+    flowedBody,
+    flowedFrames,
+  );
+
   // Wrap-mode anchored PICTURES (square/tight/through) become CSS floats at
   // the head of their anchor paragraph so body text flows around them.
   // Needs section page geometry to pick the float side for `bothSides`, so
   // it runs after `sections` is built (and after the textbox-flow pass,
   // whose body edits keep paragraph indices stable).
   const { body, frames: finalAnchoredFrames } = floatWrappingImages(
-    flowedBody,
-    flowedFrames,
+    bandedBody,
+    bandedFrames,
     sections,
   );
 
