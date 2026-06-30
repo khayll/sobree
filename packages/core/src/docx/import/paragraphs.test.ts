@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { convertDocumentXml } from "./document";
 import { convertParagraph } from "./paragraph";
 import { readParagraph } from "./paragraphs";
 
@@ -243,5 +244,33 @@ describe("convertParagraph — lastRenderedPageBreak position", () => {
   it("treats a leading whitespace-only run as still leading", () => {
     const lead = `<w:r><w:t xml:space="preserve"> </w:t></w:r>`;
     expect(convert(lead + LRPB + TEXT, true).properties.pageBreakBefore).toBe(true);
+  });
+});
+
+describe("convertDocumentXml — lastRenderedPageBreak gating", () => {
+  // A body with MANY hint-led paragraphs (≥10, the "strong signal" count).
+  const lrpbDoc = (): Document => {
+    const p = "<w:p><w:r><w:lastRenderedPageBreak/></w:r><w:r><w:t>Section</w:t></w:r></w:p>";
+    return new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:document xmlns:w="${NS_W}"><w:body>${p.repeat(12)}</w:body></w:document>`,
+      "application/xml",
+    );
+  };
+  const brokenCount = (opts: { hasComplexFrames?: boolean }) =>
+    convertDocumentXml(lrpbDoc(), { rels: new Map() }, opts).body.filter(
+      (b) => b.kind === "paragraph" && b.properties.pageBreakBefore,
+    ).length;
+
+  it("honours the hints only when the doc has complex frames", () => {
+    // Frame-heavy docs (whose frame heights we paginate imperfectly) keep
+    // Word's pagination via the hints.
+    expect(brokenCount({ hasComplexFrames: true })).toBe(12);
+  });
+
+  it("ignores the hints for a plain text-flow doc (re-paginates fresh)", () => {
+    // No frames → our own pagination is accurate; honouring stale hints
+    // would fragment the result (the ACM submission template, 17→13 pages).
+    expect(brokenCount({ hasComplexFrames: false })).toBe(0);
+    expect(brokenCount({})).toBe(0);
   });
 });
