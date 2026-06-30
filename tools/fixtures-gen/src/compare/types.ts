@@ -43,6 +43,11 @@ export interface FixtureDrift {
   fixture: string;
   /** Total blocks in the snapshot. */
   blockCount: number;
+  /** Blocks carrying real document text (non-empty, non-chrome) — the
+   *  fair denominator for the matched ratio. Empty spacer paragraphs and
+   *  section-break separators can never match a PDF line, so counting
+   *  them would penalise a faithfully-rendered doc. */
+  textBlockCount: number;
   /** Blocks that successfully matched at least one PDF line. */
   matchedBlocks: number;
   /** Blocks with >= 2 matched lines (where we can compute effective leading). */

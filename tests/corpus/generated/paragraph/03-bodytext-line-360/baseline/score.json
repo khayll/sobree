@@ -1,9 +1,10 @@
 {
-  "meanAbsDrift": 0.002272727272731645,
+  "meanAbsDrift": 0.004999999999995675,
   "libreofficePages": 1,
   "sobreePages": null,
   "pageCountDelta": null,
   "blockCount": 3,
+  "textBlockCount": 3,
   "matchedBlocks": 3,
   "matchedBlockRatio": 1
 }

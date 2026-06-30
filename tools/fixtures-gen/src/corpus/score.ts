@@ -34,9 +34,12 @@ export interface CorpusScore {
   pageCountDelta: number | null;
   /** Total blocks in Sobree's snapshot. */
   blockCount: number;
+  /** Blocks carrying real document text (non-empty, non-chrome) — the
+   *  matched-ratio denominator. */
+  textBlockCount: number;
   /** Blocks that matched at least one PDF line. */
   matchedBlocks: number;
-  /** matchedBlocks / blockCount. Lower → content not landing. */
+  /** matchedBlocks / textBlockCount. Lower → content not landing. */
   matchedBlockRatio: number;
 }
 
@@ -70,8 +73,9 @@ export function scoreFromDrift(
     sobreePages,
     pageCountDelta: sobreePages === null ? null : Math.abs(sobreePages - libreofficePages),
     blockCount: drift.blockCount,
+    textBlockCount: drift.textBlockCount,
     matchedBlocks: drift.matchedBlocks,
-    matchedBlockRatio: drift.blockCount > 0 ? drift.matchedBlocks / drift.blockCount : 1,
+    matchedBlockRatio: drift.textBlockCount > 0 ? drift.matchedBlocks / drift.textBlockCount : 1,
   };
 }
 

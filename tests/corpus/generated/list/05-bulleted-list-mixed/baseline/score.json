@@ -4,6 +4,7 @@
   "sobreePages": null,
   "pageCountDelta": null,
   "blockCount": 5,
+  "textBlockCount": 5,
   "matchedBlocks": 5,
   "matchedBlockRatio": 1
 }

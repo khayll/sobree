@@ -23,6 +23,21 @@
  * Truncated snapshot text (ending in `…`) opportunistically consumes
  * additional PDF lines until the *next* block's prefix appears,
  * gluing wrapped continuations to the right block.
+ *
+ * PHASE 2 — column-tolerant recovery. The linear cursor above assumes
+ * Sobree's block order matches the PDF's line order. That holds for
+ * single-column flow, but a multi-column section breaks it: LibreOffice
+ * extracts the two columns *interleaved by baseline-Y* (and even fuses
+ * a left+right line that share a Y into one glyph string), while Sobree
+ * emits clean logical reading order — all of column 1, then column 2.
+ * The cursor desyncs the moment it enters the column band and strands
+ * the whole second column as "none". After the linear pass, a second
+ * pass re-examines each still-unmatched block with a LOOSE,
+ * bidirectional search over a bounded window: alphanumeric-only
+ * comparison (so curly-quote spacing and glued glyphs don't defeat it)
+ * and substring matches that may reuse a fused line. This only ever
+ * upgrades "none" → "substring"; phase-1 matches and their line groups
+ * (which the drift metric measures) are untouched.
  */
 
 import type { LineMetric } from "../pdf/types";
@@ -151,7 +166,80 @@ export function matchBlocksToLines(
     }
   }
 
+  recoverColumnInterleave(results, flatLines);
   return results;
+}
+
+/** How far the column-tolerant recovery pass looks on either side of a
+ *  block's reading-order anchor. Wide enough to span a two-column band's
+ *  interleave (a page of lines), bounded so a coincidental match in a far
+ *  section can't be latched (mirrors `PREFIX_SCAN_WINDOW`). */
+const RECOVERY_WINDOW = 60;
+
+/**
+ * Phase 2: upgrade still-"none" blocks to "substring" when their text is
+ * present in the PDF but out of linear reading order (the multi-column
+ * case). Walks `results` in order, tracking a soft anchor = the latest
+ * matched line index seen so far; each unmatched block is searched
+ * bidirectionally from that anchor with loose, alphanumeric-only
+ * comparison. Mutates `results` in place. Non-consuming: a fused
+ * left+right line may satisfy several blocks.
+ */
+function recoverColumnInterleave(results: MatchResult[], flatLines: LineMetric[]): void {
+  const lineIndex = new Map<LineMetric, number>();
+  flatLines.forEach((l, i) => lineIndex.set(l, i));
+  const loose = flatLines.map((l) => looseNormalize(l.text));
+
+  let anchor = 0;
+  for (const r of results) {
+    if (r.matchType !== "none") {
+      const idx = r.pdfLines.length > 0 ? lineIndex.get(r.pdfLines[0]!) : undefined;
+      if (idx !== undefined) anchor = Math.max(anchor, idx);
+      continue;
+    }
+    const text = looseNormalize(stripEllipsis(r.block.text));
+    if (text.length === 0) continue; // empty / punctuation-only — nothing to match
+    const probe = text.slice(0, Math.min(24, text.length));
+    const lo = Math.max(0, anchor - RECOVERY_WINDOW);
+    const hi = Math.min(flatLines.length, anchor + RECOVERY_WINDOW);
+    let hit = -1;
+    // Search outward from the anchor (forward first, then the mirrored
+    // backward line) so the nearest occurrence wins. `d` reaches the
+    // farther of the two window edges (forward `hi-1-anchor`, backward
+    // `anchor-lo`).
+    const maxStep = Math.max(hi - 1 - anchor, anchor - lo);
+    for (let d = 0; d <= maxStep && hit < 0; d++) {
+      for (const k of [anchor + d, anchor - d]) {
+        if (k < lo || k >= hi) continue;
+        const lt = loose[k]!;
+        // `lt.startsWith(probe)`: block begins this line.
+        // `probe.startsWith(lt)`: line is a (wrapped) head of the block.
+        // `lt.includes(probe)`: block text sits mid-line (a fused column).
+        if (
+          lt.startsWith(probe) ||
+          (lt.length >= 10 && probe.startsWith(lt)) ||
+          lt.includes(probe)
+        ) {
+          hit = k;
+          break;
+        }
+      }
+    }
+    if (hit >= 0) {
+      r.pdfLines = [flatLines[hit]!];
+      r.matchType = "substring";
+    }
+  }
+}
+
+/** Lowercase + collapse every non-alphanumeric run to a single space.
+ *  Erases list markers, curly-quote spacing, and glyph-gluing artifacts
+ *  of PDF extraction, reducing matching to "is this text present". */
+function looseNormalize(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /** Flatten all pages' lines into a single array, preserving order. */

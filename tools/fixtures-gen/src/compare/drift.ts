@@ -14,6 +14,7 @@
  */
 
 import type { MatchResult } from "./match";
+import type { SnapshotBlock } from "./snapshot";
 import type { BlockDrift, FixtureDrift } from "./types";
 
 export function buildDrift(fixture: string, matches: MatchResult[]): FixtureDrift {
@@ -31,12 +32,21 @@ export function buildDrift(fixture: string, matches: MatchResult[]): FixtureDrif
   return {
     fixture,
     blockCount: blocks.length,
-    matchedBlocks: blocks.filter((b) => b.matchedLineCount > 0).length,
+    textBlockCount: matches.filter((m) => hasContent(m.block)).length,
+    matchedBlocks: matches.filter((m) => m.pdfLines.length > 0 && hasContent(m.block)).length,
     multiLineBlocks: multiLine.length,
     meanAbsDrift,
     blocks,
     warnings,
   };
+}
+
+/** A block carries real document content — not a section-break
+ *  separator (editor chrome), not a blank spacer paragraph. Used for
+ *  BOTH the matched-ratio numerator and denominator so the ratio can
+ *  never exceed 1 (a matched block is, by definition, content). */
+function hasContent(block: SnapshotBlock): boolean {
+  return !block.isChrome && /\S/.test(block.text);
 }
 
 function buildBlockDrift(match: MatchResult, warnings: string[]): BlockDrift {

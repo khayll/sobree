@@ -201,7 +201,7 @@ function printResults(results: ScoredEntry[], mode: Mode): void {
   const lines = sorted.map((r) => {
     const drift = r.score.meanAbsDrift === null ? "—" : r.score.meanAbsDrift.toFixed(3);
     const pages = `${r.score.libreofficePages}p`;
-    const matched = `${r.score.matchedBlocks}/${r.score.blockCount}`;
+    const matched = `${r.score.matchedBlocks}/${r.score.textBlockCount}`;
     const flag =
       mode === "check" && r.regressions.length > 0 ? "✗" : r.baseline === null ? "·" : "✓";
     return `  ${flag} ${r.entry.slug.padEnd(40)} drift=${drift.padStart(6)} ${pages.padStart(4)} matched=${matched}`;

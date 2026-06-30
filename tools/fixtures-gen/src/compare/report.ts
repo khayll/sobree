@@ -9,13 +9,13 @@ import type { BlockDrift, FixtureDrift } from "./types";
 export function formatFixtureSummary(drift: FixtureDrift): string {
   const mean = drift.meanAbsDrift;
   const meanStr = mean === null ? "  n/a" : `${mean >= 0 ? " " : ""}${mean.toFixed(3)}`;
-  return `${drift.fixture.padEnd(38)} ${pad(drift.matchedBlocks, 3)}/${pad(drift.blockCount, 3)} matched · ${pad(drift.multiLineBlocks, 3)} multiline · mean |Δlh| ${meanStr}`;
+  return `${drift.fixture.padEnd(38)} ${pad(drift.matchedBlocks, 3)}/${pad(drift.textBlockCount, 3)} matched · ${pad(drift.multiLineBlocks, 3)} multiline · mean |Δlh| ${meanStr}`;
 }
 
 export function formatFixtureVerbose(drift: FixtureDrift): string {
   const header =
     `\n=== ${drift.fixture} ===\n` +
-    `  blocks: ${drift.blockCount}, matched: ${drift.matchedBlocks}, multi-line: ${drift.multiLineBlocks}, mean |Δlh|: ${drift.meanAbsDrift?.toFixed(4) ?? "n/a"}\n`;
+    `  blocks: ${drift.blockCount} (${drift.textBlockCount} text), matched: ${drift.matchedBlocks}, multi-line: ${drift.multiLineBlocks}, mean |Δlh|: ${drift.meanAbsDrift?.toFixed(4) ?? "n/a"}\n`;
   const tableHeader =
     "  idx tag      lines  fontPt   declLH   effLH    drift    text\n" +
     "  --- ---      -----  ------   ------   -----    -----    ----";
