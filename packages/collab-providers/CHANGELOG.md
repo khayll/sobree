@@ -1,5 +1,14 @@
 # @sobree/collab-providers
 
+## 0.1.42
+
+### Patch Changes
+
+- f6c7902: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [f6c7902]
+  - @sobree/core@0.1.42
+
 ## 0.1.41
 
 ### Patch Changes
