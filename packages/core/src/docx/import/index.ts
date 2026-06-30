@@ -159,6 +159,11 @@ export async function importDocx(
     { rels },
     {
       replaceParagraphs,
+      // Only honour Word's `<w:lastRenderedPageBreak/>` hints when the doc
+      // has inline-frame groups (whose heights our paginator estimates
+      // imperfectly). A plain text-flow doc re-paginates accurately, so
+      // honouring stale hints would fragment it — see convertDocumentXml.
+      hasComplexFrames: parsedInlineFrames.length > 0,
     },
   );
 
