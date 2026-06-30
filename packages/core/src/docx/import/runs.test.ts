@@ -86,6 +86,21 @@ describe("readRun — <w:drawing>", () => {
     const parsed = readRun(r);
     expect(parsed.footnoteRefId).toBe(7);
     expect(parsed.text).toBe("");
+    expect(parsed.footnoteCustomMark).toBeUndefined();
+  });
+
+  it("captures the custom mark from <w:footnoteReference w:customMarkFollows>", () => {
+    // The mark trails the reference as plain text in the SAME run.
+    const r = runFromXml(`<?xml version="1.0"?>
+      <w:r xmlns:w="${NS_W}">
+        <w:footnoteReference w:customMarkFollows="1" w:id="1"/>
+        <w:t>*</w:t>
+      </w:r>`);
+    const parsed = readRun(r);
+    expect(parsed.footnoteRefId).toBe(1);
+    expect(parsed.footnoteCustomMark).toBe("*");
+    // The mark text is consumed by the reference, not emitted as body text.
+    expect(parsed.text).toBe("");
   });
 
   it("skips uncommon-relativeFrom anchored drawings too", () => {

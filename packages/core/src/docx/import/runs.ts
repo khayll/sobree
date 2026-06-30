@@ -43,6 +43,10 @@ export interface ImportedRun {
   drawing?: ImportedDrawing;
   /** Set when the run wraps a `<w:footnoteReference w:id="N"/>`. */
   footnoteRefId?: number;
+  /** Custom mark from `<w:footnoteReference w:customMarkFollows="1">` —
+   *  the literal text following the reference in the same run (e.g. `"*"`)
+   *  that replaces the auto-number. */
+  footnoteCustomMark?: string;
   /** Set when the run wraps a `<w:commentReference w:id="N"/>`. */
   commentRefId?: number;
   /** Set when the run is inside a `<w:ins>` / `<w:del>` wrapper. */
@@ -114,7 +118,21 @@ export function readRun(r: Element): ImportedRun {
     const idAttr = footnoteRef.getAttributeNS(NS.w, "id") ?? footnoteRef.getAttribute("w:id");
     const id = Number(idAttr);
     if (Number.isFinite(id) && id >= 1) {
-      return { text: "", format: {}, isHardBreak: false, footnoteRefId: id };
+      // `customMarkFollows` ⇒ the auto-number is suppressed and the run's
+      // trailing `<w:t>` text (e.g. "*") IS the reference mark. Capture it so
+      // the renderer shows the mark instead of the number; without this the
+      // mark text was also dropped by the early return.
+      const custom =
+        footnoteRef.getAttributeNS(NS.w, "customMarkFollows") ??
+        footnoteRef.getAttribute("w:customMarkFollows");
+      const customMark = custom === "1" || custom === "true" ? readRunText(r) : "";
+      return {
+        text: "",
+        format: {},
+        isHardBreak: false,
+        footnoteRefId: id,
+        ...(customMark ? { footnoteCustomMark: customMark } : {}),
+      };
     }
   }
 
@@ -205,6 +223,19 @@ export function readRun(r: Element): ImportedRun {
  * renderer can apply CSS letter-spacing tightening that preserves the
  * dot-leader visual without touching the AST.
  */
+/** Concatenate a run's `<w:t>` text in document order (tabs → `\t`).
+ *  Used to capture a footnote's custom mark, which trails the
+ *  `<w:footnoteReference>` as plain text in the same run. */
+function readRunText(r: Element): string {
+  let text = "";
+  for (const child of Array.from(r.children)) {
+    if (child.namespaceURI !== NS.w) continue;
+    if (child.localName === "t" || child.localName === "delText") text += child.textContent ?? "";
+    else if (child.localName === "tab") text += "\t";
+  }
+  return text.trim();
+}
+
 function normaliseRunText(text: string): string {
   if (!text) return text;
   if (text.includes("\t")) return text;

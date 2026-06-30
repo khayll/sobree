@@ -58,6 +58,13 @@ describe("runs ↔ delta — round trip", () => {
     expect(rt([tab])).toEqual([tab]);
   });
 
+  it("footnote ref round-trips its custom mark (Y.Doc parity — refresh must not drop it)", () => {
+    const auto: InlineRun = { kind: "footnoteRef", id: 3 };
+    const custom: InlineRun = { kind: "footnoteRef", id: 1, customMark: "*" };
+    expect(rt([auto])).toEqual([auto]);
+    expect(rt([custom])).toEqual([custom]);
+  });
+
   it("field run preserves instruction + cached", () => {
     const f: FieldRun = {
       kind: "field",

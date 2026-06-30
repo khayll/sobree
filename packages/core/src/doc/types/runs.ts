@@ -72,6 +72,13 @@ export interface FootnoteRefRun {
   kind: "footnoteRef";
   /** ID matching a key in `SobreeDocument.footnotes`. */
   id: number;
+  /**
+   * Custom reference mark from `<w:footnoteReference w:customMarkFollows="1">`
+   * — the literal character(s) (e.g. `"*"`) Word shows in place of the
+   * auto-number, both at the reference and before the footnote body.
+   * Undefined for ordinary auto-numbered footnotes.
+   */
+  customMark?: string;
   properties?: RunProperties;
 }
 

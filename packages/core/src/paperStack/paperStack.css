@@ -216,6 +216,11 @@
 .paper-footnotes .sobree-footnotes__item {
   margin: 0.25em 0;
 }
+/* Custom-mark footnotes carry their mark ("*") in the body text — drop the
+   `<ol>` counter so it isn't doubled with an auto-number. */
+.paper-footnotes .sobree-footnotes__item--custom-mark {
+  list-style: none;
+}
 
 /* Print view — empty headers / footers stay genuinely empty. The block
    indicator in the gutter is still the discoverable affordance for
