@@ -22,7 +22,7 @@
 
 .paper {
   position: relative;
-  background: #fff;
+  background: var(--page-background, #fff);
   /* 1px outer border + drop shadow — defines the page edge so
      pages are visually distinguishable from the page-stack background,
      even when the shadow is faint at high zoom-out levels. */

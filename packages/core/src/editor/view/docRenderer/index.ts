@@ -30,6 +30,10 @@ export function renderSobreeDocument(
   // Falls back to Word's factory default 720 twips (0.5") when the
   // doc's settings.xml omits the element.
   applyDefaultTabStop(host, doc.settings?.defaultTabStopTwips ?? 720);
+  // Document page background (`<w:background w:color>` gated on
+  // `<w:displayBackgroundShape/>`). Stamped as a CSS variable so every
+  // `.paper` paints it; unset ⇒ the CSS fallback keeps pages white.
+  applyPageBackground(host, doc.settings?.pageBackgroundColor);
   // Body block indices that carry an anchored frame — so an otherwise-empty
   // float-only page (a brochure panel page) is still a valid page break
   // target. See `renderBlocks`' page-break deferral.
@@ -73,6 +77,23 @@ function applyDefaultTabStop(host: HTMLElement, tabStopTwips: number): void {
   const target = scope ?? host;
   target.style.setProperty("tab-size", `${mm}mm`);
   target.style.setProperty("-moz-tab-size", `${mm}mm`);
+}
+
+function applyPageBackground(host: HTMLElement, color: string | undefined): void {
+  // Stamp on the paper-stack / editor scope so every `.paper` inherits the
+  // variable. Clear it (rather than leaving a stale value) when the doc has
+  // no shown background, so re-rendering a plain doc reverts to white.
+  let scope: HTMLElement | null = host;
+  while (
+    scope &&
+    !scope.classList.contains("sobree-editor") &&
+    !scope.classList.contains("paper-stack")
+  ) {
+    scope = scope.parentElement;
+  }
+  const target = scope ?? host;
+  if (color) target.style.setProperty("--page-background", color);
+  else target.style.removeProperty("--page-background");
 }
 
 function renderFootnotesAside(doc: SobreeDocument, host: HTMLElement): void {

@@ -70,7 +70,10 @@ export function canonicalStyleId(id: string): string {
 
 export function parseStylesXml(
   xml: string | undefined,
-  settings: DocSettings = { doNotUseHTMLParagraphAutoSpacing: false },
+  settings: DocSettings = {
+    doNotUseHTMLParagraphAutoSpacing: false,
+    displayBackgroundShape: false,
+  },
 ): NamedStyle[] | null {
   if (!xml) return null;
   let doc: Document;
