@@ -412,28 +412,32 @@ export class PaperStack {
   }
 
   private pageContentHeightPx(): number {
-    // Prefer the EFFECTIVE content area height — what the first paper's
-    // `.paper-content` element actually reports after CSS layout. The
-    // `Paper.applyZoneOverflowPadding` may have bumped the paper's
-    // padding-top above `setup.margins.top` to make room for a
-    // taller-than-margin rich header (jellap.docx pushes body down by
-    // ~50mm because its header has logo + lifted contact-info textbox).
-    // If we ignored this and used the raw margin-derived budget, the
-    // paginator would think the page is ~200px taller than visible,
-    // overpack page 1, and the user would silently lose content past
-    // the bottom edge (Word's "Rendelkezik-e" and "Igényelnek-e"
-    // questions vanished without trace).
+    // The BASELINE budget is a NORMAL page's body area. We read the first
+    // paper's actual padding-TOP (not the nominal margin) so a rich header
+    // that `Paper.applyZoneOverflowPadding` pushed the body down for —
+    // jellap.docx's logo + lifted contact textbox bumps it ~50mm — still
+    // shrinks the budget; ignoring it overpacked page 1 and silently dropped
+    // content off the bottom edge.
+    //
+    // The BOTTOM, though, is the NOMINAL margin — NOT the first paper's
+    // padding-bottom. A page-specific footer / footnote reservation inflates
+    // THAT paper's padding-bottom, and folding it into the GLOBAL baseline
+    // shrank every OTHER page's budget too (the ACM submission template's
+    // page-1 footnote stole ~72pt from all 15 pages, under-filling each and
+    // adding ~2 pages). Per-page bottom reservations live in
+    // `footnotePageHeights`, which measures each paper's OWN geometry.
+    //
+    // `offsetHeight`/`paddingTop` are LOGICAL px (unaffected by a viewport CSS
+    // transform), matching the adapter's `offsetHeight` block measurements.
+    const nominalBottomPx = this.setup.margins.bottom * MM_TO_PX;
     const firstPaper = this.papers[0];
     if (firstPaper) {
-      const contentHeightPx = firstPaper.content.offsetHeight;
-      if (contentHeightPx > 0) return contentHeightPx;
+      const padTopPx = Number.parseFloat(getComputedStyle(firstPaper.root).paddingTop) || 0;
+      const budget = firstPaper.root.offsetHeight - padTopPx - nominalBottomPx;
+      if (budget > 0) return budget;
     }
     const { heightMM } = resolvedDimensions(this.setup);
     const { top, bottom } = this.setup.margins;
-    // CSS `zoom` on an ancestor changes `getBoundingClientRect` but NOT
-    // `offsetHeight`/`offsetTop` (in Chromium). Since the adapter measures
-    // blocks via `offsetHeight`, measurements stay in logical space at any
-    // render tier — so the budget stays logical too.
     return (heightMM - top - bottom) * MM_TO_PX;
   }
 

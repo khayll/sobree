@@ -130,11 +130,25 @@ export function applyParagraphProps(
     // line=640=32pt exact) and StatDescription paragraphs rendered ~40%
     // tall, overrunning the column. `line` is twips → pt (20 twips = 1pt).
     el.style.lineHeight = `${effective.spacing.line / 20}pt`;
+  } else if (effective.spacing?.line && effective.spacing.lineRule === "atLeast") {
+    // `atLeast`: a MINIMUM line height of `line` twips. The font's natural
+    // leading satisfies it in the COMMON case (specified ≤ natural), and
+    // there a fixed `line-height` would wrongly CLIP a taller inline. But
+    // Word DOES grow every line to the minimum when it EXCEEDS natural —
+    // the ACM submission template sets `Para` = atLeast 270 (13.5pt) over a
+    // 9pt font whose natural leading is only ~10.4pt, so leaving it natural
+    // packs the body ~25% too tight and over-fills pages. Apply the
+    // absolute minimum only when it provably exceeds natural (font size
+    // known); otherwise leave `normal` so taller content can still grow.
+    const minPt = effective.spacing.line / 20;
+    const fontSizePt = runDefaults.fontSizePt;
+    if (
+      fontSizePt !== undefined &&
+      minPt > naturalLeadingFor(runDefaults.fontFamily) * fontSizePt
+    ) {
+      el.style.lineHeight = `${minPt}pt`;
+    }
   }
-  // `atLeast` is intentionally left to natural leading: it's a MINIMUM,
-  // and the font's natural line height already meets it in the common
-  // case (specified ≤ natural). A fixed line-height would wrongly CLIP a
-  // taller line, which `atLeast` must never do.
   // Spacing applies to LI just as it does to a free paragraph —
   // Word's per-paragraph `<w:spacing w:after>` is the gap BETWEEN
   // consecutive bullets, not just a wrapper concern. Dropping it on
