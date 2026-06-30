@@ -70,14 +70,20 @@
 .paper-footer {
   bottom: 0;
   min-height: var(--margin-bottom, 25mm);
-  /* Footer text sits naturally at the bottom of the zone with just a
-     small top-pad of breathing room from the body. Word's
-     `<w:pgMar w:footer>` distance is already represented by the
-     zone's bottom-positioned anchor + min-height; adding a
-     padding-bottom on top would push the footer text UP off the
-     bottom-margin baseline by the same amount, mis-aligning vs the
-     LO reference. */
+  /* Word anchors the footer `<w:pgMar w:footer>` distance from the page
+     BOTTOM, with content growing upward — not at the top of the bottom
+     margin. We reserve the bottom margin as the zone (min-height) but
+     bottom-align the content and lift it by the footer offset, so a
+     single-line footer sits `footerTwips` from the page edge (matching
+     Word / LO) instead of floating ~a full bottom-margin up — which let
+     it collide with body-anchored frames that legitimately extend into
+     the bottom margin (e.g. a full-page content card). `padding-top`
+     stays as breathing room only when a tall footer fills the zone. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   padding-top: 4mm;
+  padding-bottom: var(--footer-offset-mm, 12.7mm);
   text-align: center;
   border-top: 1px dashed transparent;
 }
