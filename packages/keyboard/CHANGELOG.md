@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.48
+
+### Patch Changes
+
+- 23f300d: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [23f300d]
+  - @sobree/core@0.1.48
+
 ## 0.1.47
 
 ### Patch Changes
