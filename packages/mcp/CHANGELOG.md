@@ -1,5 +1,14 @@
 # @sobree/mcp
 
+## 0.1.44
+
+### Patch Changes
+
+- e9759d2: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [e9759d2]
+  - @sobree/core@0.1.44
+
 ## 0.1.43
 
 ### Patch Changes
