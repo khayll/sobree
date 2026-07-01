@@ -277,13 +277,14 @@ function makeTextRun(text: string, properties: RunProperties): TextRun {
 function mapRunFormat(f: RunFormat): RunProperties {
   const out: RunProperties = {};
   if (f.styleId) out.styleId = f.styleId;
-  if (f.bold) out.bold = true;
-  if (f.italic) out.italic = true;
-  if (f.strike) out.strike = true;
-  // Threads `<w:caps/>` from the RunFormat to the AST so per-run caps
-  // (not just style-cascade caps) reaches the renderer's
-  // `text-transform: uppercase`.
-  if (f.caps) out.caps = true;
+  // Toggle properties keep their explicit value (including `false`) — a direct
+  // `<w:b w:val="0"/>` must reach the AST so the renderer's per-run cascade can
+  // override an inherited toggle (the ACM first-author `<w:caps w:val="0"/>`).
+  // Dropping `false` here (the old `if (f.caps)` guard) lower-cased nothing.
+  if (f.bold !== undefined) out.bold = f.bold;
+  if (f.italic !== undefined) out.italic = f.italic;
+  if (f.strike !== undefined) out.strike = f.strike;
+  if (f.caps !== undefined) out.caps = f.caps;
   if (f.underline) out.underline = "single";
   if (f.color) out.color = f.color.startsWith("#") ? f.color : `#${f.color}`;
   if (f.highlight) out.highlight = f.highlight;

@@ -13,7 +13,7 @@
  */
 
 import { resolveStyleCascade } from "../../../doc/styles";
-import type { NamedStyle, ParagraphProperties } from "../../../doc/types";
+import type { NamedStyle, ParagraphProperties, RunProperties } from "../../../doc/types";
 import { resolveFontFace } from "./fontFallback";
 import { twipsToMm } from "./units";
 
@@ -21,7 +21,7 @@ export function applyParagraphProps(
   el: HTMLElement,
   props: ParagraphProperties,
   styles: readonly NamedStyle[] = [],
-): void {
+): RunProperties {
   // Resolve the style cascade for both run + paragraph defaults, then
   // overlay the paragraph's own properties so explicit settings win on
   // conflict.
@@ -64,28 +64,19 @@ export function applyParagraphProps(
   // text colour instead of Word's blue.
   if (runDefaults.color)
     el.style.color = runDefaults.color === "auto" ? "currentColor" : runDefaults.color;
-  if (runDefaults.bold) el.style.fontWeight = "bold";
-  if (runDefaults.italic) el.style.fontStyle = "italic";
-  // `underline` is an enum (single / double / dotted / …) or
-  // undefined. Map all non-"none" values to a plain underline — the
-  // exact style is decorative and most aren't representable as a
-  // single CSS rule anyway. Per-run runs can still set richer
-  // styles via their own inline declarations.
+  // `underline` is an enum (single / double / dotted / …), NOT an OOXML toggle,
+  // so it inherits from the block element. Map any non-"none" value to a plain
+  // underline — the exact style is decorative and rarely a single CSS rule.
   if (runDefaults.underline && runDefaults.underline !== "none") {
     el.style.textDecoration = "underline";
   }
-  if (runDefaults.strike) {
-    el.style.textDecoration = el.style.textDecoration
-      ? `${el.style.textDecoration} line-through`
-      : "line-through";
-  }
-  // Caps from cascade — descendant text nodes inherit
-  // `text-transform: uppercase` so a run that doesn't set its own
-  // caps still uppercases when its paragraph style does.
-  // healthcare-with-photo's `PersonalName` style extends `Title`,
-  // which carries `<w:caps/>`; without this the name renders mixed
-  // case despite the cascade resolving caps=true.
-  if (runDefaults.caps) el.style.textTransform = "uppercase";
+  // TOGGLE run properties (bold / italic / strike / caps / smallCaps) are NOT
+  // applied to the block element. CSS inheritance can only OR them with a run's
+  // own value, but OOXML toggles combine by XOR — so a `caps` paragraph style
+  // plus a `caps` character style must CANCEL, not double up (the author-name
+  // ALL-CAPS bug). They're resolved per-run in `renderTextRun`, which composes
+  // the paragraph run-defaults (returned below) with each run's char style and
+  // direct formatting. This function only emits inheritable NON-toggle CSS.
 
   // Carry the Word style id verbatim so serialize can reconstruct it
   // losslessly. A `data-*` attribute, NOT a CSS class: style ids can
@@ -230,6 +221,9 @@ export function applyParagraphProps(
       el.style.setProperty("-moz-tab-size", `${twipsToMm(minTwips)}mm`);
     }
   }
+  // The resolved run defaults are the base for per-run toggle resolution in
+  // `renderTextRun` — returned so callers can thread them into the run walk.
+  return runDefaults;
 }
 
 /**

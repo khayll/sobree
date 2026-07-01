@@ -163,10 +163,10 @@ export function renderBlocks(
       if (id) li.setAttribute(BLOCK_ID_ATTR, id);
       li.dataset.sectionIndex = String(sectionIndex);
       li.dataset.blockIndex = String(i);
-      applyParagraphProps(li, (block as Paragraph).properties, styles);
+      const liRunDefaults = applyParagraphProps(li, (block as Paragraph).properties, styles);
       applyListItemLevel(li, block, numbering);
       stampBlockRevision(li, (block as Paragraph).properties);
-      appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles);
+      appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles, liRunDefaults);
       currentList.el.appendChild(li);
       continue;
     }
