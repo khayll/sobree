@@ -33,12 +33,12 @@ import type {
   ParagraphIndent,
   ParagraphProperties,
   ParagraphSpacing,
-  RunProperties,
 } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { readShading } from "../shared/shading";
 import { parseXml, wAll, wFirst, wOnOff, wVal } from "../shared/xml";
 import { readParagraphBorders } from "./borders";
+import { readRunProperties } from "./runProperties";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
 import { readTableStyle } from "./tableStyle";
 
@@ -354,71 +354,6 @@ function mapStyleType(raw: string | null): NamedStyle["type"] | null {
   }
 }
 
-function readRunProperties(rPr: Element): RunProperties | undefined {
-  const out: RunProperties = {};
-  // <w:rFonts w:ascii="..."/> — Word stores up to four font slots
-  // (ascii / hAnsi / eastAsia / cs). We only honour ascii for now;
-  // it's the slot Word picks for Latin text, which covers > 99% of
-  // visible runs.
-  const rFonts = wFirst(rPr, "rFonts");
-  if (rFonts) {
-    const ascii = rFonts.getAttributeNS(NS.w, "ascii") ?? rFonts.getAttribute("w:ascii");
-    if (ascii) out.fontFamily = ascii;
-  }
-  // <w:sz w:val="22"/> — value is in HALF-POINTS, so 22 = 11pt.
-  const szVal = wVal(wFirst(rPr, "sz"));
-  if (szVal) {
-    const halfPts = Number.parseInt(szVal, 10);
-    if (Number.isFinite(halfPts)) out.fontSizePt = halfPts / 2;
-  }
-  // Boolean toggles keep their EXPLICIT value: bare `<w:b/>` (or val="1") is
-  // true, `<w:b w:val="0"/>` is false, absent is undefined. The `false` is
-  // load-bearing — a style that turns off an inherited toggle (ACM's `ACMRef`
-  // switches off the bold it inherits from `Titledocument`) must record it, or
-  // the cascade resolver keeps the parent's bold.
-  const bold = styleToggle(wFirst(rPr, "b"));
-  if (bold !== undefined) out.bold = bold;
-  const italic = styleToggle(wFirst(rPr, "i"));
-  if (italic !== undefined) out.italic = italic;
-  const u = wFirst(rPr, "u");
-  if (u) {
-    const v = wVal(u);
-    if (v && v !== "none") {
-      // Treat unknown values as "single" — Word has many underline
-      // styles (wave, dotted, dashLong, …) but we expose only the
-      // canonical set; coerce to the closest renderable.
-      out.underline =
-        v === "single" || v === "double" || v === "dotted" || v === "dashed" || v === "wave"
-          ? v
-          : "single";
-    } else if (v === null) {
-      // No w:val attribute = single underline by default in OOXML.
-      out.underline = "single";
-    }
-  }
-  const strike = styleToggle(wFirst(rPr, "strike"));
-  if (strike !== undefined) out.strike = strike;
-  // `<w:caps/>` cascading through a named style — same toggle behaviour
-  // as `bold` / `italic`. Mirrors the per-run read in `runs.ts`.
-  const caps = styleToggle(wFirst(rPr, "caps"));
-  if (caps !== undefined) out.caps = caps;
-  // <w:color w:val="FF0000"/> or "auto". KEEP "auto" — a style that sets
-  // color="auto" is deliberately overriding an inherited colour back to
-  // automatic (black), e.g. ACM's "Head1" based on the built-in blue
-  // "Heading1". Dropping it would let the inherited blue win. The
-  // renderer maps "auto" → currentColor.
-  const colorVal = wVal(wFirst(rPr, "color"));
-  if (colorVal) {
-    out.color = colorVal === "auto" ? "auto" : colorVal.startsWith("#") ? colorVal : `#${colorVal}`;
-  }
-  // <w:vertAlign w:val="superscript"/>
-  const vAlign = wVal(wFirst(rPr, "vertAlign"));
-  if (vAlign === "superscript" || vAlign === "subscript") {
-    out.verticalAlign = vAlign;
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
 function readParagraphProperties(pPr: Element): ParagraphProperties | undefined {
   const out: ParagraphProperties = {};
 
@@ -512,12 +447,6 @@ function mapAlignment(raw: string | null): ParagraphAlignment | null {
  *  (bare or val 1/true), `false` for an explicit `w:val="0"`/"false",
  *  `undefined` when absent. The `false` lets a style turn off an inherited
  *  toggle (see `mergeRunStyleLayer`). */
-function styleToggle(el: Element | null): boolean | undefined {
-  if (!el) return undefined;
-  const v = wVal(el);
-  return v === null || v === "1" || v === "true";
-}
-
 function readNumAttr(el: Element, name: string): number | null {
   const v = el.getAttributeNS(NS.w, name) ?? el.getAttribute(`w:${name}`);
   if (v === null) return null;

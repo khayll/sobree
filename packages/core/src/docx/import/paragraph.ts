@@ -8,7 +8,7 @@ import type {
   RunProperties,
   TextRun,
 } from "../../doc/types";
-import type { ParagraphFormat, RunFormat } from "../types";
+import type { ParagraphFormat } from "../types";
 import { type ImportedItem, readParagraph } from "./paragraphs";
 import type { ImportedRun } from "./runs";
 
@@ -231,7 +231,10 @@ function pushInline(run: ImportedRun, ctx: ConvertContext, out: InlineRun[]): vo
     return;
   }
   if (run.text === "") return;
-  const properties = mapRunFormat(run.format);
+  // `run.format` is already the native `RunProperties` (read by the shared
+  // `<w:rPr>` reader). Copy it so the run-level revision / comment ids we
+  // layer on don't mutate the imported run.
+  const properties: RunProperties = { ...run.format };
   if (run.revision) properties.revision = run.revision;
   if (run.commentIds && run.commentIds.length > 0) properties.commentIds = run.commentIds;
   out.push(makeTextRun(run.text, properties));
@@ -272,35 +275,4 @@ function resolveMediaPath(target: string): string {
 
 function makeTextRun(text: string, properties: RunProperties): TextRun {
   return { kind: "text", text, properties };
-}
-
-function mapRunFormat(f: RunFormat): RunProperties {
-  const out: RunProperties = {};
-  if (f.styleId) out.styleId = f.styleId;
-  // Toggle properties keep their explicit value (including `false`) — a direct
-  // `<w:b w:val="0"/>` must reach the AST so the renderer's per-run cascade can
-  // override an inherited toggle (the ACM first-author `<w:caps w:val="0"/>`).
-  // Dropping `false` here (the old `if (f.caps)` guard) lower-cased nothing.
-  if (f.bold !== undefined) out.bold = f.bold;
-  if (f.italic !== undefined) out.italic = f.italic;
-  if (f.strike !== undefined) out.strike = f.strike;
-  if (f.caps !== undefined) out.caps = f.caps;
-  if (f.underline) out.underline = "single";
-  if (f.color) out.color = f.color.startsWith("#") ? f.color : `#${f.color}`;
-  if (f.highlight) out.highlight = f.highlight;
-  if (f.fontFamily) out.fontFamily = f.fontFamily;
-  if (f.fontSizePt !== undefined) out.fontSizePt = f.fontSizePt;
-  if (f.verticalAlign) out.verticalAlign = f.verticalAlign;
-  // `<w:rPrChange>` snapshot — recursively map the before-state through
-  // the same RunFormat → RunProperties conversion.
-  if (f.revisionFormat) {
-    const before = mapRunFormat(f.revisionFormat.before);
-    const { author, date } = f.revisionFormat;
-    out.revisionFormat = {
-      before,
-      ...(author !== undefined ? { author } : {}),
-      ...(date !== undefined ? { date } : {}),
-    };
-  }
-  return out;
 }
