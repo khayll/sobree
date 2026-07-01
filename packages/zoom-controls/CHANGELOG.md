@@ -1,5 +1,80 @@
 # @sobree/zoom-controls
 
+## 0.1.47
+
+### Patch Changes
+
+- da4b3ad: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- 69992a9: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [da4b3ad]
+- Updated dependencies [69992a9]
+  - @sobree/core@0.1.47
+
+## 0.1.46
+
+### Patch Changes
+
+- b305cf5: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [b305cf5]
+  - @sobree/core@0.1.46
+
+## 0.1.45
+
+### Patch Changes
+
+- 124e9cb: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [124e9cb]
+  - @sobree/core@0.1.45
+
+## 0.1.44
+
+### Patch Changes
+
+- e9759d2: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [e9759d2]
+  - @sobree/core@0.1.44
+
+## 0.1.43
+
+### Patch Changes
+
+- 2ee621e: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [2ee621e]
+  - @sobree/core@0.1.43
+
+## 0.1.42
+
+### Patch Changes
+
+- f6c7902: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [f6c7902]
+  - @sobree/core@0.1.42
+
+## 0.1.41
+
+### Patch Changes
+
+- 1eba390: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [1eba390]
+  - @sobree/core@0.1.41
+
+## 0.1.40
+
+### Patch Changes
+
+- 624ab1a: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [624ab1a]
+  - @sobree/core@0.1.40
+
 ## 0.1.39
 
 ### Patch Changes

@@ -16,3 +16,16 @@ describe("parseSettingsXml — noColumnBalance", () => {
     expect(parseSettingsXml(xml).noColumnBalance).toBeUndefined();
   });
 });
+
+describe("parseSettingsXml — displayBackgroundShape", () => {
+  it("reads <w:displayBackgroundShape/> (the page-background print gate)", () => {
+    const xml = `<?xml version="1.0"?><w:settings xmlns:w="${W}"><w:displayBackgroundShape/></w:settings>`;
+    expect(parseSettingsXml(xml).displayBackgroundShape).toBe(true);
+  });
+
+  it("defaults displayBackgroundShape to false when absent", () => {
+    const xml = `<?xml version="1.0"?><w:settings xmlns:w="${W}"/>`;
+    expect(parseSettingsXml(xml).displayBackgroundShape).toBe(false);
+    expect(parseSettingsXml(undefined).displayBackgroundShape).toBe(false);
+  });
+});

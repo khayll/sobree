@@ -1,9 +1,10 @@
 import { NS } from "../shared/namespaces";
 import { readShading } from "../shared/shading";
-import { halfPtToPt, ooxmlLineHeightToCss } from "../shared/units";
+import { ooxmlLineHeightToCss } from "../shared/units";
 import { wChildren, wFirst, wVal } from "../shared/xml";
 import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
+import { readRunProperties } from "./runProperties";
 import { type ImportedRun, readRun } from "./runs";
 
 /** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
@@ -254,23 +255,16 @@ function readCommentId(el: Element): number | null {
  * `<w:rPr>`. These apply to the invisible paragraph mark glyph and
  * are what Word uses to size empty paragraphs — if the paragraph has
  * no inline runs, the mark's font drives the line height.
+ *
+ * Delegates to the shared `<w:rPr>` reader and keeps only the two
+ * height-affecting fields, so the font/size parsing lives in exactly
+ * one place.
  */
 function readMarkRunFormat(rPr: Element): { fontFamily?: string; fontSizePt?: number } {
+  const props = readRunProperties(rPr);
   const out: { fontFamily?: string; fontSizePt?: number } = {};
-  const rFonts = wFirst(rPr, "rFonts");
-  if (rFonts) {
-    const font =
-      rFonts.getAttributeNS(NS.w, "ascii") ??
-      rFonts.getAttribute("w:ascii") ??
-      rFonts.getAttributeNS(NS.w, "hAnsi") ??
-      rFonts.getAttribute("w:hAnsi");
-    if (font) out.fontFamily = font;
-  }
-  const sz = wVal(wFirst(rPr, "sz"));
-  if (sz) {
-    const pt = halfPtToPt(Number(sz));
-    if (Number.isFinite(pt) && pt > 0) out.fontSizePt = pt;
-  }
+  if (props?.fontFamily) out.fontFamily = props.fontFamily;
+  if (props?.fontSizePt !== undefined) out.fontSizePt = props.fontSizePt;
   return out;
 }
 

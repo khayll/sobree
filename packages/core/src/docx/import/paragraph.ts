@@ -8,7 +8,7 @@ import type {
   RunProperties,
   TextRun,
 } from "../../doc/types";
-import type { ParagraphFormat, RunFormat } from "../types";
+import type { ParagraphFormat } from "../types";
 import { type ImportedItem, readParagraph } from "./paragraphs";
 import type { ImportedRun } from "./runs";
 
@@ -204,7 +204,11 @@ function pushInline(run: ImportedRun, ctx: ConvertContext, out: InlineRun[]): vo
     return;
   }
   if (run.footnoteRefId !== undefined) {
-    out.push({ kind: "footnoteRef", id: run.footnoteRefId });
+    out.push({
+      kind: "footnoteRef",
+      id: run.footnoteRefId,
+      ...(run.footnoteCustomMark ? { customMark: run.footnoteCustomMark } : {}),
+    });
     return;
   }
   if (run.commentRefId !== undefined) {
@@ -227,7 +231,10 @@ function pushInline(run: ImportedRun, ctx: ConvertContext, out: InlineRun[]): vo
     return;
   }
   if (run.text === "") return;
-  const properties = mapRunFormat(run.format);
+  // `run.format` is already the native `RunProperties` (read by the shared
+  // `<w:rPr>` reader). Copy it so the run-level revision / comment ids we
+  // layer on don't mutate the imported run.
+  const properties: RunProperties = { ...run.format };
   if (run.revision) properties.revision = run.revision;
   if (run.commentIds && run.commentIds.length > 0) properties.commentIds = run.commentIds;
   out.push(makeTextRun(run.text, properties));
@@ -268,34 +275,4 @@ function resolveMediaPath(target: string): string {
 
 function makeTextRun(text: string, properties: RunProperties): TextRun {
   return { kind: "text", text, properties };
-}
-
-function mapRunFormat(f: RunFormat): RunProperties {
-  const out: RunProperties = {};
-  if (f.styleId) out.styleId = f.styleId;
-  if (f.bold) out.bold = true;
-  if (f.italic) out.italic = true;
-  if (f.strike) out.strike = true;
-  // Threads `<w:caps/>` from the RunFormat to the AST so per-run caps
-  // (not just style-cascade caps) reaches the renderer's
-  // `text-transform: uppercase`.
-  if (f.caps) out.caps = true;
-  if (f.underline) out.underline = "single";
-  if (f.color) out.color = f.color.startsWith("#") ? f.color : `#${f.color}`;
-  if (f.highlight) out.highlight = f.highlight;
-  if (f.fontFamily) out.fontFamily = f.fontFamily;
-  if (f.fontSizePt !== undefined) out.fontSizePt = f.fontSizePt;
-  if (f.verticalAlign) out.verticalAlign = f.verticalAlign;
-  // `<w:rPrChange>` snapshot — recursively map the before-state through
-  // the same RunFormat → RunProperties conversion.
-  if (f.revisionFormat) {
-    const before = mapRunFormat(f.revisionFormat.before);
-    const { author, date } = f.revisionFormat;
-    out.revisionFormat = {
-      before,
-      ...(author !== undefined ? { author } : {}),
-      ...(date !== undefined ? { date } : {}),
-    };
-  }
-  return out;
 }

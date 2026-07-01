@@ -93,6 +93,20 @@ describe("ydoc helpers", () => {
     expect(out.settings).toEqual(doc.settings);
   });
 
+  it("round-trips settings that carry no defaultTabStop (page background, noColumnBalance)", () => {
+    // The projection gated `settings` on `defaultTabStopTwips`, so a doc whose
+    // only settings were a page background or noColumnBalance lost them on
+    // refresh / collab join. Both must survive without a default tab stop.
+    const doc = seedDoc();
+    doc.settings = { pageBackgroundColor: "#FFCC99", noColumnBalance: true };
+
+    const ydoc = new Y.Doc();
+    seedYDoc(ydoc, doc, ids(doc.body.length));
+    const { doc: out } = projectYDoc(ydoc);
+
+    expect(out.settings).toEqual(doc.settings);
+  });
+
   it("applyDocumentToYDoc updates a single block in place", () => {
     const doc = seedDoc();
     const ydoc = new Y.Doc();

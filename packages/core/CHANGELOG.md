@@ -1,5 +1,154 @@
 # @sobree/core
 
+## 0.1.47
+
+### Patch Changes
+
+- da4b3ad: Honour an explicit toggle-off in a paragraph/character STYLE. A style can turn
+  off a run toggle it inherits from its `basedOn` chain with `<w:b w:val="0"/>` —
+  the ACM reference-format paragraph (`ACMRef`) switches off the bold it inherits
+  from `Titledocument`, so the citation renders upright while the "ACM Reference
+  Format:" heading stays bold. The style importer dropped that explicit `0` (it
+  only kept `true`), so the cascade kept the parent's bold and the paragraph
+  rendered bold. Styles now record the explicit `false`, and the cascade resolver
+  treats it as a definite reset (an inherited toggle re-declared as `true` still
+  XORs to off, as before). Completes the toggle-property model from the previous
+  release, which fixed this only for direct run formatting.
+- 69992a9: Unify the two `<w:rPr>` (run-properties) importers into one reader.
+  `<w:rPr>` is a single OOXML concept with two homes — inside a `<w:r>`
+  (direct run formatting) and inside a `<w:style>` (a style's run defaults) —
+  but the importer parsed each with its own function, and the two drifted.
+  They now share one `readRunProperties(rPr)` that returns the native
+  `RunProperties` directly (dropping the redundant `RunFormat` intermediate
+  type and its mapping layer). Two latent bugs the drift had caused are fixed
+  as a result: a DIRECT run's underline now keeps its full style
+  (double / dotted / dashed / wave) instead of collapsing to single, and a
+  direct `<w:color w:val="auto"/>` that resets an inherited colour back to
+  automatic is now honoured (previously dropped, so the run stayed coloured).
+
+## 0.1.46
+
+### Patch Changes
+
+- b305cf5: Resolve OOXML toggle run properties (`caps`, `bold`, `italic`, `strike`) by XOR
+  across the style cascade, the way Word does. They were applied as inheritable
+  CSS at BOTH the block element and each run — and CSS can only OR them, so a
+  `caps` paragraph style plus a `caps` character style DOUBLED into ALL-CAPS
+  instead of cancelling (the ACM author names rendered "FIRST AUTHOR'S NAME"
+  instead of "First Author's Name").
+
+  Toggles now resolve once per run: the paragraph-style run defaults XOR the
+  character style, then direct formatting overrides absolutely (the importer keeps
+  an explicit `<w:b w:val="0"/>` as `false` so it can). The block element no longer
+  emits inheritable toggle CSS — it can't XOR — so the renderer applies each run's
+  resolved toggle exactly once. Single-level caps (a lone style `<w:caps/>`, e.g.
+  a résumé name banner) still uppercase; bold/italic are unaffected in the common
+  single-level case. `caps: false` round-trips through the Y.Doc.
+
+## 0.1.45
+
+### Patch Changes
+
+- 124e9cb: Two coupled pagination/spacing fixes.
+
+  **`atLeast` / `exact` line rule.** The renderer only honoured `lineRule="auto"`,
+  so paragraphs with `<w:spacing w:lineRule="atLeast" w:line="N"/>` (every ACM
+  style; common in academic templates) fell back to the font's natural leading and
+  rendered ~25% too tight. `atLeast` now applies the absolute minimum line height
+  when it exceeds the natural leading (matching LibreOffice exactly — e.g. an
+  abstract at 12pt, body at 13.5pt), leaving `normal` otherwise so a taller inline
+  still grows the line.
+
+  **Per-page pagination budget.** The page budget was taken from page 1's content
+  area, which is shrunk by page-1-specific reservations (a first-page footer, a
+  footnote), then applied to every page — so all pages under-filled (the ACM
+  template's page-1 footnote stole ~72pt from all 15 pages). The baseline is now a
+  normal page's body area (paper height − header reservation − nominal bottom
+  margin), and per-page budgets are measured from each paper's OWN geometry, so a
+  page-specific footer/footnote shrinks only that page.
+
+  Together these make most multi-page corpus fixtures match LibreOffice's page
+  count exactly (ieee-trans, gatech, jellap, complex-multipage, lease, healthcare,
+  pentest, nih, …) with faithful line spacing. A few remain ±1; wsu-thesis and
+  fedramp still over-count from a separate, pre-existing cause.
+
+## 0.1.44
+
+### Patch Changes
+
+- e9759d2: Render a footnote's custom reference mark. Word lets a footnote use a custom
+  mark instead of the auto-number via `<w:footnoteReference w:customMarkFollows="1">`
+  followed by the mark text (e.g. an author "_" footnote). Sobree dropped that
+  trailing text and rendered the auto-number "1" at both the reference and the
+  footnote body ("1. _ Place…"). The importer now captures the custom mark onto
+  `FootnoteRefRun.customMark`; the reference renders the mark, and the footnote
+  body — whose text already carries the mark — drops its `<ol>` counter so it
+  isn't doubled. `customMark` round-trips through the Y.Doc by construction.
+
+## 0.1.43
+
+### Patch Changes
+
+- 2ee621e: Stop over-paginating plain text-flow documents. Sobree honoured Word's
+  `<w:lastRenderedPageBreak/>` hints as forced page breaks whenever a doc had
+  ≥10 of them — a band-aid for frame-heavy layouts (complex-multipage's 32
+  inline-frame pills) whose heights the paginator estimates imperfectly. But for
+  a plain-flow document those stale hints, which mark where Word _last_ broke,
+  don't line up with Sobree's own (accurate) pagination and strand half-empty
+  pages: the ACM submission template blew up from 13 pages to 17. Honouring the
+  hints is now gated on the document actually having inline-frame groups, so
+  plain-flow docs re-paginate fresh per ECMA-376. ACM drops 17 → 13 (matching
+  Word); other hint-heavy reports improve too (wsu-thesis 38 → 32,
+  fedramp 47 → 37); frame-heavy docs (complex-multipage) are unchanged.
+
+## 0.1.42
+
+### Patch Changes
+
+- f6c7902: Lay out a horizontal band of anchored pictures as a row instead of scattering
+  it. Flyers place several `<wp:anchor>` photos side-by-side at a fixed position
+  to form a banner strip (the USDA farm-loss handout's three portraits). Each was
+  converted to a CSS float and pushed to whichever margin it sat nearer, so the
+  row collapsed and body text filled the gaps. Such a group — two or more
+  displacing-wrap pictures sharing one empty anchor paragraph and a vertical band
+  — now coalesces into a single in-flow `InlineFrame` (the same height-reserving
+  wrapper inline drawing groups use), keeping the row and letting the body text
+  flow below it. A lone wrap-around image still floats as before.
+
+## 0.1.41
+
+### Patch Changes
+
+- 1eba390: Render the document page background colour. Word stores a page colour as
+  `<w:background w:color="RRGGBB"/>` and shows it in print layout when
+  `<w:displayBackgroundShape/>` is set in settings — Sobree parsed neither, so a
+  flyer with a full-page peach background (the USDA farm-loss handout) imported on
+  plain white. The importer now reads the gated background colour onto
+  `document.settings.pageBackgroundColor`, and the renderer paints every `.paper`
+  with it (falling back to white when absent). Theme-colour and VML-fill
+  backgrounds aren't modelled yet.
+
+  Also fixes a Y.Doc round-trip gap: the projection only re-attached
+  `document.settings` when `defaultTabStopTwips` was present, so a doc whose
+  settings were a page background (or `noColumnBalance`) alone lost them on
+  refresh / collab join. Settings now survive whenever any field is set.
+
+## 0.1.40
+
+### Patch Changes
+
+- 624ab1a: Anchor the page footer the `w:footer` distance from the page bottom, the way
+  Word does, instead of floating it at the top of the bottom margin. The footer
+  zone filled the whole bottom margin and top-aligned its content, ignoring the
+  parsed `<w:pgMar w:footer>` offset — so a short footer sat almost a full
+  bottom-margin too high and could collide with a body-anchored frame that
+  legitimately extends into the bottom margin (e.g. a full-page content card,
+  where the footer text overlapped the card's bottom edge). The footer content is
+  now bottom-aligned within the zone and lifted by the footer offset, so a single
+  line lands `footerTwips` from the page edge — matching Word / LibreOffice for
+  small offsets while preserving the previous position when the offset equals the
+  bottom margin.
+
 ## 0.1.39
 
 ### Patch Changes

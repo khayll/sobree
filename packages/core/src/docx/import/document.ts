@@ -49,6 +49,14 @@ export interface DocumentImport {
  */
 export interface ConvertOptions {
   replaceParagraphs?: Map<Element, Block>;
+  /** Whether the document carries inline-frame groups (section textbox
+   *  pills, `<wp:inline>` drawing groups). These are the layouts whose
+   *  frame heights our paginator estimates imperfectly, so for them we
+   *  fall back to honouring Word's `<w:lastRenderedPageBreak/>` hints.
+   *  A plain text-flow document paginates accurately on its own and must
+   *  IGNORE the hints (ECMA-376's guidance), or stale hints fragment its
+   *  pages. Set by the importer from the parsed inline-frame count. */
+  hasComplexFrames?: boolean;
 }
 
 export function convertDocumentXml(
@@ -60,26 +68,29 @@ export function convertDocumentXml(
   if (!body) return { body: [], warnings: ["document.xml has no <w:body>"], sectPrEls: [] };
   // `<w:lastRenderedPageBreak/>` is a HINT Word writes during save
   // — a record of where Word's layout engine broke pages last time.
-  // ECMA-376 says consumers SHOULD ignore it for layout. But ignoring
-  // it on heavily-decorated docs (complex-multipage's 21 hints)
-  // packs Sobree pages 3-into-1, so per-element y positions drift
-  // 300-400pt vs LO's reference. Honoring it preserves LO's page
-  // layout exactly but fragments pages when our paginator's section-
-  // frame heights differ from LO's.
+  // ECMA-376 says consumers SHOULD ignore it for layout, and a
+  // re-paginating editor normally must: the hints are stale the moment
+  // our line metrics differ from Word's.
   //
-  // Compromise: honor the hint when there are MANY (≥10) — that's
-  // a strong signal the source was rendered+saved by Word with
-  // meaningful pagination decisions. For low-hint docs (≤3, the
-  // jellap.docx case) ignore the hint entirely. The middle range
-  // is a tossup; bias toward honoring since over-pagination is
-  // visually less wrong than 300pt content drift.
+  // The one exception is frame-heavy documents (complex-multipage's 32
+  // inline-frame section pills): our paginator estimates those frame
+  // heights imperfectly, so without the hints it packs pages 3-into-1
+  // and per-element y positions drift 300-400pt vs LO. There, honouring
+  // a STRONG hint signal (≥10 markers) restores Word's page layout.
+  //
+  // For a plain text-flow document (no inline frames) we paginate
+  // accurately on our own, so honouring stale hints only FRAGMENTS the
+  // result — the ACM submission template (12 hints, zero frames) blew
+  // up from 13 pages to 17, each forced break stranding a half-empty
+  // page. So gate honouring on BOTH a strong hint count AND the presence
+  // of the frames that make our own pagination unreliable.
   const hintCount = body.getElementsByTagNameNS(
     "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
     "lastRenderedPageBreak",
   ).length;
   const enrichedCtx: ConvertContext = {
     ...ctx,
-    honorLastRenderedPageBreaks: hintCount >= 10,
+    honorLastRenderedPageBreaks: hintCount >= 10 && opts?.hasComplexFrames === true,
     // Fold the replacement map into the CONTEXT (not just the body
     // walker's opts) — host paragraphs can live inside table cells,
     // whose walker only sees ctx. Without this, a drawing claimed from

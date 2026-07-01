@@ -1,4 +1,4 @@
-import { resolveRunStyle } from "../../../doc/styles";
+import { mergeRunStyleLayer, resolveRunStyle } from "../../../doc/styles";
 import type {
   HyperlinkRun,
   InlineRun,
@@ -31,13 +31,14 @@ export function appendInlineRuns(
   runs: readonly InlineRun[],
   rawParts: Record<string, Uint8Array> = {},
   styles: readonly NamedStyle[] = [],
+  paragraphRunDefaults: RunProperties = {},
 ): void {
   if (runs.length === 0) {
     parent.appendChild(document.createElement("br"));
     return;
   }
   for (const run of runs) {
-    const node = renderRun(run, rawParts, styles);
+    const node = renderRun(run, rawParts, styles, paragraphRunDefaults);
     if (node) parent.appendChild(node);
   }
 }
@@ -46,10 +47,11 @@ function renderRun(
   run: InlineRun,
   rawParts: Record<string, Uint8Array>,
   styles: readonly NamedStyle[],
+  paragraphRunDefaults: RunProperties,
 ): Node | null {
   switch (run.kind) {
     case "text":
-      return renderTextRun(run, styles);
+      return renderTextRun(run, styles, paragraphRunDefaults);
     case "break":
       if (run.type === "line") return document.createElement("br");
       if (run.type === "page") {
@@ -83,7 +85,7 @@ function renderRun(
     case "drawing":
       return renderDrawing(run, rawParts);
     case "hyperlink":
-      return renderHyperlink(run, rawParts, styles);
+      return renderHyperlink(run, rawParts, styles, paragraphRunDefaults);
     case "footnoteRef":
       return renderFootnoteRef(run);
     case "commentRef":
@@ -104,7 +106,9 @@ function renderFootnoteRef(run: import("../../../doc/types").FootnoteRefRun): HT
   const link = document.createElement("a");
   link.setAttribute("href", `#sobree-footnote-${run.id}`);
   link.setAttribute("id", `sobree-footnote-ref-${run.id}`);
-  link.textContent = String(run.id);
+  // A custom mark (`<w:footnoteReference w:customMarkFollows>`) replaces the
+  // auto-number — e.g. an author "*" footnote.
+  link.textContent = run.customMark ?? String(run.id);
   sup.appendChild(link);
   return sup;
 }
@@ -138,18 +142,27 @@ function renderCommentRef(run: import("../../../doc/types").CommentRefRun): HTML
  * The DOM shape round-trips cleanly through the serializer which walks
  * these wrappers back into a single flat `RunProperties`.
  */
-function renderTextRun(run: TextRun, styles: readonly NamedStyle[] = []): Node {
+function renderTextRun(
+  run: TextRun,
+  styles: readonly NamedStyle[] = [],
+  paragraphRunDefaults: RunProperties = {},
+): Node {
   let node: Node = document.createTextNode(run.text);
-  // A run character style (`<w:rStyle>`) contributes its rPr UNDER any
-  // direct run formatting — Word's cascade order (char style < direct
-  // rPr). resolveStyleCascade returns the char style's own properties
-  // (character styles don't chain to DocDefaults), so the run's font /
-  // size still inherit from the paragraph; only what the char style sets
-  // (colour, underline, …) is added.
-  const p: RunProperties =
+  // Resolve the run's EFFECTIVE properties across Word's cascade:
+  //   paragraph-style run defaults  ⊕(toggles) char style  → then direct rPr.
+  // Toggle properties (bold/caps/…) XOR across the STYLE levels — so a `caps`
+  // paragraph style plus a `caps` character style cancel to lower-case, as
+  // Word renders it — while direct rPr (which stores explicit `val="0"` too)
+  // overrides absolutely. Non-toggle fields (colour, font, underline) override
+  // leaf-last. Resolving toggles HERE, once per run, is why the block element
+  // no longer emits inheritable toggle CSS (it can't XOR): see
+  // `applyParagraphProps`.
+  const charStyle =
     run.properties.styleId && styles.length > 0
-      ? { ...resolveRunStyle(styles, run.properties.styleId), ...run.properties }
-      : run.properties;
+      ? resolveRunStyle(styles, run.properties.styleId)
+      : {};
+  const styleLayer = mergeRunStyleLayer(paragraphRunDefaults, charStyle);
+  const p: RunProperties = { ...styleLayer, ...run.properties };
 
   if (p.verticalAlign === "superscript") node = wrap("sup", node);
   else if (p.verticalAlign === "subscript") node = wrap("sub", node);
@@ -225,10 +238,11 @@ function renderHyperlink(
   link: HyperlinkRun,
   rawParts: Record<string, Uint8Array>,
   styles: readonly NamedStyle[] = [],
+  paragraphRunDefaults: RunProperties = {},
 ): Node {
   const a = document.createElement("a");
   a.setAttribute("href", link.href);
-  appendInlineRuns(a, link.children, rawParts, styles);
+  appendInlineRuns(a, link.children, rawParts, styles, paragraphRunDefaults);
   return a;
 }
 

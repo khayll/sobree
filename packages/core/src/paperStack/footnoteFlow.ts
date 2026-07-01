@@ -93,20 +93,32 @@ export function distributeFootnotes(papers: readonly Paper[]): void {
 }
 
 /**
- * Per-page body budget after subtracting each page's footnote-zone
- * height — entry `i` is page `i`'s budget. Trailing entries equal to the
- * baseline are trimmed so two arrays differing only by an unrelated tail
- * compare equal (keeps the repaginate loop's `arraysEqual` honest).
+ * Per-page body budget — entry `i` is page `i`'s budget. Each page's budget is
+ * its OWN content-box area (paper height minus its actual top + bottom padding,
+ * so a page-specific footer reservation that inflated `padding-bottom` — e.g. a
+ * first-page footer — shrinks only THAT page) minus its footnote-zone height.
+ * The area is read from geometry, NOT `content.offsetHeight`, because a page
+ * that momentarily overflows during the iterative repaginate reports its
+ * overflowing CONTENT height there, not the page area.
+ *
+ * Trailing entries that meet (or exceed) the unconstrained `baselineBudgetPx`
+ * are trimmed: those pages fall back to the engine's global default, so two
+ * arrays differing only by an unrelated tail compare equal (keeps the
+ * repaginate loop's `arraysEqual` honest).
  */
 export function footnotePageHeights(papers: readonly Paper[], baselineBudgetPx: number): number[] {
   const heights: number[] = [];
   for (const paper of papers) {
+    const cs = getComputedStyle(paper.root);
+    const padTop = Number.parseFloat(cs.paddingTop) || 0;
+    const padBottom = Number.parseFloat(cs.paddingBottom) || 0;
+    const pageArea = paper.root.offsetHeight - padTop - padBottom;
     // Only footnotes share the page with body content; comments live in a
     // sidebar outside the paper card.
     const fnH = paper.footnotes.classList.contains("is-empty") ? 0 : paper.footnotes.offsetHeight;
-    heights.push(baselineBudgetPx - fnH);
+    heights.push(pageArea - fnH);
   }
-  while (heights.length > 0 && heights[heights.length - 1] === baselineBudgetPx) {
+  while (heights.length > 0 && (heights[heights.length - 1] ?? 0) >= baselineBudgetPx) {
     heights.pop();
   }
   return heights;

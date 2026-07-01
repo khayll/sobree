@@ -9,6 +9,23 @@ function runFromXml(xml: string): Element {
   return new DOMParser().parseFromString(xml, "application/xml").documentElement;
 }
 
+describe("readRun — toggle properties keep their explicit value", () => {
+  it('bare <w:caps/> is true; <w:caps w:val="0"/> is an explicit false', () => {
+    const on = readRun(
+      runFromXml(`<w:r xmlns:w="${NS_W}"><w:rPr><w:caps/></w:rPr><w:t>x</w:t></w:r>`),
+    );
+    expect(on.format.caps).toBe(true);
+    // The explicit false is load-bearing: it must override an inherited toggle.
+    const off = readRun(
+      runFromXml(`<w:r xmlns:w="${NS_W}"><w:rPr><w:caps w:val="0"/></w:rPr><w:t>x</w:t></w:r>`),
+    );
+    expect(off.format.caps).toBe(false);
+    // Absent element → unspecified, not false.
+    const none = readRun(runFromXml(`<w:r xmlns:w="${NS_W}"><w:t>x</w:t></w:r>`));
+    expect(none.format.caps).toBeUndefined();
+  });
+});
+
 describe("readRun — <w:drawing>", () => {
   it("flags inline drawings without an anchor", () => {
     const r = runFromXml(`<?xml version="1.0"?>
@@ -85,6 +102,21 @@ describe("readRun — <w:drawing>", () => {
       </w:r>`);
     const parsed = readRun(r);
     expect(parsed.footnoteRefId).toBe(7);
+    expect(parsed.text).toBe("");
+    expect(parsed.footnoteCustomMark).toBeUndefined();
+  });
+
+  it("captures the custom mark from <w:footnoteReference w:customMarkFollows>", () => {
+    // The mark trails the reference as plain text in the SAME run.
+    const r = runFromXml(`<?xml version="1.0"?>
+      <w:r xmlns:w="${NS_W}">
+        <w:footnoteReference w:customMarkFollows="1" w:id="1"/>
+        <w:t>*</w:t>
+      </w:r>`);
+    const parsed = readRun(r);
+    expect(parsed.footnoteRefId).toBe(1);
+    expect(parsed.footnoteCustomMark).toBe("*");
+    // The mark text is consumed by the reference, not emitted as body text.
     expect(parsed.text).toBe("");
   });
 

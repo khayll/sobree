@@ -1,5 +1,43 @@
 import type { NamedStyle, ParagraphProperties, RunProperties, SobreeDocument } from "./types";
 
+/** OOXML TOGGLE run properties (ECMA-376 §17.7.3): when the same one is
+ *  specified at multiple levels of the style hierarchy, the values combine by
+ *  XOR — a style that re-declares an inherited `<w:caps/>` turns caps OFF. All
+ *  other run fields (colour, font, underline, …) override leaf-last. */
+const RUN_TOGGLE_KEYS = [
+  "bold",
+  "italic",
+  "strike",
+  "doubleStrike",
+  "caps",
+  "smallCaps",
+  "hidden",
+] as const;
+
+/**
+ * Merge one run-property layer of the STYLE hierarchy onto the accumulated
+ * base. Non-toggle fields override (leaf wins). For toggle fields the layer's
+ * value decides:
+ *   - absent (`undefined`)  → keep the inherited value;
+ *   - `true` (a `<w:b/>` re-declaration) → XOR: toggle the inherited value, so
+ *     a `caps` style based on another `caps` style CANCELS to off;
+ *   - `false` (an explicit `<w:b w:val="0"/>`) → RESET to off. An explicit off
+ *     is a definite "not bold", not a toggle — so a style that turns off the
+ *     bold it inherited (ACM's `ACMRef` off `Titledocument`) renders upright.
+ *
+ * NOT used for DIRECT run formatting: there a plain spread applies, so an
+ * explicit run-level `false` overrides the resolved style value outright.
+ */
+export function mergeRunStyleLayer(base: RunProperties, over: RunProperties): RunProperties {
+  const out: RunProperties = { ...base, ...over };
+  for (const k of RUN_TOGGLE_KEYS) {
+    const o = over[k];
+    if (o === undefined) continue;
+    out[k] = o === false ? false : !base[k];
+  }
+  return out;
+}
+
 /**
  * Style-cascade resolver — walks `styleId` up its `basedOn` chain and
  * merges defaults base-first, leaf-last. The result is what the
@@ -36,7 +74,7 @@ export function resolveStyleCascade(
   let paragraphDefaults: ParagraphProperties = {};
   for (let i = chain.length - 1; i >= 0; i--) {
     const s = chain[i]!;
-    if (s.runDefaults) runDefaults = { ...runDefaults, ...s.runDefaults };
+    if (s.runDefaults) runDefaults = mergeRunStyleLayer(runDefaults, s.runDefaults);
     if (s.paragraphDefaults) {
       paragraphDefaults = mergeParagraphDefaults(paragraphDefaults, s.paragraphDefaults);
     }
@@ -70,7 +108,7 @@ export function resolveRunStyle(styles: readonly NamedStyle[], styleId: string):
   let out: RunProperties = {};
   for (let i = chain.length - 1; i >= 0; i--) {
     const rd = chain[i]?.runDefaults;
-    if (rd) out = { ...out, ...rd };
+    if (rd) out = mergeRunStyleLayer(out, rd);
   }
   return out;
 }

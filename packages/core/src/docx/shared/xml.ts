@@ -66,6 +66,27 @@ export function wOnOff(root: Document | Element, localName: string): boolean {
   return val !== "false" && val !== "0" && val !== "off";
 }
 
+/**
+ * TRI-STATE read of an OOXML toggle property (`CT_OnOff`: `<w:b>`,
+ * `<w:caps>`, …) from an already-resolved element. Unlike {@link wOnOff}
+ * this distinguishes "absent" from "explicit-off":
+ *   - element absent (`null`)             → `undefined` (inherit);
+ *   - present, no `w:val` (bare `<w:b/>`) → `true`;
+ *   - `w:val` "0" / "false"               → `false` (explicit off).
+ *
+ * The `false` is load-bearing at BOTH `<w:rPr>` sites: a direct run's
+ * `<w:caps w:val="0"/>` overrides an inherited toggle, and a style's
+ * explicit-off resets it as the cascade combines (`mergeRunStyleLayer`).
+ * Toggle XOR-combination across the style hierarchy is the resolver's job
+ * (doc/styles.ts), not the reader's — this only records the raw value.
+ */
+export function wToggleOn(el: Element | null): boolean | undefined {
+  if (!el) return undefined;
+  const val = wVal(el);
+  if (val === null) return true;
+  return val !== "false" && val !== "0";
+}
+
 /** Build an XML declaration header + root element. Used by the exporter. */
 export function xmlDocument(rootXml: string): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n${rootXml}`;

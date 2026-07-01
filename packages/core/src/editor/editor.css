@@ -118,6 +118,10 @@
 .sobree-editor .sobree-footnotes__item {
   margin: 0.25em 0;
 }
+/* Custom-mark footnotes ("*") carry the mark in body text — drop the counter. */
+.sobree-editor .sobree-footnotes__item--custom-mark {
+  list-style: none;
+}
 
 /* Tracked changes — neutral semantic marks. Core ships only the
    underline / strikethrough so changes are VISIBLE with no plugin;

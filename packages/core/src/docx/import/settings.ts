@@ -39,10 +39,17 @@ export interface DocSettings {
    *  continuous section breaks document-wide (columns fill column-first
    *  instead of equalising on the last page). */
   noColumnBalance?: boolean;
+  /** `<w:displayBackgroundShape/>` — Word's gate for painting the
+   *  document `<w:background>` (page colour / background shape) in print
+   *  layout. Absent ⇒ the background stays hidden on the printed page. */
+  displayBackgroundShape: boolean;
 }
 
 export function parseSettingsXml(xml: string | undefined): DocSettings {
-  const out: DocSettings = { doNotUseHTMLParagraphAutoSpacing: false };
+  const out: DocSettings = {
+    doNotUseHTMLParagraphAutoSpacing: false,
+    displayBackgroundShape: false,
+  };
   if (!xml) return out;
   let doc: Document;
   try {
@@ -81,6 +88,10 @@ export function parseSettingsXml(xml: string | undefined): DocSettings {
 
   // <w:noColumnBalance/> — disable column balancing at continuous breaks.
   if (wFirst(doc, "noColumnBalance")) out.noColumnBalance = true;
+
+  // <w:displayBackgroundShape/> — show the document background in print
+  // layout (Word sets this whenever a page colour is applied).
+  if (wFirst(doc, "displayBackgroundShape")) out.displayBackgroundShape = true;
 
   // <w:defaultTabStop w:val="720"/> — interval for tab advances when a
   // paragraph has no explicit `<w:tabs>` stops. Word's factory default

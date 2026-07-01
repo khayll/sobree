@@ -1,7 +1,7 @@
+import type { RunProperties } from "../../doc/types";
 import { NS } from "../shared/namespaces";
-import { halfPtToPt } from "../shared/units";
-import { wFirst, wVal } from "../shared/xml";
-import type { RunFormat } from "../types";
+import { wFirst } from "../shared/xml";
+import { readRunProperties } from "./runProperties";
 
 /** Frame-of-reference choices the importer carries through; mapped 1:1 to
  *  the `DrawingAnchor.relativeFromH` / `relativeFromV` AST values. */
@@ -32,7 +32,7 @@ export interface ImportedDrawing {
  */
 export interface ImportedRun {
   text: string;
-  format: RunFormat;
+  format: RunProperties;
   /** True if this run was `<w:br/>`; `text` is empty in that case. */
   isHardBreak: boolean;
   /** Type of break for `isHardBreak` runs — line (Shift-Enter), page
@@ -43,6 +43,10 @@ export interface ImportedRun {
   drawing?: ImportedDrawing;
   /** Set when the run wraps a `<w:footnoteReference w:id="N"/>`. */
   footnoteRefId?: number;
+  /** Custom mark from `<w:footnoteReference w:customMarkFollows="1">` —
+   *  the literal text following the reference in the same run (e.g. `"*"`)
+   *  that replaces the auto-number. */
+  footnoteCustomMark?: string;
   /** Set when the run wraps a `<w:commentReference w:id="N"/>`. */
   commentRefId?: number;
   /** Set when the run is inside a `<w:ins>` / `<w:del>` wrapper. */
@@ -114,7 +118,21 @@ export function readRun(r: Element): ImportedRun {
     const idAttr = footnoteRef.getAttributeNS(NS.w, "id") ?? footnoteRef.getAttribute("w:id");
     const id = Number(idAttr);
     if (Number.isFinite(id) && id >= 1) {
-      return { text: "", format: {}, isHardBreak: false, footnoteRefId: id };
+      // `customMarkFollows` ⇒ the auto-number is suppressed and the run's
+      // trailing `<w:t>` text (e.g. "*") IS the reference mark. Capture it so
+      // the renderer shows the mark instead of the number; without this the
+      // mark text was also dropped by the early return.
+      const custom =
+        footnoteRef.getAttributeNS(NS.w, "customMarkFollows") ??
+        footnoteRef.getAttribute("w:customMarkFollows");
+      const customMark = custom === "1" || custom === "true" ? readRunText(r) : "";
+      return {
+        text: "",
+        format: {},
+        isHardBreak: false,
+        footnoteRefId: id,
+        ...(customMark ? { footnoteCustomMark: customMark } : {}),
+      };
     }
   }
 
@@ -153,40 +171,16 @@ export function readRun(r: Element): ImportedRun {
 
   text = normaliseRunText(text);
 
+  // `<w:rPr>` — direct run formatting. Parsed by the ONE shared reader
+  // (the same `readRunProperties` the style importer uses) so the two
+  // `<w:rPr>` homes can't drift; it also folds in the nested
+  // `<w:rPrChange>` format-revision snapshot.
   const rPr = wFirst(r, "rPr");
-  const format: RunFormat = rPr ? readRunFormat(rPr) : {};
-
-  // `<w:rPrChange>` — a snapshot of the run's pre-tracked-edit
-  // properties. Lives inside the *current* `<w:rPr>` and wraps its
-  // own inner `<w:rPr>` carrying the snapshot. We recurse into that
-  // inner rPr through the same parser so the snapshot keeps the same
-  // shape as the current properties.
-  if (rPr) {
-    const rPrChange = wFirst(rPr, "rPrChange");
-    if (rPrChange) {
-      const innerRPr = wFirst(rPrChange, "rPr");
-      const before = innerRPr ? readRunFormat(innerRPr) : {};
-      const author =
-        rPrChange.getAttributeNS(NS.w, "author") ?? rPrChange.getAttribute("w:author") ?? undefined;
-      const date =
-        rPrChange.getAttributeNS(NS.w, "date") ?? rPrChange.getAttribute("w:date") ?? undefined;
-      format.revisionFormat = {
-        before,
-        ...(author !== undefined ? { author } : {}),
-        ...(date !== undefined ? { date } : {}),
-      };
-    }
-  }
+  const format: RunProperties = (rPr ? readRunProperties(rPr) : undefined) ?? {};
 
   return { text, format, isHardBreak: false };
 }
 
-/**
- * Parse a `<w:rPr>` element into a `RunFormat`. Extracted so it can
- * recurse for the `<w:rPrChange><w:rPr>...</w:rPr></w:rPrChange>`
- * snapshot (without re-parsing the change marker itself — the snapshot
- * is the *pre-tracking* state and never carries its own `rPrChange`).
- */
 /**
  * Pull-in normalisation for `<w:t>` content. Word renders certain
  * source artefacts visually differently from how a browser would:
@@ -205,67 +199,24 @@ export function readRun(r: Element): ImportedRun {
  * renderer can apply CSS letter-spacing tightening that preserves the
  * dot-leader visual without touching the AST.
  */
+/** Concatenate a run's `<w:t>` text in document order (tabs → `\t`).
+ *  Used to capture a footnote's custom mark, which trails the
+ *  `<w:footnoteReference>` as plain text in the same run. */
+function readRunText(r: Element): string {
+  let text = "";
+  for (const child of Array.from(r.children)) {
+    if (child.namespaceURI !== NS.w) continue;
+    if (child.localName === "t" || child.localName === "delText") text += child.textContent ?? "";
+    else if (child.localName === "tab") text += "\t";
+  }
+  return text.trim();
+}
+
 function normaliseRunText(text: string): string {
   if (!text) return text;
   if (text.includes("\t")) return text;
   if (text.length >= 4 && /^[ \u00A0]+$/.test(text)) return " ";
   return text;
-}
-
-function readRunFormat(rPr: Element): RunFormat {
-  const format: RunFormat = {};
-  // `<w:rStyle>` — character style reference. Resolved against the style
-  // cascade at render time (its colour / underline / … layer under direct
-  // run formatting). Without this a run styled only via a char style
-  // (e.g. a "Blue" link colour) renders with just its paragraph style.
-  const rStyle = wVal(wFirst(rPr, "rStyle"));
-  if (rStyle) format.styleId = rStyle;
-  if (hasBooleanProperty(rPr, "b")) format.bold = true;
-  if (hasBooleanProperty(rPr, "i")) format.italic = true;
-  if (hasBooleanProperty(rPr, "strike")) format.strike = true;
-  // `<w:caps/>` (or `<w:caps w:val="true"/>`) — render the run with
-  // `text-transform: uppercase`. Word toggles the displayed glyph case
-  // without mutating the source text; round-trip preserves the
-  // mixed-case characters. Without honouring this, resume templates
-  // like healthcare-with-photo render "Peter Burkimsher" instead of
-  // "PETER BURKIMSHER" in the banner.
-  if (hasBooleanProperty(rPr, "caps")) format.caps = true;
-  // Word's `<w:u>` has a `w:val` of "none" | "single" | "double" | … —
-  // treat anything non-"none" as underline for our purposes.
-  const u = wFirst(rPr, "u");
-  if (u && wVal(u) !== "none") format.underline = true;
-
-  const colorEl = wFirst(rPr, "color");
-  const color = wVal(colorEl);
-  if (color && color !== "auto") {
-    format.color = color.startsWith("#") ? color : `#${color}`;
-  }
-
-  const highlight = wVal(wFirst(rPr, "highlight"));
-  if (highlight && highlight !== "none") format.highlight = highlight;
-
-  const rFonts = wFirst(rPr, "rFonts");
-  if (rFonts) {
-    // Prefer `w:ascii`, fall back to `w:hAnsi`. We ignore `eastAsia` and
-    // `cs` for the first pass — adding them is a follow-up once we have
-    // non-Latin test fixtures.
-    const font =
-      rFonts.getAttributeNS(NS.w, "ascii") ??
-      rFonts.getAttribute("w:ascii") ??
-      rFonts.getAttributeNS(NS.w, "hAnsi") ??
-      rFonts.getAttribute("w:hAnsi");
-    if (font) format.fontFamily = font;
-  }
-
-  const sz = wVal(wFirst(rPr, "sz"));
-  if (sz) {
-    const pt = halfPtToPt(Number(sz));
-    if (Number.isFinite(pt) && pt > 0) format.fontSizePt = pt;
-  }
-
-  const vAlign = wVal(wFirst(rPr, "vertAlign"));
-  if (vAlign === "subscript" || vAlign === "superscript") format.verticalAlign = vAlign;
-  return format;
 }
 
 /**
@@ -401,16 +352,4 @@ function normaliseRelativeFromV(v: string): ImportedAnchor["relativeFromV"] {
   // "paragraph", "topMargin", "bottomMargin", "insideMargin", "outsideMargin"
   // collapse to "paragraph".
   return "paragraph";
-}
-
-/**
- * `<w:rPr>` treats presence of `<w:b/>` as "true" but also allows
- * `<w:b w:val="false"/>` — the explicit-off form. Honour both.
- */
-function hasBooleanProperty(rPr: Element, localName: string): boolean {
-  const el = wFirst(rPr, localName);
-  if (!el) return false;
-  const val = wVal(el);
-  if (val === null) return true; // bare `<w:b/>`
-  return val !== "false" && val !== "0";
 }

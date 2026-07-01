@@ -58,6 +58,13 @@ describe("runs ↔ delta — round trip", () => {
     expect(rt([tab])).toEqual([tab]);
   });
 
+  it("footnote ref round-trips its custom mark (Y.Doc parity — refresh must not drop it)", () => {
+    const auto: InlineRun = { kind: "footnoteRef", id: 3 };
+    const custom: InlineRun = { kind: "footnoteRef", id: 1, customMark: "*" };
+    expect(rt([auto])).toEqual([auto]);
+    expect(rt([custom])).toEqual([custom]);
+  });
+
   it("field run preserves instruction + cached", () => {
     const f: FieldRun = {
       kind: "field",
@@ -232,6 +239,15 @@ describe("runPropsToAttrs / attrsToRunProps", () => {
     const attrs = runPropsToAttrs({ bold: true });
     expect(attrs).toEqual({ bold: true });
     expect(attrsToRunProps(attrs)).toEqual({ bold: true });
+  });
+
+  it("round-trips an EXPLICIT toggle-off (Y.Doc parity — a direct caps:false must survive)", () => {
+    // A direct `<w:caps w:val="0"/>` that lower-cases a name whose style has
+    // caps must survive the seed→project round-trip, or the name renders
+    // ALL-CAPS on reload.
+    const attrs = runPropsToAttrs({ caps: false });
+    expect(attrs).toEqual({ caps: false });
+    expect(attrsToRunProps(attrs)).toEqual({ caps: false });
   });
 });
 
