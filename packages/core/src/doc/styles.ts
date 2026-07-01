@@ -16,19 +16,24 @@ const RUN_TOGGLE_KEYS = [
 
 /**
  * Merge one run-property layer of the STYLE hierarchy onto the accumulated
- * base. Non-toggle fields override (leaf wins); toggle fields XOR (absent =
- * `false`, the XOR identity). This is the correct combinator for style→style
- * inheritance — it is NOT used for DIRECT run formatting, where an explicit
- * `<w:b w:val="0"/>` must absolutely override the styles' XOR (a plain spread
- * handles that, since the importer stores the explicit `false`).
+ * base. Non-toggle fields override (leaf wins). For toggle fields the layer's
+ * value decides:
+ *   - absent (`undefined`)  → keep the inherited value;
+ *   - `true` (a `<w:b/>` re-declaration) → XOR: toggle the inherited value, so
+ *     a `caps` style based on another `caps` style CANCELS to off;
+ *   - `false` (an explicit `<w:b w:val="0"/>`) → RESET to off. An explicit off
+ *     is a definite "not bold", not a toggle — so a style that turns off the
+ *     bold it inherited (ACM's `ACMRef` off `Titledocument`) renders upright.
+ *
+ * NOT used for DIRECT run formatting: there a plain spread applies, so an
+ * explicit run-level `false` overrides the resolved style value outright.
  */
 export function mergeRunStyleLayer(base: RunProperties, over: RunProperties): RunProperties {
   const out: RunProperties = { ...base, ...over };
   for (const k of RUN_TOGGLE_KEYS) {
-    const b = base[k];
     const o = over[k];
-    if (b === undefined && o === undefined) continue;
-    out[k] = Boolean(b) !== Boolean(o);
+    if (o === undefined) continue;
+    out[k] = o === false ? false : !base[k];
   }
   return out;
 }

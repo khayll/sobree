@@ -1,7 +1,46 @@
 import { describe, expect, it } from "vitest";
 import { defaultStyles } from "./builders";
-import { resolveRunStyle, resolveStyleCascade } from "./styles";
+import { mergeRunStyleLayer, resolveRunStyle, resolveStyleCascade } from "./styles";
 import type { NamedStyle } from "./types";
+
+describe("mergeRunStyleLayer — toggle semantics", () => {
+  it("absent toggle inherits the base value", () => {
+    expect(mergeRunStyleLayer({ bold: true }, {}).bold).toBe(true);
+  });
+
+  it("a re-declared `true` toggle XORs (caps-on-caps cancels)", () => {
+    expect(mergeRunStyleLayer({ caps: true }, { caps: true }).caps).toBe(false);
+    expect(mergeRunStyleLayer({ caps: false }, { caps: true }).caps).toBe(true);
+  });
+
+  it("an explicit `false` RESETS the inherited toggle to off", () => {
+    // ACM's ACMRef turns off the bold it inherits from Titledocument.
+    expect(mergeRunStyleLayer({ bold: true }, { bold: false }).bold).toBe(false);
+  });
+
+  it("resolves a style that switches off an inherited toggle to off", () => {
+    const styles: NamedStyle[] = [
+      { id: "Titledocument", type: "paragraph", displayName: "Title", runDefaults: { bold: true } },
+      {
+        id: "ACMRef",
+        type: "paragraph",
+        displayName: "ACM Ref",
+        basedOn: "Titledocument",
+        runDefaults: { bold: false },
+      },
+    ];
+    expect(resolveStyleCascade(styles, "ACMRef").runDefaults.bold).toBe(false);
+    // A sibling that does NOT re-declare keeps the inherited bold.
+    styles.push({
+      id: "ACMRefHead",
+      type: "paragraph",
+      displayName: "ACM Ref Head",
+      basedOn: "Titledocument",
+      runDefaults: {},
+    });
+    expect(resolveStyleCascade(styles, "ACMRefHead").runDefaults.bold).toBe(true);
+  });
+});
 
 describe("resolveStyleCascade — built-in defaults", () => {
   const styles = defaultStyles();

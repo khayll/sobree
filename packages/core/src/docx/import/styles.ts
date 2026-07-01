@@ -371,9 +371,15 @@ function readRunProperties(rPr: Element): RunProperties | undefined {
     const halfPts = Number.parseInt(szVal, 10);
     if (Number.isFinite(halfPts)) out.fontSizePt = halfPts / 2;
   }
-  // Boolean toggles — present element + (no `w:val` OR val="1"/"true") = true.
-  if (toggleOn(wFirst(rPr, "b"))) out.bold = true;
-  if (toggleOn(wFirst(rPr, "i"))) out.italic = true;
+  // Boolean toggles keep their EXPLICIT value: bare `<w:b/>` (or val="1") is
+  // true, `<w:b w:val="0"/>` is false, absent is undefined. The `false` is
+  // load-bearing — a style that turns off an inherited toggle (ACM's `ACMRef`
+  // switches off the bold it inherits from `Titledocument`) must record it, or
+  // the cascade resolver keeps the parent's bold.
+  const bold = styleToggle(wFirst(rPr, "b"));
+  if (bold !== undefined) out.bold = bold;
+  const italic = styleToggle(wFirst(rPr, "i"));
+  if (italic !== undefined) out.italic = italic;
   const u = wFirst(rPr, "u");
   if (u) {
     const v = wVal(u);
@@ -390,10 +396,12 @@ function readRunProperties(rPr: Element): RunProperties | undefined {
       out.underline = "single";
     }
   }
-  if (toggleOn(wFirst(rPr, "strike"))) out.strike = true;
+  const strike = styleToggle(wFirst(rPr, "strike"));
+  if (strike !== undefined) out.strike = strike;
   // `<w:caps/>` cascading through a named style — same toggle behaviour
   // as `bold` / `italic`. Mirrors the per-run read in `runs.ts`.
-  if (toggleOn(wFirst(rPr, "caps"))) out.caps = true;
+  const caps = styleToggle(wFirst(rPr, "caps"));
+  if (caps !== undefined) out.caps = caps;
   // <w:color w:val="FF0000"/> or "auto". KEEP "auto" — a style that sets
   // color="auto" is deliberately overriding an inherited colour back to
   // automatic (black), e.g. ACM's "Head1" based on the built-in blue
@@ -500,8 +508,12 @@ function mapAlignment(raw: string | null): ParagraphAlignment | null {
   }
 }
 
-function toggleOn(el: Element | null): boolean {
-  if (!el) return false;
+/** Tri-state read of a style's OOXML toggle: `true` for a present element
+ *  (bare or val 1/true), `false` for an explicit `w:val="0"`/"false",
+ *  `undefined` when absent. The `false` lets a style turn off an inherited
+ *  toggle (see `mergeRunStyleLayer`). */
+function styleToggle(el: Element | null): boolean | undefined {
+  if (!el) return undefined;
   const v = wVal(el);
   return v === null || v === "1" || v === "true";
 }
