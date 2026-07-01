@@ -104,7 +104,9 @@ function renderFootnoteRef(run: import("../../../doc/types").FootnoteRefRun): HT
   const link = document.createElement("a");
   link.setAttribute("href", `#sobree-footnote-${run.id}`);
   link.setAttribute("id", `sobree-footnote-ref-${run.id}`);
-  link.textContent = String(run.id);
+  // A custom mark (`<w:footnoteReference w:customMarkFollows>`) replaces the
+  // auto-number — e.g. an author "*" footnote.
+  link.textContent = run.customMark ?? String(run.id);
   sup.appendChild(link);
   return sup;
 }

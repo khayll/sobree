@@ -204,7 +204,11 @@ function pushInline(run: ImportedRun, ctx: ConvertContext, out: InlineRun[]): vo
     return;
   }
   if (run.footnoteRefId !== undefined) {
-    out.push({ kind: "footnoteRef", id: run.footnoteRefId });
+    out.push({
+      kind: "footnoteRef",
+      id: run.footnoteRefId,
+      ...(run.footnoteCustomMark ? { customMark: run.footnoteCustomMark } : {}),
+    });
     return;
   }
   if (run.commentRefId !== undefined) {

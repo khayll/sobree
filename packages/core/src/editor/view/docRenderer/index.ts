@@ -1,4 +1,4 @@
-import type { SobreeDocument } from "../../../doc/types";
+import type { Block, InlineRun, SobreeDocument } from "../../../doc/types";
 import { renderBlocks } from "./block";
 
 /**
@@ -106,14 +106,43 @@ function renderFootnotesAside(doc: SobreeDocument, host: HTMLElement): void {
     .map((s) => Number(s))
     .filter((n) => Number.isFinite(n))
     .sort((a, b) => a - b);
+  // Footnotes with a custom reference mark carry that mark literally in their
+  // body text (Word stores no `<w:footnoteRef>` auto-number element for them),
+  // so suppressing the `<ol>` counter avoids a doubled "1. * …" marker.
+  const customMarkIds = collectCustomMarkFootnoteIds(doc);
   for (const id of ids) {
     const li = document.createElement("li");
     li.id = `sobree-footnote-${id}`;
     li.value = id;
-    li.className = "sobree-footnotes__item";
+    li.className = customMarkIds.has(id)
+      ? "sobree-footnotes__item sobree-footnotes__item--custom-mark"
+      : "sobree-footnotes__item";
     renderBlocks(doc.footnotes![id]!, li, doc.numbering, doc.styles, doc.rawParts);
     list.appendChild(li);
   }
   aside.appendChild(list);
   host.appendChild(aside);
+}
+
+/** Footnote ids whose body reference uses a custom mark — collected from the
+ *  `FootnoteRefRun`s in body text so the body renderer can suppress its
+ *  auto-number for them. */
+function collectCustomMarkFootnoteIds(doc: SobreeDocument): Set<number> {
+  const ids = new Set<number>();
+  const visitRuns = (runs: readonly InlineRun[]): void => {
+    for (const r of runs) {
+      if (r.kind === "footnoteRef" && r.customMark) ids.add(r.id);
+      else if (r.kind === "hyperlink") visitRuns(r.children);
+    }
+  };
+  const visitBlocks = (blocks: readonly Block[]): void => {
+    for (const b of blocks) {
+      if (b.kind === "paragraph") visitRuns(b.runs);
+      else if (b.kind === "table") {
+        for (const row of b.rows) for (const cell of row.cells) visitBlocks(cell.content);
+      }
+    }
+  };
+  visitBlocks(doc.body);
+  return ids;
 }
