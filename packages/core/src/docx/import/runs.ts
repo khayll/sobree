@@ -1,7 +1,7 @@
+import type { RunProperties } from "../../doc/types";
 import { NS } from "../shared/namespaces";
-import { halfPtToPt } from "../shared/units";
-import { wFirst, wVal } from "../shared/xml";
-import type { RunFormat } from "../types";
+import { wFirst } from "../shared/xml";
+import { readRunProperties } from "./runProperties";
 
 /** Frame-of-reference choices the importer carries through; mapped 1:1 to
  *  the `DrawingAnchor.relativeFromH` / `relativeFromV` AST values. */
@@ -32,7 +32,7 @@ export interface ImportedDrawing {
  */
 export interface ImportedRun {
   text: string;
-  format: RunFormat;
+  format: RunProperties;
   /** True if this run was `<w:br/>`; `text` is empty in that case. */
   isHardBreak: boolean;
   /** Type of break for `isHardBreak` runs — line (Shift-Enter), page
@@ -171,40 +171,16 @@ export function readRun(r: Element): ImportedRun {
 
   text = normaliseRunText(text);
 
+  // `<w:rPr>` — direct run formatting. Parsed by the ONE shared reader
+  // (the same `readRunProperties` the style importer uses) so the two
+  // `<w:rPr>` homes can't drift; it also folds in the nested
+  // `<w:rPrChange>` format-revision snapshot.
   const rPr = wFirst(r, "rPr");
-  const format: RunFormat = rPr ? readRunFormat(rPr) : {};
-
-  // `<w:rPrChange>` — a snapshot of the run's pre-tracked-edit
-  // properties. Lives inside the *current* `<w:rPr>` and wraps its
-  // own inner `<w:rPr>` carrying the snapshot. We recurse into that
-  // inner rPr through the same parser so the snapshot keeps the same
-  // shape as the current properties.
-  if (rPr) {
-    const rPrChange = wFirst(rPr, "rPrChange");
-    if (rPrChange) {
-      const innerRPr = wFirst(rPrChange, "rPr");
-      const before = innerRPr ? readRunFormat(innerRPr) : {};
-      const author =
-        rPrChange.getAttributeNS(NS.w, "author") ?? rPrChange.getAttribute("w:author") ?? undefined;
-      const date =
-        rPrChange.getAttributeNS(NS.w, "date") ?? rPrChange.getAttribute("w:date") ?? undefined;
-      format.revisionFormat = {
-        before,
-        ...(author !== undefined ? { author } : {}),
-        ...(date !== undefined ? { date } : {}),
-      };
-    }
-  }
+  const format: RunProperties = (rPr ? readRunProperties(rPr) : undefined) ?? {};
 
   return { text, format, isHardBreak: false };
 }
 
-/**
- * Parse a `<w:rPr>` element into a `RunFormat`. Extracted so it can
- * recurse for the `<w:rPrChange><w:rPr>...</w:rPr></w:rPrChange>`
- * snapshot (without re-parsing the change marker itself — the snapshot
- * is the *pre-tracking* state and never carries its own `rPrChange`).
- */
 /**
  * Pull-in normalisation for `<w:t>` content. Word renders certain
  * source artefacts visually differently from how a browser would:
@@ -241,68 +217,6 @@ function normaliseRunText(text: string): string {
   if (text.includes("\t")) return text;
   if (text.length >= 4 && /^[ \u00A0]+$/.test(text)) return " ";
   return text;
-}
-
-function readRunFormat(rPr: Element): RunFormat {
-  const format: RunFormat = {};
-  // `<w:rStyle>` — character style reference. Resolved against the style
-  // cascade at render time (its colour / underline / … layer under direct
-  // run formatting). Without this a run styled only via a char style
-  // (e.g. a "Blue" link colour) renders with just its paragraph style.
-  const rStyle = wVal(wFirst(rPr, "rStyle"));
-  if (rStyle) format.styleId = rStyle;
-  // Toggle run properties (`<w:b>`, `<w:i>`, `<w:strike>`, `<w:caps>`) keep
-  // their EXPLICIT value — `w:val="0"` becomes `false`, not "unspecified".
-  // Direct formatting is where a `false` matters: it must override a toggle
-  // the style cascade turned on (the ACM first-author `<w:caps w:val="0"/>`
-  // that lower-cases a name whose Authors style carries `<w:caps/>`). Bare
-  // `<w:caps/>` (or `w:val="true"`) is `true` — Word toggles the displayed
-  // glyph case without mutating the source text, and the round-trip preserves
-  // the mixed-case characters (healthcare-with-photo's "PETER BURKIMSHER").
-  const bold = readToggleProperty(rPr, "b");
-  if (bold !== undefined) format.bold = bold;
-  const italic = readToggleProperty(rPr, "i");
-  if (italic !== undefined) format.italic = italic;
-  const strike = readToggleProperty(rPr, "strike");
-  if (strike !== undefined) format.strike = strike;
-  const caps = readToggleProperty(rPr, "caps");
-  if (caps !== undefined) format.caps = caps;
-  // Word's `<w:u>` has a `w:val` of "none" | "single" | "double" | … —
-  // treat anything non-"none" as underline for our purposes.
-  const u = wFirst(rPr, "u");
-  if (u && wVal(u) !== "none") format.underline = true;
-
-  const colorEl = wFirst(rPr, "color");
-  const color = wVal(colorEl);
-  if (color && color !== "auto") {
-    format.color = color.startsWith("#") ? color : `#${color}`;
-  }
-
-  const highlight = wVal(wFirst(rPr, "highlight"));
-  if (highlight && highlight !== "none") format.highlight = highlight;
-
-  const rFonts = wFirst(rPr, "rFonts");
-  if (rFonts) {
-    // Prefer `w:ascii`, fall back to `w:hAnsi`. We ignore `eastAsia` and
-    // `cs` for the first pass — adding them is a follow-up once we have
-    // non-Latin test fixtures.
-    const font =
-      rFonts.getAttributeNS(NS.w, "ascii") ??
-      rFonts.getAttribute("w:ascii") ??
-      rFonts.getAttributeNS(NS.w, "hAnsi") ??
-      rFonts.getAttribute("w:hAnsi");
-    if (font) format.fontFamily = font;
-  }
-
-  const sz = wVal(wFirst(rPr, "sz"));
-  if (sz) {
-    const pt = halfPtToPt(Number(sz));
-    if (Number.isFinite(pt) && pt > 0) format.fontSizePt = pt;
-  }
-
-  const vAlign = wVal(wFirst(rPr, "vertAlign"));
-  if (vAlign === "subscript" || vAlign === "superscript") format.verticalAlign = vAlign;
-  return format;
 }
 
 /**
@@ -438,20 +352,4 @@ function normaliseRelativeFromV(v: string): ImportedAnchor["relativeFromV"] {
   // "paragraph", "topMargin", "bottomMargin", "insideMargin", "outsideMargin"
   // collapse to "paragraph".
   return "paragraph";
-}
-
-/**
- * `<w:rPr>` treats presence of `<w:b/>` as "true" but also allows
- * `<w:b w:val="false"/>` — the explicit-off form. Honour both.
- */
-/** Tri-state read of an OOXML toggle property: `true` for a present element
- *  (bare or `w:val` true/1), `false` for an explicit `w:val="0"`/"false",
- *  `undefined` when the element is absent. The `false` is load-bearing for
- *  DIRECT run formatting, which must be able to override an inherited toggle. */
-function readToggleProperty(rPr: Element, localName: string): boolean | undefined {
-  const el = wFirst(rPr, localName);
-  if (!el) return undefined;
-  const val = wVal(el);
-  if (val === null) return true;
-  return val !== "false" && val !== "0";
 }

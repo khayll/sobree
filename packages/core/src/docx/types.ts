@@ -19,40 +19,6 @@ export interface DocxExportResult {
   warnings: string[];
 }
 
-/** A single inline run's formatting flags — what `<w:rPr>` tells us. */
-export interface RunFormat {
-  /** `<w:rStyle w:val="…">` — a character style applied to the run. Its
-   *  rPr (colour, underline, …) is resolved against the style cascade at
-   *  render time, under any direct run formatting. */
-  styleId?: string;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strike?: boolean;
-  /** `<w:caps/>` — render the run with `text-transform: uppercase`. */
-  caps?: boolean;
-  /** CSS-ready `#rrggbb`. */
-  color?: string;
-  /** Highlight colour name or CSS-ready `#rrggbb`. */
-  highlight?: string;
-  /** CSS-ready `font-family` value. */
-  fontFamily?: string;
-  /** Size in pt. */
-  fontSizePt?: number;
-  verticalAlign?: "subscript" | "superscript";
-  /**
-   * `<w:rPrChange>` — a snapshot of the run's properties before the
-   * most recent tracked format edit. The inner `<w:rPr>` is parsed
-   * into the same `RunFormat` shape (recursion-free: the snapshot
-   * itself doesn't carry an `revisionFormat`).
-   */
-  revisionFormat?: {
-    before: RunFormat;
-    author?: string;
-    date?: string;
-  };
-}
-
 /** Paragraph-level formatting — from `<w:pPr>`. */
 export interface ParagraphFormat {
   /** 1..6 if the paragraph carries a `Heading{N}` style; 0 otherwise. */
