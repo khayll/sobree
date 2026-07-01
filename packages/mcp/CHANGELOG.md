@@ -1,5 +1,17 @@
 # @sobree/mcp
 
+## 0.1.47
+
+### Patch Changes
+
+- da4b3ad: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- 69992a9: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [da4b3ad]
+- Updated dependencies [69992a9]
+  - @sobree/core@0.1.47
+
 ## 0.1.46
 
 ### Patch Changes
