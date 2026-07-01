@@ -1,5 +1,31 @@
 # @sobree/core
 
+## 0.1.47
+
+### Patch Changes
+
+- da4b3ad: Honour an explicit toggle-off in a paragraph/character STYLE. A style can turn
+  off a run toggle it inherits from its `basedOn` chain with `<w:b w:val="0"/>` —
+  the ACM reference-format paragraph (`ACMRef`) switches off the bold it inherits
+  from `Titledocument`, so the citation renders upright while the "ACM Reference
+  Format:" heading stays bold. The style importer dropped that explicit `0` (it
+  only kept `true`), so the cascade kept the parent's bold and the paragraph
+  rendered bold. Styles now record the explicit `false`, and the cascade resolver
+  treats it as a definite reset (an inherited toggle re-declared as `true` still
+  XORs to off, as before). Completes the toggle-property model from the previous
+  release, which fixed this only for direct run formatting.
+- 69992a9: Unify the two `<w:rPr>` (run-properties) importers into one reader.
+  `<w:rPr>` is a single OOXML concept with two homes — inside a `<w:r>`
+  (direct run formatting) and inside a `<w:style>` (a style's run defaults) —
+  but the importer parsed each with its own function, and the two drifted.
+  They now share one `readRunProperties(rPr)` that returns the native
+  `RunProperties` directly (dropping the redundant `RunFormat` intermediate
+  type and its mapping layer). Two latent bugs the drift had caused are fixed
+  as a result: a DIRECT run's underline now keeps its full style
+  (double / dotted / dashed / wave) instead of collapsing to single, and a
+  direct `<w:color w:val="auto"/>` that resets an inherited colour back to
+  automatic is now honoured (previously dropped, so the run stayed coloured).
+
 ## 0.1.46
 
 ### Patch Changes
