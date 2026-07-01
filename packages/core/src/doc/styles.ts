@@ -1,5 +1,38 @@
 import type { NamedStyle, ParagraphProperties, RunProperties, SobreeDocument } from "./types";
 
+/** OOXML TOGGLE run properties (ECMA-376 §17.7.3): when the same one is
+ *  specified at multiple levels of the style hierarchy, the values combine by
+ *  XOR — a style that re-declares an inherited `<w:caps/>` turns caps OFF. All
+ *  other run fields (colour, font, underline, …) override leaf-last. */
+const RUN_TOGGLE_KEYS = [
+  "bold",
+  "italic",
+  "strike",
+  "doubleStrike",
+  "caps",
+  "smallCaps",
+  "hidden",
+] as const;
+
+/**
+ * Merge one run-property layer of the STYLE hierarchy onto the accumulated
+ * base. Non-toggle fields override (leaf wins); toggle fields XOR (absent =
+ * `false`, the XOR identity). This is the correct combinator for style→style
+ * inheritance — it is NOT used for DIRECT run formatting, where an explicit
+ * `<w:b w:val="0"/>` must absolutely override the styles' XOR (a plain spread
+ * handles that, since the importer stores the explicit `false`).
+ */
+export function mergeRunStyleLayer(base: RunProperties, over: RunProperties): RunProperties {
+  const out: RunProperties = { ...base, ...over };
+  for (const k of RUN_TOGGLE_KEYS) {
+    const b = base[k];
+    const o = over[k];
+    if (b === undefined && o === undefined) continue;
+    out[k] = Boolean(b) !== Boolean(o);
+  }
+  return out;
+}
+
 /**
  * Style-cascade resolver — walks `styleId` up its `basedOn` chain and
  * merges defaults base-first, leaf-last. The result is what the
@@ -36,7 +69,7 @@ export function resolveStyleCascade(
   let paragraphDefaults: ParagraphProperties = {};
   for (let i = chain.length - 1; i >= 0; i--) {
     const s = chain[i]!;
-    if (s.runDefaults) runDefaults = { ...runDefaults, ...s.runDefaults };
+    if (s.runDefaults) runDefaults = mergeRunStyleLayer(runDefaults, s.runDefaults);
     if (s.paragraphDefaults) {
       paragraphDefaults = mergeParagraphDefaults(paragraphDefaults, s.paragraphDefaults);
     }
@@ -70,7 +103,7 @@ export function resolveRunStyle(styles: readonly NamedStyle[], styleId: string):
   let out: RunProperties = {};
   for (let i = chain.length - 1; i >= 0; i--) {
     const rd = chain[i]?.runDefaults;
-    if (rd) out = { ...out, ...rd };
+    if (rd) out = mergeRunStyleLayer(out, rd);
   }
   return out;
 }

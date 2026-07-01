@@ -28,7 +28,7 @@ export function renderParagraph(
   const isEmpty = p.runs.length === 0 || p.runs.every((r) => (r.kind === "text" ? !r.text : false));
   const tag = level && !isEmpty ? `h${level}` : "p";
   const el = document.createElement(tag);
-  applyParagraphProps(el, p.properties, styles);
+  const paraRunDefaults = applyParagraphProps(el, p.properties, styles);
   // Cascade the dominant text run's font onto the paragraph itself when
   // the paragraph has no explicit font from style cascade. CSS unitless
   // line-height computes against the element's own font-size — if the
@@ -70,13 +70,13 @@ export function renderParagraph(
     el.classList.add("sobree-tab-spread");
     const before = document.createElement("span");
     before.className = "sobree-tab-spread__before";
-    appendInlineRuns(before, split.before, rawParts, styles);
+    appendInlineRuns(before, split.before, rawParts, styles, paraRunDefaults);
     const after = document.createElement("span");
     after.className = "sobree-tab-spread__after";
-    appendInlineRuns(after, split.after, rawParts, styles);
+    appendInlineRuns(after, split.after, rawParts, styles, paraRunDefaults);
     el.append(before, after);
   } else {
-    appendInlineRuns(el, p.runs, rawParts, styles);
+    appendInlineRuns(el, p.runs, rawParts, styles, paraRunDefaults);
   }
   return el;
 }

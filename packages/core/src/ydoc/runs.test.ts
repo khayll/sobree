@@ -240,6 +240,15 @@ describe("runPropsToAttrs / attrsToRunProps", () => {
     expect(attrs).toEqual({ bold: true });
     expect(attrsToRunProps(attrs)).toEqual({ bold: true });
   });
+
+  it("round-trips an EXPLICIT toggle-off (Y.Doc parity — a direct caps:false must survive)", () => {
+    // A direct `<w:caps w:val="0"/>` that lower-cases a name whose style has
+    // caps must survive the seed→project round-trip, or the name renders
+    // ALL-CAPS on reload.
+    const attrs = runPropsToAttrs({ caps: false });
+    expect(attrs).toEqual({ caps: false });
+    expect(attrsToRunProps(attrs)).toEqual({ caps: false });
+  });
 });
 
 describe("deltaToRuns — defensive cases", () => {

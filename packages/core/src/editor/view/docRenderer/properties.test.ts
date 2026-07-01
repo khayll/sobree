@@ -92,7 +92,7 @@ describe("applyParagraphProps", () => {
     expect(el.style.borderTop).toBe("4px double currentcolor");
   });
 
-  it("applies run-default font, colour, bold from the style cascade", () => {
+  it("applies NON-toggle run defaults (font, colour) to the block; returns the cascade for per-run toggle resolution", () => {
     const styles: NamedStyle[] = [
       {
         id: "Heading1",
@@ -101,10 +101,16 @@ describe("applyParagraphProps", () => {
         runDefaults: { fontFamily: "Cambria", color: "#2E74B5", bold: true },
       },
     ];
-    const el = p({ styleId: "Heading1" }, styles);
+    const el = doc.createElement("p");
+    const runDefaults = applyParagraphProps(el, { styleId: "Heading1" }, styles);
+    // Non-toggle fields inherit from the block element.
     expect(el.style.fontFamily).toContain("Cambria");
     expect(el.style.color).toBe("rgb(46, 116, 181)");
-    expect(el.style.fontWeight).toBe("bold");
+    // Bold is a TOGGLE — NOT applied to the block (CSS can't XOR it with a
+    // run's own value). It comes back in the resolved run defaults so the run
+    // walk can resolve + apply it per-run.
+    expect(el.style.fontWeight).toBe("");
+    expect(runDefaults.bold).toBe(true);
   });
 
   it("paragraph's own runDefaults override the style cascade", () => {

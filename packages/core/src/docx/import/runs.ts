@@ -251,16 +251,22 @@ function readRunFormat(rPr: Element): RunFormat {
   // (e.g. a "Blue" link colour) renders with just its paragraph style.
   const rStyle = wVal(wFirst(rPr, "rStyle"));
   if (rStyle) format.styleId = rStyle;
-  if (hasBooleanProperty(rPr, "b")) format.bold = true;
-  if (hasBooleanProperty(rPr, "i")) format.italic = true;
-  if (hasBooleanProperty(rPr, "strike")) format.strike = true;
-  // `<w:caps/>` (or `<w:caps w:val="true"/>`) — render the run with
-  // `text-transform: uppercase`. Word toggles the displayed glyph case
-  // without mutating the source text; round-trip preserves the
-  // mixed-case characters. Without honouring this, resume templates
-  // like healthcare-with-photo render "Peter Burkimsher" instead of
-  // "PETER BURKIMSHER" in the banner.
-  if (hasBooleanProperty(rPr, "caps")) format.caps = true;
+  // Toggle run properties (`<w:b>`, `<w:i>`, `<w:strike>`, `<w:caps>`) keep
+  // their EXPLICIT value — `w:val="0"` becomes `false`, not "unspecified".
+  // Direct formatting is where a `false` matters: it must override a toggle
+  // the style cascade turned on (the ACM first-author `<w:caps w:val="0"/>`
+  // that lower-cases a name whose Authors style carries `<w:caps/>`). Bare
+  // `<w:caps/>` (or `w:val="true"`) is `true` — Word toggles the displayed
+  // glyph case without mutating the source text, and the round-trip preserves
+  // the mixed-case characters (healthcare-with-photo's "PETER BURKIMSHER").
+  const bold = readToggleProperty(rPr, "b");
+  if (bold !== undefined) format.bold = bold;
+  const italic = readToggleProperty(rPr, "i");
+  if (italic !== undefined) format.italic = italic;
+  const strike = readToggleProperty(rPr, "strike");
+  if (strike !== undefined) format.strike = strike;
+  const caps = readToggleProperty(rPr, "caps");
+  if (caps !== undefined) format.caps = caps;
   // Word's `<w:u>` has a `w:val` of "none" | "single" | "double" | … —
   // treat anything non-"none" as underline for our purposes.
   const u = wFirst(rPr, "u");
@@ -438,10 +444,14 @@ function normaliseRelativeFromV(v: string): ImportedAnchor["relativeFromV"] {
  * `<w:rPr>` treats presence of `<w:b/>` as "true" but also allows
  * `<w:b w:val="false"/>` — the explicit-off form. Honour both.
  */
-function hasBooleanProperty(rPr: Element, localName: string): boolean {
+/** Tri-state read of an OOXML toggle property: `true` for a present element
+ *  (bare or `w:val` true/1), `false` for an explicit `w:val="0"`/"false",
+ *  `undefined` when the element is absent. The `false` is load-bearing for
+ *  DIRECT run formatting, which must be able to override an inherited toggle. */
+function readToggleProperty(rPr: Element, localName: string): boolean | undefined {
   const el = wFirst(rPr, localName);
-  if (!el) return false;
+  if (!el) return undefined;
   const val = wVal(el);
-  if (val === null) return true; // bare `<w:b/>`
+  if (val === null) return true;
   return val !== "false" && val !== "0";
 }
