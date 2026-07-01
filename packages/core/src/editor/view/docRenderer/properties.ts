@@ -17,10 +17,24 @@ import type { NamedStyle, ParagraphProperties, RunProperties } from "../../../do
 import { resolveFontFace } from "./fontFallback";
 import { twipsToMm } from "./units";
 
+/**
+ * Whether each side of a paragraph sits next to a same-style paragraph.
+ * Used to resolve `<w:contextualSpacing/>`: the before/after margin is
+ * dropped only when the corresponding neighbour shares this paragraph's
+ * style. The block walker (`renderBlocks`) owns the sequence and computes
+ * these; `applyParagraphProps` combines them with the resolved
+ * `contextualSpacing` flag (which may come from the style cascade).
+ */
+export interface ContextualNeighbors {
+  prevSameStyle: boolean;
+  nextSameStyle: boolean;
+}
+
 export function applyParagraphProps(
   el: HTMLElement,
   props: ParagraphProperties,
   styles: readonly NamedStyle[] = [],
+  contextualNeighbors: ContextualNeighbors = { prevSameStyle: false, nextSameStyle: false },
 ): RunProperties {
   // Resolve the style cascade for both run + paragraph defaults, then
   // overlay the paragraph's own properties so explicit settings win on
@@ -146,10 +160,19 @@ export function applyParagraphProps(
   // LIs (the pre-fix behaviour) collapsed every list to zero inter-
   // bullet gap, packing ~3pt per bullet too tight and cascading into
   // a 2-page short-fall on complex-multipage.docx vs LO.
-  if (effective.spacing?.beforeTwips !== undefined) {
+  // `<w:contextualSpacing/>` collapses the gap to a same-style neighbour:
+  // suppress THIS paragraph's before-space when the previous block is a
+  // same-style paragraph, and its after-space when the next one is. Word
+  // does this so a run of double-spaced body paragraphs (or tight bullets)
+  // shows no inter-paragraph gap — without it every such paragraph keeps
+  // its cascaded `after` (e.g. docDefaults 160 twips), inflating page count
+  // (~5 extra pages on a 27-page thesis).
+  const suppressBefore = effective.contextualSpacing === true && contextualNeighbors.prevSameStyle;
+  const suppressAfter = effective.contextualSpacing === true && contextualNeighbors.nextSameStyle;
+  if (effective.spacing?.beforeTwips !== undefined && !suppressBefore) {
     el.style.marginTop = `${twipsToMm(effective.spacing.beforeTwips)}mm`;
   }
-  if (effective.spacing?.afterTwips !== undefined) {
+  if (effective.spacing?.afterTwips !== undefined && !suppressAfter) {
     el.style.marginBottom = `${twipsToMm(effective.spacing.afterTwips)}mm`;
   }
   const isLi = el.tagName === "LI";

@@ -29,6 +29,51 @@ describe("applyParagraphProps", () => {
     expect(el.style.marginBottom).toBe("2mm"); // 120 twips ≈ 2.1 → 2
   });
 
+  describe("contextualSpacing", () => {
+    const ctx = (
+      props: ParagraphProperties,
+      neighbors: Parameters<typeof applyParagraphProps>[3],
+    ) => {
+      const el = doc.createElement("p");
+      applyParagraphProps(el, props, [], neighbors);
+      return el;
+    };
+    const spacing = { spacing: { beforeTwips: 160, afterTwips: 160 } };
+
+    it("suppresses after-margin when the next block is the same style", () => {
+      const el = ctx(
+        { ...spacing, contextualSpacing: true },
+        { prevSameStyle: false, nextSameStyle: true },
+      );
+      expect(el.style.marginTop).toBe("3mm"); // before kept (prev differs)
+      expect(el.style.marginBottom).toBe(""); // after suppressed
+    });
+
+    it("suppresses before-margin when the previous block is the same style", () => {
+      const el = ctx(
+        { ...spacing, contextualSpacing: true },
+        { prevSameStyle: true, nextSameStyle: false },
+      );
+      expect(el.style.marginTop).toBe(""); // before suppressed
+      expect(el.style.marginBottom).toBe("3mm"); // after kept (next differs)
+    });
+
+    it("keeps both margins when neither neighbour shares the style", () => {
+      const el = ctx(
+        { ...spacing, contextualSpacing: true },
+        { prevSameStyle: false, nextSameStyle: false },
+      );
+      expect(el.style.marginTop).toBe("3mm");
+      expect(el.style.marginBottom).toBe("3mm");
+    });
+
+    it("does nothing without the contextualSpacing flag", () => {
+      const el = ctx(spacing, { prevSameStyle: true, nextSameStyle: true });
+      expect(el.style.marginTop).toBe("3mm");
+      expect(el.style.marginBottom).toBe("3mm");
+    });
+  });
+
   it("line=240 auto → line-height:normal; multi-line scales by natural leading", () => {
     expect(p({ spacing: { line: 240, lineRule: "auto" } }).style.lineHeight).toBe("normal");
     // 360/240 = 1.5 × default leading 1.15 = 1.725

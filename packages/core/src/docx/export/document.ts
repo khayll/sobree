@@ -175,6 +175,8 @@ function renderPPr(
     if (props.indent.hangingTwips !== undefined) attrs["w:hanging"] = props.indent.hangingTwips;
     if (Object.keys(attrs).length > 0) parts.push(el("w:ind", attrs));
   }
+  // CT_PPr schema orders `contextualSpacing` immediately after `ind`.
+  if (props.contextualSpacing) parts.push(el("w:contextualSpacing"));
   if (props.borders?.bottom) {
     const b = props.borders.bottom;
     parts.push(

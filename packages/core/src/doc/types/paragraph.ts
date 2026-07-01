@@ -14,6 +14,17 @@ export interface ParagraphProperties {
   indent?: ParagraphIndent;
   borders?: ParagraphBorders;
   shading?: Shading;
+  /**
+   * `<w:contextualSpacing/>` (ECMA-376 §17.3.1.9) — omit this
+   * paragraph's before/after spacing when the adjacent paragraph uses
+   * the SAME paragraph style. Word/LibreOffice collapse the inter-
+   * paragraph gap to zero between consecutive same-style paragraphs
+   * (the classic case: double-spaced thesis body, or tight bulleted
+   * lists). The renderer suppresses the corresponding margin only when
+   * the neighbour shares this paragraph's style — see
+   * `applyParagraphProps`.
+   */
+  contextualSpacing?: boolean;
   /** Keep this paragraph on the same page as the next one. */
   keepNext?: boolean;
   /** Don't allow this paragraph to break across pages. */

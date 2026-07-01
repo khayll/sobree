@@ -247,6 +247,34 @@ describe("convertParagraph — lastRenderedPageBreak position", () => {
   });
 });
 
+describe("convertParagraph — contextualSpacing", () => {
+  const para = (inner: string): Element =>
+    new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:p xmlns:w="${NS_W}">${inner}</w:p>`,
+      "application/xml",
+    ).documentElement;
+  const convert = (inner: string) =>
+    convertParagraph(para(inner), { rels: new Map(), honorLastRenderedPageBreaks: false });
+
+  it("reads <w:contextualSpacing/> off the paragraph pPr", () => {
+    const props = convert(
+      "<w:pPr><w:contextualSpacing/></w:pPr><w:r><w:t>x</w:t></w:r>",
+    ).properties;
+    expect(props.contextualSpacing).toBe(true);
+  });
+
+  it("honours the explicit-off form so a style turning it off wins", () => {
+    const props = convert(
+      `<w:pPr><w:contextualSpacing w:val="0"/></w:pPr><w:r><w:t>x</w:t></w:r>`,
+    ).properties;
+    expect(props.contextualSpacing).toBeUndefined();
+  });
+
+  it("leaves it unset when absent", () => {
+    expect(convert("<w:r><w:t>x</w:t></w:r>").properties.contextualSpacing).toBeUndefined();
+  });
+});
+
 describe("convertDocumentXml — lastRenderedPageBreak gating", () => {
   // A body with MANY hint-led paragraphs (≥10, the "strong signal" count).
   const lrpbDoc = (): Document => {

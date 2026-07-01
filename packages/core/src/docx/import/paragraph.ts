@@ -157,6 +157,7 @@ function mapParagraphFormat(f: ParagraphFormat): ParagraphProperties {
   if (f.spacingAfterTwips !== undefined) spacing.afterTwips = f.spacingAfterTwips;
   if (f.spacingBeforeTwips !== undefined) spacing.beforeTwips = f.spacingBeforeTwips;
   if (Object.keys(spacing).length > 0) out.spacing = spacing;
+  if (f.contextualSpacing) out.contextualSpacing = true;
   if (f.numId !== undefined) {
     out.numbering = { numId: f.numId, level: f.numLevel ?? 0 };
   }

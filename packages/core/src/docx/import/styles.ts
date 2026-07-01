@@ -402,6 +402,11 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
   // presence alone would inherit a page break onto every paragraph.
   if (wOnOff(pPr, "pageBreakBefore")) out.pageBreakBefore = true;
 
+  // <w:contextualSpacing/> — Word's `ListParagraph` style carries this so
+  // consecutive bullets render tight; read it off the style cascade too,
+  // not just direct paragraph pPr.
+  if (wOnOff(pPr, "contextualSpacing")) out.contextualSpacing = true;
+
   // <w:pBdr> — divider rules. Word puts the top/bottom rule of a
   // letterhead/résumé header on a STYLE (e.g. a "Name" style's top rule),
   // so read it here too, not just on direct paragraphs.
