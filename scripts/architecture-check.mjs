@@ -28,6 +28,7 @@ const ignoredDirNames = new Set([
   "dist",
   "coverage",
   ".git",
+  ".claude",
   ".turbo",
   ".astro",
   "baseline",

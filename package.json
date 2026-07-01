@@ -34,7 +34,8 @@
     "version-packages": "changeset version",
     "build:packages": "pnpm --filter \"./packages/*\" build",
     "release": "pnpm build:packages && changeset publish",
-    "check:architecture": "node scripts/architecture-check.mjs",
+    "test:architecture": "vitest --config vitest.architecture.config.ts run",
+    "check:architecture": "node scripts/architecture-check.mjs && pnpm test:architecture",
     "check:all": "pnpm check && pnpm check:architecture"
   },
   "devDependencies": {
@@ -43,6 +44,7 @@
     "@microsoft/api-extractor": "^7.58.7",
     "@sobree/collab-server": "workspace:*",
     "@types/node": "^22.10.2",
+    "archunit": "^2.3.0",
     "@vitest/ui": "^3.2.4",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
