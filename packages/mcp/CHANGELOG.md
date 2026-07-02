@@ -1,5 +1,18 @@
 # @sobree/mcp
 
+## 0.1.49
+
+### Patch Changes
+
+- 0772e5e: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- 2837a11: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [0772e5e]
+- Updated dependencies [2837a11]
+- Updated dependencies [2837a11]
+  - @sobree/core@0.1.49
+
 ## 0.1.48
 
 ### Patch Changes
