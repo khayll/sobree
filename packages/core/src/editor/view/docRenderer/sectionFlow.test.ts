@@ -58,8 +58,8 @@ describe("openColumnContainerIfNeeded", () => {
     expect(wrapper.className).toBe("sobree-cols sobree-section-cols");
     expect(wrapper.dataset.colCount).toBe("2");
     expect(wrapper.dataset.pagCid).toBe("cols-3");
-    // 720 twips → 13mm (rounded); the flow pass sizes equal tracks itself.
-    expect(wrapper.dataset.colGapMm).toBe("13");
+    // 720 twips = 12.7mm exact; the flow pass sizes equal tracks itself.
+    expect(wrapper.dataset.colGapMm).toBe("12.7");
     expect(wrapper.dataset.colWidthsMm).toBeUndefined();
     expect(host.firstElementChild).toBe(wrapper);
   });
@@ -79,9 +79,9 @@ describe("openColumnContainerIfNeeded", () => {
     expect(wrapper.className).toBe("sobree-cols sobree-cols-unequal");
     expect(wrapper.dataset.colCount).toBe("2");
     expect(wrapper.dataset.pagCid).toBe("cols-1");
-    // 6576 twips → 116mm, 2928 → 52mm (rounded by twipsToMm)
-    expect(wrapper.dataset.colWidthsMm).toBe("116,52");
-    expect(wrapper.dataset.colGapsMm).toBe("13"); // one gap (n-1)
+    // 6576 twips = 115.993mm, 2928 = 51.647mm (sub-twip exact)
+    expect(wrapper.dataset.colWidthsMm).toBe("115.993,51.647");
+    expect(wrapper.dataset.colGapsMm).toBe("12.7"); // one gap (n-1)
   });
 
   it("stamps data-col-fill when the section ends at a hard page break", () => {

@@ -28,10 +28,14 @@ describe("units", () => {
     expect(emuToPx(914400)).toBe(96); // 1 inch = 96 px
   });
 
-  it("twipsToMm rounds to the nearest whole millimetre", () => {
-    expect(twipsToMm(1440)).toBe(25); // 1 inch ≈ 25mm (rounded from 25.4)
-    expect(twipsToMm(567)).toBe(10); // 567 twips ≈ 10.0mm
-    expect(twipsToMm(283)).toBe(5); // 283 twips ≈ 4.99mm → 5
+  it("twipsToMm keeps sub-twip precision (3 decimals), never whole-mm rounds", () => {
+    expect(twipsToMm(1440)).toBe(25.4); // 1 inch, exact
+    expect(twipsToMm(720)).toBe(12.7); // 0.5 inch, exact
+    // Point-authored spacing must survive: 160 twips = 8pt = 2.822mm.
+    // Whole-mm rounding (→ 3mm) grew every spaced paragraph by ~0.68px
+    // and moved page counts on paragraph-dense documents.
+    expect(twipsToMm(160)).toBe(2.822);
+    expect(twipsToMm(240)).toBe(4.233); // 12pt default after-spacing
     expect(twipsToMm(0)).toBe(0);
   });
 

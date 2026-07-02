@@ -98,9 +98,9 @@ describe("createListContainer", () => {
       { numId: 1, ordered: false, leftTwips: 720, hangingTwips: 360 },
       0,
     );
-    // text column at `left` = 720 twips ≈ 13mm; marker box = hanging 360 ≈ 6mm
-    expect(el.style.paddingLeft).toBe("13mm");
-    expect(el.style.getPropertyValue("--sobree-list-hang")).toBe("6mm");
+    // text column at `left` = 720 twips = 12.7mm; marker box = hanging 360 = 6.35mm
+    expect(el.style.paddingLeft).toBe("12.7mm");
+    expect(el.style.getPropertyValue("--sobree-list-hang")).toBe("6.35mm");
     expect(el.classList.contains("sobree-hang")).toBe(true);
   });
 

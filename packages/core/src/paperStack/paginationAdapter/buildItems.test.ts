@@ -28,6 +28,24 @@ function stubHeight(el: Element, px: number): void {
   Object.defineProperty(el, "offsetHeight", { value: px, configurable: true });
 }
 
+/** Stub an element's client rect so the flow-gap measurement sees a real
+ *  layout position. `height: 0` on purpose — `logicalHeightPx` then falls
+ *  back to `offsetHeight`, keeping height stubs orthogonal to gap stubs. */
+function stubRect(el: HTMLElement, r: { top: number; bottom: number }): void {
+  el.getBoundingClientRect = () =>
+    ({
+      top: r.top,
+      bottom: r.bottom,
+      height: 0,
+      width: 0,
+      left: 0,
+      right: 0,
+      x: 0,
+      y: r.top,
+      toJSON: () => ({}),
+    }) as DOMRect;
+}
+
 describe("buildItems: tall table row driven by a non-paragraph cell", () => {
   it("measures the row by its tallest cell, not its first — boxes sum to the true row height", () => {
     // Regression guard for the fedramp revision-history table: a row whose
@@ -116,6 +134,45 @@ describe("buildItems: forced page breaks", () => {
     expect(glue?.type).toBe("glue");
     const box = nextBox(items, penaltyIdx + 1);
     expect(box?.el).toBe(els[1]);
+  });
+
+  it("charges only the broken-to block's own space-before to the new page", () => {
+    const els = elements(`
+      <p>before</p>
+      <p data-page-break-before style="margin-top: 5px">after</p>
+    `);
+    // Lay out a 20px collapsed gap between the blocks: 5px of it is the
+    // target's space-before (its margin-top), the other 15px the previous
+    // paragraph's space-after. Word honours ONLY the space-before after a
+    // hard break — the space-after dies at the old page's bottom.
+    stubRect(els[0]!, { top: 0, bottom: 100 });
+    stubRect(els[1]!, { top: 120, bottom: 140 });
+    const items = buildItems(els);
+    const penaltyIdx = items.findIndex((it) => it.type === "penalty");
+    expect(penaltyIdx).toBeGreaterThan(0);
+    // The previous block's share sits BEFORE the penalty — trailing glue
+    // on the old page, which `usedHeight` already excludes.
+    const beforeGlue = items[penaltyIdx - 1];
+    expect(beforeGlue).toEqual({ type: "glue", height: 15 });
+    // Exactly the block's own margin-top is charged to the new page.
+    const afterGlue = items[penaltyIdx + 1];
+    expect(afterGlue).toEqual({ type: "glue", height: 5 });
+  });
+
+  it("`data-page-break` marker: the whole inter-block gap stays on the old page", () => {
+    const els = elements(`
+      <p>before</p>
+      <div data-page-break></div>
+      <p>after</p>
+    `);
+    // 10px gap between the paragraph and the marker — all of it is the
+    // paragraph's space-after; none of it belongs to the new page.
+    stubRect(els[0]!, { top: 0, bottom: 100 });
+    stubRect(els[1]!, { top: 110, bottom: 110 });
+    const items = buildItems(els);
+    const penaltyIdx = items.findIndex((it) => it.type === "penalty");
+    expect(items[penaltyIdx - 1]).toEqual({ type: "glue", height: 10 });
+    expect(items[penaltyIdx + 1]).toEqual({ type: "glue", height: 0 });
   });
 
   it("`data-page-break-before` on a heading emits a Penalty before the heading box", () => {

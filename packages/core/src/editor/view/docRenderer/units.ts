@@ -43,17 +43,21 @@ export function emuToPx(emu: number): number {
 }
 
 /**
- * Twips → millimetres, ROUNDED to the nearest whole millimetre.
+ * Twips → millimetres, rounded to 3 decimals — finer than a twip
+ * (1 twip ≈ 0.0176mm), so the source value survives unchanged while the
+ * emitted CSS string stays short and stable (`2.822mm`, not
+ * `2.8222222222222224mm`).
  *
- * Word's body-geometry values (indents, spacing, column gaps) are
- * authored in whole points / mm and survive a round-trip as twips;
- * rounding to integer mm here keeps the emitted CSS stable (`5mm`,
- * not `4.97mm`) and matches the renderer's long-standing output that
- * the oracle snapshots are blessed against. Callers needing sub-mm
- * precision should use `twipsToMmExact`.
+ * NOT whole millimetres: Word authors spacing/indents in points
+ * (`w:after="160"` is exactly 8pt = 2.822mm), and integer-mm rounding
+ * distorted every value by up to ±0.5mm (±1.9px). Stacked over a page
+ * of paragraphs that grows real layout past Word's — wsu-thesis's title
+ * page carries ~45 spaced paragraphs whose after-spacing rounded 2.822mm
+ * → 3mm, +30px on the page, spilling its last lines onto an extra page.
+ * Callers formatting their own strings can use `twipsToMmExact`.
  */
 export function twipsToMm(twips: number): number {
-  return Math.round((twips / TWIPS_PER_INCH) * MM_PER_INCH);
+  return Math.round((twips / TWIPS_PER_INCH) * MM_PER_INCH * 1000) / 1000;
 }
 
 /** Twips → millimetres, exact (no rounding). */

@@ -59,7 +59,7 @@
           "text": "Fifth item.",
         },
       ],
-      "style": "padding-left: 13mm; --sobree-list-hang: 6mm; --mk-pre: ""; --mk-suf: ".";",
+      "style": "padding-left: 12.7mm; --sobree-list-hang: 6.35mm; --mk-pre: ""; --mk-suf: ".";",
       "tag": "OL",
       "text": "First item.Second item.Third item — a longer one with enough…",
     },
