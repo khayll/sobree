@@ -18,7 +18,7 @@ import type {
   TableStyleCellFormat,
   TableStyleDefinition,
 } from "../../../doc/types";
-import { twipsToMm, twipsToMmExact } from "./units";
+import { twipsToMmExact } from "./units";
 
 /**
  * Renderer for a table cell's block content, injected by the caller
@@ -232,22 +232,16 @@ function renderCell(
   // are silently dropped inside table cells.
   if (cell.content.length > 0) {
     renderCellBlocks(cell.content, el, numbering, styles, rawParts);
-    // Match LibreOffice's "compress paragraph after-spacing inside
-    // table cells" rendering opinion. Word literally applies
-    // `<w:spacing w:after>` in cells; LO ignores it for the implicit
-    // 240-twip (4mm) default that most styles inherit. Result on
-    // resume-style docs (complex-multipage.docx, healthcare-with-photo)
-    // is that LO packs significantly more rows per page than Word /
-    // Sobree-stock — which then forces Sobree to spend extra pages
-    // for content that LO fits inline.
-    //
-    // The compression only affects paragraphs whose rendered margin
-    // is the OOXML default (4mm); explicit non-default after-spacing
-    // (e.g. 8mm, 12mm) is preserved as-authored. Paragraphs that the
-    // renderer left WITHOUT an inline margin-bottom (because the
-    // source said nothing) inherit the browser default via the CSS
-    // selector in `paperStack.css` and get tightened there.
-    tightenDefaultAfterSpacing(el);
+    // Word/LibreOffice do not render the space-after of a cell's LAST
+    // block — the cell ends at its bottom margin, not at the trailing
+    // paragraph's spacing (LO models this as the Word-compat
+    // "AddParaTableSpacing=false" option). This is a SEMANTIC rule
+    // keyed on position, replacing the old value-matching tightener
+    // that zeroed any margin equal to the 240-twip default: that
+    // heuristic missed other doc defaults (nih-icsc's 200-twip
+    // after-spacing kept ~13px on 100+ single-paragraph rows, +2 pages
+    // vs LO) and silently mutated MID-cell paragraphs too.
+    suppressTrailingCellSpacing(el);
   } else {
     // Word requires every cell to have at least one paragraph; supply
     // a single <br> so the cell renders with a caret target / minimum
@@ -258,40 +252,21 @@ function renderCell(
 }
 
 /**
- * Walk a table cell's rendered paragraphs and zero out the
- * margin-bottom for any paragraph whose source carried the default
- * `<w:spacing w:after="240"/>` (≈ 4 mm). Word renders this literally;
- * LibreOffice ignores it inside table cells. We match LO so resume-
- * style multi-row cells pack to LO's page count rather than running
- * 1–2 pages longer.
- *
- * Custom non-default after-spacing (e.g. 8 mm, 12 mm — usually set
- * intentionally by the author for visual separation) is left alone;
- * removing it would be a more aggressive deviation from spec than
- * the LO heuristic justifies.
+ * Zero the space-after of a cell's LAST block-level child (and, for a
+ * trailing list, its last item). Word and LibreOffice both drop the
+ * trailing block's after-spacing inside a table cell — the gap below
+ * the text is the CELL's bottom margin, not paragraph spacing.
+ * Inter-block spacing inside the cell is preserved as authored.
  */
-function tightenDefaultAfterSpacing(cellEl: HTMLElement): void {
-  for (const p of cellEl.querySelectorAll("p")) {
-    if (!(p instanceof HTMLElement)) continue;
-    const mb = p.style.marginBottom;
-    // The renderer formats the value as `${twipsToMm(after)}mm`; compare
-    // the parsed number against the converted 240-twip OOXML default so
-    // the match survives conversion-precision changes. Anything else
-    // (explicit larger after-spacing, e.g. "8mm" or "10mm") is left alone.
-    if (mb.endsWith("mm") && Number.parseFloat(mb) === twipsToMm(240)) {
-      p.style.marginBottom = "0px";
-    }
-    // Line-height tightening: Word's "Multiple 1.15" line-rule renders
-    // as `line-height: ~1.20` (Calibri natural leading 1.05 × 1.15
-    // multiplier). LO ignores this inside table cells, defaulting to
-    // single-spacing. Tightening here unlocks the page-density win
-    // needed to absorb the Operating Systems / Tech Proficiency
-    // widow into the previous page. Line baselines shift slightly
-    // vs LO's reference rendering, so the corpus drift score rises
-    // — accepted as the cost of one-fewer-page convergence.
-    const lh = p.style.lineHeight;
-    if (lh && /^1\.(0[5-9]|1[0-9]|2[0-9])\d*$/.test(lh)) {
-      p.style.lineHeight = "1";
+function suppressTrailingCellSpacing(cellEl: HTMLElement): void {
+  const last = cellEl.lastElementChild;
+  if (!(last instanceof HTMLElement)) return;
+  const tag = last.tagName;
+  if (tag === "P" || tag === "UL" || tag === "OL" || tag === "TABLE") {
+    last.style.marginBottom = "0px";
+    if (tag === "UL" || tag === "OL") {
+      const lastLi = last.lastElementChild;
+      if (lastLi instanceof HTMLElement) lastLi.style.marginBottom = "0px";
     }
   }
 }

@@ -24,7 +24,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Team",
                     },
@@ -39,7 +39,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Project",
                     },
@@ -54,7 +54,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Owner",
                     },
@@ -69,7 +69,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Status",
                     },
@@ -99,7 +99,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Engineering",
                     },
@@ -114,7 +114,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Auth refactor",
                     },
@@ -129,7 +129,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Alice",
                     },
@@ -144,7 +144,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "On track",
                     },
@@ -165,7 +165,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Pipeline migration",
                     },
@@ -180,7 +180,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Bob",
                     },
@@ -195,7 +195,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "At risk",
                     },
@@ -216,7 +216,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Design",
                     },
@@ -231,7 +231,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Onboarding redesign",
                     },
@@ -246,7 +246,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: left; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Carol",
                     },
@@ -261,7 +261,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Blocked",
                     },
@@ -285,7 +285,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; text-align: center; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Note: figures revised against the previous quarter; see Sche…",
                     },
