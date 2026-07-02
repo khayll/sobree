@@ -20,35 +20,59 @@ import type { DomBox, DomItem } from "./types";
  */
 export function buildItems(blocks: HTMLElement[]): DomItem[] {
   const items: DomItem[] = [];
-  // Track running vertical position so inter-block glue reflects the REAL
-  // gap after CSS margin-collapse (not the naïve sum of margins).
-  let prevBottom = 0;
+  const scale = viewportScale(blocks[0]);
+  // Track the previous IN-FLOW block's rect so inter-block glue reflects
+  // the REAL gap after CSS margin-collapse (not the naïve sum of margins).
+  // Rect-based (fractional) rather than offsetTop/offsetHeight: the offset
+  // APIs round to integer px, and because glue clamps at 0 the rounding
+  // never cancels — a page of N single-line paragraphs accumulated up to
+  // ~0.5px of phantom height per block (a 45-line thesis title page
+  // measured +22px and spilled its last paragraphs onto an extra page).
+  let prev: { offsetParent: Element | null; bottom: number } | null = null;
   for (let i = 0; i < blocks.length; i++) {
     const el = blocks[i];
     if (!el) continue;
 
     // Absolute / fixed positioning takes the element out of flow. It
-    // shouldn't contribute to gaps OR to `prevBottom`. Without this
-    // the next in-flow block's `offsetTop` is below the previous
-    // in-flow block, but `prevBottom` reflects the absolute block's
-    // (much smaller) offsetTop+0, producing a negative gap that gets
-    // clamped to 0 — harmless — OR an unrelated huge gap when the
-    // absolute block landed elsewhere. Either way we should ignore.
+    // shouldn't contribute to gaps OR to `prev`. Without this the next
+    // in-flow block would measure its gap against the absolute block's
+    // rect — producing a negative gap that gets clamped to 0 (harmless)
+    // OR an unrelated huge gap when the absolute block landed elsewhere.
+    // Either way we should ignore.
     const cs = getComputedStyle(el);
     const isOutOfFlow = cs.position === "absolute" || cs.position === "fixed";
 
-    const gapBefore = isOutOfFlow ? 0 : Math.max(0, el.offsetTop - prevBottom);
-    // Forced-break ordering: the -Infinity penalty goes BEFORE the glue,
-    // so the inter-block gap is charged to the NEW page. Word honours a
-    // paragraph's space-before after an explicit page break (and the CSS
-    // keeps the margin on `[data-page-break-before]` blocks), so the
-    // page budget must account for it. For AUTOMATIC breaks the glue
-    // stays where it is — trailing on the previous page — matching
-    // Word's suppression of space-before at the top of the page (the
-    // `.paper-content > :first-child` rule zeroes the rendered margin).
+    const rect = el.getBoundingClientRect();
+    // Blocks living in different papers mid-repagination have no
+    // meaningful flow gap between them — matches the old clamp-to-0
+    // behaviour of the per-paper offsetTop math.
+    const gapBefore =
+      isOutOfFlow || !prev || prev.offsetParent !== el.offsetParent
+        ? 0
+        : Math.max(0, (rect.top - prev.bottom) / scale);
+
     const forcedBreak = isPageBreakMarker(el) || hasPageBreakBefore(el);
-    if (forcedBreak) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
-    if (i > 0 || gapBefore > 0) {
+    if (forcedBreak) {
+      // Forced-break ordering: Word honours the broken-to paragraph's OWN
+      // space-before after an explicit page break (and the CSS keeps the
+      // margin on `[data-page-break-before]` blocks), so exactly that much
+      // glue goes AFTER the -Infinity penalty — charged to the NEW page.
+      // The REST of the laid-out gap is the PREVIOUS block's space-after,
+      // which Word leaves to die at the old page's bottom; it goes BEFORE
+      // the penalty as trailing glue that `usedHeight` already excludes.
+      // Charging the whole collapsed gap to the new page phantom-filled
+      // every page that follows a hard break (gatech-thesis's title page
+      // carried +15px from the break paragraph's space-after and spilled
+      // its copyright line onto an extra page). For AUTOMATIC breaks the
+      // glue stays where it is — trailing on the previous page — matching
+      // Word's suppression of space-before at the top of the page (the
+      // `.paper-content > :first-child` rule zeroes the rendered margin).
+      const ownBefore = isPageBreakMarker(el) ? 0 : Number.parseFloat(cs.marginTop) || 0;
+      const trailing = Math.max(0, gapBefore - ownBefore);
+      if (i > 0 && trailing > 0) items.push({ type: "glue", height: trailing });
+      items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
+      if (i > 0 || ownBefore > 0) items.push({ type: "glue", height: ownBefore });
+    } else if (i > 0 || gapBefore > 0) {
       // Glue between blocks: height is the actual laid-out gap (often 0 if
       // the previous block's margin-bottom collapsed with this one's margin-top).
       items.push({ type: "glue", height: gapBefore });
@@ -57,25 +81,52 @@ export function buildItems(blocks: HTMLElement[]): DomItem[] {
     if (isPageBreakMarker(el)) {
       items.push({ type: "box", height: 0, el, monolithic: true });
     } else if (isKeepTogetherGroup(el)) {
-      items.push(singleBox(el, { monolithic: true }));
+      items.push(singleBox(el, scale, { monolithic: true }));
     } else if (el.tagName === "P") {
-      items.push(...paragraphLineItems(el, ensureParagraphId(el)));
+      items.push(...paragraphLineItems(el, ensureParagraphId(el), scale));
     } else if (el.tagName === "OL" || el.tagName === "UL") {
-      items.push(...listItemBoxes(el, ensureListId(el)));
+      items.push(...listItemBoxes(el, ensureListId(el), scale));
     } else if (el.tagName === "TABLE") {
-      items.push(...tableRowBoxes(el, ensureTableId(el)));
+      items.push(...tableRowBoxes(el, ensureTableId(el), scale));
     } else {
-      items.push(singleBox(el, extraFlagsFor(el)));
+      items.push(singleBox(el, scale, extraFlagsFor(el)));
     }
 
-    // Out-of-flow elements don't move prevBottom — they don't push
-    // siblings down so the next in-flow block measures its real gap
-    // against the previous in-flow block.
+    // Out-of-flow elements don't move `prev` — they don't push siblings
+    // down so the next in-flow block measures its real gap against the
+    // previous in-flow block.
     if (!isOutOfFlow) {
-      prevBottom = el.offsetTop + el.offsetHeight;
+      prev = { offsetParent: el.offsetParent, bottom: rect.bottom };
     }
   }
   return items;
+}
+
+/**
+ * Ratio of rendered (viewport) px to logical px — the CSS
+ * `transform: scale()` a zooming viewport applies above the paper stack.
+ * `getBoundingClientRect()` returns post-transform px; dividing by this
+ * recovers fractional LOGICAL px comparable with the `pageContentHeight`
+ * budget (which is offsetHeight-derived — logical by definition). Derived
+ * from the first block's offsetParent because it's the nearest tall box:
+ * the integer rounding of its offsetHeight skews the ratio by <0.1%,
+ * i.e. <0.02px on a line box. jsdom has no layout — every rect is 0 —
+ * so this returns 1 and the offsetHeight fallback in `logicalHeightPx`
+ * keeps the pipeline alive.
+ */
+function viewportScale(first: HTMLElement | undefined): number {
+  const ref = first?.offsetParent;
+  if (!(ref instanceof HTMLElement) || ref.offsetHeight <= 0) return 1;
+  const h = ref.getBoundingClientRect().height;
+  return h > 0 ? h / ref.offsetHeight : 1;
+}
+
+/** Border-box height in fractional logical px. Rect-based so sub-pixel
+ *  line heights survive; `offsetHeight` fallback covers jsdom (no layout,
+ *  rects all zero). */
+function logicalHeightPx(el: HTMLElement, scale: number): number {
+  const h = el.getBoundingClientRect().height;
+  return h > 0 ? h / scale : el.offsetHeight;
 }
 
 /**
@@ -128,7 +179,7 @@ function ensureTableId(el: HTMLElement): string {
  * the page budget overflows visibly; that's a known T3 gap (Word's
  * `<w:cantSplit/>` semantics are still the implicit default here).
  */
-function tableRowBoxes(table: HTMLElement, tid: string): DomItem[] {
+function tableRowBoxes(table: HTMLElement, tid: string, scale: number): DomItem[] {
   void tid; // ensureTableId is called by the parent for the data-pag-tid stamp
   const trs: HTMLElement[] = [];
   // Walk THEAD rows first (they render at top of each per-page table
@@ -159,7 +210,7 @@ function tableRowBoxes(table: HTMLElement, tid: string): DomItem[] {
   if (trs.length === 0) {
     // No rows — emit one zero box pointing at the table so it survives
     // distribution (rare; mostly defensive for malformed imports).
-    return [singleBox(table, { monolithic: true })];
+    return [singleBox(table, scale, { monolithic: true })];
   }
   // Estimate a page-budget threshold for the "tall row" decision. Rows
   // taller than this are split by their dominant cell's paragraphs so
@@ -178,9 +229,9 @@ function tableRowBoxes(table: HTMLElement, tid: string): DomItem[] {
     const tr = trs[i]!;
     const rowHeight = tr.offsetHeight;
     if (rowHeight > TALL_ROW_THRESHOLD_PX) {
-      out.push(...tallRowParagraphBoxes(tr));
+      out.push(...tallRowParagraphBoxes(tr, scale));
     } else {
-      out.push(singleBox(tr, { monolithic: true }));
+      out.push(singleBox(tr, scale, { monolithic: true }));
     }
     if (i < trs.length - 1) out.push({ type: "glue", height: 0 });
   }
@@ -201,11 +252,11 @@ function tableRowBoxes(table: HTMLElement, tid: string): DomItem[] {
  * across pages: label cell on the first fragment, content cell content
  * split by where the paginator chose to break.
  */
-function tallRowParagraphBoxes(tr: HTMLElement): DomItem[] {
+function tallRowParagraphBoxes(tr: HTMLElement, scale: number): DomItem[] {
   const cells = Array.from(tr.children).filter(
     (c): c is HTMLElement => c.tagName === "TD" || c.tagName === "TH",
   );
-  if (cells.length === 0) return [singleBox(tr, { monolithic: true })];
+  if (cells.length === 0) return [singleBox(tr, scale, { monolithic: true })];
   // Dominant cell = the one DRIVING the row's height (tallest content),
   // not the one with the most block children. Selecting by count tied a
   // 9-item `<ul>` revision cell with the one-line date cell next to it
@@ -214,16 +265,16 @@ function tallRowParagraphBoxes(tr: HTMLElement): DomItem[] {
   // never broke the page, and the table overflowed. Height is the real
   // "which cell makes this row tall" signal.
   let dominant = cells[0]!;
-  let domHeight = cellContentHeight(cells[0]!);
+  let domHeight = cellContentHeight(cells[0]!, scale);
   for (let i = 1; i < cells.length; i++) {
-    const h = cellContentHeight(cells[i]!);
+    const h = cellContentHeight(cells[i]!, scale);
     if (h > domHeight) {
       dominant = cells[i]!;
       domHeight = h;
     }
   }
   const paras = cellParagraphs(dominant);
-  if (paras.length === 0) return [singleBox(tr, { monolithic: true })];
+  if (paras.length === 0) return [singleBox(tr, scale, { monolithic: true })];
 
   const out: DomItem[] = [];
   const boxes: DomBox[] = [];
@@ -231,7 +282,7 @@ function tallRowParagraphBoxes(tr: HTMLElement): DomItem[] {
     const p = paras[i]!;
     const box: DomBox = {
       type: "box",
-      height: measureBlockHeight(p),
+      height: measureBlockHeight(p, scale),
       el: p,
       cellTr: tr,
       isFirstLineOfParagraph: true,
@@ -249,15 +300,15 @@ function tallRowParagraphBoxes(tr: HTMLElement): DomItem[] {
   // own text — so push any residual onto the last box. Over-measuring
   // is harmless (worst case the row breaks one px early); under-
   // measuring overflows the page.
-  const residual = tr.offsetHeight - boxes.reduce((sum, b) => sum + b.height, 0);
+  const residual = logicalHeightPx(tr, scale) - boxes.reduce((sum, b) => sum + b.height, 0);
   if (residual > 0) boxes[boxes.length - 1]!.height += residual;
   return out;
 }
 
 /** Total height of a cell's breakable block children — the signal for
  *  which cell drives a tall row's height. */
-function cellContentHeight(cell: HTMLElement): number {
-  return cellParagraphs(cell).reduce((sum, p) => sum + measureBlockHeight(p), 0);
+function cellContentHeight(cell: HTMLElement, scale: number): number {
+  return cellParagraphs(cell).reduce((sum, p) => sum + measureBlockHeight(p, scale), 0);
 }
 
 /**
@@ -298,19 +349,19 @@ function cellParagraphs(cell: HTMLElement): HTMLElement[] {
  * pagination pass. Each LI gets its own `data-pag-pid` for the same
  * reason at the LI level.
  */
-function listItemBoxes(list: HTMLElement, lid: string): DomItem[] {
+function listItemBoxes(list: HTMLElement, lid: string, scale: number): DomItem[] {
   void lid; // ensureListId is called by the parent for the data-pag-lid stamp
   const lis = Array.from(list.children).filter((c): c is HTMLElement => c.tagName === "LI");
   if (lis.length === 0) {
     // Empty list — nothing to paginate. Emit a zero-height placeholder
     // pointing at the OL itself so it survives distribution.
-    return [singleBox(list, {})];
+    return [singleBox(list, scale, {})];
   }
   const out: DomItem[] = [];
   for (let i = 0; i < lis.length; i++) {
     const li = lis[i]!;
     const pid = ensureParagraphId(li);
-    const lineItems = paragraphLineItems(li, pid);
+    const lineItems = paragraphLineItems(li, pid, scale);
     out.push(...lineItems);
     if (i < lis.length - 1) {
       // Inter-item glue is the REAL laid-out gap (LI margins — Word's
@@ -319,23 +370,20 @@ function listItemBoxes(list: HTMLElement, lid: string): DomItem[] {
       // 0 here under-counted every spaced list by ~spacing×items and
       // over-packed pages (healthcare's 17-bullet skills list measured
       // ~140px short, pushing page-1 content through the bottom margin).
-      //
-      // `offsetTop`/`offsetHeight` are integer-rounded, so a fractional
-      // line box (18.4px) reports a phantom 1px "gap" per item. That's
-      // below the measurement resolution, not real spacing — counting it
-      // accumulates false fullness (~1px × bullets) and spills the last
-      // line of a tightly-fitting document onto an extra page. Real
-      // spacing gaps are ≥ a few px; ignore anything under 2.
+      // Rect-based like the block loop: the offset APIs are integer-
+      // rounded, and a fractional line box (18.4px) reported a phantom
+      // 1px "gap" per item that needed a ≥2px threshold to reject;
+      // fractional rects measure the real gap directly.
       const next = lis[i + 1]!;
-      const raw = next.offsetTop - (li.offsetTop + li.offsetHeight);
-      out.push({ type: "glue", height: raw >= 2 ? raw : 0 });
+      const raw = (next.getBoundingClientRect().top - li.getBoundingClientRect().bottom) / scale;
+      out.push({ type: "glue", height: Math.max(0, raw) });
     }
   }
   return out;
 }
 
-function paragraphLineItems(p: HTMLElement, pid: string): DomItem[] {
-  const lines = measureParagraphLines(p);
+function paragraphLineItems(p: HTMLElement, pid: string, scale: number): DomItem[] {
+  const lines = measureParagraphLines(p, logicalHeightPx(p, scale));
   // `data-keep-next` applies to the LAST line of the paragraph so the
   // paginator forbids breaking between the paragraph and what follows
   // it. Mirrors how h1-h6 implicitly get keepWithNext via extraFlagsFor.
@@ -347,7 +395,7 @@ function paragraphLineItems(p: HTMLElement, pid: string): DomItem[] {
   const keepTogether = p.hasAttribute("data-keep-together");
   if (lines.length <= 1) {
     return [
-      singleBox(p, {
+      singleBox(p, scale, {
         paragraphId: pid,
         isFirstLineOfParagraph: true,
         isLastLineOfParagraph: true,
@@ -378,10 +426,10 @@ function paragraphLineItems(p: HTMLElement, pid: string): DomItem[] {
   return out;
 }
 
-function singleBox(el: HTMLElement, extra: Partial<DomBox>): DomBox {
+function singleBox(el: HTMLElement, scale: number, extra: Partial<DomBox>): DomBox {
   return {
     type: "box",
-    height: measureBlockHeight(el),
+    height: measureBlockHeight(el, scale),
     el,
     isFirstLineOfParagraph: true,
     isLastLineOfParagraph: true,
@@ -405,10 +453,7 @@ function extraFlagsFor(el: HTMLElement): Partial<DomBox> {
   return flags;
 }
 
-function measureBlockHeight(el: HTMLElement): number {
-  // `offsetHeight` is logical — ignoring any CSS transform scale on an
-  // ancestor viewport. `getBoundingClientRect` would return post-transform
-  // pixels and mismatch the logical `pageContentHeight` budget.
+function measureBlockHeight(el: HTMLElement, scale: number): number {
   const cs = getComputedStyle(el);
   // Absolute / fixed positioning takes the element out of flow — it
   // doesn't push siblings down and shouldn't consume page budget.
@@ -419,15 +464,15 @@ function measureBlockHeight(el: HTMLElement): number {
   // page budget and triggering a spurious extra page.
   if (cs.position === "absolute" || cs.position === "fixed") return 0;
   // Boxes are the BORDER-BOX height only. Margins are owned by the GLUE
-  // items (the `offsetTop − prevBottom` deltas measured by the block
-  // walk), which reflect the real laid-out gap after margin collapse.
-  // The old `offsetHeight + marginTop` here predates that glue and
+  // items (the rect deltas measured by the block walk), which reflect
+  // the real laid-out gap after margin collapse. The old
+  // `offsetHeight + marginTop` here predates that glue and
   // DOUBLE-COUNTED every single-line paragraph's space-before (once in
   // the glue, once in the box) — pages holding several spaced headings
   // ran a phantom ~15-25px fuller per heading and under-filled, breaking
   // a paragraph or two earlier than Word/LibreOffice on the same budget
   // (acm-submission-template page 2 carried +53px of phantom height).
-  return el.offsetHeight;
+  return logicalHeightPx(el, scale);
 }
 
 function isPageBreakMarker(el: HTMLElement): boolean {

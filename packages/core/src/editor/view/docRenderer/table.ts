@@ -18,7 +18,7 @@ import type {
   TableStyleCellFormat,
   TableStyleDefinition,
 } from "../../../doc/types";
-import { twipsToMmExact } from "./units";
+import { twipsToMm, twipsToMmExact } from "./units";
 
 /**
  * Renderer for a table cell's block content, injected by the caller
@@ -274,11 +274,13 @@ function tightenDefaultAfterSpacing(cellEl: HTMLElement): void {
   for (const p of cellEl.querySelectorAll("p")) {
     if (!(p instanceof HTMLElement)) continue;
     const mb = p.style.marginBottom;
-    // The renderer formats the value as `${twipsToMm(after)}mm`. The
-    // OOXML default is 240 twips → 4mm. Match the exact rendered
-    // string to avoid mis-tightening anything else (e.g. paragraphs
-    // with explicit larger after-spacing render as "8mm" or "10mm").
-    if (mb === "4mm") p.style.marginBottom = "0px";
+    // The renderer formats the value as `${twipsToMm(after)}mm`; compare
+    // the parsed number against the converted 240-twip OOXML default so
+    // the match survives conversion-precision changes. Anything else
+    // (explicit larger after-spacing, e.g. "8mm" or "10mm") is left alone.
+    if (mb.endsWith("mm") && Number.parseFloat(mb) === twipsToMm(240)) {
+      p.style.marginBottom = "0px";
+    }
     // Line-height tightening: Word's "Multiple 1.15" line-rule renders
     // as `line-height: ~1.20` (Calibri natural leading 1.05 × 1.15
     // multiplier). LO ignores this inside table cells, defaulting to

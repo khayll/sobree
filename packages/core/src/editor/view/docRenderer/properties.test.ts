@@ -17,16 +17,16 @@ describe("applyParagraphProps", () => {
   });
 
   it("emits firstLine indent as positive text-indent, hanging as negative", () => {
-    expect(p({ indent: { firstLineTwips: 720 } }).style.textIndent).toBe("13mm"); // 720tw ≈ 12.7 → 13
-    expect(p({ indent: { leftTwips: 720, hangingTwips: 360 } }).style.textIndent).toBe("-6mm");
+    expect(p({ indent: { firstLineTwips: 720 } }).style.textIndent).toBe("12.7mm"); // 720tw = 12.7mm exact
+    expect(p({ indent: { leftTwips: 720, hangingTwips: 360 } }).style.textIndent).toBe("-6.35mm");
     // first-line indent is NOT applied to list items (marker geometry owns it)
     expect(p({ indent: { firstLineTwips: 720 } }, [], "li").style.textIndent).toBe("");
   });
 
-  it("emits spacing before/after as mm margins (rounded)", () => {
+  it("emits spacing before/after as mm margins (sub-twip exact)", () => {
     const el = p({ spacing: { beforeTwips: 240, afterTwips: 120 } });
-    expect(el.style.marginTop).toBe("4mm"); // 240 twips ≈ 4.23 → 4
-    expect(el.style.marginBottom).toBe("2mm"); // 120 twips ≈ 2.1 → 2
+    expect(el.style.marginTop).toBe("4.233mm"); // 240 twips = 12pt
+    expect(el.style.marginBottom).toBe("2.117mm"); // 120 twips = 6pt
   });
 
   describe("contextualSpacing", () => {
@@ -45,7 +45,7 @@ describe("applyParagraphProps", () => {
         { ...spacing, contextualSpacing: true },
         { prevSameStyle: false, nextSameStyle: true },
       );
-      expect(el.style.marginTop).toBe("3mm"); // before kept (prev differs)
+      expect(el.style.marginTop).toBe("2.822mm"); // before kept (prev differs)
       expect(el.style.marginBottom).toBe(""); // after suppressed
     });
 
@@ -55,7 +55,7 @@ describe("applyParagraphProps", () => {
         { prevSameStyle: true, nextSameStyle: false },
       );
       expect(el.style.marginTop).toBe(""); // before suppressed
-      expect(el.style.marginBottom).toBe("3mm"); // after kept (next differs)
+      expect(el.style.marginBottom).toBe("2.822mm"); // after kept (next differs)
     });
 
     it("keeps both margins when neither neighbour shares the style", () => {
@@ -63,14 +63,14 @@ describe("applyParagraphProps", () => {
         { ...spacing, contextualSpacing: true },
         { prevSameStyle: false, nextSameStyle: false },
       );
-      expect(el.style.marginTop).toBe("3mm");
-      expect(el.style.marginBottom).toBe("3mm");
+      expect(el.style.marginTop).toBe("2.822mm");
+      expect(el.style.marginBottom).toBe("2.822mm");
     });
 
     it("does nothing without the contextualSpacing flag", () => {
       const el = ctx(spacing, { prevSameStyle: true, nextSameStyle: true });
-      expect(el.style.marginTop).toBe("3mm");
-      expect(el.style.marginBottom).toBe("3mm");
+      expect(el.style.marginTop).toBe("2.822mm");
+      expect(el.style.marginBottom).toBe("2.822mm");
     });
   });
 
@@ -118,7 +118,7 @@ describe("applyParagraphProps", () => {
     const li = p({ indent: { leftTwips: 720 } }, [], "li");
     expect(li.style.marginLeft).toBe("");
     const para = p({ indent: { leftTwips: 720 } });
-    expect(para.style.marginLeft).toBe("13mm"); // 720 twips ≈ 12.7 → 13
+    expect(para.style.marginLeft).toBe("12.7mm"); // 720 twips = 12.7mm exact
   });
 
   it("renders paragraph borders with mapped style + colour", () => {
@@ -195,9 +195,9 @@ describe("applyParagraphProps", () => {
         paragraphDefaults: { indent: { firstLineTwips: 240 } },
       },
     ];
-    // 240 twips ≈ 4.2mm → 4mm — applied even though the paragraph sets no
+    // 240 twips = 4.233mm — applied even though the paragraph sets no
     // direct indent of its own.
-    expect(p({ styleId: "Para" }, styles).style.textIndent).toBe("4mm");
+    expect(p({ styleId: "Para" }, styles).style.textIndent).toBe("4.233mm");
   });
 
   it("carries the style id verbatim in data-style-id for non-heading styles only", () => {

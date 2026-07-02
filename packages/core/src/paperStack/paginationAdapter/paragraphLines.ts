@@ -17,13 +17,22 @@ export interface LineMetric {
   endCharOffset: number;
 }
 
-export function measureParagraphLines(el: HTMLElement): LineMetric[] {
+/**
+ * `logicalHeight` is the paragraph's border-box height in LOGICAL px —
+ * fractional when the caller can supply it (buildItems' rect-based
+ * measurer), `offsetHeight` otherwise (distribute.ts only consumes the
+ * char offsets, where sub-pixel height precision is irrelevant).
+ */
+export function measureParagraphLines(
+  el: HTMLElement,
+  logicalHeight: number = el.offsetHeight,
+): LineMetric[] {
   const totalChars = countTextChars(el);
   if (totalChars === 0) {
     return [
       {
         lineIndex: 0,
-        height: el.getBoundingClientRect().height,
+        height: logicalHeight,
         startCharOffset: 0,
         endCharOffset: 0,
       },
@@ -43,17 +52,16 @@ export function measureParagraphLines(el: HTMLElement): LineMetric[] {
     return [
       {
         lineIndex: 0,
-        height: el.offsetHeight,
+        height: logicalHeight,
         startCharOffset: 0,
         endCharOffset: totalChars,
       },
     ];
   }
+  // Line rects are only used for CLUSTERING (how many lines, where they
+  // start); heights come from `logicalHeight` so they stay in logical px
+  // regardless of any CSS transform an ancestor viewport applies.
   const lines = clusterLineRects(Array.from(range.getClientRects()));
-  // `offsetHeight` is in LOGICAL px (unaffected by CSS transforms on an
-  // ancestor viewport). `getBoundingClientRect()` is post-transform — mixing
-  // the two with a logical `pageContentHeight` mis-packs pages at any zoom.
-  const logicalHeight = el.offsetHeight;
   if (lines.length <= 1) {
     return [
       {
@@ -71,7 +79,7 @@ export function measureParagraphLines(el: HTMLElement): LineMetric[] {
   }
 
   // Distribute the paragraph's logical height uniformly across clustered
-  // lines. Sum always equals `offsetHeight` exactly, so the paginator can't
+  // lines. Sum always equals `logicalHeight` exactly, so the paginator can't
   // overfill or underfill due to scale mismatches.
   const lineHeight = logicalHeight / lines.length;
   return lines.map((_l, i) => ({
