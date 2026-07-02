@@ -1,9 +1,8 @@
 import type { RunProperties } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { wFirst } from "../shared/xml";
-import type { ImportedItem } from "./paragraphs";
 import { readRunProperties } from "./runProperties";
-import { type ImportedRun, normaliseRunText, readRun } from "./runs";
+import { type ImportedItem, type ImportedRun, normaliseRunText, readRun } from "./runs";
 
 /**
  * Complex-field state machine (ECMA-376 §17.16.18). Word writes

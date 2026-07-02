@@ -6,16 +6,13 @@ import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
 import { ComplexFieldCollector } from "./fields";
 import { readRunProperties } from "./runProperties";
-import { type ImportedRun, readRun } from "./runs";
+import { type ImportedItem, type ImportedRun, readRun } from "./runs";
 import { readTabStops } from "./tabStops";
 
-/** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
-export type ImportedItem =
-  | { kind: "run"; run: ImportedRun }
-  /** `href` is set for HYPERLINK *fields* (the target lives in the field
-   *  instruction); `relId` for `<w:hyperlink r:id>` elements (resolved
-   *  against the rels table downstream). */
-  | { kind: "hyperlink"; relId?: string; href?: string; runs: ImportedRun[] };
+// Re-exported for existing consumers (paragraph.ts) — the type itself
+// lives beside `ImportedRun` in runs.ts so `fields.ts` can use it without
+// a paragraphs ↔ fields import cycle.
+export type { ImportedItem } from "./runs";
 
 export interface ImportedParagraph {
   /** Items in document order. Hyperlinks contain inner runs. */
