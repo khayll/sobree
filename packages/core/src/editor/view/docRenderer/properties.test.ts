@@ -74,8 +74,15 @@ describe("applyParagraphProps", () => {
     });
   });
 
-  it("line=240 auto → line-height:normal; multi-line scales by natural leading", () => {
-    expect(p({ spacing: { line: 240, lineRule: "auto" } }).style.lineHeight).toBe("normal");
+  it("lineRule=auto scales by natural leading — single (240) included, never CSS `normal`", () => {
+    // Browsers resolve `normal` from per-engine rounded font metrics
+    // (TNR 12pt: 18 / 18.398 / 18.5px across Chromium environments), so
+    // page fill would depend on the viewer's machine. Word single
+    // spacing = the font's design leading: 1.0 × 1.15.
+    expect(Number(p({ spacing: { line: 240, lineRule: "auto" } }).style.lineHeight)).toBeCloseTo(
+      1.15,
+      3,
+    );
     // 360/240 = 1.5 × default leading 1.15 = 1.725
     const el = p({ spacing: { line: 360, lineRule: "auto" } });
     expect(Number(el.style.lineHeight)).toBeCloseTo(1.725, 3);

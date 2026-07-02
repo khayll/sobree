@@ -128,15 +128,17 @@ export function applyParagraphProps(
     // line-rule; we ratio LibreOffice's Δy to the font size and back
     // out the leading.
     //
-    // `line=240` (single) keeps the `normal` shortcut so the browser
-    // uses its own native leading for the font; only multi-line rules
-    // need the explicit `line-height: N` declaration to scale.
-    if (effective.spacing.line === 240) {
-      el.style.lineHeight = "normal";
-    } else {
-      const naturalLeading = naturalLeadingFor(runDefaults.fontFamily);
-      el.style.lineHeight = String((effective.spacing.line / 240) * naturalLeading);
-    }
+    // `line=240` (single) goes through the SAME formula — never CSS
+    // `normal`. Browsers resolve `normal` from rounded font metrics
+    // that differ per engine / OS / device-pixel ratio (Times New
+    // Roman 12pt measured 18px, 18.398px and 18.5px across Chromium
+    // environments), so a page's fill — and therefore its break
+    // positions — silently changed with the viewer's machine. Word and
+    // LibreOffice always lay out single spacing at the font's design
+    // leading (1.15 × 12pt = 13.8pt for Times New Roman, LO-verified),
+    // which is exactly this formula at line=240.
+    const naturalLeading = naturalLeadingFor(runDefaults.fontFamily);
+    el.style.lineHeight = String((effective.spacing.line / 240) * naturalLeading);
   } else if (effective.spacing?.line && effective.spacing.lineRule === "exact") {
     // `exact`: a FIXED line height of `line` twips, independent of the
     // font. Word clips content taller than the box; CSS does the same
