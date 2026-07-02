@@ -206,8 +206,9 @@ Paragraph blocks store content as `Y.Text` (char-level CRDT); other blocks as JS
 
 ### DOCX render fidelity
 
-- The corpus runner (`pnpm corpus:check`) compares each fixture's current rendering against its committed baseline (drift, page count, matched-block ratio) and fails on regression
-- Update baselines explicitly with `pnpm corpus:baseline` when a renderer change is intentional
+- The corpus runner (`pnpm corpus:check`) compares each fixture's import-level rendering against its committed baseline (drift, matched-block ratio) and fails on regression. It never runs the live paginator.
+- The live-paginator gate (`pnpm corpus:pages`) renders each fixture in headless Chromium through the playground and compares page counts + per-page text placement against the LibreOffice reference, gated by committed `baseline/pages.json`. This is the gate that catches page-count and break-position regressions.
+- Update baselines explicitly with `pnpm corpus:baseline` / `pnpm corpus:pages:baseline` when a renderer change is intentional
 - See `tests/corpus/README.md` for fixture layout and contribution rules
 
 ## Verification
@@ -247,12 +248,14 @@ pnpm check                        # Biome format + import-order + lint (errors o
 pnpm test                         # vitest in each package
 pnpm -F "@sobree/docs..." build   # builds core first, then docs (catches MDX errors)
 pnpm corpus:check                 # render fidelity gate (needs `soffice` on PATH)
+pnpm corpus:pages                 # live-paginator gate (needs Playwright Chromium:
+                                  #   pnpm -F @sobree/fixtures-gen exec playwright install chromium)
 pnpm docs:coverage                # new public exports must be documented (ratchet)
 ```
 
-All six green is the gate before any PR. `pnpm check` fails only on
+All seven green is the gate before any PR. `pnpm check` fails only on
 error-severity diagnostics; deliberate `warn` rules and generated data
-(ignored in `biome.json`) don't block — run `pnpm format` to auto-fix. The docs build is non-optional — it's the only thing that catches MDX errors and dead links in content pages. `corpus:check` requires LibreOffice; if you don't have it locally, CI will run it for you.
+(ignored in `biome.json`) don't block — run `pnpm format` to auto-fix. The docs build is non-optional — it's the only thing that catches MDX errors and dead links in content pages. `corpus:check` requires LibreOffice and `corpus:pages` requires Playwright's Chromium; if you don't have them locally, CI will run them for you.
 
 For changes that touch editor visuals (toolbar, indicator, pagination, paper stack, zone editor), spot-check in the **playground** before opening a PR — `pnpm dev` launches it at `localhost:5174`. Tests run in jsdom and don't catch visual regressions.
 

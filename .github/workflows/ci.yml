@@ -107,6 +107,22 @@ jobs:
       - name: Corpus render-fidelity check
         run: pnpm corpus:check
 
+      # Live-paginator gate: renders every fixture in headless Chromium
+      # through the playground and compares page counts + per-page text
+      # placement against the LibreOffice reference, gated by committed
+      # `baseline/pages.json` files. Catches pagination regressions the
+      # AST-level corpus:check can't see. Carlito/Caladea are
+      # metric-compatible with Calibri/Cambria so Chromium's line breaks
+      # match the fonts the baselines were generated with.
+      - name: Install fonts (metric-compatible Calibri/Cambria)
+        run: sudo apt-get install -y --no-install-recommends fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @sobree/fixtures-gen exec playwright install --with-deps chromium
+
+      - name: Corpus live-paginator page gate
+        run: pnpm corpus:pages
+
   release:
     name: version / publish
     # Gate: only after BOTH parallel checks pass.

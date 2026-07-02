@@ -14,6 +14,8 @@
     "corpus:diff": "tsx src/corpus.ts diff",
     "corpus:check": "tsx src/corpus.ts check",
     "corpus:baseline": "tsx src/corpus.ts baseline",
+    "corpus:pages": "tsx src/corpusPages.ts check",
+    "corpus:pages:baseline": "tsx src/corpusPages.ts baseline",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -23,7 +25,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "playwright": "^1.49.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
   }
 }
