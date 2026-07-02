@@ -211,6 +211,54 @@ describe("readParagraph — HYPERLINK fields", () => {
   });
 });
 
+describe("readParagraph — complex fields packed into a single run", () => {
+  const parse = (inner: string) =>
+    readParagraph(
+      new DOMParser().parseFromString(
+        `<?xml version="1.0"?><w:p xmlns:w="${NS_W}">${inner}</w:p>`,
+        "application/xml",
+      ).documentElement,
+    ).items;
+
+  type RunItem = { run: { text: string; field?: { instruction: string; cached?: string } } };
+
+  // ECMA-376 §17.16.18: fldChar / instrText are run CONTENT — an entire
+  // field may live inside ONE <w:r>. Footer generators write exactly
+  // this shape (corpus fixture footer/08-footer-page-numbers).
+  it("reads begin + instrText + separate + end inside one <w:r>", () => {
+    const items = parse(`
+      <w:r><w:t xml:space="preserve">Page </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve">PAGE</w:instrText><w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/></w:r>
+      <w:r><w:t xml:space="preserve"> of </w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve">NUMPAGES</w:instrText><w:fldChar w:fldCharType="separate"/><w:fldChar w:fldCharType="end"/></w:r>`);
+    expect(items).toHaveLength(4);
+    expect((items[0] as RunItem).run.text).toBe("Page ");
+    expect((items[1] as RunItem).run.field).toEqual({ instruction: "PAGE" });
+    expect((items[2] as RunItem).run.text).toBe(" of ");
+    expect((items[3] as RunItem).run.field).toEqual({ instruction: "NUMPAGES" });
+  });
+
+  it("routes literal text inside a field-marked run by boundary position", () => {
+    const items = parse(
+      `<w:r><w:t xml:space="preserve">Page </w:t><w:fldChar w:fldCharType="begin"/><w:instrText>PAGE</w:instrText><w:fldChar w:fldCharType="separate"/><w:t>3</w:t><w:fldChar w:fldCharType="end"/></w:r>`,
+    );
+    expect(items).toHaveLength(2);
+    expect((items[0] as RunItem).run.text).toBe("Page ");
+    expect((items[1] as RunItem).run.field).toEqual({ instruction: "PAGE", cached: "3" });
+  });
+
+  it("still reads the Word shape (one field element per run) unchanged", () => {
+    const items = parse(`
+      <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+      <w:r><w:instrText> PAGE </w:instrText></w:r>
+      <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+      <w:r><w:t>7</w:t></w:r>
+      <w:r><w:fldChar w:fldCharType="end"/></w:r>`);
+    expect(items).toHaveLength(1);
+    expect((items[0] as RunItem).run.field).toEqual({ instruction: "PAGE", cached: "7" });
+  });
+});
+
 describe("convertParagraph — lastRenderedPageBreak position", () => {
   const para = (inner: string): Element =>
     new DOMParser().parseFromString(
