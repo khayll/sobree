@@ -26,9 +26,9 @@ describe("planRightTailTab", () => {
     expect(plan!.before).toEqual([text("ACKNOWLEDGMENT")]);
     expect(plan!.after).toEqual([text("iii")]);
     expect(plan!.leaderFill).toMatch(/^\.+$/);
-    // 9360 twips = 165mm (rounded): the stop sits at the column edge,
-    // so the calc resolves to ~0 in the browser.
-    expect(plan!.tailMarginRight).toBe("calc(100% - 165mm)");
+    // 9360 twips = 165.1mm (sub-twip exact conversion): the stop sits at
+    // the column edge, so the calc resolves to ~0 in the browser.
+    expect(plan!.tailMarginRight).toBe("calc(100% - 165.1mm)");
   });
 
   it("splits inside a single text run carrying the tab", () => {
@@ -52,7 +52,7 @@ describe("planRightTailTab", () => {
       indent: { leftTwips: 720 },
     };
     const plan = planRightTailTab(para([text("Entry\t42")], props), props);
-    expect(plan!.tailMarginRight).toBe("calc(100% - 152mm)"); // (9360-720)tw ≈ 152.4 → 152
+    expect(plan!.tailMarginRight).toBe("calc(100% - 152.4mm)"); // (9360-720)tw = 152.4mm exact
   });
 
   it("carries the first-line indent as before-span margin (flex ignores text-indent)", () => {
@@ -62,10 +62,10 @@ describe("planRightTailTab", () => {
     };
     expect(
       planRightTailTab(para([text("Entry\t42")], firstLine), firstLine)!.beforeMarginLeft,
-    ).toBe("13mm");
+    ).toBe("12.7mm");
     const hanging: ParagraphProperties = { ...RIGHT_DOT_STOP, indent: { hangingTwips: 360 } };
     expect(planRightTailTab(para([text("Entry\t42")], hanging), hanging)!.beforeMarginLeft).toBe(
-      "-6mm",
+      "-6.35mm",
     );
   });
 
