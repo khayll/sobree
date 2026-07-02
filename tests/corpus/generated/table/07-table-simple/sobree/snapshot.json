@@ -24,7 +24,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Header A",
                     },
@@ -39,7 +39,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Header B",
                     },
@@ -54,7 +54,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Header C",
                     },
@@ -75,7 +75,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Cell 1A",
                     },
@@ -90,7 +90,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Cell 1B",
                     },
@@ -105,7 +105,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Cell 1C",
                     },
@@ -126,7 +126,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Cell 2A",
                     },
@@ -141,7 +141,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Cell 2B",
                     },
@@ -156,7 +156,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Cell 2C",
                     },

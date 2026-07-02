@@ -72,7 +72,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Client name",
                     },
@@ -87,7 +87,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "John Doe",
                     },
@@ -108,7 +108,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Address",
                     },
@@ -123,7 +123,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "42 High Street, London",
                     },
@@ -144,7 +144,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Contact",
                     },
@@ -159,7 +159,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "john.doe@example.com",
                     },

@@ -123,7 +123,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Key",
                     },
@@ -138,7 +138,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "Value",
                     },
@@ -165,7 +165,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "alpha",
                     },
@@ -180,7 +180,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "1",
                     },
@@ -201,7 +201,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "beta",
                     },
@@ -216,7 +216,7 @@
                       "attrs": {
                         "data-block-index": "0",
                       },
-                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+                      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt; margin-bottom: 0px;",
                       "tag": "P",
                       "text": "2",
                     },
