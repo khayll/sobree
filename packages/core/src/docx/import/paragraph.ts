@@ -157,7 +157,13 @@ function mapParagraphFormat(f: ParagraphFormat): ParagraphProperties {
   if (f.spacingAfterTwips !== undefined) spacing.afterTwips = f.spacingAfterTwips;
   if (f.spacingBeforeTwips !== undefined) spacing.beforeTwips = f.spacingBeforeTwips;
   if (Object.keys(spacing).length > 0) out.spacing = spacing;
-  if (f.contextualSpacing) out.contextualSpacing = true;
+  if (f.contextualSpacing !== undefined) out.contextualSpacing = f.contextualSpacing;
+  // Pagination flags keep their explicit value (including `false`) — a
+  // direct `<w:keepNext w:val="0"/>` must reach the AST so it overrides
+  // the flag inherited from the style cascade at render time.
+  if (f.keepNext !== undefined) out.keepNext = f.keepNext;
+  if (f.keepLines !== undefined) out.keepLines = f.keepLines;
+  if (f.pageBreakBefore !== undefined) out.pageBreakBefore = f.pageBreakBefore;
   if (f.numId !== undefined) {
     out.numbering = { numId: f.numId, level: f.numLevel ?? 0 };
   }

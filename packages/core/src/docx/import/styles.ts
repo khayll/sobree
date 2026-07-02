@@ -36,7 +36,7 @@ import type {
 } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { readShading } from "../shared/shading";
-import { parseXml, wAll, wFirst, wOnOff, wVal } from "../shared/xml";
+import { parseXml, wAll, wFirst, wToggleOn, wVal } from "../shared/xml";
 import { readParagraphBorders } from "./borders";
 import { readRunProperties } from "./runProperties";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
@@ -397,15 +397,37 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
     if (Object.keys(indent).length > 0) out.indent = indent;
   }
 
-  // <w:pageBreakBefore/> — a CT_OnOff toggle. Honour the explicit-off
-  // form (`w:val="0"`) Word writes in DocDefaults / styles; reading by
-  // presence alone would inherit a page break onto every paragraph.
-  if (wOnOff(pPr, "pageBreakBefore")) out.pageBreakBefore = true;
+  // CT_OnOff pagination flags — TRI-STATE via `wToggleOn` so the style
+  // cascade behaves like Word's:
+  //   - absent            → undefined: inherit the basedOn chain's value;
+  //   - bare / `w:val="1"` → true;
+  //   - `w:val="0"`        → false: a derived style RESETS the flag it
+  //     inherits (e.g. a body style based on a keepNext heading style).
+  // The old presence-only read (`wOnOff` → set only when true) dropped the
+  // explicit-off form, so a child style could never turn these OFF.
+  // Unlike rPr toggles (b/i/caps…) these do NOT XOR across the hierarchy —
+  // pPr flags override leaf-last, which the plain spread merge in
+  // `mergeParagraphDefaults` already implements.
+  const pageBreakBefore = wToggleOn(wFirst(pPr, "pageBreakBefore"));
+  if (pageBreakBefore !== undefined) out.pageBreakBefore = pageBreakBefore;
+
+  // <w:keepNext/> — keep this paragraph on the same page as the next.
+  // Word's built-in heading styles declare it (ACM's `Head2` inherits it
+  // from `Heading2` via basedOn); without reading it here the cascade
+  // never delivers it and the paginator happily strands headings at the
+  // bottom of a page.
+  const keepNext = wToggleOn(wFirst(pPr, "keepNext"));
+  if (keepNext !== undefined) out.keepNext = keepNext;
+
+  // <w:keepLines/> — don't split this paragraph across pages.
+  const keepLines = wToggleOn(wFirst(pPr, "keepLines"));
+  if (keepLines !== undefined) out.keepLines = keepLines;
 
   // <w:contextualSpacing/> — Word's `ListParagraph` style carries this so
   // consecutive bullets render tight; read it off the style cascade too,
   // not just direct paragraph pPr.
-  if (wOnOff(pPr, "contextualSpacing")) out.contextualSpacing = true;
+  const contextualSpacing = wToggleOn(wFirst(pPr, "contextualSpacing"));
+  if (contextualSpacing !== undefined) out.contextualSpacing = contextualSpacing;
 
   // <w:pBdr> — divider rules. Word puts the top/bottom rule of a
   // letterhead/résumé header on a STYLE (e.g. a "Name" style's top rule),

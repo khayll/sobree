@@ -208,3 +208,51 @@ describe("style paragraph borders (<w:pBdr>)", () => {
     expect(styles.find((s) => s.id === "Plain")?.numbering).toBeUndefined();
   });
 });
+
+describe("style pagination flags (<w:keepNext>, <w:keepLines>)", () => {
+  // The ACM submission template's shape: a custom `Head2` based on the
+  // built-in `Heading2`, which declares keepNext/keepLines in its own pPr.
+  // The flags must survive the style reader AND the basedOn cascade, or
+  // the paginator strands headings at the bottom of a page.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="${NS_W}">
+  <w:style w:type="paragraph" w:styleId="Heading2">
+    <w:name w:val="heading 2"/>
+    <w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="40"/></w:pPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Head2">
+    <w:name w:val="Head2"/>
+    <w:basedOn w:val="Heading2"/>
+    <w:pPr><w:spacing w:before="240" w:after="60"/></w:pPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="LoneHead">
+    <w:name w:val="LoneHead"/>
+    <w:basedOn w:val="Heading2"/>
+    <w:pPr><w:keepNext w:val="0"/></w:pPr>
+  </w:style>
+</w:styles>`;
+
+  it("reads keepNext/keepLines off a style pPr", () => {
+    const styles = parseStylesXml(xml)!;
+    const h2 = styles.find((s) => s.id === "Heading2")!;
+    expect(h2.paragraphDefaults?.keepNext).toBe(true);
+    expect(h2.paragraphDefaults?.keepLines).toBe(true);
+  });
+
+  it("delivers keepNext through the basedOn cascade (ACM Head2 → Heading2)", () => {
+    const styles = parseStylesXml(xml)!;
+    const { paragraphDefaults } = resolveStyleCascade(styles, "Head2");
+    expect(paragraphDefaults.keepNext).toBe(true);
+    expect(paragraphDefaults.keepLines).toBe(true);
+    // The derived style's own spacing still wins.
+    expect(paragraphDefaults.spacing?.beforeTwips).toBe(240);
+  });
+
+  it("a derived style's explicit-off RESETS the inherited flag", () => {
+    const styles = parseStylesXml(xml)!;
+    const { paragraphDefaults } = resolveStyleCascade(styles, "LoneHead");
+    expect(paragraphDefaults.keepNext).toBe(false);
+    // keepLines untouched by the override — still inherited.
+    expect(paragraphDefaults.keepLines).toBe(true);
+  });
+});

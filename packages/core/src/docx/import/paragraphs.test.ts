@@ -263,15 +263,54 @@ describe("convertParagraph — contextualSpacing", () => {
     expect(props.contextualSpacing).toBe(true);
   });
 
-  it("honours the explicit-off form so a style turning it off wins", () => {
+  it("records the explicit-off form as false so it overrides a style's on", () => {
+    // Tri-state: `w:val="0"` is a definite "off" that must reach the AST —
+    // the renderer merges direct props OVER the style cascade, so `false`
+    // beats a `contextualSpacing` the paragraph's style turns on. The old
+    // presence-only read dropped it (undefined = inherit = wrong).
     const props = convert(
       `<w:pPr><w:contextualSpacing w:val="0"/></w:pPr><w:r><w:t>x</w:t></w:r>`,
     ).properties;
-    expect(props.contextualSpacing).toBeUndefined();
+    expect(props.contextualSpacing).toBe(false);
   });
 
   it("leaves it unset when absent", () => {
     expect(convert("<w:r><w:t>x</w:t></w:r>").properties.contextualSpacing).toBeUndefined();
+  });
+});
+
+describe("convertParagraph — pagination flags (keepNext / keepLines / pageBreakBefore)", () => {
+  const para = (inner: string): Element =>
+    new DOMParser().parseFromString(
+      `<?xml version="1.0"?><w:p xmlns:w="${NS_W}">${inner}</w:p>`,
+      "application/xml",
+    ).documentElement;
+  const convert = (inner: string) =>
+    convertParagraph(para(inner), { rels: new Map(), honorLastRenderedPageBreaks: false });
+
+  it("reads the flags off the direct pPr", () => {
+    const props = convert(
+      "<w:pPr><w:keepNext/><w:keepLines/><w:pageBreakBefore/></w:pPr><w:r><w:t>x</w:t></w:r>",
+    ).properties;
+    expect(props.keepNext).toBe(true);
+    expect(props.keepLines).toBe(true);
+    expect(props.pageBreakBefore).toBe(true);
+  });
+
+  it("records explicit-off as false (direct override of a style's flag)", () => {
+    // One heading allowed to sit at a page bottom despite its style's
+    // keepNext: `<w:keepNext w:val="0"/>` must reach the AST as `false`.
+    const props = convert(
+      `<w:pPr><w:keepNext w:val="0"/></w:pPr><w:r><w:t>x</w:t></w:r>`,
+    ).properties;
+    expect(props.keepNext).toBe(false);
+  });
+
+  it("leaves absent flags unset (inherit from the style cascade)", () => {
+    const props = convert("<w:r><w:t>x</w:t></w:r>").properties;
+    expect(props.keepNext).toBeUndefined();
+    expect(props.keepLines).toBeUndefined();
+    expect(props.pageBreakBefore).toBeUndefined();
   });
 });
 

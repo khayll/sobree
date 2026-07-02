@@ -336,6 +336,11 @@ function paragraphLineItems(p: HTMLElement, pid: string): DomItem[] {
   // paginator forbids breaking between the paragraph and what follows
   // it. Mirrors how h1-h6 implicitly get keepWithNext via extraFlagsFor.
   const keepNext = p.hasAttribute("data-keep-next");
+  // `data-keep-together` (Word's `<w:keepLines/>`) marks every line box
+  // so the engine keeps the paragraph's lines on one page (whole-fit
+  // check in fillPage + in-paragraph break penalty), while the paragraph
+  // keeps its line-level metadata — unlike the monolithic group path.
+  const keepTogether = p.hasAttribute("data-keep-together");
   if (lines.length <= 1) {
     return [
       singleBox(p, {
@@ -343,6 +348,7 @@ function paragraphLineItems(p: HTMLElement, pid: string): DomItem[] {
         isFirstLineOfParagraph: true,
         isLastLineOfParagraph: true,
         ...(keepNext ? { keepWithNext: true } : {}),
+        ...(keepTogether ? { keepTogether: true } : {}),
       }),
     ];
   }
@@ -360,6 +366,7 @@ function paragraphLineItems(p: HTMLElement, pid: string): DomItem[] {
       lineIndex: i,
       totalLines: lines.length,
       ...(isLast && keepNext ? { keepWithNext: true } : {}),
+      ...(keepTogether ? { keepTogether: true } : {}),
     };
     out.push(box);
     if (i < lines.length - 1) out.push({ type: "glue", height: 0 });
@@ -386,6 +393,10 @@ function extraFlagsFor(el: HTMLElement): Partial<DomBox> {
   // paragraph properties (or its resolved style cascade) say so. Matches
   // Word's `<w:keepNext/>` semantics.
   if (el.hasAttribute("data-keep-next")) flags.keepWithNext = true;
+  // keepLines on a heading (`<hN>` renders as one box, so keepTogether
+  // is effectively a no-op today) — recorded for consistency with the
+  // paragraph-line path.
+  if (el.hasAttribute("data-keep-together")) flags.keepTogether = true;
   if (tag === "pre") flags.monolithic = true;
   return flags;
 }
@@ -421,6 +432,14 @@ function hasPageBreakBefore(el: HTMLElement): boolean {
 }
 
 function isKeepTogetherGroup(el: HTMLElement): boolean {
+  // Paragraph-like elements are NEVER keep-together GROUPS: their
+  // `data-keep-together` (Word's `<w:keepLines/>`) is expressed as a
+  // `keepTogether` flag on their line boxes instead, so the paragraph
+  // KEEPS its `paragraphId` / `keepWithNext` / widow-orphan metadata.
+  // Collapsing a heading to a monolithic group box here silently
+  // discarded its keepNext — Word's heading styles declare keepNext
+  // AND keepLines together, so every heading was affected.
+  if (/^(P|H[1-6])$/.test(el.tagName)) return false;
   if (el.tagName === "FIGURE") return true;
   if (el.classList.contains("keep-together")) return true;
   if (el.hasAttribute("data-keep-together")) return true;
