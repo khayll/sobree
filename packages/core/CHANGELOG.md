@@ -1,5 +1,56 @@
 # @sobree/core
 
+## 0.1.50
+
+### Patch Changes
+
+- 49f44eb: Table cells drop the space-after of their LAST block — the semantic rule
+  Word and LibreOffice apply (LO's Word-compat "AddParaTableSpacing") —
+  replacing the value-matching tightener that zeroed only margins equal to
+  the 240-twip default. The heuristic missed other document defaults
+  (nih-icsc's 200-twip after-spacing kept ~13px on 100+ single-paragraph
+  table rows — 2 extra pages vs LibreOffice) and its companion line-height
+  clamp (1.05–1.29 → 1) started mis-firing on every cell paragraph once
+  explicit natural-leading line-heights landed. Inter-block spacing inside
+  cells is preserved as authored.
+- d7ec740: Complex fields (`w:fldChar`/`w:instrText`) are read child-by-child
+  within each run — per ECMA-376 they are run CONTENT, and producers may
+  legally pack a whole field (begin + instruction + separate + end) into
+  one run. Packed PAGE/NUMPAGES footers ("Page 1 of 2") previously lost
+  the instruction and swallowed neighbouring literal runs.
+- d7ec740: Charge Word's real page-fill budget after hard breaks: only the
+  broken-to paragraph's own space-before starts the new page (the
+  previous paragraph's space-after dies at the old page bottom), box
+  heights and inter-block gaps measure sub-pixel instead of integer px,
+  and twip→mm conversion is sub-twip exact (no ±0.5mm distortion per
+  spacing value). Thesis title pages that spilled a line onto an extra
+  page now break where LibreOffice does.
+- d7ec740: Right-aligned tab stops render TOC-style "entry … page number" lines:
+  the tail right-aligns at the stop position and the gap fills with the
+  stop's `w:leader` glyphs (dot/hyphen/underscore/middleDot/heavy) on the
+  text baseline. Style-declared `<w:tabs>` now reach the cascade (Word's
+  built-in TOC styles put the stop on the STYLE). Previously the stop was
+  treated as a left tab, wrapping every TOC entry's page number onto a
+  second line.
+- d2f5da7: Render single line spacing (`lineRule="auto"`, `line=240`) at the font's
+  natural leading instead of CSS `line-height: normal`. Browsers resolve
+  `normal` from rounded font metrics that differ per engine, OS and device
+  pixel ratio (Times New Roman 12pt measured 18px, 18.398px and 18.5px
+  across Chromium environments), so page fill — and page break positions —
+  silently changed with the viewer's machine. Word and LibreOffice always
+  lay out single spacing at the font's design leading (1.15 × font size,
+  e.g. 13.8pt for 12pt Times New Roman), which is the same formula every
+  other `auto` multiplier already used. Pagination is now deterministic
+  across environments; gatech-thesis-template's live page count converges
+  to LibreOffice's (23 = 23).
+- 776c5aa: Tab-spread layouts keep the separator characters in the document text.
+  The flex spread that lays out "label<tab>value" / TOC leader lines
+  consumed the tab (or space run) entirely, corrupting the paragraph's
+  text: copying a line yielded "labelvalue", the DOM→AST serializer lost
+  the separator, and text-level comparisons unmatched every spread line.
+  The characters now live in a zero-width span inside the spread — the
+  flex layout still carries the geometry, the text carries the document.
+
 ## 0.1.49
 
 ### Patch Changes
