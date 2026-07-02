@@ -2,7 +2,7 @@
  * Render a `Paragraph` block to a `<p>` / `<h1..6>` element: heading
  * tag selection, paragraph-property CSS (delegated to properties.ts),
  * dominant-run font cascade, leading column-break hoist, inline runs,
- * and single-tab "label \t value" right-spread.
+ * and tab-stop layouts (delegated to tabLayout.ts).
  */
 
 import type { NamedStyle, Paragraph } from "../../../doc/types";
@@ -10,6 +10,7 @@ import { headingLevelOf } from "../../../doc/walk";
 import { resolveFontFace } from "./fontFallback";
 import { appendInlineRuns } from "./inline";
 import { type ContextualNeighbors, applyParagraphProps } from "./properties";
+import { planRightTailTab, splitForTabSpread } from "./tabLayout";
 
 export function renderParagraph(
   p: Paragraph,
@@ -29,7 +30,12 @@ export function renderParagraph(
   const isEmpty = p.runs.length === 0 || p.runs.every((r) => (r.kind === "text" ? !r.text : false));
   const tag = level && !isEmpty ? `h${level}` : "p";
   const el = document.createElement(tag);
-  const paraRunDefaults = applyParagraphProps(el, p.properties, styles, contextualNeighbors);
+  const { runDefaults: paraRunDefaults, effective } = applyParagraphProps(
+    el,
+    p.properties,
+    styles,
+    contextualNeighbors,
+  );
   // Cascade the dominant text run's font onto the paragraph itself when
   // the paragraph has no explicit font from style cascade. CSS unitless
   // line-height computes against the element's own font-size — if the
@@ -59,14 +65,24 @@ export function renderParagraph(
   if (paragraphContainsPageBreak(p)) {
     el.setAttribute("data-page-break-before", "");
   }
-  // Tab-spread: a paragraph with exactly one tab between two text
-  // groups renders as a flex row (via the `sobree-tab-spread` CSS
-  // class) so the after-tab content right-aligns to the margin —
-  // Word's right-tab-stop behaviour for header label/value lines.
-  // The tab run itself is dropped; the two sides become labelled
-  // spans the CSS pushes apart with `justify-content: space-between`.
-  // Paragraphs that don't match fall through to the normal inline render.
-  const split = splitForTabSpread(p);
+  // Tab layouts (tabLayout.ts owns the semantics; this block only
+  // assembles the DOM):
+  //
+  // 1. Right-tail: "entry text `\t` page number" against a trailing
+  //    right-aligned stop (TOC lines). The tab character is consumed
+  //    by the layout; the tail right-aligns at the stop and the gap is
+  //    filled with the stop's leader glyphs. Without this, `tab-size`
+  //    treats the right stop as a LEFT stop — the single tab eats the
+  //    full line width and the page number wraps, doubling every TOC
+  //    entry's height.
+  // 2. Space-gap spread: header label/value lines where the gap is a
+  //    run of literal spaces (no tab character to key on).
+  //
+  // Both drop the separator (tab / spaces) from the DOM, so a DOM→AST
+  // serialize of an edited line loses it — accepted since the spread's
+  // flex layout, not the character, carries the geometry.
+  const rightTail = planRightTailTab(p, effective);
+  const split = rightTail ?? splitForTabSpread(p);
   if (split) {
     el.classList.add("sobree-tab-spread");
     const before = document.createElement("span");
@@ -75,59 +91,26 @@ export function renderParagraph(
     const after = document.createElement("span");
     after.className = "sobree-tab-spread__after";
     appendInlineRuns(after, split.after, rawParts, styles, paraRunDefaults);
+    if (rightTail) {
+      after.style.marginRight = rightTail.tailMarginRight;
+      if (rightTail.beforeMarginLeft) before.style.marginLeft = rightTail.beforeMarginLeft;
+      if (rightTail.leaderFill) {
+        // Synthetic view-only fill: non-editable (the serializer skips
+        // contenteditable=false chrome) and hidden from the a11y tree.
+        const leader = document.createElement("span");
+        leader.className = "sobree-tab-spread__leader";
+        leader.setAttribute("contenteditable", "false");
+        leader.setAttribute("aria-hidden", "true");
+        leader.textContent = rightTail.leaderFill;
+        el.append(before, leader, after);
+        return el;
+      }
+    }
     el.append(before, after);
   } else {
     appendInlineRuns(el, p.runs, rawParts, styles, paraRunDefaults);
   }
   return el;
-}
-
-/**
- * Detect the "label … <gap> … value" spread and split the runs into
- * before / after groups, dropping the gap runs.
- *
- * Word emits the gap of a right-tab-stop header line (e.g.
- * "YOUR NAME      GitHub: link") as a maximal run of pure-SPACE text
- * runs (`" "`), NOT as a `<w:tab/>` element — so the separator we look
- * for is the first consecutive group of space-only runs. A literal
- * tab CHARACTER inside a text run (`"\t"`) is treated as content, not
- * a separator (it stays in the before-side span), matching the
- * dotted-leader header lines where the `\t` precedes the gap space.
- *
- * Returns `null` for paragraphs without such a gap, or where either
- * side lacks real text — those render inline normally.
- */
-function splitForTabSpread(
-  p: Paragraph,
-): { before: Paragraph["runs"]; after: Paragraph["runs"] } | null {
-  // Only header label/value lines built on a right tab stop spread.
-  // The signal is a declared custom tab stop (`<w:pPr><w:tabs>`):
-  // Word fills the stop's gap with a run of spaces, which we collapse
-  // into the flex space-between. Paragraphs WITHOUT a tab stop keep
-  // their standalone space runs verbatim (a normal sentence can carry
-  // an isolated `" "` run — splitting those would wrongly reflow body
-  // text, as seen on lease-agreement / mit-template).
-  if (!p.properties.tabStops || p.properties.tabStops.length === 0) return null;
-  const isSpaceRun = (r: Paragraph["runs"][number]): boolean =>
-    r.kind === "text" && /^ +$/.test(r.text);
-  // Locate the FIRST maximal group of consecutive space-only runs.
-  let sepStart = -1;
-  let sepEnd = -1;
-  for (let i = 0; i < p.runs.length; i++) {
-    if (isSpaceRun(p.runs[i]!)) {
-      if (sepStart === -1) sepStart = i;
-      sepEnd = i;
-    } else if (sepStart !== -1) {
-      break;
-    }
-  }
-  if (sepStart === -1) return null;
-  const before = p.runs.slice(0, sepStart);
-  const after = p.runs.slice(sepEnd + 1);
-  const hasText = (runs: Paragraph["runs"]) =>
-    runs.some((r) => r.kind === "text" && r.text.trim().length > 0);
-  if (!hasText(before) || !hasText(after)) return null;
-  return { before, after };
 }
 
 /** True when any run in the paragraph is an explicit page break. */

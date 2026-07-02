@@ -11,7 +11,7 @@
  *   - `<w:style>` rPr → RunProperties: `rFonts.ascii`, `sz` (half-pts),
  *     `b`, `i`, `u`, `color`, `vertAlign`.
  *   - `<w:style>` pPr → ParagraphProperties: `jc`, `spacing.{line,
- *     lineRule, before, after}`, `ind.{left, right}`.
+ *     lineRule, before, after}`, `ind.{left, right}`, `tabs`.
  *   - `<w:basedOn>`, `<w:next>`, `<w:name>`.
  *   - `<w:docDefaults>` is folded into a synthetic Normal-basis
  *     style — anything unspecified there falls through to Word's
@@ -40,6 +40,7 @@ import { parseXml, wAll, wFirst, wToggleOn, wVal } from "../shared/xml";
 import { readParagraphBorders } from "./borders";
 import { readRunProperties } from "./runProperties";
 import { type DocSettings, shouldApplyAutoSpacing } from "./settings";
+import { readTabStops } from "./tabStops";
 import { readTableStyle } from "./tableStyle";
 
 /**
@@ -434,6 +435,13 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
   // so read it here too, not just on direct paragraphs.
   const borders = readParagraphBorders(pPr);
   if (borders) out.borders = borders;
+
+  // <w:tabs> — TOC/heading styles commonly declare their leader-tab
+  // stops on the style pPr (e.g. Word's built-in TOC1 carries the
+  // right-aligned dot-leader stop); without reading them here the
+  // renderer's tab layout never sees the stop for styled paragraphs.
+  const tabStops = readTabStops(pPr);
+  if (tabStops) out.tabStops = tabStops;
 
   // <w:shd w:val="clear" w:fill="…"/> — paragraph background colour.
   const shading = readShading(pPr);

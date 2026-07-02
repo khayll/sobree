@@ -147,7 +147,7 @@ describe("applyParagraphProps", () => {
       },
     ];
     const el = doc.createElement("p");
-    const runDefaults = applyParagraphProps(el, { styleId: "Heading1" }, styles);
+    const { runDefaults } = applyParagraphProps(el, { styleId: "Heading1" }, styles);
     // Non-toggle fields inherit from the block element.
     expect(el.style.fontFamily).toContain("Cambria");
     expect(el.style.color).toBe("rgb(46, 116, 181)");
