@@ -252,7 +252,18 @@ function stripEllipsis(text: string): string {
 }
 
 function normalize(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+  // Tab-leader fills are DECORATION, not text: LO's PDF extraction
+  // renders a TOC line's dot leader as literal ASCII periods
+  // ("ACKNOWLEDGMENT......iii") while Sobree's document text carries
+  // the tab character ("ACKNOWLEDGMENT\tiii"). Collapse ASCII-dot runs
+  // (4+ so real prose "..." survives) to a space so both sides compare
+  // on the semantic content — entry text and page number. U+2026
+  // ellipsis runs are NOT collapsed: templates use them as real text
+  // (google-modern's "…………" placeholder rules).
+  return text
+    .replace(/\.{4,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
