@@ -31,14 +31,13 @@ export interface ParagraphProperties {
   keepLines?: boolean;
   /** Insert a page break before this paragraph. */
   pageBreakBefore?: boolean;
-  /** Custom tab stops from `<w:pPr><w:tabs>`, positions in twips. The
-   *  renderer uses the smallest stop's position to compute a CSS
-   *  `tab-size` on the paragraph so `\t` characters in the text honour
-   *  the document's tab geometry instead of the browser's 8-char
-   *  default. Mixed alignments (right / decimal / leader) collapse to
-   *  "left" for now — covering the common case (label-value columns
-   *  in headers + form fields). */
-  tabStops?: readonly { positionTwips: number; alignment: string; leader?: string }[];
+  /** Custom tab stops from `<w:tabs>` (direct `<w:pPr>` or the style
+   *  cascade), positions in twips. The renderer's tab-layout module
+   *  (`docRenderer/tabLayout.ts`) owns their interpretation: a trailing
+   *  right-aligned stop renders as a right-aligned tail with optional
+   *  leader fill; remaining cases approximate via CSS `tab-size` from
+   *  the smallest stop's position. */
+  tabStops?: readonly TabStop[];
   /** Default run properties applied to runs that don't override. */
   runDefaults?: RunProperties;
   /**
@@ -60,6 +59,19 @@ export interface ParagraphProperties {
    * authoring path (via `Editor.splitBlock` in track-changes mode).
    */
   revision?: RevisionMark;
+}
+
+/**
+ * One `<w:tab>` stop (ECMA-376 §17.3.1.37). `positionTwips` is measured
+ * from the leading text margin. `alignment` is the raw `w:val`
+ * ("left" / "center" / "right" / "decimal" / "bar" / "clear" / …);
+ * `leader` is the raw `w:leader` fill ("dot" / "hyphen" / "underscore" /
+ * "middleDot" / "heavy") when present.
+ */
+export interface TabStop {
+  positionTwips: number;
+  alignment: string;
+  leader?: string;
 }
 
 export type ParagraphAlignment =

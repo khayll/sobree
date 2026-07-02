@@ -30,12 +30,22 @@ export interface ContextualNeighbors {
   nextSameStyle: boolean;
 }
 
+/** Result of {@link applyParagraphProps}: the run defaults for per-run
+ *  toggle resolution, plus the cascade-resolved paragraph properties so
+ *  callers that need the effective values (e.g. the tab-layout planner
+ *  reading style-cascaded `tabStops` / `indent`) don't re-run the
+ *  cascade. */
+export interface AppliedParagraphProps {
+  runDefaults: RunProperties;
+  effective: ParagraphProperties;
+}
+
 export function applyParagraphProps(
   el: HTMLElement,
   props: ParagraphProperties,
   styles: readonly NamedStyle[] = [],
   contextualNeighbors: ContextualNeighbors = { prevSameStyle: false, nextSameStyle: false },
-): RunProperties {
+): AppliedParagraphProps {
   // Resolve the style cascade for both run + paragraph defaults, then
   // overlay the paragraph's own properties so explicit settings win on
   // conflict.
@@ -251,7 +261,7 @@ export function applyParagraphProps(
   }
   // The resolved run defaults are the base for per-run toggle resolution in
   // `renderTextRun` — returned so callers can thread them into the run walk.
-  return runDefaults;
+  return { runDefaults, effective };
 }
 
 /**

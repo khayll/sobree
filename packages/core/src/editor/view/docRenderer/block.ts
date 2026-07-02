@@ -174,7 +174,7 @@ export function renderBlocks(
       if (id) li.setAttribute(BLOCK_ID_ATTR, id);
       li.dataset.sectionIndex = String(sectionIndex);
       li.dataset.blockIndex = String(i);
-      const liRunDefaults = applyParagraphProps(
+      const { runDefaults: liRunDefaults } = applyParagraphProps(
         li,
         (block as Paragraph).properties,
         styles,

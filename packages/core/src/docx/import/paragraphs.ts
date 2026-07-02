@@ -6,6 +6,7 @@ import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
 import { readRunProperties } from "./runProperties";
 import { type ImportedRun, readRun } from "./runs";
+import { readTabStops } from "./tabStops";
 
 /** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
 export type ImportedItem =
@@ -381,29 +382,9 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
   // determine where each `<w:tab/>` advances the cursor — critical for
   // Word headers like jellap.docx where "Cím:" + tab lands at column
   // ~30pt for the value. We store the raw stops on the AST; the
-  // renderer translates them into CSS (tab-size on the paragraph for
-  // even spacing, or absolute positions via inline-block stops for
-  // mixed layouts).
-  const tabsEl = wFirst(pPr, "tabs");
-  if (tabsEl) {
-    const stops: { positionTwips: number; alignment: string; leader?: string }[] = [];
-    for (const tab of Array.from(tabsEl.children)) {
-      if (tab.namespaceURI !== tabsEl.namespaceURI || tab.localName !== "tab") continue;
-      const posAttr = tab.getAttributeNS(tab.namespaceURI, "pos") ?? tab.getAttribute("w:pos");
-      const valAttr = tab.getAttributeNS(tab.namespaceURI, "val") ?? tab.getAttribute("w:val");
-      const leaderAttr =
-        tab.getAttributeNS(tab.namespaceURI, "leader") ?? tab.getAttribute("w:leader");
-      if (posAttr === null) continue;
-      const pos = Number(posAttr);
-      if (!Number.isFinite(pos)) continue;
-      stops.push({
-        positionTwips: pos,
-        alignment: valAttr ?? "left",
-        ...(leaderAttr ? { leader: leaderAttr } : {}),
-      });
-    }
-    if (stops.length > 0) format.tabStops = stops;
-  }
+  // renderer's tab-layout module translates them into CSS.
+  const tabStops = readTabStops(pPr);
+  if (tabStops) format.tabStops = tabStops;
 
   // <w:ind w:left="..." w:right="..." w:firstLine="..." w:hanging="..."/>
   // Paragraph indentation in twips (1/1440 inch). The renderer applies

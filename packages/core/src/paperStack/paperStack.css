@@ -429,6 +429,19 @@
   white-space: pre-wrap;
   min-width: 0;
 }
+/* Right-tab-stop leader ("entry ..... page number"): the span carries
+ * the stop's `w:leader` glyph repeated to capacity; real text glyphs —
+ * not a border or gradient — so the fill sits on the text baseline and
+ * scales with the paragraph font, matching how Word draws leaders.
+ * flex-basis 0 + min-width 0 make it absorb EXACTLY the free space
+ * between entry and page number; overflow clips the surplus glyphs. */
+.paper-content .sobree-tab-spread .sobree-tab-spread__leader {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: none;
+}
 
 /* Hidden text (`<w:vanish/>`). Print-faithful default: not shown, takes no
  * space — matching Word/LibreOffice print output. The `setShowHiddenText`

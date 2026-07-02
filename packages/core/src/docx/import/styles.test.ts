@@ -174,6 +174,23 @@ describe("style paragraph borders (<w:pBdr>)", () => {
     });
   });
 
+  it("reads a style's <w:tabs> into the cascade (TOC leader stops)", () => {
+    // Word's built-in TOC styles declare the right-aligned dot-leader
+    // stop on the STYLE pPr, not on each paragraph; dropping it here
+    // meant styled TOC lines never reached the right-tail tab layout.
+    const xml = `<?xml version="1.0"?><w:styles xmlns:w="${NS_W}">
+      <w:style w:type="paragraph" w:styleId="TOC1">
+        <w:pPr><w:tabs>
+          <w:tab w:val="right" w:leader="dot" w:pos="9360"/>
+        </w:tabs></w:pPr>
+      </w:style>
+    </w:styles>`;
+    const styles = parseStylesXml(xml)!;
+    expect(resolveStyleCascade(styles, "TOC1").paragraphDefaults.tabStops).toEqual([
+      { positionTwips: 9360, alignment: "right", leader: "dot" },
+    ]);
+  });
+
   it("keeps color='auto' on a style so it OVERRIDES an inherited colour", () => {
     // Bug: color="auto" was dropped, so a heading style based on the
     // built-in blue Heading1 inherited the blue instead of resetting to

@@ -55,7 +55,7 @@ export interface ParagraphFormat {
   /** Custom tab stops from `<w:pPr><w:tabs>` — positions in twips,
    *  alignment ("left" / "center" / "right" / "decimal"), and optional
    *  leader (dots / dashes / etc.). Translated to CSS by the renderer. */
-  tabStops?: { positionTwips: number; alignment: string; leader?: string }[];
+  tabStops?: import("../doc/types").TabStop[];
   /** Font properties of the paragraph mark itself, from
    *  `<w:pPr><w:rPr>`. Used by the renderer to size the paragraph's
    *  line height when there are no inline runs to provide a font. */
