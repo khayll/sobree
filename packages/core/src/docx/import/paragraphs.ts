@@ -4,17 +4,15 @@ import { ooxmlLineHeightToCss } from "../shared/units";
 import { wChildren, wFirst, wToggleOn, wVal } from "../shared/xml";
 import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
+import { ComplexFieldCollector } from "./fields";
 import { readRunProperties } from "./runProperties";
-import { type ImportedRun, readRun } from "./runs";
+import { type ImportedItem, type ImportedRun, readRun } from "./runs";
 import { readTabStops } from "./tabStops";
 
-/** Source-order paragraph item: either a flat run or a hyperlink-wrapped group. */
-export type ImportedItem =
-  | { kind: "run"; run: ImportedRun }
-  /** `href` is set for HYPERLINK *fields* (the target lives in the field
-   *  instruction); `relId` for `<w:hyperlink r:id>` elements (resolved
-   *  against the rels table downstream). */
-  | { kind: "hyperlink"; relId?: string; href?: string; runs: ImportedRun[] };
+// Re-exported for existing consumers (paragraph.ts) — the type itself
+// lives beside `ImportedRun` in runs.ts so `fields.ts` can use it without
+// a paragraphs ↔ fields import cycle.
+export type { ImportedItem } from "./runs";
 
 export interface ImportedParagraph {
   /** Items in document order. Hyperlinks contain inner runs. */
@@ -69,113 +67,24 @@ function collectParagraphChildren(
   revision: ImportedRun["revision"],
   activeComments: Set<number>,
 ): void {
-  // Complex-field state tracking. Word writes PAGE/NUMPAGES fields as:
-  //
-  //   <w:r><w:fldChar w:fldCharType="begin"/></w:r>
-  //   <w:r><w:instrText> PAGE </w:instrText></w:r>
-  //   <w:r><w:fldChar w:fldCharType="separate"/></w:r>
-  //   <w:r><w:t>1</w:t></w:r>   ← cached display value
-  //   <w:r><w:fldChar w:fldCharType="end"/></w:r>
-  //
-  // We swallow everything between `begin` and `end`, accumulate the
-  // instruction text + cached value, then emit ONE FieldRun. Without
-  // this, the footer in complex-multipage.docx shows "Page 1 of 16"
-  // baked into every page (the source's cached value) instead of the
-  // live per-paper substitution `<span class="sobree-field">` enables.
-  let fieldState: "before" | "code" | "result" = "before";
-  let fieldInstr = "";
-  let fieldCached = "";
-  let fieldResultRuns: ImportedRun[] = [];
-
-  const flushField = () => {
-    if (fieldState === "before") return;
-    const instruction = fieldInstr.trim();
-    // A HYPERLINK field IS a hyperlink — same semantics as
-    // `<w:hyperlink r:id>`, just with the target in the instruction and
-    // the link text in the RESULT runs. Normalise it to a hyperlink item
-    // so the link renders as an anchor with the result runs' own
-    // formatting (their rStyle gives Word's underline/colour). Collapsing
-    // it to a FieldRun (the PAGE/NUMPAGES shape) discarded all of that —
-    // links rendered as unstyled plain text.
-    const href = parseHyperlinkInstruction(instruction);
-    if (href !== null && fieldResultRuns.length > 0) {
-      out.push({ kind: "hyperlink", href, runs: fieldResultRuns });
-    } else {
-      const run: ImportedRun = {
-        text: "",
-        format: {},
-        isHardBreak: false,
-        field: fieldCached !== "" ? { instruction, cached: fieldCached } : { instruction },
-      };
-      if (revision) run.revision = revision;
-      if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
-      out.push({ kind: "run", run });
-    }
-    fieldState = "before";
-    fieldInstr = "";
-    fieldCached = "";
-    fieldResultRuns = [];
+  const tag = (run: ImportedRun): ImportedRun => {
+    if (revision) run.revision = revision;
+    if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
+    return run;
   };
+
+  // Complex fields (PAGE / NUMPAGES / HYPERLINK …) — the collector owns
+  // the fldChar begin/separate/end state machine; see `fields.ts`.
+  const fields = new ComplexFieldCollector((item) => out.push(item), tag);
 
   for (const child of Array.from(container.children)) {
     if (child.namespaceURI !== NS.w) continue;
     if (child.localName === "r") {
-      // Probe for field-char boundary / instrText inside this run.
-      const fldChar = wFirst(child, "fldChar");
-      const instrText = wFirst(child, "instrText");
-      if (fldChar) {
-        const type =
-          fldChar.getAttributeNS(NS.w, "fldCharType") ?? fldChar.getAttribute("w:fldCharType");
-        if (type === "begin") {
-          // Flush any previously-open malformed field first.
-          flushField();
-          fieldState = "code";
-          continue;
-        }
-        if (type === "separate") {
-          fieldState = "result";
-          continue;
-        }
-        if (type === "end") {
-          flushField();
-          continue;
-        }
-      }
-      if (instrText && fieldState === "code") {
-        fieldInstr += instrText.textContent ?? "";
-        continue;
-      }
-      if (fieldState === "result") {
-        // Accumulate the cached display text (the renderer substitutes
-        // PAGE/NUMPAGES live from `field.instruction`) AND keep the
-        // fully-read result runs — a HYPERLINK field's flush emits them
-        // as the link's children, formatting intact.
-        const t = wFirst(child, "t");
-        if (t) fieldCached += t.textContent ?? "";
-        const resultRun = readRun(child);
-        if (revision) resultRun.revision = revision;
-        if (activeComments.size > 0) resultRun.commentIds = Array.from(activeComments);
-        fieldResultRuns.push(resultRun);
-        continue;
-      }
-      if (fieldState === "code") {
-        // Inside the instruction zone — instructions can split across
-        // runs (Word sometimes adds a stray empty run). Skip non-
-        // instrText runs to keep the field together.
-        continue;
-      }
-      const run = readRun(child);
-      if (revision) run.revision = revision;
-      if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
-      out.push({ kind: "run", run });
+      if (fields.handleRun(child)) continue;
+      out.push({ kind: "run", run: tag(readRun(child)) });
     } else if (child.localName === "hyperlink") {
       const relId = child.getAttributeNS(NS.r, "id") ?? child.getAttribute("r:id") ?? undefined;
-      const runs = wChildren(child, "r").map((r) => {
-        const run = readRun(r);
-        if (revision) run.revision = revision;
-        if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
-        return run;
-      });
+      const runs = wChildren(child, "r").map((r) => tag(readRun(r)));
       out.push({ kind: "hyperlink", ...(relId ? { relId } : {}), runs });
     } else if (child.localName === "sdt") {
       // Run-level content control (`<w:sdt>` INSIDE a paragraph — e.g.
@@ -213,35 +122,12 @@ function collectParagraphChildren(
         field:
           cachedText !== "" ? { instruction: instr, cached: cachedText } : { instruction: instr },
       };
-      if (revision) run.revision = revision;
-      if (activeComments.size > 0) run.commentIds = Array.from(activeComments);
-      out.push({ kind: "run", run });
+      out.push({ kind: "run", run: tag(run) });
     }
     // pPr / commentReference (the balloon-icon run) handled by the
     // caller or silently dropped — the highlighted range carries the
     // visual signal, so the reference glyph is redundant.
   }
-}
-
-/**
- * Extract the target of a `HYPERLINK` field instruction, or `null` when
- * the instruction is some other field.
- *
- *   HYPERLINK "https://x.y"            → https://x.y
- *   HYPERLINK \l "bookmark"            → #bookmark
- *   HYPERLINK "https://x.y" \l "frag"  → https://x.y#frag
- *
- * Switches like `\o "tooltip"` are ignored. (ECMA-376 §17.16.5.25.)
- */
-function parseHyperlinkInstruction(instruction: string): string | null {
-  if (!/^\s*HYPERLINK\b/i.test(instruction)) return null;
-  const rest = instruction.replace(/^\s*HYPERLINK\b/i, "");
-  const anchor = /\\l\s+"([^"]*)"/.exec(rest);
-  // The first quoted string NOT belonging to a switch is the target URL.
-  const target = /(?:^|[^\\\w])\s*"([^"]*)"/.exec(rest.replace(/\\\w\s+"[^"]*"/g, ""));
-  if (target?.[1]) return anchor?.[1] ? `${target[1]}#${anchor[1]}` : target[1];
-  if (anchor?.[1]) return `#${anchor[1]}`;
-  return null;
 }
 
 function readCommentId(el: Element): number | null {
