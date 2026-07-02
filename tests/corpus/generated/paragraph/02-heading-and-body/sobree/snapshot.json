@@ -5,7 +5,7 @@
         "data-block-index": "0",
         "data-keep-next": "",
       },
-      "style": "font-family: "Calibri Light", Carlito, "Helvetica Neue", "Helvetica Light", Helvetica, Arial, sans-serif; font-size: 16pt; color: rgb(46, 116, 181); line-height: normal; margin-top: 4.233mm; margin-bottom: 0mm;",
+      "style": "font-family: "Calibri Light", Carlito, "Helvetica Neue", "Helvetica Light", Helvetica, Arial, sans-serif; font-size: 16pt; color: rgb(46, 116, 181); line-height: 1.15; margin-top: 4.233mm; margin-bottom: 0mm;",
       "tag": "H1",
       "text": "Section title",
     },
