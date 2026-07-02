@@ -1,5 +1,42 @@
 # @sobree/core
 
+## 0.1.49
+
+### Patch Changes
+
+- 0772e5e: Honour `<w:keepNext/>` and `<w:keepLines/>` from the style cascade and
+  direct paragraph formatting. Word's heading styles declare both (ACM's
+  `Head2` inherits them from the built-in `Heading2` via `basedOn`), but the
+  style importer never read them, so the paginator happily stranded headings
+  at the bottom of a page — a break Word never produces. The flags (plus
+  `<w:pageBreakBefore/>`, previously lost on DIRECT paragraphs) are now read
+  tri-state at both homes — style pPr and direct pPr — so an explicit
+  `w:val="0"` overrides an inherited flag, and they round-trip through
+  export. A paragraph's `keepLines` maps to per-line keep-together boxes in
+  the paginator, keeping its `keepNext` and widow/orphan metadata intact
+  (collapsing it to a monolithic group box would have discarded them).
+- 2837a11: Match Word's page-fill budget: suppress space-before at the top of a page
+  and stop double-counting single-line paragraphs' margins. Word ignores a
+  paragraph's "space before" when it lands at the top of a page through an
+  automatic break (honouring it after an explicit page break) — Sobree kept
+  the margin, wasting up to a heading's spacing on every such page. Worse,
+  the paginator's box measurement ADDED `margin-top` to every single-line
+  paragraph's height even though the inter-block glue already carried that
+  gap, so pages holding several spaced headings ran a phantom ~15-25px
+  fuller per heading and broke a paragraph or two earlier than
+  Word/LibreOffice. With both fixed, page fill matches Word's budget —
+  acm-submission-template renders 13 pages breaking mid-paragraph exactly
+  where Word does (was 14), and other over-paginating fixtures move toward
+  LibreOffice's counts. Explicit `<w:pageBreakBefore/>` paragraphs keep
+  their space-before, now correctly charged to the new page.
+- 2837a11: Widow/orphan control now defaults to Word's semantics: at least 2 lines
+  of a split paragraph on each side of a page break (`<w:widowControl/>`
+  is ON by default and PREVENTS single lines; the old 1/1 default read it
+  backwards). A heading can no longer sit at a page bottom with a single
+  orphan line of its following paragraph — acm-submission-template's
+  page 1 now ends exactly where Word's does, with the Introduction
+  heading opening page 2.
+
 ## 0.1.48
 
 ### Patch Changes
