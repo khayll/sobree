@@ -227,6 +227,11 @@ export function applyParagraphProps(
   if (effective.keepNext) {
     el.setAttribute("data-keep-next", "");
   }
+  // `keepLines` (`<w:keepLines/>`): the paragraph's lines must not split
+  // across pages — the paginator's monolithic/keep-together treatment.
+  if (effective.keepLines) {
+    el.setAttribute("data-keep-together", "");
+  }
   // Custom tab stops (`<w:pPr><w:tabs>`) → CSS `tab-size` so `\t`
   // characters in run text honour Word's stop geometry. We use the
   // smallest stop's position as the tab width — a strict approximation:

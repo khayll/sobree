@@ -1,7 +1,7 @@
 import { NS } from "../shared/namespaces";
 import { readShading } from "../shared/shading";
 import { ooxmlLineHeightToCss } from "../shared/units";
-import { wChildren, wFirst, wOnOff, wVal } from "../shared/xml";
+import { wChildren, wFirst, wToggleOn, wVal } from "../shared/xml";
 import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
 import { readRunProperties } from "./runProperties";
@@ -341,11 +341,25 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
     }
   }
 
-  // <w:contextualSpacing/> — CT_OnOff toggle. Read with the explicit-off
-  // form (`w:val="0"`) so a style turning it OFF on a specific paragraph
-  // doesn't read as ON. The renderer suppresses before/after only when an
-  // adjacent paragraph shares this one's style.
-  if (wOnOff(pPr, "contextualSpacing")) format.contextualSpacing = true;
+  // CT_OnOff pagination flags — TRI-STATE via `wToggleOn`: absent means
+  // "inherit from the style cascade" (undefined), and an explicit
+  // `w:val="0"` records `false` so DIRECT formatting can turn OFF a flag
+  // the paragraph's style declares (e.g. one heading allowed to sit at a
+  // page bottom despite Heading2's keepNext). Presence-only reads can't
+  // express that override.
+  const contextualSpacing = wToggleOn(wFirst(pPr, "contextualSpacing"));
+  if (contextualSpacing !== undefined) format.contextualSpacing = contextualSpacing;
+
+  // <w:keepNext/> / <w:keepLines/> / <w:pageBreakBefore/> on the direct
+  // pPr — same properties the style reader pulls off `<w:style>` pPr
+  // (two homes, one meaning). The paginator consumes them via the
+  // renderer's `data-keep-next` / `data-page-break-before` stamps.
+  const keepNext = wToggleOn(wFirst(pPr, "keepNext"));
+  if (keepNext !== undefined) format.keepNext = keepNext;
+  const keepLines = wToggleOn(wFirst(pPr, "keepLines"));
+  if (keepLines !== undefined) format.keepLines = keepLines;
+  const pageBreakBefore = wToggleOn(wFirst(pPr, "pageBreakBefore"));
+  if (pageBreakBefore !== undefined) format.pageBreakBefore = pageBreakBefore;
 
   const numPr = wFirst(pPr, "numPr");
   if (numPr) {

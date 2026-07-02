@@ -139,6 +139,15 @@ function renderParagraph(
   return el("w:p", null, `${pPr}${runs}`);
 }
 
+/** Serialise a CT_OnOff pPr flag, preserving the tri-state the importer
+ *  reads: `true` → bare element, `false` → the explicit-off form
+ *  (`w:val="0"`), which a direct paragraph uses to override the flag its
+ *  style cascade turns on. Callers skip the element entirely for
+ *  `undefined` (inherit). */
+function onOffEl(tag: string, on: boolean): string {
+  return on ? el(tag) : el(tag, { "w:val": "0" });
+}
+
 function renderPPr(
   props: ParagraphProperties,
   ctx: ExportContext,
@@ -176,7 +185,8 @@ function renderPPr(
     if (Object.keys(attrs).length > 0) parts.push(el("w:ind", attrs));
   }
   // CT_PPr schema orders `contextualSpacing` immediately after `ind`.
-  if (props.contextualSpacing) parts.push(el("w:contextualSpacing"));
+  if (props.contextualSpacing !== undefined)
+    parts.push(onOffEl("w:contextualSpacing", props.contextualSpacing));
   if (props.borders?.bottom) {
     const b = props.borders.bottom;
     parts.push(
@@ -192,9 +202,11 @@ function renderPPr(
       ),
     );
   }
-  if (props.keepNext) parts.push(el("w:keepNext"));
-  if (props.keepLines) parts.push(el("w:keepLines"));
-  if (props.pageBreakBefore) parts.push(el("w:pageBreakBefore"));
+  if (props.keepNext !== undefined) parts.push(onOffEl("w:keepNext", props.keepNext));
+  if (props.keepLines !== undefined) parts.push(onOffEl("w:keepLines", props.keepLines));
+  if (props.pageBreakBefore !== undefined) {
+    parts.push(onOffEl("w:pageBreakBefore", props.pageBreakBefore));
+  }
   // Paragraph-mark revision — `<w:pPr><w:rPr><w:ins .../></w:rPr></w:pPr>`
   // (ECMA-376 §17.13.5.20 for ins, §17.13.5.14 for del). The `<w:rPr>`
   // inside pPr targets the paragraph mark itself, not the run text.

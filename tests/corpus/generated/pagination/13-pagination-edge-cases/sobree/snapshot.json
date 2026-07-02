@@ -196,6 +196,7 @@
     {
       "attrs": {
         "data-block-index": "24",
+        "data-page-break-before": "",
       },
       "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
       "tag": "P",
