@@ -212,7 +212,7 @@ function readRunText(r: Element): string {
   return text.trim();
 }
 
-function normaliseRunText(text: string): string {
+export function normaliseRunText(text: string): string {
   if (!text) return text;
   if (text.includes("\t")) return text;
   if (text.length >= 4 && /^[ \u00A0]+$/.test(text)) return " ";
