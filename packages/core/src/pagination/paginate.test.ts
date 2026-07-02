@@ -223,3 +223,47 @@ describe("paginate", () => {
     expect(page2KT).toBe(10);
   });
 });
+
+describe("forced break followed by leading glue (space-before after a hard break)", () => {
+  // buildItems places the inter-block glue AFTER a forced-break penalty so
+  // the NEW page is charged the gap — Word honours a paragraph's
+  // space-before after an explicit page break.
+
+  it("charges the leading glue to the new page", () => {
+    const items: Item[] = [box(100), penalty(Number.NEGATIVE_INFINITY), glue(50), box(200)];
+    const pages = paginate(items, { pageHeight: 700 });
+    expect(pages.length).toBe(2);
+    expect(pages[1]!.usedHeight).toBe(250); // glue 50 + box 200
+  });
+
+  it("never emits an empty page when the block after the break almost fills it", () => {
+    const items: Item[] = [
+      box(100),
+      penalty(Number.NEGATIVE_INFINITY),
+      glue(50),
+      box(680, { monolithic: true }), // 50 + 680 > 700 — must still land on page 2
+    ];
+    const pages = paginate(items, { pageHeight: 700 });
+    expect(pages.length).toBe(2);
+    const page2Boxes = pages[1]!.items.filter((i) => i.type === "box");
+    expect(page2Boxes.length).toBe(1);
+    expect(page2Boxes[0]!.height).toBe(680);
+  });
+
+  it("leading glue is not a break candidate (no empty page via glue-break)", () => {
+    const items: Item[] = [
+      box(100),
+      penalty(Number.NEGATIVE_INFINITY),
+      glue(50),
+      // Two boxes that overflow together — the break must fall BETWEEN
+      // them, not at the leading glue (which would emit an empty page).
+      box(400),
+      glue(0),
+      box(400),
+    ];
+    const pages = paginate(items, { pageHeight: 700 });
+    expect(pages.length).toBe(3);
+    expect(pages[1]!.items.filter((i) => i.type === "box").length).toBe(1);
+    expect(pages[2]!.items.filter((i) => i.type === "box").length).toBe(1);
+  });
+});
