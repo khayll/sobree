@@ -96,17 +96,20 @@ export interface Candidate {
 }
 
 export const DEFAULTS: Omit<ResolvedConfig, "pageHeight"> = {
-  // Word's default "Widow/Orphan Control" allows a single line of a
-  // paragraph on either side of a page break. We mirror that — setting
-  // widows / orphans to 1 means "no special protection against
-  // 1-line widows or orphans, accept whatever break the underfull
-  // cost prefers". Match Word's behaviour for the typical case where
-  // a long paragraph straddles a page boundary mid-sentence.
-  widows: 1,
-  orphans: 1,
+  // Word's "Widow/Orphan Control" (`<w:widowControl/>`, ECMA-376
+  // §17.3.1.44) is ON by default and PREVENTS single lines: a paragraph
+  // straddling a page boundary must keep at least 2 lines on each side.
+  // The previous 1/1 default had this backwards ("Word allows a single
+  // line") — it let the scorer strand one orphan line under a heading at
+  // a page bottom, a break Word never produces (acm-submission-template
+  // kept the Introduction heading + one intro line on page 1 where Word
+  // moves both to page 2). Paragraphs that explicitly DISABLE
+  // widowControl (`w:val="0"`, e.g. ACM's Bibentry) may split 1-line in
+  // Word — honouring that per-paragraph is a follow-up; default-on is by
+  // far the common case.
+  widows: 2,
+  orphans: 2,
   underfullWeight: 1.0,
-  // Penalty still in place for the explicit cases — e.g. a forced break
-  // would still leave NO lines on either side, which is forbidden.
   widowOrphanPenalty: 10000,
   keepPenalty: 10000,
 };
