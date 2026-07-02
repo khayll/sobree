@@ -64,6 +64,19 @@ describe("buildItems: tall table row driven by a non-paragraph cell", () => {
 });
 
 describe("buildItems: forced page breaks", () => {
+  /** First BOX at or after `idx` — forced breaks put the inter-block glue
+   *  BETWEEN the penalty and the element's box (the gap is charged to the
+   *  new page, mirroring Word honouring space-before after a hard break). */
+  const nextBox = (items: ReturnType<typeof buildItems>, idx: number) => {
+    for (let i = idx; i < items.length; i++) {
+      const it = items[i];
+      if (it?.type === "box") return it;
+      // Only glue may sit between a forced-break penalty and its box.
+      expect(it?.type).toBe("glue");
+    }
+    return undefined;
+  };
+
   it("`data-page-break` element emits Penalty(-Infinity) + zero-height monolithic box", () => {
     const els = elements(`
       <p>before</p>
@@ -77,9 +90,10 @@ describe("buildItems: forced page breaks", () => {
     expect(penalty).toBeDefined();
     expect(penalty?.cost).toBe(Number.NEGATIVE_INFINITY);
 
-    // The marker element follows the penalty, monolithic, height 0.
+    // The marker element follows the penalty (after the inter-block
+    // glue), monolithic, height 0.
     const idx = items.indexOf(penalty!);
-    const marker = items[idx + 1];
+    const marker = nextBox(items, idx + 1);
     expect(marker?.type).toBe("box");
     if (marker?.type === "box") {
       expect(marker.height).toBe(0);
@@ -87,21 +101,21 @@ describe("buildItems: forced page breaks", () => {
     }
   });
 
-  it("`data-page-break-before` on a paragraph emits a Penalty before its line boxes", () => {
+  it("`data-page-break-before` on a paragraph emits a Penalty before its glue + line boxes", () => {
     const els = elements(`
       <p>before</p>
       <p data-page-break-before>after</p>
     `);
     const items = buildItems(els);
 
-    // The Penalty must precede a Box whose `el` is the second paragraph.
+    // The Penalty must precede the block's glue AND its box — the glue
+    // lands AFTER the break so the new page is charged the space-before.
     const penaltyIdx = items.findIndex((it) => it.type === "penalty");
     expect(penaltyIdx).toBeGreaterThan(0);
-    const next = items[penaltyIdx + 1];
-    expect(next?.type).toBe("box");
-    if (next?.type === "box") {
-      expect(next.el).toBe(els[1]);
-    }
+    const glue = items[penaltyIdx + 1];
+    expect(glue?.type).toBe("glue");
+    const box = nextBox(items, penaltyIdx + 1);
+    expect(box?.el).toBe(els[1]);
   });
 
   it("`data-page-break-before` on a heading emits a Penalty before the heading box", () => {
@@ -112,11 +126,8 @@ describe("buildItems: forced page breaks", () => {
     const items = buildItems(els);
     const penaltyIdx = items.findIndex((it) => it.type === "penalty");
     expect(penaltyIdx).toBeGreaterThan(0);
-    const next = items[penaltyIdx + 1];
-    expect(next?.type).toBe("box");
-    if (next?.type === "box") {
-      expect(next.el).toBe(els[1]);
-    }
+    const box = nextBox(items, penaltyIdx + 1);
+    expect(box?.el).toBe(els[1]);
   });
 
   it("`data-page-break-before` on a table emits a Penalty before the first row box", () => {
@@ -127,15 +138,15 @@ describe("buildItems: forced page breaks", () => {
     const items = buildItems(els);
     const penaltyIdx = items.findIndex((it) => it.type === "penalty");
     expect(penaltyIdx).toBeGreaterThan(0);
-    const next = items[penaltyIdx + 1];
-    expect(next?.type).toBe("box");
-    if (next?.type === "box") {
+    const box = nextBox(items, penaltyIdx + 1);
+    expect(box?.type).toBe("box");
+    if (box?.type === "box") {
       // After table-row pagination landed, tables emit one box per
       // TR (so the paginator can break between rows). The Penalty's
-      // immediate follow-up is the first row's box; rows are
-      // monolithic — we don't yet split a single row across pages.
-      expect(next.el?.tagName).toBe("TR");
-      expect(next.monolithic).toBe(true);
+      // first follow-up box is the first row's; rows are monolithic —
+      // we don't yet split a single row across pages.
+      expect(box.el?.tagName).toBe("TR");
+      expect(box.monolithic).toBe(true);
     }
   });
 

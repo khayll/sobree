@@ -253,6 +253,30 @@
   display: flow-root;
 }
 
+/* Space-before suppression at the top of a page.
+ *
+ * Word ignores a paragraph's (and table's) "space before" when it lands
+ * at the top of a page through an AUTOMATIC page break — the content
+ * starts flush at the margin. LibreOffice mirrors this for Word docs via
+ * its "add paragraph spacing at tops of pages" compat option (off).
+ * Sobree's paginator already agrees: when it breaks at the inter-block
+ * glue, the gap stays on the PREVIOUS page as trailing whitespace and the
+ * new page is not charged for it. Keeping the CSS margin-top at render
+ * time therefore (a) diverged from Word/LO and (b) diverged from the
+ * paginator's own plan — every page opening with a spaced block (e.g. a
+ * heading) wasted that margin and under-filled (acm-submission-template
+ * page 2 lost 22.7px to the Introduction heading's space-before).
+ *
+ * A paragraph that carries an EXPLICIT break (`<w:pageBreakBefore/>` →
+ * `data-page-break-before`) keeps its space-before — Word honours it
+ * after hard breaks; `buildItems` charges the gap to the new page for
+ * exactly that case. `!important` is required because the renderer
+ * writes margins as inline styles; the selector keeps it scoped to the
+ * one place the rule applies. */
+.paper-content > :first-child:not([data-page-break-before]) {
+  margin-top: 0 !important;
+}
+
 /* Table-cell paragraph line-height tightening.
  *
  * Word's "single" line spacing (the implicit default for paragraphs

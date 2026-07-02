@@ -50,6 +50,12 @@ function fillPage(items: Item[], start: number, cfg: ResolvedConfig): FillResult
   let h = 0;
   const candidates: Candidate[] = [];
   let idx = start;
+  // Has at least one BOX been placed on this page? A page may open with
+  // GLUE (a forced break precedes the inter-block gap so the new page is
+  // charged the space-before Word honours after hard breaks) — breaking
+  // before any box is placed would emit an empty page, so every overflow
+  // guard below requires `hasBox`, not merely `idx > start`.
+  let hasBox = false;
 
   while (idx < items.length) {
     const it = items[idx];
@@ -70,7 +76,11 @@ function fillPage(items: Item[], start: number, cfg: ResolvedConfig): FillResult
     }
 
     if (it.type === "glue") {
-      if (isGlueBetweenBoxes(items, idx) && !isGlueInsideKeepTogether(items, idx)) {
+      // `h > 0`: a page can BEGIN with glue (a forced break precedes the
+      // gap so the new page is charged the space-before Word honours
+      // after hard breaks) — breaking at that leading glue would emit an
+      // EMPTY page, never a sensible candidate.
+      if (h > 0 && isGlueBetweenBoxes(items, idx) && !isGlueInsideKeepTogether(items, idx)) {
         // Glue break: glue STAYS on current page as trailing — so pageEnd
         // is one past the glue. heightAt excludes the glue's height so
         // leftover reflects usable page space, not trailing whitespace.
@@ -93,18 +103,18 @@ function fillPage(items: Item[], start: number, cfg: ResolvedConfig): FillResult
     const box = it;
 
     // Oversized monolithic item with room used: force a break before it.
-    if (box.monolithic && h + box.height > cfg.pageHeight && idx > start) {
+    if (box.monolithic && h + box.height > cfg.pageHeight && hasBox) {
       return pickAndEmit(items, start, idx, candidates, cfg);
     }
 
     // Oversized item on an otherwise empty page: place alone and let it overflow.
-    if (box.height > cfg.pageHeight && idx === start) {
+    if (box.height > cfg.pageHeight && !hasBox) {
       // eslint-disable-next-line no-console
       console.warn(
         `paginate: item (height ${box.height}) exceeds pageHeight (${cfg.pageHeight}). Placing alone; page will overflow.`,
       );
       return {
-        page: { items: [box], usedHeight: box.height, cost: 0 },
+        page: { items: [box], usedHeight: h + box.height, cost: 0 },
         next: idx + 1,
       };
     }
@@ -120,17 +130,21 @@ function fillPage(items: Item[], start: number, cfg: ResolvedConfig): FillResult
           `paginate: keepTogether paragraph (height ${paraH}) exceeds pageHeight (${cfg.pageHeight}). Falling back to normal breaking.`,
         );
         // fall through
-      } else if (h + paraH > cfg.pageHeight && idx > start) {
+      } else if (h + paraH > cfg.pageHeight && hasBox) {
         return pickAndEmit(items, start, idx, candidates, cfg);
       }
     }
 
-    // Generic overflow: adding this box would exceed page height.
-    if (h + box.height > cfg.pageHeight && idx > start) {
+    // Generic overflow: adding this box would exceed page height. Requires
+    // hasBox — with only leading glue placed, breaking would emit an empty
+    // page; instead the box is placed (it may overflow slightly, matching
+    // Word drawing a hard-break paragraph's space-before regardless).
+    if (h + box.height > cfg.pageHeight && hasBox) {
       return pickAndEmit(items, start, idx, candidates, cfg);
     }
 
     h += box.height;
+    hasBox = true;
     idx++;
   }
 

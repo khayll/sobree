@@ -38,6 +38,16 @@ export function buildItems(blocks: HTMLElement[]): DomItem[] {
     const isOutOfFlow = cs.position === "absolute" || cs.position === "fixed";
 
     const gapBefore = isOutOfFlow ? 0 : Math.max(0, el.offsetTop - prevBottom);
+    // Forced-break ordering: the -Infinity penalty goes BEFORE the glue,
+    // so the inter-block gap is charged to the NEW page. Word honours a
+    // paragraph's space-before after an explicit page break (and the CSS
+    // keeps the margin on `[data-page-break-before]` blocks), so the
+    // page budget must account for it. For AUTOMATIC breaks the glue
+    // stays where it is — trailing on the previous page — matching
+    // Word's suppression of space-before at the top of the page (the
+    // `.paper-content > :first-child` rule zeroes the rendered margin).
+    const forcedBreak = isPageBreakMarker(el) || hasPageBreakBefore(el);
+    if (forcedBreak) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
     if (i > 0 || gapBefore > 0) {
       // Glue between blocks: height is the actual laid-out gap (often 0 if
       // the previous block's margin-bottom collapsed with this one's margin-top).
@@ -45,22 +55,16 @@ export function buildItems(blocks: HTMLElement[]): DomItem[] {
     }
 
     if (isPageBreakMarker(el)) {
-      items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
       items.push({ type: "box", height: 0, el, monolithic: true });
     } else if (isKeepTogetherGroup(el)) {
-      if (hasPageBreakBefore(el)) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
       items.push(singleBox(el, { monolithic: true }));
     } else if (el.tagName === "P") {
-      if (hasPageBreakBefore(el)) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
       items.push(...paragraphLineItems(el, ensureParagraphId(el)));
     } else if (el.tagName === "OL" || el.tagName === "UL") {
-      if (hasPageBreakBefore(el)) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
       items.push(...listItemBoxes(el, ensureListId(el)));
     } else if (el.tagName === "TABLE") {
-      if (hasPageBreakBefore(el)) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
       items.push(...tableRowBoxes(el, ensureTableId(el)));
     } else {
-      if (hasPageBreakBefore(el)) items.push({ type: "penalty", cost: Number.NEGATIVE_INFINITY });
       items.push(singleBox(el, extraFlagsFor(el)));
     }
 
@@ -414,8 +418,16 @@ function measureBlockHeight(el: HTMLElement): number {
   // once via the gap to its in-flow sibling), losing ~178px from the
   // page budget and triggering a spurious extra page.
   if (cs.position === "absolute" || cs.position === "fixed") return 0;
-  const marginTop = Number.parseFloat(cs.marginTop) || 0;
-  return el.offsetHeight + marginTop;
+  // Boxes are the BORDER-BOX height only. Margins are owned by the GLUE
+  // items (the `offsetTop − prevBottom` deltas measured by the block
+  // walk), which reflect the real laid-out gap after margin collapse.
+  // The old `offsetHeight + marginTop` here predates that glue and
+  // DOUBLE-COUNTED every single-line paragraph's space-before (once in
+  // the glue, once in the box) — pages holding several spaced headings
+  // ran a phantom ~15-25px fuller per heading and under-filled, breaking
+  // a paragraph or two earlier than Word/LibreOffice on the same budget
+  // (acm-submission-template page 2 carried +53px of phantom height).
+  return el.offsetHeight;
 }
 
 function isPageBreakMarker(el: HTMLElement): boolean {
