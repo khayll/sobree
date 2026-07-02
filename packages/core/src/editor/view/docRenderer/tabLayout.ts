@@ -45,6 +45,13 @@ const LEADER_FILL_CAPACITY = 512;
 export interface RightTailPlan {
   before: InlineRun[];
   after: InlineRun[];
+  /** The document characters the spread's flex layout replaces (the tab,
+   *  or the space run for the legacy spread). The renderer keeps them in
+   *  a zero-width span so the paragraph's TEXT is not corrupted by the
+   *  layout: copy/paste yields "label\tvalue" (not "labelvalue"), the
+   *  DOM→AST serializer round-trips the separator, and text-level
+   *  comparisons (the corpus matcher) still see the source characters. */
+  separatorText: string;
   /** Fill glyph string for the gap (already repeated to capacity);
    *  absent when the stop declares no usable `w:leader`. */
   leaderFill?: string;
@@ -136,6 +143,7 @@ export function planRightTailTab(
   return {
     before,
     after,
+    separatorText: "\t",
     ...(leaderChar ? { leaderFill: leaderChar.repeat(LEADER_FILL_CAPACITY) } : {}),
     tailMarginRight,
     ...(beforeMarginLeft ? { beforeMarginLeft } : {}),
@@ -171,7 +179,7 @@ function hasVisibleContent(runs: readonly InlineRun[]): boolean {
  */
 export function splitForTabSpread(
   p: Paragraph,
-): { before: Paragraph["runs"]; after: Paragraph["runs"] } | null {
+): { before: Paragraph["runs"]; after: Paragraph["runs"]; separatorText: string } | null {
   // Only header label/value lines built on a right tab stop spread.
   // The signal is a declared custom tab stop (`<w:pPr><w:tabs>`):
   // Word fills the stop's gap with a run of spaces, which we collapse
@@ -201,5 +209,9 @@ export function splitForTabSpread(
   const hasText = (runs: Paragraph["runs"]) =>
     runs.some((r) => r.kind === "text" && r.text.trim().length > 0);
   if (!hasText(before) || !hasText(after)) return null;
-  return { before, after };
+  const separatorText = p.runs
+    .slice(sepStart, sepEnd + 1)
+    .map((r) => (r.kind === "text" ? r.text : ""))
+    .join("");
+  return { before, after, separatorText };
 }

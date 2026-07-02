@@ -429,6 +429,19 @@
   white-space: pre-wrap;
   min-width: 0;
 }
+/* The separator characters the flex layout replaces (the tab, or the
+ * legacy spread's space run). They must STAY in the DOM — copy/paste,
+ * the DOM→AST serializer, and text-level comparisons all read the
+ * paragraph's text — but contribute no visual extent: the flex gap /
+ * leader carries the geometry. Zero width + hidden overflow keeps the
+ * glyphs out of layout without removing them from the document text. */
+.paper-content .sobree-tab-spread .sobree-tab-spread__sep {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
 /* Right-tab-stop leader ("entry ..... page number"): the span carries
  * the stop's `w:leader` glyph repeated to capacity; real text glyphs —
  * not a border or gradient — so the fill sits on the text baseline and

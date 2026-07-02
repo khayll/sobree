@@ -78,9 +78,12 @@ export function renderParagraph(
   // 2. Space-gap spread: header label/value lines where the gap is a
   //    run of literal spaces (no tab character to key on).
   //
-  // Both drop the separator (tab / spaces) from the DOM, so a DOM→AST
-  // serialize of an edited line loses it — accepted since the spread's
-  // flex layout, not the character, carries the geometry.
+  // The flex layout carries the GEOMETRY, but the separator characters
+  // (tab / spaces) stay in the DOM inside a zero-width `__sep` span —
+  // dropping them corrupted the paragraph's text: copy/paste yielded
+  // "labelvalue", the DOM→AST serializer lost the tab, and the corpus
+  // text-matcher unmatched every spread line (pentest-engineer 72→63
+  // matched blocks).
   const rightTail = planRightTailTab(p, effective);
   const split = rightTail ?? splitForTabSpread(p);
   if (split) {
@@ -88,6 +91,9 @@ export function renderParagraph(
     const before = document.createElement("span");
     before.className = "sobree-tab-spread__before";
     appendInlineRuns(before, split.before, rawParts, styles, paraRunDefaults);
+    const sep = document.createElement("span");
+    sep.className = "sobree-tab-spread__sep";
+    sep.textContent = split.separatorText;
     const after = document.createElement("span");
     after.className = "sobree-tab-spread__after";
     appendInlineRuns(after, split.after, rawParts, styles, paraRunDefaults);
@@ -102,11 +108,11 @@ export function renderParagraph(
         leader.setAttribute("contenteditable", "false");
         leader.setAttribute("aria-hidden", "true");
         leader.textContent = rightTail.leaderFill;
-        el.append(before, leader, after);
+        el.append(before, sep, leader, after);
         return el;
       }
     }
-    el.append(before, after);
+    el.append(before, sep, after);
   } else {
     appendInlineRuns(el, p.runs, rawParts, styles, paraRunDefaults);
   }

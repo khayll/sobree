@@ -54,9 +54,26 @@ interface BlockSnapshot {
   children?: BlockSnapshot[];
 }
 
+/**
+ * DOCUMENT text of an element — `textContent` minus view-only chrome
+ * (aria-hidden decoration such as the tab-spread's leader-glyph fill).
+ * The chrome is synthetic renderer output, not document content: with it
+ * included, a TOC entry's 512-glyph leader fill consumed the whole
+ * `maxTextLen` window and the page number never reached the snapshot.
+ */
+function documentText(el: Element): string {
+  if (el.getAttribute("aria-hidden") === "true") return "";
+  let out = "";
+  for (const child of Array.from(el.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) out += child.textContent ?? "";
+    else if (child.nodeType === Node.ELEMENT_NODE) out += documentText(child as Element);
+  }
+  return out;
+}
+
 function snapshotElement(el: Element, maxTextLen = 60): BlockSnapshot {
   const out: BlockSnapshot = { tag: el.tagName };
-  const text = (el.textContent ?? "").trim();
+  const text = documentText(el).trim();
   if (text.length > 0) {
     out.text = text.length > maxTextLen ? `${text.slice(0, maxTextLen)}…` : text;
   }

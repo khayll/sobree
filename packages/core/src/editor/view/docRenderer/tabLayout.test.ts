@@ -111,17 +111,23 @@ describe("renderParagraph right-tail spread", () => {
       {},
     );
     expect(el.classList.contains("sobree-tab-spread")).toBe(true);
-    const [before, leader, after] = Array.from(el.children) as HTMLElement[];
+    const [before, sep, leader, after] = Array.from(el.children) as HTMLElement[];
     expect(before!.className).toBe("sobree-tab-spread__before");
     expect(before!.textContent).toBe("ACKNOWLEDGMENT");
+    // The tab character STAYS in the DOM (zero-width span) — the flex
+    // layout carries the geometry, but the document text must survive:
+    // copy/paste, the DOM→AST serializer, and the corpus text-matcher
+    // all read it (dropping it unmatched every spread line of
+    // pentest-engineer).
+    expect(sep!.className).toBe("sobree-tab-spread__sep");
+    expect(sep!.textContent).toBe("\t");
     expect(leader!.className).toBe("sobree-tab-spread__leader");
     expect(leader!.getAttribute("contenteditable")).toBe("false");
     expect(leader!.getAttribute("aria-hidden")).toBe("true");
     expect(leader!.textContent).toMatch(/^\.+$/);
     expect(after!.className).toBe("sobree-tab-spread__after");
     expect(after!.textContent).toBe("iii");
-    // No tab character survives into the DOM — the layout replaces it.
-    expect(el.textContent).not.toContain("\t");
+    expect(el.textContent).toContain("ACKNOWLEDGMENT\t");
   });
 
   it("renders no leader span when the stop declares no leader", () => {
@@ -129,8 +135,9 @@ describe("renderParagraph right-tail spread", () => {
       tabStops: [{ positionTwips: 9360, alignment: "right" }],
     };
     const el = renderParagraph(para([text("Entry\t42")], props), [], {});
-    expect(el.children).toHaveLength(2);
+    expect(el.children).toHaveLength(3); // before, sep, after
     expect(el.querySelector(".sobree-tab-spread__leader")).toBeNull();
+    expect(el.textContent).toBe("Entry\t42");
   });
 
   it("keeps the tab-size fallback for paragraphs the plan rejects", () => {
