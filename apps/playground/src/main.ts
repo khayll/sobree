@@ -26,6 +26,7 @@ import { keyboard } from "@sobree/keyboard";
 import { review } from "@sobree/review";
 import { zoomControls } from "@sobree/zoom-controls";
 
+import { installCorpusHarness } from "./corpusHarness";
 import { fieldAlmanacSeed } from "./seeds/fieldAlmanac";
 import "./playground.css";
 
@@ -131,6 +132,8 @@ if (import.meta.env.DEV) {
   // `convergenceReport` below.
   (window as unknown as { convergenceReport: unknown }).convergenceReport = convergenceReport;
   (window as unknown as { ooxmlBlame: unknown }).ooxmlBlame = ooxmlBlame;
+  // Live-paginator corpus gate hook — driven by `pnpm corpus:pages`.
+  installCorpusHarness(editor);
 }
 
 // =====================================================================

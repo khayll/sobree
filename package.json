@@ -30,6 +30,8 @@
     "corpus:diff": "pnpm --filter @sobree/fixtures-gen corpus:diff",
     "corpus:check": "pnpm --filter @sobree/fixtures-gen corpus:check",
     "corpus:baseline": "pnpm --filter @sobree/fixtures-gen corpus:baseline",
+    "corpus:pages": "pnpm --filter @sobree/fixtures-gen corpus:pages",
+    "corpus:pages:baseline": "pnpm --filter @sobree/fixtures-gen corpus:pages:baseline",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "build:packages": "pnpm --filter \"./packages/*\" build",

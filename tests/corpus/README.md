@@ -47,6 +47,8 @@ Each docx lives in its category folder with companion artifacts:
 │   └── snapshot.json     — DOM block snapshot
 └── baseline/             — committed reference numbers, updated explicitly
     ├── drift.json        — committed drift score (mean abs line-height delta)
+    ├── pages.json        — live-paginator score (page-count delta vs LO +
+    │                       per-page text overlap), from `pnpm corpus:pages:baseline`
     ├── known-issues.md   — what we know doesn't match Word, why
     └── tier.json         — { tier: 1 | 2 | 3, features: [...] }
 ```
@@ -86,14 +88,27 @@ git diff tests/corpus          # review the visual / numeric changes
 git add -p
 ```
 
-### CI gate
+### CI gates
 
-`pnpm corpus:check` runs the corpus and exits non-zero if any
-fixture's drift score regresses beyond tolerance vs its committed
-baseline. PRs cannot merge until either:
+Two complementary gates run in CI; both compare against committed
+baselines and exit non-zero on regression:
+
+- **`pnpm corpus:check`** — import-level: drift score, matched-block
+  ratio. Fast (jsdom), but it never runs the live paginator, so
+  page-count and break-position regressions are invisible to it.
+- **`pnpm corpus:pages`** — live-paginator: renders each fixture in a
+  headless Chromium through the playground (`window.__corpusPages`),
+  waits for pagination to settle (one clean load per doc — rapid
+  consecutive loads report garbage counts), then scores page count and
+  per-page text placement against `libreoffice/metrics.json`.
+  Requires Playwright's browser once per machine:
+  `pnpm --filter @sobree/fixtures-gen exec playwright install chromium`.
+
+PRs cannot merge until either:
 
 - the regression is fixed, or
-- the baseline is explicitly updated with a justifying commit message.
+- the baseline is explicitly updated with a justifying commit message
+  (`pnpm corpus:baseline` / `pnpm corpus:pages:baseline`).
 
 ## Why both generated and real-world?
 
