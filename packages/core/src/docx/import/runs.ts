@@ -65,6 +65,21 @@ export interface ImportedRun {
   field?: { instruction: string; cached?: string };
 }
 
+/**
+ * Source-order paragraph item: either a flat run or a hyperlink-wrapped
+ * group. Lives HERE (with `ImportedRun`, the shape it groups) rather than
+ * in `paragraphs.ts` so both the paragraph walker and the complex-field
+ * collector (`fields.ts`) can depend on it without forming an import
+ * cycle — `paragraphs.ts` imports the collector, so the collector must
+ * not reach back into `paragraphs.ts`.
+ */
+export type ImportedItem =
+  | { kind: "run"; run: ImportedRun }
+  /** `href` is set for HYPERLINK *fields* (the target lives in the field
+   *  instruction); `relId` for `<w:hyperlink r:id>` elements (resolved
+   *  against the rels table downstream). */
+  | { kind: "hyperlink"; relId?: string; href?: string; runs: ImportedRun[] };
+
 export function readRun(r: Element): ImportedRun {
   // Hard break — emitted as its own run with no text. Word distinguishes
   // line / page / column breaks via `<w:br w:type="...">`. Column
