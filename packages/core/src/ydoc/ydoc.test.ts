@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { appendBlock, emptyDocument, heading, paragraph, text } from "../doc/builders";
+import { appendBlock, emptyDocument, field, heading, paragraph, text } from "../doc/builders";
 import type { AnchoredFrame, SobreeDocument } from "../doc/types";
 import { applyDocumentToYDoc } from "./apply";
 import { projectYDoc } from "./project";
@@ -75,6 +75,23 @@ describe("ydoc helpers", () => {
     // exactly the "refresh drops the header textbox + photo" bug.
     expect(out.anchoredFrames).toEqual(doc.anchoredFrames);
     expect(out.headerFooterFrames).toEqual(doc.headerFooterFrames);
+  });
+
+  it("round-trips FieldRun in headerFooterBodies (Page {PAGE} of {NUMPAGES})", () => {
+    const doc = seedDoc();
+    doc.headerFooterBodies = {
+      "footer1.xml": [
+        paragraph([text("Page "), field("PAGE"), text(" of "), field("NUMPAGES", "2")]),
+      ],
+    };
+
+    const ydoc = new Y.Doc();
+    seedYDoc(ydoc, doc, ids(doc.body.length));
+    const { doc: out } = projectYDoc(ydoc);
+
+    // A refresh / collab join renders the footer from this projection —
+    // the live page-number substitution dies if the instruction is lost.
+    expect(out.headerFooterBodies).toEqual(doc.headerFooterBodies);
   });
 
   it("round-trips footnotes, comments and settings", () => {
