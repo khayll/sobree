@@ -357,9 +357,29 @@ function loadHeaderFooterParts(
       // (and every paragraph-anchored frame) off the page.
       partFrames.push(...parseVmlFloatingFrames(parsed, { rels: headerRels }));
       if (partFrames.length > 0) frames[ref.partId] = partFrames;
+      // Inline-drawing frames (`<wp:inline>` with a textbox payload) —
+      // the SAME pass the document body runs. Header/footer parts host
+      // these too: ljmu-university-letterhead's footer is one inline
+      // textbox holding the whole department-address block, which the
+      // run importer's drawing branch (blip-only) silently dropped —
+      // the letterhead rendered with an empty footer. The claim pass
+      // removes each drawing from the part DOM; the host paragraph is
+      // swapped for its InlineFrame via `replaceParagraphs`, exactly
+      // like the body path.
+      const partInlineFrames = parseInlineFrames(parsed, {
+        rels: headerRels,
+        parseBlockBody: (txbxContent) =>
+          convertBlocksFromContainer(txbxContent, { rels: headerRels }).body,
+        ...(theme ? { theme } : {}),
+      });
+      const replaceParagraphs = new Map<Element, Block>();
+      for (const { hostParagraphEl, frame } of partInlineFrames) {
+        frame.hostProps = convertParagraph(hostParagraphEl, { rels: headerRels }).properties;
+        replaceParagraphs.set(hostParagraphEl, frame);
+      }
       // Header part roots: `<w:hdr>` or `<w:ftr>`. Both wrap a stream
       // of paragraphs + tables identical in shape to `<w:body>`.
-      const { body } = convertBlocksFromContainer(root, { rels: headerRels });
+      const { body } = convertBlocksFromContainer(root, { rels: headerRels, replaceParagraphs });
       bodies[ref.partId] = body;
     }
   }

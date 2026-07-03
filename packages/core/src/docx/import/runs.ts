@@ -20,6 +20,8 @@ export interface ImportedDrawing {
   widthEmu?: number;
   heightEmu?: number;
   altText?: string;
+  /** `<a:srcRect>` crop, normalised to 0-1 fractions per edge. */
+  srcRect?: { l?: number; t?: number; r?: number; b?: number };
   /** Present when the drawing is a `<wp:anchor>` (floating) rather than
    *  `<wp:inline>`. The renderer positions the image absolutely via
    *  these coordinates. */
@@ -305,6 +307,31 @@ function readDrawing(drawing: Element): ImportedDrawing {
   if (blip) {
     const rId = blip.getAttributeNS(NS.r, "embed") ?? blip.getAttribute("r:embed");
     if (rId) out.embedRelId = rId;
+  }
+  // `<a:srcRect>` — source crop in 1/1000ths of a percent per edge
+  // (ECMA-376 §20.1.8.55). Word letterheads crop one logo out of a
+  // multi-logo strip this way; without it the WHOLE strip squeezes
+  // into the extent. Normalised to 0-1 fractions for the AST.
+  const srcRectEl = drawing.getElementsByTagNameNS(NS.a, "srcRect")[0];
+  if (srcRectEl) {
+    const frac = (name: string): number | undefined => {
+      const v = Number(srcRectEl.getAttribute(name));
+      return Number.isFinite(v) && v !== 0 ? v / 100000 : undefined;
+    };
+    const rect = { l: frac("l"), t: frac("t"), r: frac("r"), b: frac("b") };
+    if (
+      rect.l !== undefined ||
+      rect.t !== undefined ||
+      rect.r !== undefined ||
+      rect.b !== undefined
+    ) {
+      out.srcRect = {
+        ...(rect.l !== undefined ? { l: rect.l } : {}),
+        ...(rect.t !== undefined ? { t: rect.t } : {}),
+        ...(rect.r !== undefined ? { r: rect.r } : {}),
+        ...(rect.b !== undefined ? { b: rect.b } : {}),
+      };
+    }
   }
   const extent = wpRoot?.getElementsByTagNameNS(NS.wp, "extent")[0];
   if (extent) {

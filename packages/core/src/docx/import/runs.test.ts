@@ -49,6 +49,32 @@ describe("readRun — <w:drawing>", () => {
     expect(parsed.drawing?.embedRelId).toBe("rId1");
     expect(parsed.drawing?.widthEmu).toBe(914400);
     expect(parsed.drawing?.anchor).toBeUndefined();
+    expect(parsed.drawing?.srcRect).toBeUndefined();
+  });
+
+  it("reads the <a:srcRect> source crop as 0-1 fractions", () => {
+    // ljmu letterhead: the header PNG holds two logos side by side and
+    // the drawing crops to the LJMU mark (left 3.048%, right 59.274%).
+    const r = runFromXml(`<?xml version="1.0"?>
+      <w:r xmlns:w="${NS_W}" xmlns:wp="${NS_WP}" xmlns:r="${NS_R}">
+        <w:drawing>
+          <wp:inline>
+            <wp:extent cx="2939143" cy="1533448"/>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData>
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:blipFill>
+                    <a:blip r:embed="rId1"/>
+                    <a:srcRect l="3048" r="59274"/>
+                  </pic:blipFill>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>`);
+    const parsed = readRun(r);
+    expect(parsed.drawing?.srcRect).toEqual({ l: 0.03048, r: 0.59274 });
   });
 
   it("skips <wp:anchor> drawings — handled by the per-page anchor layer", () => {
