@@ -21,7 +21,14 @@ export { readTextDistances } from "./margins";
 export type { TextDistancesEmu } from "./margins";
 export { normalizePartPath, readBlipEmbedPart } from "./relationships";
 export { readBorder, readGeometry, readSolidFill } from "./shapeProps";
-export { parseThemeLineWidthsEmu, parseThemeXml, readDrawingColor } from "./colors";
+export {
+  type ThemeFillStyles,
+  parseThemeFillStyles,
+  parseThemeLineWidthsEmu,
+  parseThemeXml,
+  readDrawingColor,
+  resolveThemeFillEntry,
+} from "./colors";
 export type { ThemePalette } from "./colors";
 export type {
   EmuExtent,

@@ -228,7 +228,19 @@ function tableRowBoxes(table: HTMLElement, tid: string, scale: number): DomItem[
   for (let i = 0; i < trs.length; i++) {
     const tr = trs[i]!;
     const rowHeight = tr.offsetHeight;
-    if (rowHeight > TALL_ROW_THRESHOLD_PX) {
+    // A row can be tall for two reasons: tall CONTENT (a long
+    // Experience listing — split it by paragraphs so it flows across
+    // pages) or a tall `<w:trHeight>` MINIMUM (a newsletter's layout
+    // scaffold row that is mostly reserved whitespace). Splitting a
+    // scaffold row shreds the layout AND re-applies the minimum per
+    // fragment — a 2-page newsletter exploded to 22 pages. Only rows
+    // whose content is itself tall split; minimum-tall rows stay
+    // monolithic at their full height and break BETWEEN rows, which
+    // is what Word does with them.
+    if (
+      rowHeight > TALL_ROW_THRESHOLD_PX &&
+      maxCellContentHeight(tr, scale) > TALL_ROW_THRESHOLD_PX
+    ) {
       out.push(...tallRowParagraphBoxes(tr, scale));
     } else {
       out.push(singleBox(tr, scale, { monolithic: true }));
@@ -236,6 +248,18 @@ function tableRowBoxes(table: HTMLElement, tid: string, scale: number): DomItem[
     if (i < trs.length - 1) out.push({ type: "glue", height: 0 });
   }
   return out;
+}
+
+/** The tallest cell-content height in the row — the "is the CONTENT
+ *  tall, or only the row minimum?" signal for the split decision. */
+function maxCellContentHeight(tr: HTMLElement, scale: number): number {
+  let max = 0;
+  for (const c of Array.from(tr.children)) {
+    if ((c.tagName === "TD" || c.tagName === "TH") && c instanceof HTMLElement) {
+      max = Math.max(max, cellContentHeight(c, scale));
+    }
+  }
+  return max;
 }
 
 /**

@@ -77,7 +77,11 @@ export function parseThemeLineWidthsEmu(xml: string | undefined): number[] {
  * style container): literal `srgbClr` or theme `schemeClr`, transforms
  * applied. Returns `#RRGGBB` or undefined when no resolvable colour.
  */
-export function readDrawingColor(parent: Element, theme?: ThemePalette): string | undefined {
+export function readDrawingColor(
+  parent: Element,
+  theme?: ThemePalette,
+  phClr?: string,
+): string | undefined {
   const srgb = firstA(parent, "srgbClr");
   if (srgb) {
     const val = srgb.getAttribute("val");
@@ -86,12 +90,125 @@ export function readDrawingColor(parent: Element, theme?: ThemePalette): string 
   }
   const scheme = firstA(parent, "schemeClr");
   if (scheme) {
-    const slot = mapSchemeSlot(scheme.getAttribute("val"));
-    const base = slot && theme ? theme[slot] : undefined;
+    const slotVal = scheme.getAttribute("val");
+    // `phClr` is the style-list PLACEHOLDER colour (§20.1.4.1.14): a
+    // theme fill/line style entry is a template, and the shape's
+    // `<a:*Ref>` colour child substitutes in at resolution time.
+    const base =
+      slotVal === "phClr"
+        ? phClr
+        : (() => {
+            const slot = mapSchemeSlot(slotVal);
+            return slot && theme ? theme[slot] : undefined;
+          })();
     if (!base) return undefined;
     return applyTransforms(base, scheme);
   }
   return undefined;
+}
+
+/**
+ * The theme's `<a:fmtScheme>` fill style lists, kept as raw elements —
+ * resolved per shape at import time (each shape substitutes its own
+ * `phClr`). `fill` = `<a:fillStyleLst>` (fillRef idx 1-999, 1-based);
+ * `bg` = `<a:bgFillStyleLst>` (fillRef idx ≥1001, idx-1000 is 1-based).
+ */
+export interface ThemeFillStyles {
+  fill: Element[];
+  bg: Element[];
+}
+
+export function parseThemeFillStyles(xml: string | undefined): ThemeFillStyles | undefined {
+  if (!xml) return undefined;
+  let doc: Document;
+  try {
+    doc = parseXml(xml);
+  } catch {
+    return undefined;
+  }
+  const list = (name: string): Element[] => {
+    const lst = doc.getElementsByTagNameNS(NS.a, name)[0];
+    return lst ? Array.from(lst.children).filter((c) => c.namespaceURI === NS.a) : [];
+  };
+  const fill = list("fillStyleLst");
+  const bg = list("bgFillStyleLst");
+  if (fill.length === 0 && bg.length === 0) return undefined;
+  return { fill, bg };
+}
+
+/**
+ * Resolve one theme fill-style entry against a shape's placeholder
+ * colour. Returns a CSS background value:
+ *
+ *   - `<a:solidFill>`  → `#RRGGBB` (phClr substituted, transforms applied)
+ *   - `<a:gradFill>`   → `linear-gradient(...)` over the resolved stops
+ *                        (`<a:lin ang>` is 1/60000-degree clockwise from
+ *                        3 o'clock; CSS 0deg points up, so css = ooxml/60000
+ *                        + 90). Path gradients approximate as linear —
+ *                        the stop colours dominate the visual.
+ *   - `<a:blipFill>` + duotone → the MIDPOINT of the two duotone
+ *                        endpoint colours as a solid. The texture image
+ *                        itself lives in the theme part and tiles at
+ *                        ~paper-grain scale; its duotone endpoints bound
+ *                        every pixel, so the midpoint is the flat colour
+ *                        the eye averages it to (a CV theme's page frame
+ *                        reads as exactly this light grey ring).
+ *
+ * `undefined` when the entry can't be resolved (unknown kind, no colours).
+ */
+export function resolveThemeFillEntry(
+  entry: Element,
+  theme: ThemePalette | undefined,
+  phClr: string,
+): string | undefined {
+  if (entry.localName === "solidFill") {
+    return readDrawingColor(entry, theme, phClr);
+  }
+  if (entry.localName === "gradFill") {
+    const stops: { pos: number; color: string }[] = [];
+    const gsLst = firstA(entry, "gsLst");
+    for (const gs of gsLst ? Array.from(gsLst.children) : []) {
+      if (gs.namespaceURI !== NS.a || gs.localName !== "gs") continue;
+      const pos = Number(gs.getAttribute("pos") ?? "0") / 100000;
+      const color = readDrawingColor(gs, theme, phClr);
+      if (color) stops.push({ pos, color });
+    }
+    if (stops.length < 2) return stops[0]?.color;
+    stops.sort((a, b) => a.pos - b.pos);
+    const lin = firstA(entry, "lin");
+    const ang = Number(lin?.getAttribute("ang") ?? "5400000");
+    const cssDeg = (Number.isFinite(ang) ? ang / 60000 : 90) + 90;
+    const stopList = stops.map((s) => `${s.color} ${Math.round(s.pos * 100)}%`).join(", ");
+    return `linear-gradient(${Math.round(cssDeg)}deg, ${stopList})`;
+  }
+  if (entry.localName === "blipFill") {
+    const duotone = entry.getElementsByTagNameNS(NS.a, "duotone")[0];
+    if (!duotone) return undefined;
+    const ends: string[] = [];
+    for (const clr of Array.from(duotone.children)) {
+      if (clr.namespaceURI !== NS.a) continue;
+      // Wrap so readDrawingColor sees the clr as the single colour child.
+      const holder = duotone.ownerDocument.createElementNS(NS.a, "a:holder");
+      holder.appendChild(clr.cloneNode(true));
+      const c = readDrawingColor(holder, theme, phClr);
+      if (c) ends.push(c);
+    }
+    if (ends.length === 0) return undefined;
+    if (ends.length === 1) return ends[0];
+    return mixHex(ends[0] as string, ends[1] as string);
+  }
+  return undefined;
+}
+
+/** Channel-wise midpoint of two `#RRGGBB` colours. */
+function mixHex(a: string, b: string): string {
+  const ca = hexChannels(a);
+  const cb = hexChannels(b);
+  return channelsToHex(
+    Math.round((ca[0] + cb[0]) / 2),
+    Math.round((ca[1] + cb[1]) / 2),
+    Math.round((ca[2] + cb[2]) / 2),
+  );
 }
 
 /** `tx1/bg1/tx2/bg2` are the wp-level aliases of the theme's dk/lt slots. */

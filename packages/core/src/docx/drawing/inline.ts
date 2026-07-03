@@ -38,7 +38,7 @@
 
 import type { Block, InlineFrame, InlineFrameTextbox } from "../../doc/types";
 import { NS } from "../shared/namespaces";
-import type { ThemePalette } from "./colors";
+import type { ThemeFillStyles, ThemePalette } from "./colors";
 import { directChildrenNS, findAncestor, firstChildNS, firstNS } from "./dom";
 import { numAttr, numAttrOr } from "./extents";
 import { readBlipEmbedPart } from "./relationships";
@@ -77,6 +77,10 @@ export interface InlineFramesContext {
   /** Theme `<a:lnStyleLst>` outline widths (EMU), indexed by a shape's
    *  `<a:lnRef idx>` so a style-referenced border imports at full width. */
   themeLineWidthsEmu?: number[];
+  /** Theme `<a:fmtScheme>` fill style lists so a shape's `<a:fillRef>`
+   *  resolves through the referenced entry (solid / gradient / duotone
+   *  texture) instead of flattening to the ref colour. */
+  themeFillStyles?: ThemeFillStyles;
   /**
    * Body content width in EMU (page width − left/right margins). Needed
    * only to lay out a paragraph that holds MORE THAN ONE inline drawing
@@ -418,7 +422,7 @@ function buildInlineFrame(
           const { off, ext: shapeExt } = readShapeXfrm(child);
           if (shapeExt.cx <= 0 || shapeExt.cy <= 0) continue;
           const geom = readGeometry(child);
-          const fill = readSolidFill(child, ctx.theme);
+          const fill = readSolidFill(child, ctx.theme, ctx.themeFillStyles);
           const border = readBorder(child, ctx.theme, ctx.themeLineWidthsEmu);
           const decoration: InlineFrame["shapes"][number] = {
             geometry: geom,
@@ -480,7 +484,7 @@ function readInlineTextbox(wsp: Element, ctx: InlineFramesContext): InlineFrameT
     sizeEmu: { wEmu: shapeExt.cx, hEmu: shapeExt.cy },
     body: ctx.parseBlockBody(txbxContent),
   };
-  const fill = readSolidFill(wsp, ctx.theme);
+  const fill = readSolidFill(wsp, ctx.theme, ctx.themeFillStyles);
   if (fill !== undefined) textbox.fill = fill;
   const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
   if (border !== undefined) textbox.border = border;
@@ -571,7 +575,7 @@ function buildBareShapeFrame(
     offsetEmu: { xEmu: off.x, yEmu: off.y },
     sizeEmu: { wEmu: ext.cx > 0 ? ext.cx : wEmu, hEmu: ext.cy > 0 ? ext.cy : hEmu },
   };
-  const fill = readSolidFill(wsp, ctx.theme);
+  const fill = readSolidFill(wsp, ctx.theme, ctx.themeFillStyles);
   if (fill !== undefined) shape.fill = fill;
   const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
   if (border !== undefined) shape.border = border;

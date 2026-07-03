@@ -146,6 +146,14 @@ function renderRow(
   renderCellBlocks: RenderCellBlocks,
 ): HTMLElement {
   const tr = document.createElement("tr");
+  // `<w:trHeight>`: `atLeast` = CSS `height` on a table row acts as a
+  // minimum (the row still grows with content — exactly Word's rule);
+  // `exact` = Word clips overflow, so pin the height and hide overflow
+  // via the cells (max-height doesn't apply to table rows).
+  if (row.heightTwips !== undefined) {
+    tr.style.height = `${twipsToMmExact(row.heightTwips).toFixed(2)}mm`;
+    if (row.heightRule === "exact") tr.dataset.rowHeightExact = "";
+  }
   let col = 0;
   for (const cell of row.cells) {
     const gridSpan = cell.gridSpan ?? 1;

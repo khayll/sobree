@@ -78,3 +78,21 @@ describe("convertTable — cell tcBorders", () => {
     });
   });
 });
+
+describe("convertTable — trHeight", () => {
+  it("reads <w:trHeight> with the default atLeast rule", () => {
+    const t = table(`<w:tr><w:trPr><w:trHeight w:val="710"/></w:trPr><w:tc><w:p/></w:tc></w:tr>`);
+    expect(t.rows[0]).toMatchObject({ heightTwips: 710, heightRule: "atLeast" });
+  });
+
+  it("reads hRule exact; auto imports as absent (content-sized)", () => {
+    const exact = table(
+      `<w:tr><w:trPr><w:trHeight w:val="400" w:hRule="exact"/></w:trPr><w:tc><w:p/></w:tc></w:tr>`,
+    );
+    expect(exact.rows[0]).toMatchObject({ heightTwips: 400, heightRule: "exact" });
+    const auto = table(
+      `<w:tr><w:trPr><w:trHeight w:val="400" w:hRule="auto"/></w:trPr><w:tc><w:p/></w:tc></w:tr>`,
+    );
+    expect(auto.rows[0]?.heightTwips).toBeUndefined();
+  });
+});

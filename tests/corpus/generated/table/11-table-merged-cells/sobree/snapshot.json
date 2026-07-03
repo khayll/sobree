@@ -79,6 +79,7 @@
                   "text": "Status",
                 },
               ],
+              "style": "height: 7.06mm;",
               "tag": "TR",
               "text": "TeamProjectOwnerStatus",
             },
