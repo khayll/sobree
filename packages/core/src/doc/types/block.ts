@@ -62,6 +62,13 @@ export interface TableRow {
   cells: TableCell[];
   /** True if this row is a header row repeated on each page. */
   isHeader?: boolean;
+  /** `<w:trHeight w:val>` in twips. Meaning depends on `heightRule`. */
+  heightTwips?: number;
+  /** `<w:trHeight w:hRule>`: `atLeast` (default when trHeight present)
+   *  = the row grows with content but never shrinks below the value;
+   *  `exact` = the row is EXACTLY this tall, content clips. Banner
+   *  tables size their name row this way (0.5in row, text centred). */
+  heightRule?: "atLeast" | "exact";
 }
 
 export interface TableCell {

@@ -30,7 +30,7 @@
 
 import type { AnchorOrigin, AnchoredContent, AnchoredFrame, Block } from "../../doc/types";
 import { NS } from "../shared/namespaces";
-import type { ThemePalette } from "./colors";
+import type { ThemeFillStyles, ThemePalette } from "./colors";
 import { parseCustomGeometry } from "./customGeometry";
 import { firstChildNS } from "./dom";
 import { numAttr } from "./extents";
@@ -75,6 +75,10 @@ export interface AnchoredFramesContext {
   /** Theme `<a:lnStyleLst>` outline widths (EMU), indexed by a shape's
    *  `<a:lnRef idx>` so a style-referenced border imports at full width. */
   themeLineWidthsEmu?: number[];
+  /** Theme `<a:fmtScheme>` fill style lists so a shape's `<a:fillRef>`
+   *  resolves through the referenced entry (solid / gradient / duotone
+   *  texture) instead of flattening to the ref colour. */
+  themeFillStyles?: ThemeFillStyles;
 }
 
 /**
@@ -473,7 +477,7 @@ function parseShape(
         kind: "textbox",
         body: parseTextboxBody(txbxContent, ctx),
       };
-      const fill = readSolidFill(wsp, ctx.theme);
+      const fill = readSolidFill(wsp, ctx.theme, ctx.themeFillStyles);
       if (fill !== undefined) out.fill = fill;
       const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
       if (border !== undefined) out.border = border;
@@ -511,7 +515,7 @@ function parseShape(
       out.path = preset;
     }
   }
-  const fill = readSolidFill(wsp, ctx.theme);
+  const fill = readSolidFill(wsp, ctx.theme, ctx.themeFillStyles);
   if (fill !== undefined) out.fill = fill;
   const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
   if (border !== undefined) out.border = border;

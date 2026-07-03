@@ -104,6 +104,19 @@ function readRow(tr: Element, ctx: ConvertContext): TableRow {
   const cells = wChildren(tr, "tc").map((tc) => readCell(tc, ctx));
   const row: TableRow = { cells };
   if (isHeader) row.isHeader = true;
+  // `<w:trHeight w:val w:hRule>` — banner tables size their rows this
+  // way (a 710-twip name row with the text vertically centred). The
+  // default hRule is `atLeast` (§17.4.80); `auto` means content-sized,
+  // the same as no trHeight at all, so it imports as absent.
+  const trHeight = trPr ? wFirst(trPr, "trHeight") : null;
+  if (trHeight) {
+    const val = Number(wVal(trHeight) ?? "");
+    const hRule = trHeight.getAttribute("w:hRule") ?? "atLeast";
+    if (Number.isFinite(val) && val > 0 && hRule !== "auto") {
+      row.heightTwips = val;
+      row.heightRule = hRule === "exact" ? "exact" : "atLeast";
+    }
+  }
   return row;
 }
 

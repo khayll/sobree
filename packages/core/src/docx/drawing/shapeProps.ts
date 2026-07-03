@@ -8,7 +8,12 @@
 
 import type { FrameBorder } from "../../doc/types";
 import { NS } from "../shared/namespaces";
-import { type ThemePalette, readDrawingColor } from "./colors";
+import {
+  type ThemeFillStyles,
+  type ThemePalette,
+  readDrawingColor,
+  resolveThemeFillEntry,
+} from "./colors";
 import { firstChildNS } from "./dom";
 import { numAttr } from "./extents";
 
@@ -43,7 +48,11 @@ export function readGeometry(wsp: Element): "rect" | "ellipse" | "roundedRect" |
  * `readDrawingColor`. Direct-child traversal so a fill nested deeper
  * inside a child shape isn't picked up by mistake.
  */
-export function readSolidFill(shape: Element, theme?: ThemePalette): string | undefined {
+export function readSolidFill(
+  shape: Element,
+  theme?: ThemePalette,
+  themeFillStyles?: ThemeFillStyles,
+): string | undefined {
   const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (spPr) {
     for (const fill of Array.from(spPr.children)) {
@@ -67,22 +76,39 @@ export function readSolidFill(shape: Element, theme?: ThemePalette): string | un
   // shape inserted from the ribbon; without it every gallery shape (the
   // black step banner, the header pills, the footer arrow) imports
   // fill-less and renders invisible.
-  return readStyleRefFill(shape, theme);
+  return readStyleRefFill(shape, theme, themeFillStyles);
 }
 
 /**
  * Resolve a shape's fill from its `<wps:style><a:fillRef>`. `idx="0"` is
- * the theme's explicit "no fill" slot → undefined; any other slot we
- * model as a solid fill of the referenced colour (idx 1 = the solidFill
- * entry, which is what the ribbon emits). The `<a:schemeClr>` /
- * `<a:srgbClr>` child carries the colour, resolved by `readDrawingColor`.
+ * the theme's explicit "no fill" slot → undefined. Any other idx selects
+ * a theme fill-style entry (§20.1.4.1.14): 1-999 index `fillStyleLst`,
+ * ≥1001 index `bgFillStyleLst` (idx-1000), and the fillRef's own colour
+ * child is the entry's `phClr` placeholder. When the theme lists aren't
+ * available, fall back to a solid of the ref colour — right for idx 1
+ * (the ribbon default, a plain `solidFill phClr` template), a flattening
+ * for the rest.
  */
-function readStyleRefFill(shape: Element, theme?: ThemePalette): string | undefined {
+function readStyleRefFill(
+  shape: Element,
+  theme?: ThemePalette,
+  themeFillStyles?: ThemeFillStyles,
+): string | undefined {
   const style = firstChildNS(shape, NS.wps, "style");
   if (!style) return undefined;
   const fillRef = firstChildNS(style, NS.a, "fillRef");
-  if (!fillRef || fillRef.getAttribute("idx") === "0") return undefined;
-  return readDrawingColor(fillRef, theme);
+  if (!fillRef) return undefined;
+  const idx = Number.parseInt(fillRef.getAttribute("idx") ?? "0", 10);
+  if (!Number.isFinite(idx) || idx <= 0) return undefined;
+  const phClr = readDrawingColor(fillRef, theme);
+  if (themeFillStyles && phClr) {
+    const entry = idx >= 1001 ? themeFillStyles.bg[idx - 1001] : themeFillStyles.fill[idx - 1];
+    if (entry) {
+      const resolved = resolveThemeFillEntry(entry, theme, phClr);
+      if (resolved !== undefined) return resolved;
+    }
+  }
+  return phClr;
 }
 
 /** Read the shape outline `<a:ln>` (width + colour + dash) into a

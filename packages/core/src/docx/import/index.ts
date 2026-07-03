@@ -8,7 +8,13 @@ import type {
   SobreeDocument,
 } from "../../doc/types";
 import { mountFontTableFromZip } from "../../fonts";
-import { type ThemePalette, parseThemeLineWidthsEmu, parseThemeXml } from "../drawing";
+import {
+  type ThemeFillStyles,
+  type ThemePalette,
+  parseThemeFillStyles,
+  parseThemeLineWidthsEmu,
+  parseThemeXml,
+} from "../drawing";
 import { parseAnchoredFrames, parseVmlFloatingFrames } from "../drawing/anchored";
 import { parseInlineFrames } from "../drawing/inline";
 import { parseXml } from "../shared/xml";
@@ -59,6 +65,11 @@ export async function importDocx(
   // style reference, so without these their thin border imports width-less.
   const themeLineWidthsEmu = parseThemeLineWidthsEmu(unzipped.text["word/theme/theme1.xml"]);
   const themeLineWidths = themeLineWidthsEmu.length > 0 ? { themeLineWidthsEmu } : {};
+  // Fill-style lists (`<a:fmtScheme>`): a shape's `<a:fillRef idx>` picks
+  // an entry here and substitutes its own colour for the entry's phClr —
+  // this is where a page-frame decoration's subtle texture ring comes from.
+  const fillStyles = parseThemeFillStyles(unzipped.text["word/theme/theme1.xml"]);
+  const themeFills = fillStyles ? { themeFillStyles: fillStyles } : {};
   // Walk the body's direct paragraph children FIRST to build a stable
   // element → index map. The new floating-layer parser uses this to
   // attribute each anchored frame to the body paragraph that contained
@@ -76,6 +87,7 @@ export async function importDocx(
     parseBlockBody: (txbxContent) => convertBlocksFromContainer(txbxContent, { rels }).body,
     ...(theme ? { theme } : {}),
     ...themeLineWidths,
+    ...themeFills,
   });
   // Floating legacy-VML objects (`<w:pict>` watermarks / absolute-
   // positioned backgrounds) become picture frames in the same overlay,
@@ -83,7 +95,12 @@ export async function importDocx(
   // inflate flow height and displace body content). Appended after the
   // DrawingML anchors — both feed the one floating layer.
   anchoredFrames.push(
-    ...parseVmlFloatingFrames(xml, { rels, ...(theme ? { theme } : {}), ...themeLineWidths }),
+    ...parseVmlFloatingFrames(xml, {
+      rels,
+      ...(theme ? { theme } : {}),
+      ...themeLineWidths,
+      ...themeFills,
+    }),
   );
   // Parse inline-drawing frames (`<w:drawing><wp:inline>` with
   // textbox payload) into the new InlineFrame model. Phase 1.1:
@@ -126,6 +143,7 @@ export async function importDocx(
     honorLastRenderedPageBreaks,
     ...(theme ? { theme } : {}),
     ...themeLineWidths,
+    ...themeFills,
     ...(contentWidthEmu !== undefined ? { contentWidthEmu } : {}),
     ...(settings.defaultTabStopTwips !== undefined
       ? { defaultTabStopTwips: settings.defaultTabStopTwips }
@@ -214,6 +232,7 @@ export async function importDocx(
     unzipped.text,
     rels,
     theme,
+    { ...themeLineWidths, ...themeFills },
   );
 
   // Thread `word/*` media and other embedded binary parts through the AST
@@ -310,6 +329,9 @@ function loadHeaderFooterParts(
   textParts: Record<string, string>,
   rels: Map<string, string>,
   theme?: ThemePalette,
+  // Same theme drawing context the body parse uses — header/footer
+  // decorations resolve style-referenced fills / line widths identically.
+  drawingTheme?: { themeLineWidthsEmu?: number[]; themeFillStyles?: ThemeFillStyles },
 ): { bodies: Record<string, Block[]>; frames: Record<string, AnchoredFrame[]> } {
   const bodies: Record<string, Block[]> = {};
   const frames: Record<string, AnchoredFrame[]> = {};
@@ -348,6 +370,7 @@ function loadHeaderFooterParts(
         parseBlockBody: (txbxContent) =>
           convertBlocksFromContainer(txbxContent, { rels: headerRels }).body,
         ...(theme ? { theme } : {}),
+        ...drawingTheme,
       });
       // Floating VML in a header/footer is almost always a full-page
       // watermark (`<w:pict>` with `position:absolute`). Claim it into the
@@ -371,6 +394,7 @@ function loadHeaderFooterParts(
         parseBlockBody: (txbxContent) =>
           convertBlocksFromContainer(txbxContent, { rels: headerRels }).body,
         ...(theme ? { theme } : {}),
+        ...drawingTheme,
       });
       const replaceParagraphs = new Map<Element, Block>();
       for (const { hostParagraphEl, frame } of partInlineFrames) {
