@@ -185,11 +185,7 @@ describe("readRunSegments — <w:br/> is run content, not a run type", () => {
     // The old single-run contract early-returned on the <w:br/> and
     // dropped "First-class " entirely.
     const r = runFromXml(
-      `<w:r xmlns:w="${NS_W}">` +
-        `<w:rPr><w:color w:val="564B3C"/></w:rPr>` +
-        `<w:br/>` +
-        `<w:t xml:space="preserve">First-class </w:t>` +
-        `</w:r>`,
+      `<w:r xmlns:w="${NS_W}"><w:rPr><w:color w:val="564B3C"/></w:rPr><w:br/><w:t xml:space="preserve">First-class </w:t></w:r>`,
     );
     const segs = readRunSegments(r);
     expect(segs).toHaveLength(2);
