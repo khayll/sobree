@@ -153,6 +153,10 @@ export function renderInlineFrameBlock(
     el.style.width = `${pctX(shape.sizeEmu.wEmu)}%`;
     el.style.height = `${pctY(shape.sizeEmu.hEmu)}%`;
     if (shape.fill) el.style.background = shape.fill;
+    if (shape.border) {
+      const widthPx = Math.max(1, Math.round(emuToPx(shape.border.widthEmu)));
+      el.style.border = `${widthPx}px ${shape.border.style} ${shape.border.color}`;
+    }
     if (shape.geometry === "ellipse") el.style.borderRadius = "50%";
     else if (shape.geometry === "roundedRect") el.style.borderRadius = "8px";
     wrapper.appendChild(el);
