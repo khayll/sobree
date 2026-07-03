@@ -17,6 +17,7 @@ export function renderParagraph(
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
   contextualNeighbors?: ContextualNeighbors,
+  tableStyleId?: string,
 ): HTMLElement {
   const level = headingLevelOf(p);
   // Empty heading paragraphs (no text, no image runs) demote to plain
@@ -35,6 +36,7 @@ export function renderParagraph(
     p.properties,
     styles,
     contextualNeighbors,
+    tableStyleId,
   );
   // Cascade the dominant text run's font onto the paragraph itself when
   // the paragraph has no explicit font from style cascade. CSS unitless

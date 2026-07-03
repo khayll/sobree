@@ -247,3 +247,72 @@ describe("resolveRunStyle — character (rStyle) resolution", () => {
     expect(resolveRunStyle(styles, "Nope")).toEqual({});
   });
 });
+
+describe("table style pPr layer (ECMA-376 §17.7.2)", () => {
+  // Word's built-in TableGrid: `<w:pPr><w:spacing w:after="0" w:line="240"/></w:pPr>`
+  // applies to every paragraph inside the table, layered between
+  // DocDefaults and the paragraph's style. nih-style shape: docDefaults
+  // says line=276 after=200; cells must render single-spaced with no
+  // after-gap (LibreOffice's measured in-table pitch is single).
+  const styles: NamedStyle[] = [
+    {
+      id: "DocDefaults",
+      type: "paragraph",
+      displayName: "Document defaults",
+      paragraphDefaults: { spacing: { afterTwips: 200, line: 276, lineRule: "auto" } },
+      runDefaults: { fontSizePt: 11 },
+    },
+    { id: "Normal", type: "paragraph", displayName: "Normal", basedOn: "DocDefaults" },
+    {
+      id: "TableNormal",
+      type: "table",
+      displayName: "Normal Table",
+    },
+    {
+      id: "TableGrid",
+      type: "table",
+      displayName: "Table Grid",
+      basedOn: "TableNormal",
+      paragraphDefaults: { spacing: { afterTwips: 0, line: 240, lineRule: "auto" } },
+    },
+    {
+      id: "CellHeading",
+      type: "paragraph",
+      displayName: "Cell Heading",
+      basedOn: "Normal",
+      paragraphDefaults: { spacing: { line: 360, lineRule: "auto" } },
+    },
+  ];
+
+  it("layers the table style's spacing between DocDefaults and the paragraph style", () => {
+    const { paragraphDefaults } = resolveStyleCascade(styles, undefined, {
+      tableStyleId: "TableGrid",
+    });
+    expect(paragraphDefaults.spacing).toMatchObject({ afterTwips: 0, line: 240 });
+  });
+
+  it("a paragraph STYLE inside the cell still overrides the table layer", () => {
+    const { paragraphDefaults } = resolveStyleCascade(styles, "CellHeading", {
+      tableStyleId: "TableGrid",
+    });
+    // CellHeading's own line=360 wins over TableGrid's 240; the after=0
+    // it does NOT re-declare comes from the table layer, not DocDefaults.
+    expect(paragraphDefaults.spacing?.line).toBe(360);
+    expect(paragraphDefaults.spacing?.afterTwips).toBe(0);
+  });
+
+  it("without a tableStyleId the cascade is unchanged (DocDefaults wins)", () => {
+    const { paragraphDefaults } = resolveStyleCascade(styles, undefined);
+    expect(paragraphDefaults.spacing).toMatchObject({ afterTwips: 200, line: 276 });
+  });
+
+  it("run defaults layer the same way (table style rPr under the paragraph style)", () => {
+    const withRPr = styles.map((s) =>
+      s.id === "TableGrid" ? { ...s, runDefaults: { fontSizePt: 9 } } : s,
+    );
+    const { runDefaults } = resolveStyleCascade(withRPr, undefined, {
+      tableStyleId: "TableGrid",
+    });
+    expect(runDefaults.fontSizePt).toBe(9);
+  });
+});

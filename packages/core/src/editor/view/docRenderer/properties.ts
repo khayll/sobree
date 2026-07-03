@@ -45,6 +45,10 @@ export function applyParagraphProps(
   props: ParagraphProperties,
   styles: readonly NamedStyle[] = [],
   contextualNeighbors: ContextualNeighbors = { prevSameStyle: false, nextSameStyle: false },
+  /** `w:tblStyle` of the CONTAINING table — layers the table style's own
+   *  pPr/rPr under the paragraph style (ECMA-376 §17.7.2); see
+   *  `resolveStyleCascade`. */
+  tableStyleId?: string,
 ): AppliedParagraphProps {
   // Resolve the style cascade for both run + paragraph defaults, then
   // overlay the paragraph's own properties so explicit settings win on
@@ -56,7 +60,7 @@ export function applyParagraphProps(
   const effectiveStyleId = props.styleId ?? "Normal";
   const { runDefaults: cascadeRunDefaults, paragraphDefaults } =
     styles.length > 0
-      ? resolveStyleCascade(styles, effectiveStyleId)
+      ? resolveStyleCascade(styles, effectiveStyleId, tableStyleId ? { tableStyleId } : undefined)
       : { runDefaults: {}, paragraphDefaults: {} };
   const effective: ParagraphProperties = mergeParagraphProperties(paragraphDefaults, props);
   // Overlay the paragraph's OWN `runDefaults` on top of the style
