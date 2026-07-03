@@ -1,5 +1,26 @@
 # @sobree/mcp
 
+## 0.1.54
+
+### Patch Changes
+
+- a0b78f8: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- 42e05fe: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- 46d0bcd: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- f3b4b83: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- f27ae72: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [a0b78f8]
+- Updated dependencies [46d0bcd]
+- Updated dependencies [f3b4b83]
+- Updated dependencies [42e05fe]
+- Updated dependencies [f27ae72]
+  - @sobree/core@0.1.54
+
 ## 0.1.53
 
 ### Patch Changes

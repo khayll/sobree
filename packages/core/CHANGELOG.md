@@ -1,5 +1,66 @@
 # @sobree/core
 
+## 0.1.54
+
+### Patch Changes
+
+- a0b78f8: Table row heights and theme fill-style resolution. `<w:trHeight>` now
+  imports and renders (`atLeast` = CSS min-height semantics on the row,
+  `exact` flagged) — banner tables get their designed tall name rows
+  instead of collapsing to text height. A shape's `<a:fillRef>` resolves
+  through the theme's actual fill-style lists: solid entries substitute
+  the shape's placeholder colour, gradient entries render as CSS
+  gradients, and duotone-textured background entries paint their duotone
+  midpoint — a CV template's rounded page-frame ring now shows in its
+  light grey instead of flattening to invisible white. The paginator's
+  tall-row splitter only splits rows whose CONTENT is tall; rows tall by
+  declared minimum (newsletter layout scaffolds) stay monolithic and
+  break between rows like Word.
+- 46d0bcd: Keep-with-next chains longer than a page now degrade to natural page
+  breaks, and consecutive forced page breaks coalesce. A document styling
+  every job-title / company / spacer paragraph as a keepNext heading
+  chains dozens of blocks; every break inside the chain is forbidden, and
+  the paginator picked the earliest equally-forbidden candidate — one
+  near-empty page per block (a CV exploded from 3 to 13 pages). Word
+  breaks an infeasible keep chain at the natural page boundary, and a
+  page-break-before at the top of an already-fresh page is satisfied,
+  not stacked into a blank page (thesis front matter rendered a blank
+  page between two title pages). Widow/orphan back-off also no longer
+  retreats INTO a forbidden keep break.
+- f3b4b83: Inline geometric shape decorations (photo-placeholder rectangles and
+  similar `wps` shapes without text) now paint their outline. The
+  importer already resolved the shape's theme border color and width;
+  the inline-frame renderer applied only the fill, leaving the square a
+  borderless blob where Word draws a thin themed line around it.
+- 42e05fe: Text after a `<w:br/>` inside the same run is no longer dropped. A
+  break is run _content_ interleaved with `<w:t>` text, not a run type —
+  Word emits a single run containing a break followed by text when the
+  author types Shift-Enter mid-sentence and keeps typing. The importer's
+  early-return on the first break discarded both the line break and every
+  character after it (a CV lost "First-class " from its education
+  section; a hospital letterhead lost its whole department line). Runs
+  are now read as ordered segment sequences split at break boundaries,
+  each keeping the run's formatting.
+- f27ae72: Header/footer fidelity for documents with title pages and designed
+  zones. Four fixes that together restore Word's rendering of a CV whose
+  zones carried the page design: (1) zone selection is exact-type with
+  per-type inheritance (OOXML §17.10.3-6) — a titlePg document's missing
+  first footer renders BLANK on page 1 instead of borrowing the default,
+  a first-only header no longer leaks onto later pages, and a section
+  declaring only a first footer still inherits the default footer for
+  its body pages; (2) anchored frames understand all three OOXML
+  positioning forms — EMU offsets, `<wp:align>` keywords (center/right/
+  bottom), and Word 2010 percent offsets (`wp14:pctPos*Offset`),
+  including the `mc:AlternateContent` wrapper Word puts around percent
+  positions — so centred page frames and bottom-anchored footer bars
+  land where Word puts them instead of the top-left corner; (3) an
+  explicit `<a:noFill/>` (and `<a:ln><a:noFill/>`) overrides the shape
+  style's fill/line reference, and a direct outline width merges with a
+  style-referenced colour — outline-only frame decorations stop painting
+  as opaque white boxes and keep their thin themed line; (4) PAGE /
+  NUMPAGES fields inside zone-anchored textboxes substitute the live
+  page number per page instead of showing Word's stale cached value.
+
 ## 0.1.53
 
 ### Patch Changes
