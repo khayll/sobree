@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readRun } from "./runs";
+import { readRun, readRunSegments } from "./runs";
 
 const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const NS_WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
@@ -175,5 +175,45 @@ describe("readRun — <w:drawing>", () => {
       </w:r>`);
     const parsed = readRun(r);
     expect(parsed.drawing).toBeUndefined();
+  });
+});
+
+describe("readRunSegments — <w:br/> is run content, not a run type", () => {
+  it("splits a mixed run into break + text, keeping the shared rPr", () => {
+    // Word emits this when the author types Shift-Enter mid-sentence and
+    // keeps typing: `Lancaster University, UK` ⏎ `First-class honours`.
+    // The old single-run contract early-returned on the <w:br/> and
+    // dropped "First-class " entirely.
+    const r = runFromXml(
+      `<w:r xmlns:w="${NS_W}">` +
+        `<w:rPr><w:color w:val="564B3C"/></w:rPr>` +
+        `<w:br/>` +
+        `<w:t xml:space="preserve">First-class </w:t>` +
+        `</w:r>`,
+    );
+    const segs = readRunSegments(r);
+    expect(segs).toHaveLength(2);
+    expect(segs[0]).toMatchObject({ isHardBreak: true, breakType: "line" });
+    expect(segs[1]).toMatchObject({ isHardBreak: false, text: "First-class " });
+    expect(segs[1]?.format.color).toBe("#564B3C");
+  });
+
+  it("text before AND after a page break both survive, in order", () => {
+    const r = runFromXml(
+      `<w:r xmlns:w="${NS_W}"><w:t>before</w:t><w:br w:type="page"/><w:t>after</w:t></w:r>`,
+    );
+    const segs = readRunSegments(r);
+    expect(segs.map((s) => (s.isHardBreak ? `[${s.breakType}]` : s.text))).toEqual([
+      "before",
+      "[page]",
+      "after",
+    ]);
+  });
+
+  it("a break-only run stays a single break segment", () => {
+    const r = runFromXml(`<w:r xmlns:w="${NS_W}"><w:br w:type="column"/></w:r>`);
+    const segs = readRunSegments(r);
+    expect(segs).toHaveLength(1);
+    expect(segs[0]).toMatchObject({ isHardBreak: true, breakType: "column" });
   });
 });

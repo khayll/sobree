@@ -6,7 +6,7 @@ import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
 import { ComplexFieldCollector } from "./fields";
 import { readRunProperties } from "./runProperties";
-import { type ImportedItem, type ImportedRun, readRun } from "./runs";
+import { type ImportedItem, type ImportedRun, readRunSegments } from "./runs";
 import { readTabStops } from "./tabStops";
 
 // Re-exported for existing consumers (paragraph.ts) — the type itself
@@ -81,10 +81,10 @@ function collectParagraphChildren(
     if (child.namespaceURI !== NS.w) continue;
     if (child.localName === "r") {
       if (fields.handleRun(child)) continue;
-      out.push({ kind: "run", run: tag(readRun(child)) });
+      for (const seg of readRunSegments(child)) out.push({ kind: "run", run: tag(seg) });
     } else if (child.localName === "hyperlink") {
       const relId = child.getAttributeNS(NS.r, "id") ?? child.getAttribute("r:id") ?? undefined;
-      const runs = wChildren(child, "r").map((r) => tag(readRun(r)));
+      const runs = wChildren(child, "r").flatMap((r) => readRunSegments(r).map(tag));
       out.push({ kind: "hyperlink", ...(relId ? { relId } : {}), runs });
     } else if (child.localName === "sdt") {
       // Run-level content control (`<w:sdt>` INSIDE a paragraph — e.g.

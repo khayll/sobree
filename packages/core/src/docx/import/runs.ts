@@ -82,20 +82,47 @@ export type ImportedItem =
    *  against the rels table downstream). */
   | { kind: "hyperlink"; relId?: string; href?: string; runs: ImportedRun[] };
 
-export function readRun(r: Element): ImportedRun {
-  // Hard break — emitted as its own run with no text. Word distinguishes
-  // line / page / column breaks via `<w:br w:type="...">`. Column
-  // breaks are critical for multi-column form layouts (jellap.docx
-  // uses one to push subsequent fields to the right column so they
-  // pair as table rows).
-  const brEl = wFirst(r, "br");
-  if (brEl) {
-    const typeAttr = brEl.getAttributeNS(NS.w, "type") ?? brEl.getAttribute("w:type");
-    const breakType: "line" | "page" | "column" =
-      typeAttr === "page" ? "page" : typeAttr === "column" ? "column" : "line";
-    return { text: "", format: {}, isHardBreak: true, breakType };
-  }
+/**
+ * Read a `<w:r>` into a SEQUENCE of imported runs. A run's content is an
+ * ordered list of `<w:t>` / `<w:tab/>` / `<w:br/>` children — a break is
+ * run *content*, not a run *type*, so `<w:r><w:br/><w:t>First-class</w:t></w:r>`
+ * (Word emits this when the author types Shift-Enter mid-sentence and keeps
+ * typing) is a break FOLLOWED by text under the same `<w:rPr>`. The old
+ * single-run contract early-returned on the first `<w:br/>` and silently
+ * dropped everything after it.
+ */
+export function readRunSegments(r: Element): ImportedRun[] {
+  const brs = Array.from(r.children).filter((c) => c.namespaceURI === NS.w && c.localName === "br");
+  if (brs.length === 0) return [readRun(r)];
 
+  const rPr = wFirst(r, "rPr");
+  const format: RunProperties = (rPr ? readRunProperties(rPr) : undefined) ?? {};
+  const segments: ImportedRun[] = [];
+  let text = "";
+  const flushText = () => {
+    const t = normaliseRunText(text);
+    text = "";
+    if (t) segments.push({ text: t, format, isHardBreak: false });
+  };
+  for (const child of Array.from(r.children)) {
+    if (child.namespaceURI !== NS.w) continue;
+    if (child.localName === "t" || child.localName === "delText") {
+      text += child.textContent ?? "";
+    } else if (child.localName === "tab") {
+      text += "\t";
+    } else if (child.localName === "br") {
+      flushText();
+      const typeAttr = child.getAttributeNS(NS.w, "type") ?? child.getAttribute("w:type");
+      const breakType: "line" | "page" | "column" =
+        typeAttr === "page" ? "page" : typeAttr === "column" ? "column" : "line";
+      segments.push({ text: "", format: {}, isHardBreak: true, breakType });
+    }
+  }
+  flushText();
+  return segments;
+}
+
+export function readRun(r: Element): ImportedRun {
   // Drawing (image). Inline placement renders in the paragraph; anchor
   // placement is now handled by the per-page anchor layer
   // (`parseAnchoredFrames` + `renderAnchorLayer`). When we encounter
@@ -182,8 +209,10 @@ export function readRun(r: Element): ImportedRun {
     } else if (child.localName === "tab") {
       text += "\t";
     }
-    // Other children (rPr, br, drawing, footnoteReference, …) are
-    // handled by the dedicated branches above before we reach here.
+    // Other children (rPr, drawing, footnoteReference, …) are handled
+    // by the dedicated branches above before we reach here; `<w:br/>`
+    // is handled by `readRunSegments`, the entry point all paragraph
+    // walkers use.
   }
 
   text = normaliseRunText(text);
