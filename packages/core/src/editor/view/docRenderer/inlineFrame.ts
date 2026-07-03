@@ -56,6 +56,19 @@ export function renderInlineFrameBlock(
   // so font / line-height applied here are inert — only the margins
   // matter, and they're what closes the per-band vertical deficit.
   applyParagraphProps(wrapper, frame.hostProps ?? {}, styles);
+  // The host paragraph's TAB GRID must not reach the textbox body: its
+  // `<w:tabs>` describe the host LINE (where the drawing sits like a
+  // glyph), not the box's inner paragraphs — Word resolves those against
+  // their OWN stops, falling back to the document's default grid.
+  // `tab-size` is CSS-inherited, so the host value set by
+  // applyParagraphProps above would shadow the editor-scope default for
+  // every inner paragraph (ljmu letterhead: the Footer style's 4513-twip
+  // centre stop became a 79.6mm tab advance inside the footer box,
+  // wrapping "@ljmu" onto a second line where Word's 720-twip default
+  // grid keeps the socials on one). Clearing it restores inheritance
+  // from the editor scope (`applyDefaultTabStop`).
+  wrapper.style.removeProperty("tab-size");
+  wrapper.style.removeProperty("-moz-tab-size");
   wrapper.style.position = "relative";
   wrapper.style.boxSizing = "border-box";
   wrapper.style.width = "100%";
