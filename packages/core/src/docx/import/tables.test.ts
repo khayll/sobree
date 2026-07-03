@@ -96,3 +96,18 @@ describe("convertTable — trHeight", () => {
     expect(auto.rows[0]?.heightTwips).toBeUndefined();
   });
 });
+
+describe("convertTable — explicit nil cell borders suppress the grid", () => {
+  it("keeps w:val='nil' sides as style none instead of dropping them", () => {
+    // Banner tables declare a fully-bordered grid at table level, then
+    // carve the clean design per cell: `nil` sides must SUPPRESS the
+    // grid, not fall back to it.
+    const t = table(
+      `<w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:color="auto"/></w:tblBorders></w:tblPr>` +
+        `<w:tr><w:tc><w:tcPr><w:tcBorders><w:top w:val="nil"/><w:left w:val="single" w:sz="4" w:color="6B7C71"/></w:tcBorders></w:tcPr><w:p/></w:tc></w:tr>`,
+    );
+    const borders = t.rows[0]?.cells[0]?.borders;
+    expect(borders?.top).toMatchObject({ style: "none" });
+    expect(borders?.left).toMatchObject({ style: "single", color: "#6B7C71" });
+  });
+});
