@@ -84,8 +84,16 @@
   justify-content: flex-end;
   padding-top: 4mm;
   padding-bottom: var(--footer-offset-mm, 12.7mm);
-  text-align: center;
   border-top: 1px dashed transparent;
+}
+/* Centring is a presentation default for LEGACY string-template
+ * footers only ("Page {page} of {pages}" — Sobree-native chrome).
+ * Rich document zones render through the same block pipeline as the
+ * body, and their alignment belongs to each paragraph's own
+ * properties: Word's default is LEFT (the ljmu letterhead's footer
+ * address block centred wrongly under the old zone-wide rule). */
+.paper-footer.paper-zone--template {
+  text-align: center;
 }
 
 /* Floating-object layer — sits over the content rectangle as a sibling

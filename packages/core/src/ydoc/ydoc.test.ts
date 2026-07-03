@@ -94,6 +94,40 @@ describe("ydoc helpers", () => {
     expect(out.headerFooterBodies).toEqual(doc.headerFooterBodies);
   });
 
+  it("round-trips an auto-fit InlineFrame in headerFooterBodies (ljmu footer shape)", () => {
+    // The ljmu letterhead's footer is one inline textbox whose height
+    // auto-fits its text (<a:spAutoFit/>). Both the frame block and the
+    // autoFit flag must survive seed → project, or a refresh re-renders
+    // the footer pinned to the stale saved extent (text floats ~13mm
+    // above Word's position) — or drops the address block entirely.
+    const doc = seedDoc();
+    doc.headerFooterBodies = {
+      "footer1.xml": [
+        {
+          kind: "inline_frame",
+          groupExtentEmu: { wEmu: 3930650, hEmu: 1404620 },
+          sizeEmu: { wEmu: 3930650, hEmu: 1404620 },
+          textboxes: [
+            {
+              offsetEmu: { xEmu: 0, yEmu: 0 },
+              sizeEmu: { wEmu: 3930650, hEmu: 1404620 },
+              body: [paragraph([text("Department Name, Address, Postcode")])],
+              autoFit: true,
+              vAlign: "top",
+            },
+          ],
+          pictures: [],
+          shapes: [],
+        },
+      ],
+    };
+
+    const ydoc = new Y.Doc();
+    seedYDoc(ydoc, doc, ids(doc.body.length));
+    const { doc: out } = projectYDoc(ydoc);
+    expect(out.headerFooterBodies).toEqual(doc.headerFooterBodies);
+  });
+
   it("round-trips footnotes, comments and settings", () => {
     const doc = seedDoc();
     doc.footnotes = { 1: [paragraph([text("A footnote body.")])] };

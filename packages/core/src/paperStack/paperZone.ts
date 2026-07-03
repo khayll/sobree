@@ -29,6 +29,10 @@ export interface ZoneRenderContext {
  */
 export function renderZone(zone: HTMLElement, ctx: ZoneRenderContext): void {
   zone.replaceChildren();
+  // Rich (document-AST) content: alignment comes from each paragraph's
+  // own properties, exactly like the body — clear the template-mode
+  // presentation class so the zone imposes nothing of its own.
+  zone.classList.remove("paper-zone--template");
   if (ctx.blocks.length === 0) {
     zone.classList.add("is-empty");
     return;
@@ -60,6 +64,10 @@ export function paintZoneFrames(
 
 export function setZoneText(zone: HTMLElement, text: string): void {
   zone.textContent = text;
+  // Legacy string-template zones ("Page {page} of {pages}") are
+  // Sobree-native chrome with no document alignment of their own —
+  // the class opts them into the centred presentation default.
+  zone.classList.add("paper-zone--template");
   zone.classList.toggle("is-empty", text.trim() === "");
 }
 
