@@ -811,8 +811,10 @@ function mergeInto(head: HTMLElement, tail: HTMLElement): void {
 /** Parse "sobree-footnote-7" → 7; returns null for anything else. */
 
 /**
- * Walk the paginator's output back-to-front, collapsing trailing pages
- * whose blocks are all visually empty into the previous page.
+ * Collapse MIDDLE pages whose blocks are all visually empty (stale
+ * page-break hints landing after empty placeholder paragraphs) into
+ * the following page. Trailing blank pages are kept — see the note in
+ * the body: Word/LO print them when the empties genuinely overflow.
  *
  * "Visually empty" = an empty paragraph: a `<p>` (or list-item `<li>`)
  * with no text content and no embedded image / table / break. We keep
@@ -839,16 +841,17 @@ export function collapseTrailingEmptyPages(
       const idx = el.getAttribute("data-block-index");
       return idx !== null && anchoredBlockIndices.has(Number(idx));
     });
-  // Walk from the last page back. While the last page is fully empty
-  // and we have a previous page to absorb into, merge it down.
-  while (out.length >= 2) {
-    const last = out[out.length - 1];
-    if (!last || anchorsFrame(last) || !last.every(isVisuallyEmptyBlock)) break;
-    const prev = out[out.length - 2]!;
-    prev.push(...last);
-    out.pop();
-  }
-  // Now collapse MIDDLE pages whose ONLY blocks are visually empty —
+  // TRAILING pages are NOT collapsed: Word/LibreOffice treat trailing
+  // empty paragraphs as ordinary blocks — when they FIT the last content
+  // page's remaining budget the paginator already keeps them there (no
+  // extra page: jellap), and when they genuinely overflow they get a
+  // real trailing blank page (pentest-engineer: LO's page 3 has zero
+  // text lines, exactly the blank Word prints). The old uncondition-
+  // al absorb-down pass existed to mask phantom page-fill (integer
+  // rounding, margin double-counts) that made empties spill spuriously;
+  // with the budget honest it only deleted legitimate blank pages.
+  //
+  // Collapse MIDDLE pages whose ONLY blocks are visually empty —
   // these are pages created by stale page-break hints landing AFTER
   // empty placeholder paragraphs. LO collapses them; Sobree should
   // too. complex-multipage.docx has 2 such pages (intentional

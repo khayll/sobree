@@ -26,11 +26,19 @@ function paraWithImg(): HTMLElement {
 }
 
 describe("collapseTrailingEmptyPages", () => {
-  it("absorbs a trailing all-empty page into the previous page", () => {
+  it("keeps a trailing all-empty page (Word/LO print the blank when it overflowed)", () => {
+    // Trailing empty paragraphs are ordinary blocks: when they FIT the
+    // last content page the paginator never emits an extra page in the
+    // first place; when this pass sees a trailing all-empty page, the
+    // empties genuinely OVERFLOWED and Word/LO print a real blank page
+    // (pentest-engineer: LO's page 3 has zero text lines). The old
+    // unconditional absorb-down existed to mask phantom page-fill and,
+    // on nih-icsc, forced empties onto a page whose table rows already
+    // overlapped the footer zone.
     const pages = [[p("alpha")], [p(""), p("")]];
     const out = collapseTrailingEmptyPages(pages);
-    expect(out).toHaveLength(1);
-    expect(out[0]?.map((el) => el.textContent ?? "")).toEqual(["alpha", "", ""]);
+    expect(out).toHaveLength(2);
+    expect(out[1]?.map((el) => el.textContent ?? "")).toEqual(["", ""]);
   });
 
   it("leaves a real last page alone", () => {
