@@ -56,11 +56,25 @@ export function mergeRunStyleLayer(base: RunProperties, over: RunProperties): Ru
 export function resolveStyleCascade(
   styles: readonly NamedStyle[] | SobreeDocument,
   styleId: string | undefined,
+  opts?: {
+    /**
+     * The `w:tblStyle` of the table CONTAINING the paragraph. Per
+     * ECMA-376 §17.7.2 a TABLE style's own `<w:pPr>`/`<w:rPr>` apply to
+     * every paragraph inside the table, layered BETWEEN DocDefaults and
+     * the paragraph's style. Word's built-in `TableGrid` declares
+     * `<w:spacing w:after="0" w:line="240"/>` this way — cell
+     * paragraphs render single-spaced with no after-gap even when
+     * DocDefaults says `line=276 after=200`. Skipping this layer made
+     * every TableGrid cell ~1.4pt/line taller than Word/LibreOffice,
+     * compounding into extra pages on table-heavy documents.
+     */
+    tableStyleId?: string;
+  },
 ): { runDefaults: RunProperties; paragraphDefaults: ParagraphProperties } {
   const list = Array.isArray(styles)
     ? (styles as readonly NamedStyle[])
     : (styles as SobreeDocument).styles;
-  const chain = collectStyleChain(list, styleId);
+  const chain = collectStyleChain(list, styleId, opts?.tableStyleId);
   // Build base-up: deeper inherited defaults first, the block's own
   // style last so it wins on conflict.
   //
@@ -129,6 +143,7 @@ function mergeParagraphDefaults(
 function collectStyleChain(
   styles: readonly NamedStyle[],
   styleId: string | undefined,
+  tableStyleId?: string,
 ): NamedStyle[] {
   const out: NamedStyle[] = [];
   const seen = new Set<string>();
@@ -159,12 +174,30 @@ function collectStyleChain(
     walk(findNormalAnchor(styles)?.id);
   }
 
-  // 3. DocDefaults is the document-wide base and applies to EVERYTHING.
-  //    The walks above reach it when a chain threads through Normal; a
-  //    standalone style doesn't, so ensure it's present (the importer
-  //    synthesises it from `<w:docDefaults>` under this id).
+  // 3. For a paragraph INSIDE a table, the TABLE style's own pPr/rPr
+  //    layer applies UNDER the paragraph style but OVER DocDefaults
+  //    (ECMA-376 §17.7.2 ordering: docDefaults → table style →
+  //    numbering → paragraph style → direct). Appending the table
+  //    chain here — after the paragraph chain, before DocDefaults —
+  //    gives exactly that precedence in the base-first merge. The
+  //    `seen` set keeps a style that appears in both chains at its
+  //    leafmost (higher-precedence) position.
+  if (tableStyleId) {
+    walk(tableStyleId);
+  }
+
+  // 4. DocDefaults is the document-wide base and applies to EVERYTHING —
+  //    it must be the LAST array entry so the base-first merge applies
+  //    it before every other layer. The walks above may have captured it
+  //    mid-array (Normal's basedOn chain reaches it BEFORE the table
+  //    chain was appended, which would wrongly re-apply DocDefaults on
+  //    top of the table style's pPr) — hoist it to the end.
   const docDefaults = styles.find((x) => x.id === "DocDefaults");
-  if (docDefaults && !seen.has(docDefaults.id)) out.push(docDefaults);
+  if (docDefaults) {
+    const at = out.indexOf(docDefaults);
+    if (at !== -1) out.splice(at, 1);
+    out.push(docDefaults);
+  }
 
   return out;
 }

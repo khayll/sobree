@@ -51,6 +51,11 @@ export function renderBlocks(
   /** `<w:noColumnBalance/>` — fill multi-column sections column-first even
    *  at continuous breaks (document-wide opt-out of column balancing). */
   noColumnBalance = false,
+  /** `w:tblStyle` of the CONTAINING table when these blocks are a cell's
+   *  content — layers the table style's own pPr/rPr under each
+   *  paragraph's style (ECMA-376 §17.7.2). Threaded from `renderTable`
+   *  via the cell-renderer wrapper below. */
+  tableStyleId?: string,
 ): void {
   // Outline numbers ("1", "1.1", …) for headings whose style links a
   // numbering definition — computed in one document-order pass, stamped as
@@ -179,6 +184,7 @@ export function renderBlocks(
         (block as Paragraph).properties,
         styles,
         contextualNeighborsFor(i),
+        tableStyleId,
       );
       applyListItemLevel(li, block, numbering);
       stampBlockRevision(li, (block as Paragraph).properties);
@@ -201,6 +207,7 @@ export function renderBlocks(
       rawParts,
       nextSectionForBreak,
       block.kind === "paragraph" ? contextualNeighborsFor(i) : undefined,
+      tableStyleId,
     );
     if (rendered) {
       if (id) rendered.setAttribute(BLOCK_ID_ATTR, id);
@@ -286,15 +293,46 @@ function renderBlock(
   rawParts: Record<string, Uint8Array>,
   nextSection?: SectionProperties,
   contextualNeighbors?: ContextualNeighbors,
+  tableStyleId?: string,
 ): HTMLElement | null {
   if (block.kind === "paragraph")
-    return renderParagraph(block, styles, rawParts, contextualNeighbors);
-  if (block.kind === "table") return renderTable(block, renderBlocks, numbering, styles, rawParts);
+    return renderParagraph(block, styles, rawParts, contextualNeighbors, tableStyleId);
+  if (block.kind === "table") {
+    // The cell-renderer wrapper forwards the INNER table's own style id
+    // into its cells' cascade (nested tables take their own layer, not
+    // the outer table's — matching Word's per-table scoping).
+    return renderTable(block, renderCellContent, numbering, styles, rawParts);
+  }
   if (block.kind === "section_break") return renderSectionBreak(nextSection);
   if (block.kind === "inline_frame") {
     return renderInlineFrameBlock(block, numbering, styles, rawParts, renderBlocks);
   }
   return null;
+}
+
+/** Cell-content renderer handed to `renderTable`: plain `renderBlocks`
+ *  with the containing table's `w:tblStyle` threaded so every cell
+ *  paragraph's cascade includes the table style's pPr/rPr layer. */
+function renderCellContent(
+  blocks: readonly Block[],
+  host: HTMLElement,
+  numbering: readonly NumberingDefinition[],
+  styles: readonly NamedStyle[],
+  rawParts: Record<string, Uint8Array>,
+  tableStyleId?: string,
+): void {
+  renderBlocks(
+    blocks,
+    host,
+    numbering,
+    styles,
+    rawParts,
+    undefined,
+    [],
+    new Set(),
+    false,
+    tableStyleId,
+  );
 }
 
 /**

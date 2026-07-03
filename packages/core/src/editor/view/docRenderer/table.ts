@@ -34,6 +34,11 @@ export type RenderCellBlocks = (
   numbering: readonly NumberingDefinition[],
   styles: readonly NamedStyle[],
   rawParts: Record<string, Uint8Array>,
+  /** The containing table's `w:tblStyle` — cell paragraphs layer the
+   *  table style's own pPr/rPr under their paragraph style
+   *  (ECMA-376 §17.7.2; Word's `TableGrid` zeroes after-spacing and
+   *  singles line spacing for every cell paragraph this way). */
+  tableStyleId?: string,
 ) => void;
 
 /**
@@ -73,6 +78,7 @@ export function renderTable(
     colCount: countColumns(table),
     borders: effBorders,
     margins: effectiveCellMargins(table, styleDef),
+    tableStyleId: table.properties.styleId,
   };
 
   // Pre-compute rowspan per (row, col) for every restart cell.
@@ -123,6 +129,9 @@ interface CellStyleContext {
   /** Effective default cell padding (instance `<w:tblCellMar>` ?? style),
    *  per side in twips. Absent sides fall back to Word's default. */
   margins: TableCellMargins | undefined;
+  /** The table's `w:tblStyle` id — threaded into each cell paragraph's
+   *  style cascade (the table style's own pPr/rPr layer). */
+  tableStyleId: string | undefined;
 }
 
 function renderRow(
@@ -231,7 +240,7 @@ function renderCell(
   // alignment, font from style). Without this, per-paragraph properties
   // are silently dropped inside table cells.
   if (cell.content.length > 0) {
-    renderCellBlocks(cell.content, el, numbering, styles, rawParts);
+    renderCellBlocks(cell.content, el, numbering, styles, rawParts, cellCtx.tableStyleId);
     // Word/LibreOffice do not render the space-after of a cell's LAST
     // block — the cell ends at its bottom margin, not at the trailing
     // paragraph's spacing (LO models this as the Word-compat
