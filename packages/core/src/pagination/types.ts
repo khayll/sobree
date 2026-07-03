@@ -126,8 +126,22 @@ export function resolveConfig(cfg: Config): ResolvedConfig {
   };
 }
 
-/** Effective page budget for `pageIdx` — per-page override if present,
- *  global `pageHeight` otherwise. */
+/** Effective page budget for `pageIdx` — per-page override if present.
+ *
+ *  A pageIdx BEYOND the measured array extends the LAST measured page's
+ *  budget, not the global default: the per-page heights are measured
+ *  from the existing papers' real geometry (footer/footnote zone
+ *  reservations included), and a re-plan that produces MORE pages than
+ *  before creates pages with the same section geometry as their
+ *  predecessors. Falling back to the nominal `pageHeight` handed those
+ *  new tail pages an unreserved budget — nih-icsc's re-plan packed
+ *  871px of table rows into an 806px page (baseline said 885) and the
+ *  rows rendered over the footer zone. The global default applies only
+ *  when no page was measured at all (first iteration). */
 export function pageHeightAt(cfg: ResolvedConfig, pageIdx: number): number {
-  return cfg.pageHeights?.[pageIdx] ?? cfg.pageHeight;
+  const heights = cfg.pageHeights;
+  if (!heights || heights.length === 0) return cfg.pageHeight;
+  // Inside the measured range, a sparse hole still means "no override".
+  if (pageIdx < heights.length) return heights[pageIdx] ?? cfg.pageHeight;
+  return heights[heights.length - 1] ?? cfg.pageHeight;
 }

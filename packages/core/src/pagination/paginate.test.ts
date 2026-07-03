@@ -174,33 +174,40 @@ describe("paginate", () => {
     expect(pages[0]!.usedHeight).toBe(720); // 60 × 12
   });
 
-  it("9. per-page budgets: pageHeights[0]=300 shrinks page 1 only", () => {
-    // 100 × 12 boxes = 1200 total. Global pageHeight=720 (60 per page).
-    // pageHeights[0]=300 shrinks page 1 to 25 boxes; remaining 75 fall
-    // through to subsequent pages at the global 720 budget (60 each).
-    // Expected: page 1 has 25, page 2 has 60, page 3 has 15.
+  it("9. per-page budgets: pages beyond the array EXTEND the last measured height", () => {
+    // 100 × 12 boxes = 1200 total. Global pageHeight=720.
+    // pageHeights=[300]: page 1 gets 300 (25 boxes); pages BEYOND the
+    // measured array extend the LAST entry (300, 25 boxes each) — the
+    // measured heights carry the papers' real zone reservations, and a
+    // re-plan that creates MORE pages than were measured must not hand
+    // the new tail pages the unreserved global default (nih-icsc packed
+    // 871px of table rows into an 806px page that way, rendering rows
+    // over the footer zone). 100 boxes / 25 per page = 4 pages.
     const items = Array.from({ length: 100 }, () => box(12));
     const pages = paginate(items, { pageHeight: 720, pageHeights: [300] });
-    expect(pages).toHaveLength(3);
+    expect(pages).toHaveLength(4);
     expect(boxCount(pages[0]!.items)).toBe(25);
-    expect(boxCount(pages[1]!.items)).toBe(60);
-    expect(boxCount(pages[2]!.items)).toBe(15);
+    expect(boxCount(pages[1]!.items)).toBe(25);
+    expect(boxCount(pages[3]!.items)).toBe(25);
   });
 
-  it("10. per-page budgets: undefined entries fall back to global pageHeight", () => {
-    // Same setup as test 9 but with pageHeights sparse — only entry 1
-    // (page 2) is overridden to 120 (10 boxes). Page 0 uses global
-    // (60 boxes), page 1 uses 120 (10), page 2+ uses global again.
-    // 60 + 10 + 30 = 100 boxes across 3 pages.
+  it("10. per-page budgets: mid-array holes use the global; beyond-end extends the last", () => {
+    // heights [120, <hole>, 120]: page 1 → 120 (10 boxes); page 2's
+    // sparse hole means "no override" → global 720 (60 boxes); page 3 →
+    // 120 (10); pages BEYOND the array extend the last measured entry
+    // (120 → 10 each). 10 + 60 + 10 + 10 + 10 = 100 boxes, 5 pages.
     const items = Array.from({ length: 100 }, () => box(12));
+    const sparse: (number | undefined)[] = [120, undefined, 120];
     const pages = paginate(items, {
       pageHeight: 720,
-      pageHeights: [720, 120],
+      pageHeights: sparse as number[],
     });
-    expect(pages).toHaveLength(3);
-    expect(boxCount(pages[0]!.items)).toBe(60);
-    expect(boxCount(pages[1]!.items)).toBe(10);
-    expect(boxCount(pages[2]!.items)).toBe(30);
+    expect(pages).toHaveLength(5);
+    expect(boxCount(pages[0]!.items)).toBe(10);
+    expect(boxCount(pages[1]!.items)).toBe(60);
+    expect(boxCount(pages[2]!.items)).toBe(10);
+    expect(boxCount(pages[3]!.items)).toBe(10);
+    expect(boxCount(pages[4]!.items)).toBe(10);
   });
 
   it("8. keep-together: a 10-line paragraph near page bottom moves entirely to next page", () => {
