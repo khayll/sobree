@@ -1,5 +1,14 @@
 # @sobree/review
 
+## 0.1.51
+
+### Patch Changes
+
+- Updated dependencies [1fe74c0]
+- Updated dependencies [388cc6a]
+- Updated dependencies [463efef]
+  - @sobree/core@0.1.51
+
 ## 0.1.50
 
 ### Patch Changes

@@ -1,5 +1,39 @@
 # @sobree/core
 
+## 0.1.51
+
+### Patch Changes
+
+- 1fe74c0: Footer zones render like the body. Rich header/footer content no longer
+  inherits the zone's centred presentation default — alignment belongs to
+  each paragraph's own properties, and Word's default is left; centring
+  now applies only to legacy string-template zones ("Page {page} of
+  {pages}"). And `<a:spAutoFit/>` text boxes size to their TEXT: the
+  stored extent is only the last-saved size that Word/LibreOffice re-fit
+  on layout, so pinning it floated ljmu-letterhead's footer address block
+  ~13mm above Word's position (with the slack inside the box); the
+  auto-fit flag is read off `<wps:bodyPr>`, drives content-driven height
+  in the renderer, and round-trips through the Y.Doc.
+- 388cc6a: A host paragraph's tab grid no longer leaks into its inline frame's
+  text. `tab-size` is CSS-inherited, so the host paragraph's `<w:tabs>`
+  (applied to the frame wrapper with the rest of its properties) shadowed
+  the document's default tab grid for every paragraph inside the box —
+  ljmu-letterhead's footer socials line inherited the Footer style's
+  4513-twip centre stop as a 79.6mm tab advance and wrapped onto two
+  lines where Word's 720-twip default grid keeps it on one. Word resolves
+  a textbox's inner paragraphs against their OWN stops, falling back to
+  the document default.
+- 463efef: Inline text boxes and image source crops import faithfully. A lone
+  `<wp:inline>` text box (`wps:txbx`) was silently dropped — the guard
+  that skipped it deferred to a removed legacy pass, so a letterhead
+  footer holding its address block in one inline text box rendered
+  empty; it now imports as an InlineFrame, and header/footer parts run
+  the same inline-frame pass as the document body. `<a:srcRect>` image
+  crops are read (fractions on the AST), rendered via a clipping wrapper,
+  re-exported, and survive the Y.Doc round-trip — a multi-logo strip
+  cropped to one logo no longer shows the whole strip squeezed into the
+  extent.
+
 ## 0.1.50
 
 ### Patch Changes
