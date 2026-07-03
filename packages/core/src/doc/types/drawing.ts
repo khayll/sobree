@@ -22,6 +22,19 @@ export interface AnchoredFrame {
   anchor: AnchorOrigin;
   offsetXEmu: number;
   offsetYEmu: number;
+  /** Alignment keyword from `<wp:positionH><wp:align>` — Word's second
+   *  positioning form. When set the frame aligns within the
+   *  `horizontalFrom` base extent and `offsetXEmu` is 0. */
+  alignH?: "left" | "center" | "right";
+  /** `<wp:positionV><wp:align>` — vertical counterpart of `alignH`. */
+  alignV?: "top" | "center" | "bottom";
+  /** Percent position from `<wp14:pctPosHOffset>`, a 0–1 fraction of
+   *  the `horizontalFrom` base extent — Word's third positioning form. */
+  pctPosX?: number;
+  /** `<wp14:pctPosVOffset>` — vertical counterpart of `pctPosX`. A
+   *  footer "Page N" bar sits at `pctPosY: 1` from `margin`: its top
+   *  at 100% of the content height, i.e. at the bottom margin line. */
+  pctPosY?: number;
   widthEmu: number;
   heightEmu: number;
   /** Stacking order. Higher = on top. Default 0. */

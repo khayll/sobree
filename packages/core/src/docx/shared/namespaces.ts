@@ -20,6 +20,11 @@ export const NS = {
   wps: "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
   /** Word-processing groups (containers for shapes / pictures). */
   wpg: "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+  /** Word 2010 drawing extensions — percent-based anchor positions
+   *  (`<wp14:pctPosHOffset>` / `<wp14:pctPosVOffset>`). */
+  wp14: "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing",
+  /** Markup compatibility (`<mc:AlternateContent>` Choice/Fallback). */
+  mc: "http://schemas.openxmlformats.org/markup-compatibility/2006",
   /** VML — the legacy `<v:shape>` / `<w:pict>` path Word still emits
    *  for OLE-embedded images and some compatibility shapes. */
   v: "urn:schemas-microsoft-com:vml",

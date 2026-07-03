@@ -35,7 +35,14 @@ import { parseCustomGeometry } from "./customGeometry";
 import { firstChildNS } from "./dom";
 import { numAttr } from "./extents";
 import { readTextDistances } from "./margins";
-import { coerceHRelativeFrom, coerceVRelativeFrom, readPosOffset } from "./position";
+import {
+  coerceHRelativeFrom,
+  coerceVRelativeFrom,
+  findAnchorPositionEl,
+  readPctPos,
+  readPosAlign,
+  readPosOffset,
+} from "./position";
 import { expandPresetGeometry } from "./presetGeometry";
 import { normalizePartPath, readBlipEmbedPart } from "./relationships";
 import { readBorder, readGeometry, readSolidFill } from "./shapeProps";
@@ -266,6 +273,10 @@ function parseAnchoredFrame(
     heightEmu,
     content,
   };
+  if (offset.alignH) out.alignH = offset.alignH;
+  if (offset.alignV) out.alignV = offset.alignV;
+  if (offset.pctPosX !== undefined) out.pctPosX = offset.pctPosX;
+  if (offset.pctPosY !== undefined) out.pctPosY = offset.pctPosY;
   if (behindAttr === "1" || behindAttr === "true") out.behindText = true;
   const wrap = readWrapType(anchor);
   if (wrap) {
@@ -552,8 +563,8 @@ function readAnchorOrigin(
   drawing: Element,
   ctx: AnchoredFramesContext,
 ): AnchorOrigin {
-  const posH = firstChildNS(anchor, NS.wp, "positionH");
-  const posV = firstChildNS(anchor, NS.wp, "positionV");
+  const posH = findAnchorPositionEl(anchor, "positionH");
+  const posV = findAnchorPositionEl(anchor, "positionV");
   const horizontalFrom = posH ? coerceHRelativeFrom(posH.getAttribute("relativeFrom")) : "page";
   const verticalFrom = posV ? coerceVRelativeFrom(posV.getAttribute("relativeFrom")) : "page";
 
@@ -580,13 +591,33 @@ function readAnchorOrigin(
   return origin;
 }
 
-function readAnchorOffset(anchor: Element): { x: number; y: number } {
-  const posH = firstChildNS(anchor, NS.wp, "positionH");
-  const posV = firstChildNS(anchor, NS.wp, "positionV");
-  return {
+function readAnchorOffset(anchor: Element): {
+  x: number;
+  y: number;
+  alignH?: "left" | "center" | "right";
+  alignV?: "top" | "center" | "bottom";
+  pctPosX?: number;
+  pctPosY?: number;
+} {
+  const posH = findAnchorPositionEl(anchor, "positionH");
+  const posV = findAnchorPositionEl(anchor, "positionV");
+  // Word writes exactly ONE positioning form per axis: an EMU
+  // `<wp:posOffset>`, an `<wp:align>` keyword, or a percent
+  // `<wp14:pctPos*Offset>`. Read all three; the absent forms come back
+  // 0/undefined and the resolver picks the one that's set.
+  const out: ReturnType<typeof readAnchorOffset> = {
     x: readPosOffset(posH),
     y: readPosOffset(posV),
   };
+  const alignH = readPosAlign(posH);
+  if (alignH === "left" || alignH === "center" || alignH === "right") out.alignH = alignH;
+  const alignV = readPosAlign(posV);
+  if (alignV === "top" || alignV === "center" || alignV === "bottom") out.alignV = alignV;
+  const pctX = readPctPos(posH);
+  if (pctX !== undefined) out.pctPosX = pctX;
+  const pctY = readPctPos(posV);
+  if (pctY !== undefined) out.pctPosY = pctY;
+  return out;
 }
 
 function readSpPrXfrm(shape: Element): {

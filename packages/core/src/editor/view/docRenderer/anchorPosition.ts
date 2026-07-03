@@ -29,6 +29,19 @@ export interface AnchorGeometry {
    * a paragraph-anchored frame is never page-relative.
    */
   anchorParaTopEmu?: number | null;
+  /**
+   * Full page size in EMU. Required to resolve `align` / `pctPos*`
+   * positioning forms (they place the frame within the BASE EXTENT —
+   * the page box or the margin/content box — so the resolver needs the
+   * box's size, not just its origin). When absent, align/pct frames
+   * degrade to the base origin (offset-0 behaviour).
+   */
+  pageWidthEmu?: number;
+  pageHeightEmu?: number;
+  /** Right / bottom page margins in EMU — with the left/top margins
+   *  these bound the margin (content) box for align / pct resolution. */
+  marginRightEmu?: number;
+  marginBottomEmu?: number;
 }
 
 export function resolveAnchorPosition(
@@ -36,9 +49,61 @@ export function resolveAnchorPosition(
   geom: AnchorGeometry,
 ): { xEmu: number; yEmu: number } {
   return {
-    xEmu: horizontalBaseEmu(frame, geom) + frame.offsetXEmu,
-    yEmu: verticalBaseEmu(frame, geom) + frame.offsetYEmu,
+    xEmu: horizontalBaseEmu(frame, geom) + horizontalWithinBaseEmu(frame, geom),
+    yEmu: verticalBaseEmu(frame, geom) + verticalWithinBaseEmu(frame, geom),
   };
+}
+
+/**
+ * The frame's position WITHIN its base extent — one of Word's three
+ * per-axis forms: an EMU offset (`<wp:posOffset>`, the stored default),
+ * an alignment keyword (`<wp:align>` — centred page frames), or a
+ * percent of the base extent (`<wp14:pctPos*Offset>` — a footer bar at
+ * 100% of the margin box sits at the bottom margin line). Exactly one
+ * is set per axis; align/pct need the base extent from the geometry and
+ * fall back to the plain offset when the caller can't supply it.
+ */
+function horizontalWithinBaseEmu(frame: AnchoredFrame, geom: AnchorGeometry): number {
+  const extent = horizontalExtentEmu(frame, geom);
+  if (extent !== undefined) {
+    if (frame.alignH !== undefined) {
+      if (frame.alignH === "center") return (extent - frame.widthEmu) / 2;
+      if (frame.alignH === "right") return extent - frame.widthEmu;
+      return 0;
+    }
+    if (frame.pctPosX !== undefined) return frame.pctPosX * extent;
+  }
+  return frame.offsetXEmu;
+}
+
+function verticalWithinBaseEmu(frame: AnchoredFrame, geom: AnchorGeometry): number {
+  const extent = verticalExtentEmu(frame, geom);
+  if (extent !== undefined) {
+    if (frame.alignV !== undefined) {
+      if (frame.alignV === "center") return (extent - frame.heightEmu) / 2;
+      if (frame.alignV === "bottom") return extent - frame.heightEmu;
+      return 0;
+    }
+    if (frame.pctPosY !== undefined) return frame.pctPosY * extent;
+  }
+  return frame.offsetYEmu;
+}
+
+function horizontalExtentEmu(frame: AnchoredFrame, geom: AnchorGeometry): number | undefined {
+  if (geom.pageWidthEmu === undefined) return undefined;
+  if (frame.anchor.horizontalFrom === "page") return geom.pageWidthEmu;
+  if (geom.marginRightEmu === undefined) return undefined;
+  return geom.pageWidthEmu - geom.marginLeftEmu - geom.marginRightEmu;
+}
+
+function verticalExtentEmu(frame: AnchoredFrame, geom: AnchorGeometry): number | undefined {
+  if (geom.pageHeightEmu === undefined) return undefined;
+  if (frame.anchor.verticalFrom === "page") return geom.pageHeightEmu;
+  if (geom.marginBottomEmu === undefined) return undefined;
+  // Margin and paragraph bases share the content-box height; a
+  // paragraph-based align/pct is vanishingly rare and Word treats the
+  // extent as the content box there too.
+  return geom.pageHeightEmu - geom.marginTopEmu - geom.marginBottomEmu;
 }
 
 function verticalBaseEmu(frame: AnchoredFrame, geom: AnchorGeometry): number {

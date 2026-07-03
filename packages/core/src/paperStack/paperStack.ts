@@ -485,7 +485,18 @@ export class PaperStack {
         // into the header overlay. The same partId resolves on every
         // page that uses this header, and each paint builds independent
         // DOM, so a repeating header paints on every page with no cloning.
-        paper.setHeaderFrames(richZones.headerFooterFrames?.[header.partId] ?? [], ctx);
+        paper.setHeaderFrames(richZones.headerFooterFrames?.[header.partId] ?? [], ctx, {
+          pageNumber: pageNum,
+          totalPages: pages,
+        });
+      } else if (richZones) {
+        // The document HAS rich zones but declares none for this page
+        // (titlePg with no first ref, or a first-only ref past page 1):
+        // Word renders a BLANK zone. Falling into the template branch
+        // painted Sobree's native "Page N of M" chrome onto pages the
+        // document deliberately leaves empty.
+        paper.setHeaderText("");
+        paper.setHeaderFrames([], this.emptyAnchorCtx());
       } else {
         const hTpl = zoneTemplateFor(this.setup.header, pageNum, pages);
         paper.setHeaderText(substituteVariables(hTpl, { page: pageNum, pages }));
@@ -501,7 +512,14 @@ export class PaperStack {
           pageNumber: pageNum,
           totalPages: pages,
         });
-        paper.setFooterFrames(richZones.headerFooterFrames?.[footer.partId] ?? [], ctx);
+        paper.setFooterFrames(richZones.headerFooterFrames?.[footer.partId] ?? [], ctx, {
+          pageNumber: pageNum,
+          totalPages: pages,
+        });
+      } else if (richZones) {
+        // See the header branch: declared-blank zones stay blank.
+        paper.setFooterText("");
+        paper.setFooterFrames([], this.emptyAnchorCtx());
       } else {
         const fTpl = zoneTemplateFor(this.setup.footer, pageNum, pages);
         paper.setFooterText(substituteVariables(fTpl, { page: pageNum, pages }));
@@ -655,37 +673,33 @@ export class PaperStack {
     isFirstOfSection: boolean,
   ): { partId: string; body: readonly Block[] } | null {
     if (!this.richZones || !this.sections) return null;
-    // OOXML §17.10.3: when a section omits headerReference / footerReference,
-    // the corresponding zone is inherited from the prior section. Walk back
-    // until we find a section that declares refs; bail at section 0. This
-    // is how multi-section forms (jellap.docx) keep a single header part
-    // across continuous section breaks even though only section 0 names it.
-    let lookupIdx = sectionIdx;
-    let section: SectionProperties | undefined;
-    while (lookupIdx >= 0) {
+    // Which TYPE this page needs (OOXML §17.10.4-6): with titlePg on the
+    // page's OWN section, the section's first page uses the `first` ref;
+    // every other page the `default`. There is NO cross-type fallback —
+    // a missing type means a BLANK zone (Word materialises an empty
+    // one). The healthcare CV declares ONLY a first header + ONLY a
+    // default footer: fallbacks leaked the "Page N" footer onto the
+    // title page and the first-page frame decorations onto later pages.
+    // Even-page support is a future addition.
+    const current = this.sections[sectionIdx];
+    const wanted = isFirstOfSection && current?.titlePage === true ? "first" : "default";
+    // OOXML §17.10.3: inheritance is PER TYPE — a section that declares
+    // no ref of the wanted type inherits THAT type from the prior
+    // section, even when it declares refs of other types (cms's later
+    // sections declare only first-page footers yet keep the chapter
+    // footer on their body pages). Walk back until some section
+    // declares the wanted type; bail at section 0.
+    for (let lookupIdx = sectionIdx; lookupIdx >= 0; lookupIdx--) {
       const candidate = this.sections[lookupIdx];
-      if (candidate) {
-        const refs = kind === "header" ? candidate.headerRefs : candidate.footerRefs;
-        if (refs.length > 0) {
-          section = candidate;
-          break;
-        }
-      }
-      lookupIdx -= 1;
+      if (!candidate) continue;
+      const refs = kind === "header" ? candidate.headerRefs : candidate.footerRefs;
+      const preferred = refs.find((r) => r.type === wanted);
+      if (!preferred) continue;
+      const body = this.richZones.headerFooterBodies[preferred.partId];
+      if (body === undefined) return null;
+      return { partId: preferred.partId, body };
     }
-    if (!section) return null;
-    const refs = kind === "header" ? section.headerRefs : section.footerRefs;
-    if (refs.length === 0) return null;
-    // Type preference: titlePage + first-of-section → `first`,
-    // otherwise → `default`. Even-page support is a future addition.
-    const preferred =
-      isFirstOfSection && section.titlePage === true
-        ? (refs.find((r) => r.type === "first") ?? refs.find((r) => r.type === "default"))
-        : (refs.find((r) => r.type === "default") ?? refs[0]);
-    if (!preferred) return null;
-    const body = this.richZones.headerFooterBodies[preferred.partId];
-    if (body === undefined) return null;
-    return { partId: preferred.partId, body };
+    return null;
   }
 }
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { coerceHRelativeFrom, coerceVRelativeFrom, readPosOffset } from "./position";
+import {
+  coerceHRelativeFrom,
+  coerceVRelativeFrom,
+  findAnchorPositionEl,
+  readPctPos,
+  readPosAlign,
+  readPosOffset,
+} from "./position";
 import { el } from "./testUtil";
 
 describe("position — relativeFrom coercion", () => {
@@ -40,5 +47,84 @@ describe("position — posOffset", () => {
         el(`<wp:positionH relativeFrom="page"><wp:align>left</wp:align></wp:positionH>`),
       ),
     ).toBe(0);
+  });
+});
+
+describe("position — align keyword", () => {
+  it("reads <wp:align> center", () => {
+    const posV = el(`<wp:positionV relativeFrom="page"><wp:align>center</wp:align></wp:positionV>`);
+    expect(readPosAlign(posV)).toBe("center");
+  });
+
+  it("collapses book-fold inside/outside onto the odd-page side per axis", () => {
+    expect(
+      readPosAlign(
+        el(`<wp:positionH relativeFrom="margin"><wp:align>inside</wp:align></wp:positionH>`),
+      ),
+    ).toBe("left");
+    expect(
+      readPosAlign(
+        el(`<wp:positionV relativeFrom="margin"><wp:align>outside</wp:align></wp:positionV>`),
+      ),
+    ).toBe("bottom");
+  });
+
+  it("returns undefined for offset-form positions and null elements", () => {
+    expect(
+      readPosAlign(
+        el(`<wp:positionV relativeFrom="page"><wp:posOffset>100</wp:posOffset></wp:positionV>`),
+      ),
+    ).toBeUndefined();
+    expect(readPosAlign(null)).toBeUndefined();
+  });
+});
+
+describe("position — wp14 percent offset", () => {
+  it("normalises 1/1000-percent to a 0-1 fraction", () => {
+    const posV = el(
+      `<wp:positionV relativeFrom="margin"><wp14:pctPosVOffset>100000</wp14:pctPosVOffset></wp:positionV>`,
+    );
+    expect(readPctPos(posV)).toBe(1);
+    const posH = el(
+      `<wp:positionH relativeFrom="page"><wp14:pctPosHOffset>25000</wp14:pctPosHOffset></wp:positionH>`,
+    );
+    expect(readPctPos(posH)).toBe(0.25);
+  });
+
+  it("returns undefined when absent", () => {
+    expect(
+      readPctPos(el(`<wp:positionV relativeFrom="page"><wp:align>top</wp:align></wp:positionV>`)),
+    ).toBeUndefined();
+    expect(readPctPos(null)).toBeUndefined();
+  });
+});
+
+describe("position — mc:AlternateContent-wrapped positions", () => {
+  it("finds the Choice-branch positionV (Word's percent-form wrapper)", () => {
+    const anchor = el(
+      `<wp:anchor behindDoc="0">` +
+        `<wp:positionH relativeFrom="margin"><wp:align>center</wp:align></wp:positionH>` +
+        `<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">` +
+        `<mc:Choice Requires="wp14"><wp:positionV relativeFrom="margin"><wp14:pctPosVOffset>100000</wp14:pctPosVOffset></wp:positionV></mc:Choice>` +
+        `<mc:Fallback><wp:positionV relativeFrom="page"><wp:posOffset>9372600</wp:posOffset></wp:positionV></mc:Fallback>` +
+        "</mc:AlternateContent>" +
+        "</wp:anchor>",
+    );
+    const posV = findAnchorPositionEl(anchor, "positionV");
+    expect(posV?.getAttribute("relativeFrom")).toBe("margin");
+    expect(readPctPos(posV)).toBe(1);
+    // The direct positionH still resolves directly.
+    expect(readPosAlign(findAnchorPositionEl(anchor, "positionH"))).toBe("center");
+  });
+
+  it("uses the Fallback branch when no Choice carries the position", () => {
+    const anchor = el(
+      `<wp:anchor behindDoc="0">` +
+        `<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">` +
+        `<mc:Fallback><wp:positionV relativeFrom="page"><wp:posOffset>123</wp:posOffset></wp:positionV></mc:Fallback>` +
+        "</mc:AlternateContent>" +
+        "</wp:anchor>",
+    );
+    expect(readPosOffset(findAnchorPositionEl(anchor, "positionV"))).toBe(123);
   });
 });
