@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { defaultSection } from "../doc/builders/document";
 import type { AnchoredFrame } from "../doc/types";
 import { DEFAULT_PAGE_SETUP } from "./pageSetup";
 import { type AnchorRenderDeps, PaperStack, collapseTrailingEmptyPages } from "./paperStack";
@@ -138,5 +139,79 @@ describe("PaperStack anchored frames — independent of header/footer rich zones
     stack.setAnchoredFrames([bgFrame], deps);
     stack.setAnchoredFrames(null, deps);
     expect(container.querySelectorAll(".paper-anchor")).toHaveLength(0);
+  });
+});
+
+describe("rich zone selection — titlePg + per-type inheritance", () => {
+  function para(text: string) {
+    return {
+      kind: "paragraph" as const,
+      properties: {},
+      runs: [{ kind: "text" as const, text, properties: {} }],
+    };
+  }
+
+  type ZonePick = { partId: string } | null;
+  type Pickable = {
+    pickRichZone(k: "header" | "footer", si: number, first: boolean): ZonePick;
+  };
+
+  function stackWithZones(
+    sections: Parameters<PaperStack["setSections"]>[0],
+    bodies: Record<string, ReturnType<typeof para>[]>,
+  ): Pickable {
+    const container = doc.createElement("div");
+    doc.body.appendChild(container);
+    const stack = new PaperStack(container, DEFAULT_PAGE_SETUP);
+    stack.setSections(sections);
+    stack.setRichZones({
+      headerFooterBodies: bodies,
+      numbering: [],
+      styles: [],
+      rawParts: {},
+    });
+    return stack as unknown as Pickable;
+  }
+
+  it("titlePg with only a first header + only a default footer blanks the missing types", () => {
+    // The healthcare CV shape: Word shows the first header ONLY on page 1
+    // and the default footer ONLY on pages 2+ — no cross-type borrowing.
+    const section = {
+      ...defaultSection(),
+      titlePage: true,
+      headerRefs: [{ type: "first" as const, partId: "header1.xml" }],
+      footerRefs: [{ type: "default" as const, partId: "footer1.xml" }],
+    };
+    const stack = stackWithZones([section], {
+      "header1.xml": [para("FIRST HEADER")],
+      "footer1.xml": [para("Page N")],
+    });
+    expect(stack.pickRichZone("header", 0, true)?.partId).toBe("header1.xml");
+    expect(stack.pickRichZone("header", 0, false)).toBeNull(); // no default header → blank
+    expect(stack.pickRichZone("footer", 0, true)).toBeNull(); // no first footer → blank title page
+    expect(stack.pickRichZone("footer", 0, false)?.partId).toBe("footer1.xml");
+  });
+
+  it("a section declaring only a first footer inherits the DEFAULT footer per type", () => {
+    // OOXML §17.10.3 — inheritance is per TYPE: cms's later sections
+    // declare only first-page footers yet keep the chapter footer on
+    // their body pages.
+    const s0 = {
+      ...defaultSection(),
+      footerRefs: [{ type: "default" as const, partId: "footerA.xml" }],
+    };
+    const s1 = {
+      ...defaultSection(),
+      titlePage: true,
+      footerRefs: [{ type: "first" as const, partId: "footerB.xml" }],
+    };
+    const stack = stackWithZones([s0, s1], {
+      "footerA.xml": [para("CHAPTER FOOTER")],
+      "footerB.xml": [para("SECTION COVER")],
+    });
+    // Section 1's body pages: default lookup walks back to section 0.
+    expect(stack.pickRichZone("footer", 1, false)?.partId).toBe("footerA.xml");
+    // Section 1's first page keeps its own first footer.
+    expect(stack.pickRichZone("footer", 1, true)?.partId).toBe("footerB.xml");
   });
 });

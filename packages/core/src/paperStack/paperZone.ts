@@ -56,9 +56,15 @@ export function paintZoneFrames(
   overlay: HTMLElement,
   frames: readonly AnchoredFrame[],
   ctx: AnchorLayerContext,
+  page?: { pageNumber: number; totalPages: number },
 ): void {
   const fresh = renderAnchorLayer(frames, ctx);
   overlay.replaceChildren(...Array.from(fresh.children));
+  // A zone frame can be a TEXTBOX carrying PAGE / NUMPAGES fields (the
+  // classic "Page N" bar is an anchored textbox, not zone flow text) —
+  // give it the same per-paper substitution the flow path gets, or the
+  // field shows Word's stale cached value on every page.
+  if (page) substituteFieldNodes(overlay, page.pageNumber, page.totalPages);
   overlay.classList.toggle("is-empty", frames.length === 0);
 }
 
@@ -82,6 +88,9 @@ export function setZoneText(zone: HTMLElement, text: string): void {
  * concern in one place.
  */
 function substituteFieldNodes(zone: HTMLElement, pageNumber: number, totalPages: number): void {
+  // Shared by the zone FLOW path (renderZone) and the zone FRAME path
+  // (paintZoneFrames) — both render through `renderBlocks`, so fields
+  // arrive as the same `span.sobree-field` nodes either way.
   const fields = zone.querySelectorAll<HTMLElement>("span.sobree-field");
   for (const field of Array.from(fields)) {
     // Match the field TYPE, not the whole instruction — Word appends

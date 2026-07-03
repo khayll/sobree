@@ -208,31 +208,43 @@ export class Paper {
    * flow (so `verticalFrom="paragraph"` anchors to a header paragraph).
    * Pass `[]` to clear. Mirrors `setAnchoredFrames` for body.
    */
-  setHeaderFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
+  setHeaderFrames(
+    frames: readonly AnchoredFrame[],
+    ctx: AnchorLayerContext,
+    page?: { pageNumber: number; totalPages: number },
+  ): void {
     const resolved = this.resolveFrames(frames, this.header);
     paintZoneFrames(
       this.headerAnchorsBehind,
       resolved.filter((f) => f.behindText),
       ctx,
+      page,
     );
     paintZoneFrames(
       this.headerAnchors,
       resolved.filter((f) => !f.behindText),
       ctx,
+      page,
     );
   }
 
-  setFooterFrames(frames: readonly AnchoredFrame[], ctx: AnchorLayerContext): void {
+  setFooterFrames(
+    frames: readonly AnchoredFrame[],
+    ctx: AnchorLayerContext,
+    page?: { pageNumber: number; totalPages: number },
+  ): void {
     const resolved = this.resolveFrames(frames, this.footer);
     paintZoneFrames(
       this.footerAnchorsBehind,
       resolved.filter((f) => f.behindText),
       ctx,
+      page,
     );
     paintZoneFrames(
       this.footerAnchors,
       resolved.filter((f) => !f.behindText),
       ctx,
+      page,
     );
   }
 
@@ -263,6 +275,16 @@ export class Paper {
         : parsePxFromMm(this.root.style.getPropertyValue("--margin-top"))) * EMU_PER_PX;
     const marginLeftEmu =
       parsePxFromMm(this.root.style.getPropertyValue("--margin-left")) * EMU_PER_PX;
+    // Base-extent geometry for `align` / `pctPos*` positioned frames —
+    // those place the frame within the page or margin BOX, so the
+    // resolver needs the box sizes, not just its origins. Read from the
+    // same root styles `applySetup` wrote (mm), converted to EMU.
+    const pageWidthEmu = parsePxFromMm(this.root.style.width) * EMU_PER_PX;
+    const pageHeightEmu = parsePxFromMm(this.root.style.height) * EMU_PER_PX;
+    const marginRightEmu =
+      parsePxFromMm(this.root.style.getPropertyValue("--margin-right")) * EMU_PER_PX;
+    const marginBottomEmu =
+      parsePxFromMm(this.root.style.getPropertyValue("--margin-bottom")) * EMU_PER_PX;
     return frames.map((f) => {
       let anchorParaTopEmu: number | null = null;
       if (f.anchor.verticalFrom === "paragraph" && f.anchor.paragraphIndex !== undefined) {
@@ -275,6 +297,10 @@ export class Paper {
         marginTopEmu,
         marginLeftEmu,
         anchorParaTopEmu,
+        pageWidthEmu,
+        pageHeightEmu,
+        marginRightEmu,
+        marginBottomEmu,
       });
       return { ...f, offsetXEmu: xEmu, offsetYEmu: yEmu };
     });

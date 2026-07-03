@@ -47,8 +47,16 @@ export function readSolidFill(shape: Element, theme?: ThemePalette): string | un
   const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   if (spPr) {
     for (const fill of Array.from(spPr.children)) {
-      if (fill.namespaceURI === NS.a && fill.localName === "solidFill") {
+      if (fill.namespaceURI !== NS.a) continue;
+      if (fill.localName === "solidFill") {
         return readDrawingColor(fill, theme);
+      }
+      // Explicit `<a:noFill/>` OVERRIDES the style fillRef (ECMA-376
+      // §20.1.4.1.14 — direct spPr fill wins over the style reference).
+      // Falling through painted outline-only frame shapes with the
+      // gallery's default white fill, covering everything behind them.
+      if (fill.localName === "noFill") {
+        return undefined;
       }
     }
   }
@@ -87,16 +95,34 @@ export function readBorder(
   const spPr = firstChildNS(shape, NS.wps, "spPr") ?? firstChildNS(shape, NS.pic, "spPr");
   const ln = spPr ? firstChildNS(spPr, NS.a, "ln") : null;
   if (ln) {
+    // `<a:ln><a:noFill/></a:ln>` is an EXPLICIT no-stroke — it must not
+    // fall back to the style lnRef (a gallery shape with its outline
+    // removed in Word would grow one back).
+    if (firstChildNS(ln, NS.a, "noFill")) return undefined;
     const widthEmu = numAttr(ln, "w");
     const solidFill = firstChildNS(ln, NS.a, "solidFill");
     const color = solidFill ? readDrawingColor(solidFill, theme) : undefined;
-    if (!color) return undefined;
     const prstDash = firstChildNS(ln, NS.a, "prstDash");
-    return {
-      color,
-      widthEmu: widthEmu || 0,
-      style: coerceBorderStyle(prstDash?.getAttribute("val")),
-    };
+    if (color) {
+      return {
+        color,
+        widthEmu: widthEmu || 0,
+        style: coerceBorderStyle(prstDash?.getAttribute("val")),
+      };
+    }
+    // Direct `<a:ln w>` with no colour child: the WIDTH is direct, the
+    // COLOUR comes from the style lnRef (Word merges the two — a page
+    // frame with `<a:ln w="12700"/>` + `<a:lnRef><a:schemeClr>` draws a
+    // 1pt themed line; returning undefined dropped the frame outline).
+    const ref = readStyleRefBorder(shape, theme, themeLineWidthsEmu);
+    if (ref) {
+      return {
+        color: ref.color,
+        widthEmu: widthEmu || ref.widthEmu,
+        style: coerceBorderStyle(prstDash?.getAttribute("val")),
+      };
+    }
+    return undefined;
   }
   // No DIRECT outline: fall back to the shape-STYLE reference, the way
   // ribbon-inserted gallery shapes record their default thin outline. The

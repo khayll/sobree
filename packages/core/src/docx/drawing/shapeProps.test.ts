@@ -124,3 +124,46 @@ describe("shapeProps — border", () => {
     });
   });
 });
+
+describe("readSolidFill — explicit noFill overrides the style fillRef", () => {
+  it("a noFill shape with a gallery style stays unfilled", () => {
+    // Outline-only page-frame decorations (thesis/CV borders) carry
+    // <a:noFill/> in spPr plus a <wps:style><a:fillRef> from the shape
+    // gallery. Direct spPr fill wins (ECMA-376 §20.1.4.1.14) — falling
+    // through to the fillRef painted them opaque white, covering
+    // everything behind.
+    const wsp = el(
+      "<wps:wsp>" +
+        `<wps:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></wps:spPr>` +
+        `<wps:style><a:fillRef idx="1"><a:srgbClr val="FFFFFF"/></a:fillRef></wps:style>` +
+        "</wps:wsp>",
+    );
+    expect(readSolidFill(wsp)).toBeUndefined();
+  });
+});
+
+describe("readBorder — direct width merges with style lnRef colour", () => {
+  it("ln w + colourless ln takes the stroke colour from the lnRef", () => {
+    const wsp = el(
+      "<wps:wsp>" +
+        `<wps:spPr><a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom><a:ln w="12700"/></wps:spPr>` +
+        `<wps:style><a:lnRef idx="1"><a:srgbClr val="D9D9D9"/></a:lnRef></wps:style>` +
+        "</wps:wsp>",
+    );
+    expect(readBorder(wsp, undefined, [6350])).toEqual({
+      color: "#D9D9D9",
+      widthEmu: 12700,
+      style: "solid",
+    });
+  });
+
+  it("an explicit <a:ln><a:noFill/> never falls back to the lnRef", () => {
+    const wsp = el(
+      "<wps:wsp>" +
+        `<wps:spPr><a:ln w="6350"><a:noFill/></a:ln></wps:spPr>` +
+        `<wps:style><a:lnRef idx="1"><a:srgbClr val="FF0000"/></a:lnRef></wps:style>` +
+        "</wps:wsp>",
+    );
+    expect(readBorder(wsp, undefined, [6350])).toBeUndefined();
+  });
+});

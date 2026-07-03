@@ -13,6 +13,7 @@ const NS_ATTRS = [
   `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"`,
   `xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"`,
   `xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"`,
+  `xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"`,
 ].join(" ");
 
 /** Parse `<prefix:tag …>…</…>` and return the root element. The namespace
