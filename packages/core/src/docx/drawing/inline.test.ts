@@ -321,6 +321,44 @@ describe("parseInlineFrames", () => {
     expect(frames[0]!.frame.textboxes).toHaveLength(1);
   });
 
+  it("reads <a:spAutoFit/> as textbox.autoFit (height tracks the text)", () => {
+    // ljmu letterhead's footer: the saved extent is stale; Word/LO re-fit
+    // the shape to its text on layout. Without the flag the renderer pins
+    // the stale height and the footer text floats above Word's position.
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:inline>
+        <wp:extent cx="3930650" cy="1404620"/>
+        <a:graphic><a:graphicData>
+          <wps:wsp>
+            <wps:spPr><a:prstGeom prst="rect"/></wps:spPr>
+            <wps:txbx><w:txbxContent><w:p>Department Name</w:p></w:txbxContent></wps:txbx>
+            <wps:bodyPr anchor="t"><a:spAutoFit/></wps:bodyPr>
+          </wps:wsp>
+        </a:graphicData></a:graphic>
+      </wp:inline>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseInlineFrames(doc, emptyCtx);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]!.frame.textboxes[0]!.autoFit).toBe(true);
+  });
+
+  it("leaves autoFit unset for <a:noAutofit/> boxes", () => {
+    const doc = xml(`<w:body><w:p><w:r><w:drawing>
+      <wp:inline>
+        <wp:extent cx="914400" cy="914400"/>
+        <a:graphic><a:graphicData>
+          <wps:wsp>
+            <wps:spPr><a:prstGeom prst="rect"/></wps:spPr>
+            <wps:txbx><w:txbxContent><w:p>pill</w:p></w:txbxContent></wps:txbx>
+            <wps:bodyPr anchor="ctr"><a:noAutofit/></wps:bodyPr>
+          </wps:wsp>
+        </a:graphicData></a:graphic>
+      </wp:inline>
+    </w:drawing></w:r></w:p></w:body>`);
+    const frames = parseInlineFrames(doc, emptyCtx);
+    expect(frames[0]!.frame.textboxes[0]!.autoFit).toBeUndefined();
+  });
+
   it("merges a tab-separated ROW of bare inline textboxes into one frame", () => {
     // Three 1in placeholder boxes separated by tabs — the lifter drops
     // these, so the parser claims them and lays them across the content

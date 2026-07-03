@@ -118,6 +118,13 @@ export interface InlineFrameTextbox {
   };
   /** Vertical text anchor from `<wps:bodyPr anchor>`; defaults to "top". */
   vAlign?: "top" | "center" | "bottom";
+  /** `<a:spAutoFit/>` in `<wps:bodyPr>`: the shape's HEIGHT tracks its
+   *  text — the stored extent is only the last-saved size, and Word/LO
+   *  re-fit on layout. The renderer sizes such a box by its content
+   *  instead of pinning the stale extent (ljmu letterhead's footer
+   *  address box saved 36.9mm tall for ~20mm of text; pinning pushed
+   *  the text ~13mm above where Word renders it). */
+  autoFit?: boolean;
 }
 
 export interface InlineFrame {

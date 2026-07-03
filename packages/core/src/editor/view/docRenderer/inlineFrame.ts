@@ -63,12 +63,19 @@ export function renderInlineFrameBlock(
   // page boundaries. Width is the content width (100%) so the frame
   // fills the body column; pictures scale by sizeEmu / groupExtentEmu.
   // An inline drawing occupies EXACTLY its `<wp:extent>` in the body flow —
-  // a fixed box, like a tall glyph. It never grows to its content: the
-  // textboxes are `<a:noAutofit/>` (Word never resizes them), so overflowing
-  // text spills VISIBLY but does not change the frame's flow height. Pinning
-  // the height to the rendered extent is what keeps pagination matching
-  // Word's page count (a `min-height` that grows would inflate page count).
-  wrapper.style.height = `${emuToMm(frame.sizeEmu.hEmu)}mm`;
+  // a fixed box, like a tall glyph. For `<a:noAutofit/>` textboxes (Word
+  // never resizes them) overflowing text spills VISIBLY but does not
+  // change the frame's flow height; pinning the height to the rendered
+  // extent is what keeps pagination matching Word's page count.
+  //
+  // `<a:spAutoFit/>` is the opposite contract: the shape HEIGHT TRACKS
+  // ITS TEXT and the stored extent is only the last-saved size — Word/LO
+  // re-fit on layout. For a prose frame whose every textbox auto-fits,
+  // the flow height must be the CONTENT height (ljmu letterhead's footer
+  // box saved 36.9mm tall for ~20mm of address text; pinning the stale
+  // extent floated the text ~13mm above Word's render).
+  const autoFit = frame.textboxes.length > 0 && frame.textboxes.every((tb) => tb.autoFit === true);
+  if (!autoFit) wrapper.style.height = `${emuToMm(frame.sizeEmu.hEmu)}mm`;
   wrapper.style.overflow = "visible";
   // `.paper-content` is a flex column, so the frame is a flex item. Its
   // children are all absolutely positioned (no in-flow content), so the
@@ -160,14 +167,22 @@ export function renderInlineFrameBlock(
 
   frame.textboxes.forEach((tb, i) => {
     const region = document.createElement("div");
-    // Every textbox is a fixed-size box positioned at its group-local
-    // offset (both axes scaled by %-of-groupExtent, so sy applies). The
-    // box NEVER changes the frame's flow height — that's the extent.
-    region.style.position = "absolute";
-    region.style.left = `${pctX(tb.offsetEmu.xEmu)}%`;
-    region.style.top = `${pctY(tb.offsetEmu.yEmu)}%`;
-    region.style.width = `${pctX(tb.sizeEmu.wEmu)}%`;
-    region.style.height = `${pctY(tb.sizeEmu.hEmu)}%`;
+    if (autoFit && prose) {
+      // Auto-fit prose box: in flow, height driven by its text — the
+      // wrapper (and therefore pagination) measures the real content.
+      region.style.position = "relative";
+      region.style.width = `${pctX(tb.sizeEmu.wEmu)}%`;
+    } else {
+      // Every noAutofit textbox is a fixed-size box positioned at its
+      // group-local offset (both axes scaled by %-of-groupExtent, so sy
+      // applies). The box NEVER changes the frame's flow height — that's
+      // the extent.
+      region.style.position = "absolute";
+      region.style.left = `${pctX(tb.offsetEmu.xEmu)}%`;
+      region.style.top = `${pctY(tb.offsetEmu.yEmu)}%`;
+      region.style.width = `${pctX(tb.sizeEmu.wEmu)}%`;
+      region.style.height = `${pctY(tb.sizeEmu.hEmu)}%`;
+    }
     // `<a:noAutofit/>` semantics: prose project entries overflow VISIBLY
     // (never cut off — the #18 complaint); decorative pill headings clip
     // their single centred label to the rounded background.

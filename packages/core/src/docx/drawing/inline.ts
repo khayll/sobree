@@ -500,6 +500,10 @@ function readInlineTextbox(wsp: Element, ctx: InlineFramesContext): InlineFrameT
     if (anchor === "ctr") textbox.vAlign = "center";
     else if (anchor === "b") textbox.vAlign = "bottom";
     else textbox.vAlign = "top";
+    // `<a:spAutoFit/>` — the shape height tracks its text; the stored
+    // extent is only the last-saved size. Word/LibreOffice re-fit on
+    // layout, so the renderer must size by content, not the extent.
+    if (firstChildNS(bodyPr, NS.a, "spAutoFit") !== null) textbox.autoFit = true;
   }
   return textbox;
 }
