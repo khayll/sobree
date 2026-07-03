@@ -63,6 +63,18 @@ function fillPage(items: Item[], start: number, cfg: ResolvedConfig): FillResult
 
     if (it.type === "penalty") {
       if (it.cost === Number.NEGATIVE_INFINITY) {
+        // A forced break at the TOP of a page (no box placed yet) is
+        // already satisfied — `pageBreakBefore` means "start on a fresh
+        // page", not "insert another one". Consecutive break signals
+        // (an explicit page-break run directly followed by a
+        // pageBreakBefore paragraph, common in thesis front matter)
+        // coalesce in Word; emitting here produced a genuinely BLANK
+        // page between two title pages. Consume the penalty and keep
+        // filling.
+        if (!hasBox) {
+          idx++;
+          continue;
+        }
         // Forced break: current page ends before this penalty; the penalty
         // itself is consumed and doesn't appear on either page.
         return emit(items, start, idx, 0, idx + 1);
@@ -159,22 +171,30 @@ function pickAndEmit(
   candidates: Candidate[],
   cfg: ResolvedConfig,
 ): FillResult {
-  if (candidates.length === 0) {
-    // No candidates: force break at overflow position.
-    return emit(items, start, overflowIdx, 0, overflowIdx);
-  }
-
-  // Score and pick best.
-  let best: Candidate = candidates[0] as Candidate;
-  let bestCost = scoreBreak(items, start, best, cfg);
-  for (let i = 1; i < candidates.length; i++) {
-    const c = candidates[i];
-    if (!c) continue;
+  // Score every candidate; +Infinity marks a FORBIDDEN break (inside a
+  // keep-with-next pair). A page whose breakable stretch is entirely
+  // keep-connected — a CV styling every job-title / company / spacer
+  // paragraph as a keepNext heading chains dozens of blocks — has ONLY
+  // forbidden candidates. Word degrades gracefully there: an infeasible
+  // keep chain breaks at the natural page boundary anyway. Picking the
+  // "least bad" of the infinite candidates instead chose the EARLIEST
+  // glue on the page (all costs compare equal at Infinity), emitting a
+  // near-empty page per block — healthcare-with-photo exploded from 3
+  // to 13 pages. Forbidden candidates are excluded; when none remain
+  // finite, fall through to the forced break at the overflow position
+  // (the fullest page the content allows).
+  let best: Candidate | null = null;
+  let bestCost = Number.POSITIVE_INFINITY;
+  for (const c of candidates) {
     const cost = scoreBreak(items, start, c, cfg);
     if (cost < bestCost) {
       best = c;
       bestCost = cost;
     }
+  }
+  if (best === null) {
+    // No finite candidate: force break at the overflow position.
+    return emit(items, start, overflowIdx, 0, overflowIdx);
   }
 
   // Post-condition: back off by one line if widow/orphan still violated.

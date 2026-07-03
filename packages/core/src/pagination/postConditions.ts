@@ -1,4 +1,4 @@
-import { widowOrphanPenalty } from "./cost";
+import { keepWithNextPenalty, widowOrphanPenalty } from "./cost";
 import type { Candidate, Item, ResolvedConfig } from "./types";
 
 /**
@@ -22,6 +22,10 @@ export function backOffIfViolates(
   for (let i = bestPos - 1; i >= 0; i--) {
     const c = candidates[i];
     if (!c) continue;
+    // Never back off INTO a forbidden break (keep-with-next pair) —
+    // trading a widow for a split heading is the worse deal, and the
+    // scorer already treats those candidates as invalid.
+    if (keepWithNextPenalty(items, c) !== 0) continue;
     if (widowOrphanPenalty(items, start, c, cfg) === 0) return c;
   }
   return best;
