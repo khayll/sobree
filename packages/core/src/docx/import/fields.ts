@@ -2,7 +2,7 @@ import type { RunProperties } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { wFirst } from "../shared/xml";
 import { readRunProperties } from "./runProperties";
-import { type ImportedItem, type ImportedRun, normaliseRunText, readRun } from "./runs";
+import { type ImportedItem, type ImportedRun, normaliseRunText, readRunSegments } from "./runs";
 
 /**
  * Complex-field state machine (ECMA-376 §17.16.18). Word writes
@@ -54,7 +54,7 @@ export class ComplexFieldCollector {
       // as the link's children, formatting intact.
       const t = wFirst(r, "t");
       if (t) this.cached += t.textContent ?? "";
-      this.resultRuns.push(this.decorate(readRun(r)));
+      for (const seg of readRunSegments(r)) this.resultRuns.push(this.decorate(seg));
       return true;
     }
     // Inside the instruction zone — instructions can split across runs
