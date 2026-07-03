@@ -274,3 +274,59 @@ describe("forced break followed by leading glue (space-before after a hard break
     expect(pages[2]!.items.filter((i) => i.type === "box").length).toBe(1);
   });
 });
+
+describe("infeasible keep-with-next chains degrade to natural page breaks", () => {
+  it("a keep-chain longer than the page breaks at capacity, not one block per page", () => {
+    // A CV styling every job-title / company / spacer paragraph as a
+    // keepNext heading chains dozens of blocks: every inter-block break
+    // is forbidden (+Infinity). Word breaks such an infeasible chain at
+    // the natural page boundary; picking the "least bad" infinite
+    // candidate chose the EARLIEST glue and emitted a near-empty page
+    // per block (healthcare CV: 3 pages exploded to 13).
+    const items: Item[] = [];
+    for (let i = 0; i < 30; i++) {
+      items.push(box(60, { keepWithNext: true }));
+      if (i < 29) items.push(glue(0));
+    }
+    const pages = paginate(items, { pageHeight: 600 }); // 10 boxes/page
+    expect(pages).toHaveLength(3);
+    expect(boxCount(pages[0]!.items)).toBe(10);
+    expect(boxCount(pages[1]!.items)).toBe(10);
+    expect(boxCount(pages[2]!.items)).toBe(10);
+  });
+
+  it("a finite candidate before the chain is still preferred over splitting it", () => {
+    // Page: free para (breakable after) + a keep-chain that would
+    // overflow — the chain moves to the next page whole.
+    const items: Item[] = [
+      box(100),
+      glue(0),
+      ...Array.from({ length: 6 }, (_, i) => [
+        box(100, { keepWithNext: i < 5 }),
+        ...(i < 5 ? [glue(0) as Item] : []),
+      ]).flat(),
+    ];
+    const pages = paginate(items, { pageHeight: 650 });
+    expect(pages).toHaveLength(2);
+    expect(boxCount(pages[0]!.items)).toBe(1); // the free para alone
+    expect(boxCount(pages[1]!.items)).toBe(6); // chain intact
+  });
+});
+
+describe("consecutive forced breaks coalesce (no blank pages)", () => {
+  it("a forced-break penalty at the top of a fresh page is a no-op", () => {
+    // An explicit page-break run directly followed by a pageBreakBefore
+    // paragraph (thesis front matter between title pages): Word starts
+    // ONE fresh page, never a blank one between them.
+    const items: Item[] = [
+      box(100),
+      penalty(Number.NEGATIVE_INFINITY),
+      penalty(Number.NEGATIVE_INFINITY),
+      box(100),
+    ];
+    const pages = paginate(items, { pageHeight: 600 });
+    expect(pages).toHaveLength(2);
+    expect(boxCount(pages[0]!.items)).toBe(1);
+    expect(boxCount(pages[1]!.items)).toBe(1);
+  });
+});
