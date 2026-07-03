@@ -117,6 +117,16 @@ export interface DrawingRun {
    * renders it. Omitted for ordinary inline images.
    */
   verticalAlign?: "baseline" | "middle";
+  /**
+   * Source crop (`<a:srcRect>`): fractions (0–1) of the source image
+   * trimmed from each edge BEFORE the remainder scales to
+   * `widthEmu`/`heightEmu`. OOXML stores 1/1000ths of a percent; the
+   * importer normalises to fractions. Word letterheads use this to show
+   * one logo out of a multi-logo strip (ljmu: `l=0.03048 r=0.59274`
+   * keeps the middle ~37% of the PNG); ignoring it squeezed the whole
+   * strip into the extent.
+   */
+  srcRect?: { l?: number; t?: number; r?: number; b?: number };
 }
 
 export interface DrawingAnchor {

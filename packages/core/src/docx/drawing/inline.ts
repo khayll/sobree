@@ -132,7 +132,6 @@ export function parseInlineFrames(
 ): ParsedInlineFrame[] {
   const out: ParsedInlineFrame[] = [];
   const drawings = Array.from(xmlDoc.getElementsByTagNameNS(NS.w, "drawing"));
-  const inlineCountByParagraph = countInlineDrawingsByParagraph(drawings);
   let counter = 0;
   for (const drawing of drawings) {
     const inline = firstChildNS(drawing, NS.wp, "inline");
@@ -164,14 +163,17 @@ export function parseInlineFrames(
     const bareWsp = firstChildNS(graphicData, NS.wps, "wsp");
     if (!bareWsp) continue;
     if (firstChildNS(bareWsp, NS.wps, "txbx") !== null) {
-      // A bare inline TEXTBOX. A lone one (its own paragraph) flows fine
-      // through the legacy lifter as a body paragraph — claiming it would
-      // pin it to a fixed-height box and clip long instructional text, so
-      // leave it. Only claim when the paragraph holds a ROW of them
-      // (multiple inline drawings, tab-separated "Place Illustration here"
-      // boxes) — the case the lifter drops; `mergeRowsByHostParagraph`
-      // lays them across the column.
-      if ((inlineCountByParagraph.get(hostP) ?? 0) < 2) continue;
+      // A bare inline TEXTBOX — lone or in a row, claim it as an
+      // InlineFrame. The old `< 2` guard deferred lone ones to a legacy
+      // text-lifter pass that has since been deleted, so "leaving" them
+      // meant DROPPING their content entirely: the run importer's
+      // drawing branch needs an image blip and emits nothing for a
+      // wps-shape payload (ljmu-university-letterhead's footer — an
+      // inline textbox holding the department address block — rendered
+      // as a blank footer). Word's model for `<wp:inline>` IS a
+      // fixed-extent box in the line, which is exactly what InlineFrame
+      // renders. Rows (≥2 per paragraph, tab-separated placeholder
+      // boxes) still merge below via `mergeRowsByHostParagraph`.
       const frame = buildBareTextboxFrame(inline, bareWsp, hostP, ctx);
       if (frame) {
         out.push({ frame, drawingEl: drawing, hostParagraphEl: hostP });
@@ -207,20 +209,6 @@ export function parseInlineFrames(
   }
 
   return merged;
-}
-
-/** Count inline drawings per host paragraph (nearest `<w:p>` ancestor).
- *  A drawing nested inside a textbox maps to its OWN inner paragraph, not
- *  the outer host — so a single box whose content holds an image still
- *  counts as one. Drives the "is this a row?" test for bare textboxes. */
-function countInlineDrawingsByParagraph(drawings: Element[]): Map<Element, number> {
-  const counts = new Map<Element, number>();
-  for (const drawing of drawings) {
-    if (!firstChildNS(drawing, NS.wp, "inline")) continue;
-    const p = findAncestor(drawing, NS.w, "p");
-    if (p) counts.set(p, (counts.get(p) ?? 0) + 1);
-  }
-  return counts;
 }
 
 const EMU_PER_TWIP = 635; // 914400 EMU/inch ÷ 1440 twips/inch

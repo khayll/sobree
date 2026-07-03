@@ -86,6 +86,21 @@ describe("runs ↔ delta — round trip", () => {
     expect(rt([d])).toEqual([d]);
   });
 
+  it("drawing round-trips its srcRect crop (Y.Doc parity — refresh must not uncrop)", () => {
+    // ljmu letterhead: the logo strip is cropped to its middle ~37% via
+    // <a:srcRect>. If the crop is lost on seed → project, a reload shows
+    // BOTH logos squeezed into the extent.
+    const d: DrawingRun = {
+      kind: "drawing",
+      partPath: "word/media/logos.png",
+      widthEmu: 2939143,
+      heightEmu: 1533448,
+      placement: "inline",
+      srcRect: { l: 0.03048, r: 0.59274 },
+    };
+    expect(rt([d])).toEqual([d]);
+  });
+
   it("float drawing round-trips its margins (Y.Doc parity — refresh must not drop them)", () => {
     const d: DrawingRun = {
       kind: "drawing",

@@ -298,10 +298,12 @@ describe("parseInlineFrames", () => {
     expect(f.pictures[0]!.partPath).toContain("arrow.png");
   });
 
-  it("leaves a LONE bare inline textbox to the legacy lifter (not claimed)", () => {
-    // A single bare textbox in its own paragraph flows fine as a body
-    // paragraph; claiming it would pin it to a fixed-height box and clip
-    // long text. So the parser returns nothing for it.
+  it("claims a LONE bare inline textbox as an InlineFrame", () => {
+    // The old behaviour deferred lone bare textboxes to a legacy lifter
+    // pass that no longer exists — "leaving" them meant DROPPING their
+    // content (ljmu letterhead's footer address block vanished). Word's
+    // model for <wp:inline> is a fixed-extent box in the line, which is
+    // exactly what InlineFrame renders.
     const doc = xml(`<w:body><w:p><w:r><w:drawing>
       <wp:inline>
         <wp:extent cx="914400" cy="914400"/>
@@ -313,7 +315,10 @@ describe("parseInlineFrames", () => {
         </a:graphicData></a:graphic>
       </wp:inline>
     </w:drawing></w:r></w:p></w:body>`);
-    expect(parseInlineFrames(doc, emptyCtx)).toEqual([]);
+    const frames = parseInlineFrames(doc, emptyCtx);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]!.frame.kind).toBe("inline_frame");
+    expect(frames[0]!.frame.textboxes).toHaveLength(1);
   });
 
   it("merges a tab-separated ROW of bare inline textboxes into one frame", () => {

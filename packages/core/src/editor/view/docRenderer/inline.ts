@@ -262,6 +262,40 @@ function renderDrawing(
   else if (d.placement === "floatLeft" || d.placement === "floatRight") {
     applyFloat(img, d);
   }
+  // `<a:srcRect>` source crop: the VISIBLE window is the extent
+  // (widthEmu × heightEmu); the full image scales UP so that the
+  // uncropped remainder fills that window, and the crop offsets shift
+  // it left/up. A clipping wrapper at the extent size carries the
+  // placement styling the <img> would otherwise get.
+  // Inline placement only for now — anchored/float images carry their
+  // positioning on the <img> itself and would need it moved onto the
+  // wrapper; no corpus fixture crops an anchored image yet.
+  if (d.srcRect && d.placement === "inline" && d.widthEmu > 0 && d.heightEmu > 0) {
+    const { l = 0, t = 0, r = 0, b = 0 } = d.srcRect;
+    const remW = 1 - l - r;
+    const remH = 1 - t - b;
+    if (remW > 0 && remH > 0) {
+      const wrap = document.createElement("span");
+      wrap.className = "sobree-img-crop";
+      wrap.style.display = "inline-block";
+      wrap.style.overflow = "hidden";
+      wrap.style.width = img.style.width;
+      wrap.style.height = img.style.height;
+      if (img.style.verticalAlign) {
+        wrap.style.verticalAlign = img.style.verticalAlign;
+        img.style.verticalAlign = "";
+      }
+      const fullW = emuToPx(d.widthEmu) / remW;
+      const fullH = emuToPx(d.heightEmu) / remH;
+      img.style.width = `${fullW}px`;
+      img.style.height = `${fullH}px`;
+      img.style.marginLeft = `${-fullW * l}px`;
+      img.style.marginTop = `${-fullH * t}px`;
+      img.style.display = "block";
+      wrap.appendChild(img);
+      return wrap;
+    }
+  }
   return img;
 }
 

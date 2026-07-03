@@ -17,7 +17,22 @@ export function renderDrawing(run: DrawingRun, rId: string, docPrId: number): st
   const descr = run.altText ?? "";
 
   const blip = el("a:blip", { "r:embed": rId });
-  const blipFill = el("pic:blipFill", null, `${blip}${el("a:stretch", null, el("a:fillRect"))}`);
+  // `<a:srcRect>` re-emits the source crop (AST fractions → OOXML
+  // 1/1000ths of a percent) so a cropped logo round-trips instead of
+  // reverting to the full image strip.
+  const srcRect = run.srcRect
+    ? el("a:srcRect", {
+        ...(run.srcRect.l !== undefined ? { l: Math.round(run.srcRect.l * 100000) } : {}),
+        ...(run.srcRect.t !== undefined ? { t: Math.round(run.srcRect.t * 100000) } : {}),
+        ...(run.srcRect.r !== undefined ? { r: Math.round(run.srcRect.r * 100000) } : {}),
+        ...(run.srcRect.b !== undefined ? { b: Math.round(run.srcRect.b * 100000) } : {}),
+      })
+    : "";
+  const blipFill = el(
+    "pic:blipFill",
+    null,
+    `${blip}${srcRect}${el("a:stretch", null, el("a:fillRect"))}`,
+  );
   const nvPicPr = el(
     "pic:nvPicPr",
     null,

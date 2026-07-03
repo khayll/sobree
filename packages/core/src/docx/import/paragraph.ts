@@ -263,6 +263,7 @@ function drawingRunFrom(
     placement: info.anchor ? "anchor" : "inline",
   };
   if (info.altText) run.altText = info.altText;
+  if (info.srcRect) run.srcRect = info.srcRect;
   if (info.anchor) {
     run.anchor = {
       offsetXEmu: info.anchor.offsetXEmu,
