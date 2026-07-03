@@ -37,13 +37,23 @@ export function readTableBorders(el: Element): TableBorders | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-/** Read `<w:tcBorders>` (a cell's four edges). */
+/** Read `<w:tcBorders>` (a cell's four edges). An explicit
+ *  `w:val="nil"`/`"none"` side is kept as `{style:"none"}` — it means
+ *  "SUPPRESS the table grid on this edge", which is how banner tables
+ *  carve a clean design out of a fully-bordered grid (name box
+ *  outlined, email row bare). Dropping the side made it
+ *  indistinguishable from "unspecified" and the table-level border
+ *  leaked back onto every deliberately-clean edge. */
 export function readCellBorders(el: Element): TableCellBorders | null {
   const out: TableCellBorders = {};
   for (const side of ["top", "left", "right", "bottom"] as const) {
     const child = wFirst(el, side);
     if (!child) continue;
-    const spec = readBorderSide(child);
+    const val = child.getAttribute("w:val");
+    const spec =
+      val === "none" || val === "nil"
+        ? { style: "none" as const, sizeEighthsOfPt: 0, color: "auto" }
+        : readBorderSide(child);
     if (spec) out[side] = spec;
   }
   return Object.keys(out).length > 0 ? out : null;
