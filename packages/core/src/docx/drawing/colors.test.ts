@@ -75,3 +75,17 @@ describe("parseThemeLineWidthsEmu", () => {
     expect(parseThemeLineWidthsEmu(THEME)).toEqual([]); // clrScheme only
   });
 });
+
+describe("readDrawingColor — alpha transform", () => {
+  it("emits rgba() for a semi-transparent fill", () => {
+    // The layered page-frame design: an 83%-white rectangle over a
+    // grey texture is the LIGHTER inner frame. Opaque white erased it.
+    const fill = el(`<a:srgbClr val="FFFFFF"><a:alpha val="83000"/></a:srgbClr>`);
+    expect(readDrawingColor(fill)).toBe("rgba(255, 255, 255, 0.83)");
+  });
+
+  it("full opacity stays plain hex", () => {
+    const fill = el(`<a:srgbClr val="FFFFFF"><a:alpha val="100000"/></a:srgbClr>`);
+    expect(readDrawingColor(fill)).toBe("#FFFFFF");
+  });
+});
