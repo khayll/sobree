@@ -299,3 +299,25 @@ describe("renderAnchorLayer", () => {
     expect(el.style.zIndex).toBe("");
   });
 });
+
+describe("paintTextbox — container geometry", () => {
+  it("a rounded-rect empty text box keeps its rounded corners", () => {
+    // A decorative page frame is often authored as an EMPTY text box
+    // whose prstGeom is roundRect — the corner shape belongs to the
+    // shape, not to which container kind wraps it (the same frame
+    // rendered rounded on page 1 and square on page 2).
+    const frame: AnchoredFrame = {
+      id: "f",
+      anchor: { sectionIndex: 0, horizontalFrom: "page", verticalFrom: "page" },
+      offsetXEmu: 0,
+      offsetYEmu: 0,
+      widthEmu: 914400,
+      heightEmu: 914400,
+      content: { kind: "textbox", body: [], fill: "#EEEEEE", geometry: "roundedRect" },
+    };
+    const layer = renderAnchorLayer([frame], ctx());
+    const el = layer.firstElementChild as HTMLElement;
+    expect(el.style.borderRadius).toBe("8px");
+    expect(el.style.background).toBe("rgb(238, 238, 238)");
+  });
+});

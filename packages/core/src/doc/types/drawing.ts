@@ -122,6 +122,12 @@ export type AnchoredContent =
       fill?: string;
       border?: { color: string; widthEmu: number; style: "solid" | "dashed" | "dotted" | "double" };
       padding?: { topEmu: number; rightEmu: number; bottomEmu: number; leftEmu: number };
+      /** Preset geometry of the CONTAINER shape. A decorative frame is
+       *  often authored as an empty text box whose `<a:prstGeom>` is a
+       *  rounded rect — the corner shape belongs to the shape, not to
+       *  which container kind wraps it. Only the box-expressible
+       *  presets; absent = rectangular. */
+      geometry?: "rect" | "ellipse" | "roundedRect";
     }
   | {
       kind: "shape";

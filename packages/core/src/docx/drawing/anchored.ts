@@ -487,6 +487,13 @@ function parseShape(
         kind: "textbox",
         body: parseTextboxBody(txbxContent, ctx),
       };
+      // The container's preset geometry: a decorative frame is often an
+      // EMPTY text box whose <a:prstGeom> is a rounded rect — its corner
+      // shape must survive regardless of container kind (the same frame
+      // authored as a bare shape in one part and a text box in another
+      // rendered rounded on page 1 but square on page 2).
+      const geom = readGeometry(wsp);
+      if (geom === "ellipse" || geom === "roundedRect") out.geometry = geom;
       const fill = readSolidFill(wsp, ctx.theme, ctx.themeFillStyles);
       if (fill !== undefined) out.fill = fill;
       const border = readBorder(wsp, ctx.theme, ctx.themeLineWidthsEmu);
