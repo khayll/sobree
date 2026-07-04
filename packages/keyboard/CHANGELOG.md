@@ -1,5 +1,29 @@
 # @sobree/keyboard
 
+## 0.1.55
+
+### Patch Changes
+
+- 28cca43: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- 2e995c0: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- db1af47: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- fff882f: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- fd75496: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- e74f5b0: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [28cca43]
+- Updated dependencies [2e995c0]
+- Updated dependencies [db1af47]
+- Updated dependencies [fff882f]
+- Updated dependencies [fd75496]
+- Updated dependencies [e74f5b0]
+  - @sobree/core@0.1.55
+
 ## 0.1.54
 
 ### Patch Changes
