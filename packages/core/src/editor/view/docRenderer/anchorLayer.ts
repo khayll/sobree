@@ -221,6 +221,10 @@ function paintTextbox(
   // chrome lands at the OOXML-declared coordinates.
   if (content.fill) host.style.background = content.fill;
   if (content.border) applyBorder(host, content.border);
+  // Container geometry — same rules as paintShape. A decorative frame
+  // authored as an empty text box keeps its rounded corners.
+  if (content.geometry === "ellipse") host.style.borderRadius = "50%";
+  else if (content.geometry === "roundedRect") host.style.borderRadius = "8px";
   if (content.padding) {
     const p = content.padding;
     host.style.padding =
