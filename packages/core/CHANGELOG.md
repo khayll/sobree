@@ -1,5 +1,46 @@
 # @sobree/core
 
+## 0.1.55
+
+### Patch Changes
+
+- 28cca43: Anchored frames honour Word-2010 percent sizing
+  (`wp14:sizeRelH`/`sizeRelV` `pctWidth`/`pctHeight`): the rendered size
+  derives from the page or margin box instead of the stale
+  `<wp:extent>` snapshot. A CV's footer page-frame declares 108.5% of
+  the margin box beside an extent computed under different margins —
+  honouring the extent drew the decorative ring 0.27in too far into the
+  page on every side, doubling its apparent thickness.
+- 2e995c0: Calibri and Cambria (and their metric-clones Carlito/Caladea) line
+  heights now use their real font metrics for Word's `lineRule="auto"`
+  spacing: Calibri's natural single-line height is 1.2217× the font size
+  (hhea tables), not the serif 1.15× applied uniformly before. Every
+  Calibri document rendered ~6% denser than Word — a CV packed 7 extra
+  lines onto a page and broke pages early; page 2 now ends within a few
+  lines of Word's boundary.
+- db1af47: Explicit `w:val="nil"` / `"none"` cell borders now suppress the table
+  grid on that edge instead of inheriting it. Banner tables declare a
+  fully-bordered grid at table level and carve the clean design per
+  cell — a CV's name box stayed outlined but its email row and photo
+  column grew grid lines Word never draws.
+- fff882f: DrawingML colours honour the `<a:alpha>` transform — semi-transparent
+  fills emit `rgba()` instead of flattening to opaque. Layered page
+  designs rely on this: an 83%-white rectangle over a grey texture ring
+  is the LIGHTER inner frame of the design; painted opaque it erased
+  the band entirely.
+- fd75496: Duotone-textured theme fills resolve to the texture's TRUE average
+  colour: the theme image is decoded once at import, its mean linear
+  luminance measured, and the duotone endpoints (keyed dark→light by
+  lightness, not listing order) blended at that point. The previous
+  endpoint-midpoint stand-in rendered a CV's page-frame ring a heavier,
+  darker grey than Word; it remains the fallback where image decode is
+  unavailable.
+- e74f5b0: Anchored text boxes keep their container shape's preset geometry — a
+  decorative page frame authored as an EMPTY text box with a rounded-rect
+  `<a:prstGeom>` now renders rounded corners, the same as its bare-shape
+  twin (a CV's frame was rounded on page 1 but square on pages 2+ purely
+  because the two parts wrapped the same shape differently).
+
 ## 0.1.54
 
 ### Patch Changes
