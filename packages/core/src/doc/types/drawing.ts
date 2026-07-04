@@ -35,6 +35,15 @@ export interface AnchoredFrame {
    *  footer "Page N" bar sits at `pctPosY: 1` from `margin`: its top
    *  at 100% of the content height, i.e. at the bottom margin line. */
   pctPosY?: number;
+  /** Percent SIZE from `<wp14:sizeRelH><wp14:pctWidth>` (0–1 fraction
+   *  of the page or margin box). When set, the rendered width derives
+   *  from the page geometry — `widthEmu` is only Word's last-computed
+   *  value and goes stale when the layout context changes. */
+  pctWidth?: number;
+  pctWidthFrom?: "page" | "margin";
+  /** `<wp14:sizeRelV><wp14:pctHeight>` — vertical counterpart. */
+  pctHeight?: number;
+  pctHeightFrom?: "page" | "margin";
   widthEmu: number;
   heightEmu: number;
   /** Stacking order. Higher = on top. Default 0. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AnchoredFrame } from "../../../doc/types";
-import { resolveAnchorPosition } from "./anchorPosition";
+import { resolveAnchorPosition, resolveAnchorSize } from "./anchorPosition";
 
 const MARGIN_TOP = 360000; // 10mm
 const MARGIN_LEFT = 720000; // 20mm
@@ -102,5 +102,47 @@ describe("resolveAnchorPosition — align and percent forms", () => {
     const { xEmu, yEmu } = resolveAnchorPosition(f, geom);
     expect(xEmu).toBe(111);
     expect(yEmu).toBe(222);
+  });
+});
+
+describe("resolveAnchorSize — wp14 percent sizing", () => {
+  const PAGE_W = 7772400; // 8.5in
+  const PAGE_H = 10058400; // 11in
+  const M = 685800; // 0.75in margins
+  const geomFull = {
+    marginTopEmu: M,
+    marginLeftEmu: M,
+    marginRightEmu: M,
+    marginBottomEmu: M,
+    pageWidthEmu: PAGE_W,
+    pageHeightEmu: PAGE_H,
+  };
+
+  function pctFrame(over: Partial<AnchoredFrame>): AnchoredFrame {
+    return { ...frame("page", "page"), widthEmu: 100, heightEmu: 200, ...over };
+  }
+
+  it("derives the size from the margin box, ignoring the stale extent", () => {
+    // The CV footer frame: 108.5% × 104% of a 7.0 × 9.5in content box.
+    const f = pctFrame({
+      pctWidth: 1.085,
+      pctWidthFrom: "margin",
+      pctHeight: 1.04,
+      pctHeightFrom: "margin",
+    });
+    const { widthEmu, heightEmu } = resolveAnchorSize(f, geomFull);
+    expect(widthEmu / 914400).toBeCloseTo(7.595, 3);
+    expect(heightEmu / 914400).toBeCloseTo(9.88, 3);
+  });
+
+  it("page-based percents use the page box", () => {
+    const f = pctFrame({ pctWidth: 0.962, pctWidthFrom: "page" });
+    expect(resolveAnchorSize(f, geomFull).widthEmu / 914400).toBeCloseTo(8.177, 3);
+    expect(resolveAnchorSize(f, geomFull).heightEmu).toBe(200); // no pctHeight → extent
+  });
+
+  it("without page geometry the extent stands", () => {
+    const f = pctFrame({ pctWidth: 1.085, pctWidthFrom: "margin" });
+    expect(resolveAnchorSize(f, geom).widthEmu).toBe(100);
   });
 });

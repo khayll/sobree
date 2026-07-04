@@ -40,6 +40,7 @@ import {
   coerceVRelativeFrom,
   findAnchorPositionEl,
   readPctPos,
+  readPctSize,
   readPosAlign,
   readPosOffset,
 } from "./position";
@@ -281,6 +282,15 @@ function parseAnchoredFrame(
   if (offset.alignV) out.alignV = offset.alignV;
   if (offset.pctPosX !== undefined) out.pctPosX = offset.pctPosX;
   if (offset.pctPosY !== undefined) out.pctPosY = offset.pctPosY;
+  const pctSize = readPctSize(anchor);
+  if (pctSize.pctWidth !== undefined) {
+    out.pctWidth = pctSize.pctWidth;
+    out.pctWidthFrom = pctSize.pctWidthFrom ?? "margin";
+  }
+  if (pctSize.pctHeight !== undefined) {
+    out.pctHeight = pctSize.pctHeight;
+    out.pctHeightFrom = pctSize.pctHeightFrom ?? "margin";
+  }
   if (behindAttr === "1" || behindAttr === "true") out.behindText = true;
   const wrap = readWrapType(anchor);
   if (wrap) {

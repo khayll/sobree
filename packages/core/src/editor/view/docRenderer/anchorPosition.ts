@@ -44,6 +44,43 @@ export interface AnchorGeometry {
   marginBottomEmu?: number;
 }
 
+/**
+ * Resolve a frame's RENDERED size. `<wp14:pctWidth>`/`<wp14:pctHeight>`
+ * size the shape as a fraction of the page or margin box; the stored
+ * `widthEmu`/`heightEmu` (from `<wp:extent>`) is only Word's
+ * last-computed value and goes stale when the layout context changes —
+ * a CV's footer page-frame declares 108.5% of the margin box beside an
+ * extent computed under different margins, and honouring the extent
+ * drew the frame ring 0.27in too far in on every side. Falls back to
+ * the extent when the geometry can't supply the base box.
+ */
+export function resolveAnchorSize(
+  frame: AnchoredFrame,
+  geom: AnchorGeometry,
+): { widthEmu: number; heightEmu: number } {
+  let widthEmu = frame.widthEmu;
+  let heightEmu = frame.heightEmu;
+  if (frame.pctWidth !== undefined && geom.pageWidthEmu !== undefined) {
+    const base =
+      frame.pctWidthFrom === "page"
+        ? geom.pageWidthEmu
+        : geom.marginRightEmu !== undefined
+          ? geom.pageWidthEmu - geom.marginLeftEmu - geom.marginRightEmu
+          : undefined;
+    if (base !== undefined) widthEmu = frame.pctWidth * base;
+  }
+  if (frame.pctHeight !== undefined && geom.pageHeightEmu !== undefined) {
+    const base =
+      frame.pctHeightFrom === "page"
+        ? geom.pageHeightEmu
+        : geom.marginBottomEmu !== undefined
+          ? geom.pageHeightEmu - geom.marginTopEmu - geom.marginBottomEmu
+          : undefined;
+    if (base !== undefined) heightEmu = frame.pctHeight * base;
+  }
+  return { widthEmu, heightEmu };
+}
+
 export function resolveAnchorPosition(
   frame: AnchoredFrame,
   geom: AnchorGeometry,

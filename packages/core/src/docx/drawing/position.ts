@@ -96,6 +96,50 @@ export function readPosAlign(
   }
 }
 
+/**
+ * Percent SIZING `<wp14:sizeRelH relativeFrom><wp14:pctWidth>` /
+ * `<wp14:sizeRelV><wp14:pctHeight>` (Word 2010 extension). When
+ * present and non-zero, the shape's rendered size is the fraction of
+ * the page or margin box — `<wp:extent>` is only the LAST-COMPUTED
+ * size and goes stale when the layout context changes (a CV's footer
+ * frame declares 108.5% of the margin box next to an extent computed
+ * under different margins; honouring the extent drew the page-frame
+ * ring 0.27in too far in on every side). A `0` percent means "not
+ * percent-sized" and keeps the extent. The exotic bases
+ * (left/right/top/bottomMargin, inside/outsideMargin) coerce to
+ * `margin`.
+ */
+export function readPctSize(anchor: Element): {
+  pctWidth?: number;
+  pctWidthFrom?: "page" | "margin";
+  pctHeight?: number;
+  pctHeightFrom?: "page" | "margin";
+} {
+  const out: ReturnType<typeof readPctSize> = {};
+  const read = (
+    tag: "sizeRelH" | "sizeRelV",
+    pctTag: "pctWidth" | "pctHeight",
+  ): { fraction: number; base: "page" | "margin" } | undefined => {
+    const rel = firstChildNS(anchor, NS.wp14, tag);
+    const pct = rel ? firstChildNS(rel, NS.wp14, pctTag) : null;
+    const n = Number(pct?.textContent ?? "");
+    if (!Number.isFinite(n) || n <= 0) return undefined;
+    const base = rel?.getAttribute("relativeFrom") === "page" ? "page" : "margin";
+    return { fraction: n / 100000, base };
+  };
+  const h = read("sizeRelH", "pctWidth");
+  if (h) {
+    out.pctWidth = h.fraction;
+    out.pctWidthFrom = h.base;
+  }
+  const v = read("sizeRelV", "pctHeight");
+  if (v) {
+    out.pctHeight = v.fraction;
+    out.pctHeightFrom = v.base;
+  }
+  return out;
+}
+
 /** Percent-based offset `<wp14:pctPosHOffset>` / `<wp14:pctPosVOffset>`
  *  (Word 2010 extension), normalised to a 0–1 fraction of the
  *  `relativeFrom` base extent (the stored unit is 1/1000 of a percent:
