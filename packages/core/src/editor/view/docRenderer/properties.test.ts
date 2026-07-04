@@ -88,16 +88,16 @@ describe("applyParagraphProps", () => {
     expect(Number(el.style.lineHeight)).toBeCloseTo(1.725, 3);
   });
 
-  it("uses the uniform 1.15 natural leading for Calibri (matches LibreOffice)", () => {
-    // An earlier 1.05 special-case for Calibri was a mis-calibration that
-    // compensated for a wrong 11pt run-default font size; with the size
-    // corrected to 10pt, Calibri matches LibreOffice at the same 1.15
-    // leading every other font uses. 1.5 × 1.15 = 1.725.
+  it("uses Calibri's hhea natural leading (1.2217), not the serif 1.15", () => {
+    // (ascent 1536 + descent 512 + lineGap 454) / 2048 = 1.2217 — the
+    // ratio Word/LO use for Calibri "single". LO ground truth: an 11pt
+    // line=264 paragraph measures 14.75pt = 11 × 1.1 × 1.2217. The old
+    // flat 1.15 packed Calibri documents ~6% denser than Word.
     const el = p({
       spacing: { line: 360, lineRule: "auto" },
       runDefaults: { fontFamily: "Calibri" },
     });
-    expect(Number(el.style.lineHeight)).toBeCloseTo(1.725, 3);
+    expect(Number(el.style.lineHeight)).toBeCloseTo(1.5 * (2502 / 2048), 3);
   });
 
   it("lineRule=exact emits a FIXED pt line-height (line twips → pt), font-independent", () => {
