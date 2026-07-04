@@ -304,15 +304,39 @@ function mergeParagraphProperties(
  * Add more entries as drift reports show divergence on real docs.
  */
 function naturalLeadingFor(fontFamily: string | undefined): number {
-  if (!fontFamily) return 1.15;
-  // All current targets (Calibri/Carlito included) match LibreOffice at a
-  // ~1.15 natural leading. An earlier 1.05 special-case for Calibri was a
-  // mis-calibration: it was tuned to hit LO's line spacing while the run
-  // default font size was wrongly 11pt, so 11×1.05 happened to equal the
-  // true 10×1.15 for `line=360`. With the font-size default corrected to
-  // 10pt, the genuine 1.15 leading applies uniformly.
-  return 1.15;
+  const key =
+    fontFamily
+      ?.split(",")[0]
+      ?.trim()
+      .replace(/^["']|["']$/g, "")
+      .toLowerCase() ?? "";
+  return FONT_NATURAL_LEADING[key] ?? 1.15;
 }
+
+/**
+ * (ascent + descent + lineGap) / unitsPerEm from each font's `hhea`
+ * table — the exact ratio Word and LibreOffice use for "single" line
+ * spacing. Verified against LO's PDF output: a Calibri 11pt paragraph
+ * at `line=264` (1.1×) measures 14.75pt/line = 11 × 1.1 × 1.2217.
+ * Rendering Calibri at the serif baseline (1.15) made every line ~6%
+ * short; on a dense CV that packed 7 extra lines onto the page and
+ * broke a page earlier than Word.
+ *
+ * The 1.15 fallback IS the correct hhea ratio for the wide serif/sans
+ * families (Times New Roman 2355/2048, Arial 2355/2048); metric-clones
+ * (Carlito↔Calibri, Liberation↔Times/Arial) share their target's
+ * numbers by design.
+ */
+const FONT_NATURAL_LEADING: Record<string, number> = {
+  // Calibri hhea: ascent 1536 + descent 512 + lineGap 454, em 2048.
+  calibri: 2502 / 2048,
+  // Carlito is Calibri's metric-compatible replacement — same tables.
+  carlito: 2502 / 2048,
+  // Cambria hhea: ascent 1584 + descent 466 + lineGap 384, em 2048.
+  cambria: 2434 / 2048,
+  // Caladea is Cambria's metric-compatible replacement.
+  caladea: 2434 / 2048,
+};
 
 function mapBorderStyle(s: string): string {
   if (s === "single" || s === "thick") return "solid";
