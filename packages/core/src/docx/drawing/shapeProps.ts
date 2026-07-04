@@ -104,7 +104,12 @@ function readStyleRefFill(
   if (themeFillStyles && phClr) {
     const entry = idx >= 1001 ? themeFillStyles.bg[idx - 1001] : themeFillStyles.fill[idx - 1];
     if (entry) {
-      const resolved = resolveThemeFillEntry(entry, theme, phClr);
+      const resolved = resolveThemeFillEntry(
+        entry,
+        theme,
+        phClr,
+        themeFillStyles.blipAvgLum?.get(entry),
+      );
       if (resolved !== undefined) return resolved;
     }
   }
