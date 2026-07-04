@@ -23,6 +23,7 @@ export { normalizePartPath, readBlipEmbedPart } from "./relationships";
 export { readBorder, readGeometry, readSolidFill } from "./shapeProps";
 export {
   type ThemeFillStyles,
+  computeThemeBlipLuminance,
   parseThemeFillStyles,
   parseThemeLineWidthsEmu,
   parseThemeXml,

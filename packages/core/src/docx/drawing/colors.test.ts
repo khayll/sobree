@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseThemeLineWidthsEmu, parseThemeXml, readDrawingColor } from "./colors";
+import {
+  parseThemeLineWidthsEmu,
+  parseThemeXml,
+  readDrawingColor,
+  resolveThemeFillEntry,
+} from "./colors";
 
 const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 
@@ -87,5 +92,33 @@ describe("readDrawingColor — alpha transform", () => {
   it("full opacity stays plain hex", () => {
     const fill = el(`<a:srgbClr val="FFFFFF"><a:alpha val="100000"/></a:srgbClr>`);
     expect(readDrawingColor(fill)).toBe("#FFFFFF");
+  });
+});
+
+describe("resolveThemeFillEntry — duotone texture average", () => {
+  const blipEntry = (): Element =>
+    new DOMParser().parseFromString(
+      `<a:blipFill xmlns:a="${A}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blip r:embed="rId1"><a:duotone><a:srgbClr val="000000"/><a:srgbClr val="FFFFFF"/></a:duotone></a:blip><a:tile/></a:blipFill>`,
+      "application/xml",
+    ).documentElement;
+
+  it("blends dark→light endpoints at the measured mean luminance", () => {
+    // Shadows take the darker endpoint, highlights the lighter — the
+    // average is the blend at the texture's mean linear luminance.
+    expect(resolveThemeFillEntry(blipEntry(), undefined, "#FFFFFF", 0.75)).toBe("#BFBFBF");
+  });
+
+  it("orders endpoints by lightness, not listing order", () => {
+    // Word's theme bg styles list the TINT (light) endpoint first;
+    // keying on element order inverted the photo.
+    const inverted = new DOMParser().parseFromString(
+      `<a:blipFill xmlns:a="${A}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blip r:embed="rId1"><a:duotone><a:srgbClr val="FFFFFF"/><a:srgbClr val="000000"/></a:duotone></a:blip><a:tile/></a:blipFill>`,
+      "application/xml",
+    ).documentElement;
+    expect(resolveThemeFillEntry(inverted, undefined, "#FFFFFF", 0.75)).toBe("#BFBFBF");
+  });
+
+  it("falls back to the midpoint without a measured luminance", () => {
+    expect(resolveThemeFillEntry(blipEntry(), undefined, "#FFFFFF")).toBe("#808080");
   });
 });

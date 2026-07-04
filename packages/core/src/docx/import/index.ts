@@ -11,6 +11,7 @@ import { mountFontTableFromZip } from "../../fonts";
 import {
   type ThemeFillStyles,
   type ThemePalette,
+  computeThemeBlipLuminance,
   parseThemeFillStyles,
   parseThemeLineWidthsEmu,
   parseThemeXml,
@@ -69,6 +70,17 @@ export async function importDocx(
   // an entry here and substitutes its own colour for the entry's phClr —
   // this is where a page-frame decoration's subtle texture ring comes from.
   const fillStyles = parseThemeFillStyles(unzipped.text["word/theme/theme1.xml"]);
+  // Annotate blipFill entries with their texture's measured mean
+  // luminance so duotone fills resolve to the texture's TRUE average
+  // colour (async — decodes the theme image once; environments without
+  // canvas simply keep the midpoint fallback).
+  if (fillStyles) {
+    await computeThemeBlipLuminance(
+      fillStyles,
+      unzipped.text["word/theme/_rels/theme1.xml.rels"],
+      unzipped.binary,
+    );
+  }
   const themeFills = fillStyles ? { themeFillStyles: fillStyles } : {};
   // Walk the body's direct paragraph children FIRST to build a stable
   // element → index map. The new floating-layer parser uses this to

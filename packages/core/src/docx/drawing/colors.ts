@@ -116,6 +116,87 @@ export function readDrawingColor(
 export interface ThemeFillStyles {
   fill: Element[];
   bg: Element[];
+  /** Mean LUMINANCE (0–1, Rec. 601) of each `<a:blipFill>` entry's
+   *  texture image, keyed by the entry element. Computed once at
+   *  import by {@link computeThemeBlipLuminance} (async — needs image
+   *  decode); absent in environments without canvas (unit tests),
+   *  where the duotone falls back to its endpoint midpoint. */
+  blipAvgLum?: Map<Element, number>;
+}
+
+/**
+ * Decode each theme `<a:blipFill>` texture and record its mean
+ * luminance so {@link resolveThemeFillEntry} can compute the EXACT
+ * average colour of the duotoned texture — `c1·(1−lum) + c2·lum` per
+ * channel is the linear duotone's true mean, no guessed weights. A
+ * paper-grain texture is mostly light, so the midpoint fallback
+ * renders a page-frame ring visibly darker/heavier than Word.
+ *
+ * Sampling: the bitmap is drawn at most 64×64 — a tiled grain
+ * texture's mean converges long before that. Every failure (no
+ * canvas, undecodable image, missing part) just leaves the entry
+ * un-annotated.
+ */
+export async function computeThemeBlipLuminance(
+  styles: ThemeFillStyles,
+  themeRelsXml: string | undefined,
+  binaryParts: Record<string, Uint8Array>,
+): Promise<void> {
+  if (!themeRelsXml || typeof createImageBitmap !== "function") return;
+  const rels = new Map<string, string>();
+  try {
+    const doc = parseXml(themeRelsXml);
+    for (const rel of Array.from(doc.getElementsByTagName("Relationship"))) {
+      const id = rel.getAttribute("Id");
+      const target = rel.getAttribute("Target");
+      if (id && target) rels.set(id, target);
+    }
+  } catch {
+    return;
+  }
+  const avg = new Map<Element, number>();
+  for (const entry of [...styles.fill, ...styles.bg]) {
+    if (entry.localName !== "blipFill") continue;
+    const blip = entry.getElementsByTagNameNS(NS.a, "blip")[0];
+    const relId = blip?.getAttributeNS(NS.r, "embed") ?? blip?.getAttribute("r:embed");
+    const target = relId ? rels.get(relId) : undefined;
+    if (!target) continue;
+    // Targets are relative to word/theme/ — `../media/x` → `word/media/x`.
+    const path = target.startsWith("../") ? `word/${target.slice(3)}` : `word/theme/${target}`;
+    const bytes = binaryParts[path];
+    if (!bytes) continue;
+    try {
+      const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)]));
+      const w = Math.max(1, Math.min(64, bitmap.width));
+      const h = Math.max(1, Math.min(64, bitmap.height));
+      const canvas =
+        typeof OffscreenCanvas !== "undefined"
+          ? new OffscreenCanvas(w, h)
+          : Object.assign(document.createElement("canvas"), { width: w, height: h });
+      const ctx2d = canvas.getContext("2d") as
+        | OffscreenCanvasRenderingContext2D
+        | CanvasRenderingContext2D
+        | null;
+      if (!ctx2d) continue;
+      ctx2d.drawImage(bitmap, 0, 0, w, h);
+      const data = ctx2d.getImageData(0, 0, w, h).data;
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        // Linear-light luminance (γ≈2.2 decode, Rec.601 weights) — the
+        // duotone's tone mapping operates on light, not on the encoded
+        // bytes; averaging encoded values overweights the shadows and
+        // rendered the ring visibly darker than Word/LO.
+        sum +=
+          0.299 * ((data[i] as number) / 255) ** 2.2 +
+          0.587 * ((data[i + 1] as number) / 255) ** 2.2 +
+          0.114 * ((data[i + 2] as number) / 255) ** 2.2;
+      }
+      avg.set(entry, sum / (data.length / 4));
+    } catch {
+      // Undecodable image — leave the entry to the midpoint fallback.
+    }
+  }
+  if (avg.size > 0) styles.blipAvgLum = avg;
 }
 
 export function parseThemeFillStyles(xml: string | undefined): ThemeFillStyles | undefined {
@@ -160,6 +241,9 @@ export function resolveThemeFillEntry(
   entry: Element,
   theme: ThemePalette | undefined,
   phClr: string,
+  /** Measured mean luminance of the entry's texture (see
+   *  {@link computeThemeBlipLuminance}); midpoint fallback when absent. */
+  blipAvgLum?: number,
 ): string | undefined {
   if (entry.localName === "solidFill") {
     return readDrawingColor(entry, theme, phClr);
@@ -195,20 +279,38 @@ export function resolveThemeFillEntry(
     }
     if (ends.length === 0) return undefined;
     if (ends.length === 1) return ends[0];
-    return mixHex(ends[0] as string, ends[1] as string);
+    // A duotone tone-maps pixel luminance onto the two endpoint
+    // colours — SHADOWS take the darker endpoint, HIGHLIGHTS the
+    // lighter, regardless of listing order (Word's own theme bg styles
+    // list the tint endpoint first yet render highlights light; keying
+    // on the spec's element order inverted the photo). The texture's
+    // TRUE average colour is therefore dark·(1−L) + light·L at the
+    // image's mean linear luminance. Without the measured mean (no
+    // canvas in the environment) the midpoint stands in.
+    const [a, b] = ends as [string, string];
+    const darkFirst = relativeLuma(a) <= relativeLuma(b);
+    const dark = darkFirst ? a : b;
+    const light = darkFirst ? b : a;
+    return mixHex(dark, light, blipAvgLum ?? 0.5);
   }
   return undefined;
 }
 
-/** Channel-wise midpoint of two `#RRGGBB` colours. */
-function mixHex(a: string, b: string): string {
+/** Encoded-domain Rec.601 luma of a `#RRGGBB` colour (ordering only). */
+function relativeLuma(hex: string): number {
+  if (!hex.startsWith("#")) return 0;
+  const [r, g, b] = hexChannels(hex);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/** Channel-wise blend of two `#RRGGBB` colours at fraction `t` of the
+ *  way from `a` to `b`. Non-hex inputs (rgba endpoints) return `a`. */
+function mixHex(a: string, b: string, t: number): string {
+  if (!a.startsWith("#") || !b.startsWith("#")) return a;
   const ca = hexChannels(a);
   const cb = hexChannels(b);
-  return channelsToHex(
-    Math.round((ca[0] + cb[0]) / 2),
-    Math.round((ca[1] + cb[1]) / 2),
-    Math.round((ca[2] + cb[2]) / 2),
-  );
+  const mix = (i: 0 | 1 | 2): number => Math.round(ca[i] * (1 - t) + cb[i] * t);
+  return channelsToHex(mix(0), mix(1), mix(2));
 }
 
 /** `tx1/bg1/tx2/bg2` are the wp-level aliases of the theme's dk/lt slots. */
