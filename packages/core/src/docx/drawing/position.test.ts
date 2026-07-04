@@ -4,6 +4,7 @@ import {
   coerceVRelativeFrom,
   findAnchorPositionEl,
   readPctPos,
+  readPctSize,
   readPosAlign,
   readPosOffset,
 } from "./position";
@@ -126,5 +127,36 @@ describe("position — mc:AlternateContent-wrapped positions", () => {
         "</wp:anchor>",
     );
     expect(readPosOffset(findAnchorPositionEl(anchor, "positionV"))).toBe(123);
+  });
+});
+
+describe("position — wp14 percent sizing", () => {
+  it("reads pctWidth/pctHeight fractions with their bases", () => {
+    const anchor = el(
+      `<wp:anchor behindDoc="1">` +
+        `<wp14:sizeRelH relativeFrom="margin"><wp14:pctWidth>108500</wp14:pctWidth></wp14:sizeRelH>` +
+        `<wp14:sizeRelV relativeFrom="page"><wp14:pctHeight>96400</wp14:pctHeight></wp14:sizeRelV>` +
+        "</wp:anchor>",
+    );
+    expect(readPctSize(anchor)).toEqual({
+      pctWidth: 1.085,
+      pctWidthFrom: "margin",
+      pctHeight: 0.964,
+      pctHeightFrom: "page",
+    });
+  });
+
+  it("a zero percent means not-percent-sized (the extent stays)", () => {
+    // A footer bar declares sizeRelV pct=0: its HEIGHT comes from the
+    // extent, only the width is margin-relative.
+    const anchor = el(
+      `<wp:anchor behindDoc="0">` +
+        `<wp14:sizeRelH relativeFrom="margin"><wp14:pctWidth>103100</wp14:pctWidth></wp14:sizeRelH>` +
+        `<wp14:sizeRelV relativeFrom="margin"><wp14:pctHeight>0</wp14:pctHeight></wp14:sizeRelV>` +
+        "</wp:anchor>",
+    );
+    const out = readPctSize(anchor);
+    expect(out.pctWidth).toBeCloseTo(1.031, 5);
+    expect(out.pctHeight).toBeUndefined();
   });
 });

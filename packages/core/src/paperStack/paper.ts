@@ -1,6 +1,9 @@
 import type { AnchoredFrame, SectionProperties } from "../doc/types";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
-import { resolveAnchorPosition } from "../editor/view/docRenderer/anchorPosition";
+import {
+  resolveAnchorPosition,
+  resolveAnchorSize,
+} from "../editor/view/docRenderer/anchorPosition";
 import { EMU_PER_PX } from "../editor/view/docRenderer/units";
 import { type PageSetup, type VerticalAlign, resolvedDimensions } from "./pageSetup";
 import { type ZoneRenderContext, paintZoneFrames, renderZone, setZoneText } from "./paperZone";
@@ -293,7 +296,7 @@ export class Paper {
         );
         if (el) anchorParaTopEmu = offsetTopWithin(el, this.root) * EMU_PER_PX;
       }
-      const { xEmu, yEmu } = resolveAnchorPosition(f, {
+      const geom = {
         marginTopEmu,
         marginLeftEmu,
         anchorParaTopEmu,
@@ -301,8 +304,13 @@ export class Paper {
         pageHeightEmu,
         marginRightEmu,
         marginBottomEmu,
-      });
-      return { ...f, offsetXEmu: xEmu, offsetYEmu: yEmu };
+      };
+      // Size FIRST: percent-sized frames derive width/height from the
+      // page geometry, and align/pct positioning centres the RESOLVED
+      // box, not the stale extent.
+      const sized = { ...f, ...resolveAnchorSize(f, geom) };
+      const { xEmu, yEmu } = resolveAnchorPosition(sized, geom);
+      return { ...sized, offsetXEmu: xEmu, offsetYEmu: yEmu };
     });
   }
 
