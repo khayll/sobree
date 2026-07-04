@@ -230,11 +230,20 @@ function mapSchemeSlot(val: string | null): string | null {
 function applyTransforms(hex: string, clrEl: Element): string {
   let [h, s, l] = rgbToHsl(hex);
   let rgbOut: string | null = null;
+  let alpha: number | undefined;
   for (const t of Array.from(clrEl.children)) {
     if (t.namespaceURI !== NS.a) continue;
     const val = Number(t.getAttribute("val") ?? "0");
     if (!Number.isFinite(val)) continue;
     switch (t.localName) {
+      case "alpha":
+        // `<a:alpha val="83000"/>` = 83% opacity. Semi-transparent
+        // fills are how layered page designs make their middle band:
+        // an 83%-white rectangle over a grey texture reads as the
+        // LIGHTER grey frame inset in the darker ring. Dropping the
+        // alpha painted it opaque and erased the band.
+        alpha = clamp01(val / 100000);
+        break;
       case "hueOff":
         h = (((h + val / 60000) % 360) + 360) % 360;
         break;
@@ -264,7 +273,12 @@ function applyTransforms(hex: string, clrEl: Element): string {
         break;
     }
   }
-  return rgbOut ?? hslToRgb(h, s, l);
+  const out = rgbOut ?? hslToRgb(h, s, l);
+  if (alpha === undefined || alpha >= 1) return out;
+  const [r, g, b] = hexChannels(out);
+  // rgba() is a valid CSS color everywhere fills/strokes land
+  // (style.background / style.border), so alpha rides the same string.
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function clamp01(v: number): number {
