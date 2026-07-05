@@ -1,5 +1,14 @@
 # @sobree/mcp
 
+## 0.1.57
+
+### Patch Changes
+
+- 8bf75ac: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [8bf75ac]
+  - @sobree/core@0.1.57
+
 ## 0.1.56
 
 ### Patch Changes
