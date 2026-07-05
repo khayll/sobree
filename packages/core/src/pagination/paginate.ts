@@ -193,8 +193,19 @@ function pickAndEmit(
     }
   }
   if (best === null) {
-    // No finite candidate: force break at the overflow position.
-    return emit(items, start, overflowIdx, 0, overflowIdx);
+    // No finite candidate. Word's degradation for an infeasible chain
+    // is PAIRWISE, not overflow-greedy: it fills forward, and when a
+    // block fits but its keepNext SUCCESSOR's first line doesn't, that
+    // one block moves to the next page — the move never cascades to
+    // the block's own predecessor. Breaking at the raw overflow packed
+    // the page to 100.0% and ended it mid keep-pair (a CV's
+    // "Achievements:" heading + bullets landed where Word pushes
+    // them). Pull back the single trailing block whose pair broke;
+    // everything before it stays.
+    const pulled = pullBackTrailingKeepBlock(items, start, overflowIdx);
+    // A glue break consumes the glue (same as ordinary candidates).
+    const next = items[pulled]?.type === "glue" ? pulled + 1 : pulled;
+    return emit(items, start, pulled, 0, next);
   }
 
   // Post-condition: back off by one line if widow/orphan still violated.
@@ -202,6 +213,58 @@ function pickAndEmit(
   const adjustedCost = adjusted === best ? bestCost : scoreBreak(items, start, adjusted, cfg);
 
   return emit(items, start, adjusted.pageEnd, adjustedCost, adjusted.nextStart);
+}
+
+/**
+ * The one-block pullback for the all-forbidden fallback: when the LAST
+ * box placed before `overflowIdx` carries `keepWithNext` (its pair
+ * target is the very content that overflowed), the break moves to the
+ * start of that box's block — the block rides to the next page whole,
+ * exactly one keep violation happens (at the new boundary), and no
+ * cascade runs. Returns `overflowIdx` unchanged when the tail isn't a
+ * broken keep pair, when the block has no clear start, or when pulling
+ * it would empty the page.
+ */
+function pullBackTrailingKeepBlock(items: Item[], start: number, overflowIdx: number): number {
+  // Locate the last placed box.
+  let lastBoxIdx = -1;
+  for (let i = overflowIdx - 1; i >= start; i--) {
+    if (items[i]?.type === "box") {
+      lastBoxIdx = i;
+      break;
+    }
+  }
+  if (lastBoxIdx < 0) return overflowIdx;
+  const lastBox = items[lastBoxIdx] as Extract<Item, { type: "box" }>;
+  if (lastBox.keepWithNext !== true) return overflowIdx;
+
+  // Walk back to the block's first line. Line boxes share a
+  // `paragraphId`; a box without one is its own block.
+  let firstBoxIdx = lastBoxIdx;
+  if (lastBox.paragraphId !== undefined) {
+    for (let i = lastBoxIdx - 1; i >= start; i--) {
+      const it = items[i];
+      if (it?.type === "box") {
+        if (it.paragraphId !== lastBox.paragraphId) break;
+        firstBoxIdx = i;
+      }
+    }
+  }
+
+  // The page must keep at least one box, or the pullback would emit an
+  // empty page and re-open the one-page-per-block explosion.
+  let hasEarlierBox = false;
+  for (let i = firstBoxIdx - 1; i >= start; i--) {
+    if (items[i]?.type === "box") {
+      hasEarlierBox = true;
+      break;
+    }
+  }
+  if (!hasEarlierBox) return overflowIdx;
+
+  // Break at the glue preceding the block when there is one (consumed
+  // by the break, like any inter-block candidate).
+  return items[firstBoxIdx - 1]?.type === "glue" ? firstBoxIdx - 1 : firstBoxIdx;
 }
 
 function emit(
