@@ -1,5 +1,30 @@
 # @sobree/core
 
+## 0.1.56
+
+### Patch Changes
+
+- e399a1b: A pure decoration inline frame (shapes only) keeps its declared
+  `<wp:extent>` box instead of stretching to its host column — a CV's
+  photo-placeholder rectangle renders at its true 0.6×0.7in portrait
+  aspect. Percent-width tables now lay out on Word's column grid
+  (`table-layout: fixed` + per-cell grid shares), so the placeholder's
+  column keeps its designed width whatever the cell contains; dxa-width
+  tables keep content-driven layout until the `<w:tcW>` preference
+  layer lands.
+- 857fa36: Infeasible keep-with-next chains now degrade the way Word does —
+  pairwise: when a block fits on the page but its keepNext successor's
+  first line doesn't, that ONE block moves to the next page, with no
+  cascade to its own predecessor. The previous fallback packed the page
+  to exactly 100% and broke mid keep-pair; a CV's "Achievements:"
+  heading and bullets landed on the page bottom where Word pushes them
+  over.
+- a3758cc: Tables honour `<w:tblW w:type="pct">` percent widths — a banner table
+  declaring 103.3% of the text column now reaches past the margins to
+  meet the page-frame decoration, centred with symmetric overhang, the
+  way Word lays it out. Percent widths were previously ignored and the
+  banner stopped short of the frame.
+
 ## 0.1.55
 
 ### Patch Changes
