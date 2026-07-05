@@ -70,6 +70,28 @@ export function renderTable(
   const effBorders = effectiveTableBorders(table, styleDef);
   applyTableFrame(t, effBorders);
   applyTableLayout(t, table.properties);
+  // A PERCENT-width table (`<w:tblW type="pct">`) lays out on Word's
+  // column grid, not on content. CSS auto layout sized columns by
+  // content — a banner's photo column happened to look right only
+  // while its inline frame stretched to fill the cell, and collapsed to
+  // content width the moment the frame took its fixed extent. Pin
+  // `table-layout: fixed` and stamp each cell's grid share as a percent
+  // width (ON THE CELLS — a <colgroup> would not survive the
+  // paginator's row splitting, which re-parents only the tbody rows).
+  //
+  // Scope: pct-width tables ONLY. A dxa-width table's real column
+  // algorithm layers per-cell `<w:tcW>` preferences and page-width
+  // clamping on top of the grid (a recipe card declares tblW=14665
+  // dxa — wider than the page — with 12 skinny grid columns and tcW
+  // overrides; raw grid shares re-wrapped it onto a second page).
+  // That layer is a follow-up; dxa and grid-only (autofit) tables keep
+  // auto layout.
+  const gridSum = table.grid.reduce((a, b) => a + b, 0);
+  const gridShares =
+    table.properties.widthPct !== undefined && gridSum > 0
+      ? table.grid.map((w) => w / gridSum)
+      : null;
+  if (gridShares) t.style.tableLayout = "fixed";
 
   const cellCtx: CellStyleContext = {
     def: styleDef,
@@ -79,6 +101,7 @@ export function renderTable(
     borders: effBorders,
     margins: effectiveCellMargins(table, styleDef),
     tableStyleId: table.properties.styleId,
+    gridShares,
   };
 
   // Pre-compute rowspan per (row, col) for every restart cell.
@@ -132,6 +155,10 @@ interface CellStyleContext {
   /** The table's `w:tblStyle` id — threaded into each cell paragraph's
    *  style cascade (the table style's own pPr/rPr layer). */
   tableStyleId: string | undefined;
+  /** Per-grid-column width FRACTIONS (from `<w:tblGrid>`), present only
+   *  for explicit-width tables — each cell stamps its span's share as a
+   *  percent width so `table-layout: fixed` follows Word's grid. */
+  gridShares: number[] | null;
 }
 
 function renderRow(
@@ -179,6 +206,11 @@ function renderRow(
       rawParts,
       renderCellBlocks,
     );
+    if (cellCtx.gridShares) {
+      // Sum this cell's span of grid columns → percent of the table.
+      const share = cellCtx.gridShares.slice(col, col + gridSpan).reduce((a, b) => a + b, 0);
+      if (share > 0) el.style.width = `${(share * 100).toFixed(3)}%`;
+    }
     if (gridSpan > 1) el.setAttribute("colspan", String(gridSpan));
     if (rowSpan > 1) el.setAttribute("rowspan", String(rowSpan));
     tr.appendChild(el);
