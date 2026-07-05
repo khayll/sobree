@@ -44,6 +44,10 @@ export interface Table {
 export interface TableProperties {
   /** Total table width in twips, or "auto" for content-driven. */
   widthTwips?: number;
+  /** `<w:tblLayout w:type="fixed"/>` — the author locked the layout to
+   *  the column grid; content never resizes columns. Absent = Word's
+   *  autofit, where content genuinely re-flows the columns. */
+  layoutFixed?: boolean;
   /** `<w:tblW w:type="pct">` — table width as a PERCENTAGE of the text
    *  column (stored unit: fiftieths of a percent; kept here as the
    *  resolved percentage, e.g. `103.3`). Banner tables deliberately

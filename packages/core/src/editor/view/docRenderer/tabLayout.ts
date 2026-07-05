@@ -91,31 +91,70 @@ export function planRightTailTab(
   const last = stops.reduce((a, b) => (b.positionTwips >= a.positionTwips ? b : a));
   if (last.alignment !== "right") return null;
 
-  // Locate the single tab character among top-level text runs.
+  // Locate the tab characters among top-level text runs. ONE tab is
+  // the TOC right-tail. SEVERAL CONSECUTIVE tabs (nothing but
+  // whitespace between them) are Word's footer idiom — the walk
+  // consumes one STOP per tab in position order, so "Feb \t \t text"
+  // against [center@4680, right@9360] lands the tail on the SECOND
+  // stop: the empty middle segment eats the center stop and the text
+  // right-aligns at 9360, exactly Word/LO's single spread line.
   let tabRun = -1;
   let tabChar = -1;
+  let lastTabRun = -1;
+  let lastTabChar = -1;
+  let tabCount = 0;
   for (let i = 0; i < p.runs.length; i++) {
     const r = p.runs[i]!;
     if (r.kind === "hyperlink" && hyperlinkContainsTab(r.children)) return null;
     if (r.kind !== "text") continue;
     let idx = r.text.indexOf("\t");
     while (idx !== -1) {
-      if (tabRun !== -1) return null; // second tab → mixed stops, bail
-      tabRun = i;
-      tabChar = idx;
+      if (tabRun === -1) {
+        tabRun = i;
+        tabChar = idx;
+      }
+      lastTabRun = i;
+      lastTabChar = idx;
+      tabCount++;
       idx = r.text.indexOf("\t", idx + 1);
     }
   }
   if (tabRun === -1) return null;
 
+  // The tail's stop: for one tab, Word's TOC idiom targets the LAST
+  // right stop (calibrated behaviour); for N tabs, the walk consumes
+  // stops in order and the tail sits on the N-th.
+  let tailStop = last;
+  let separator = "\t";
+  if (tabCount > 1) {
+    const sorted = [...stops].sort((a, b) => a.positionTwips - b.positionTwips);
+    const walked = sorted[tabCount - 1];
+    if (!walked || walked.alignment !== "right") return null;
+    tailStop = walked;
+    // Everything between the FIRST and LAST tab must be whitespace-only
+    // — a non-empty middle segment would need its own (center) layout,
+    // which this planner doesn't model.
+    let between = "";
+    for (let i = tabRun; i <= lastTabRun; i++) {
+      const r = p.runs[i]!;
+      if (r.kind !== "text") return null;
+      const from = i === tabRun ? tabChar + 1 : 0;
+      const to = i === lastTabRun ? lastTabChar : r.text.length;
+      between += r.text.slice(from, to);
+    }
+    if (between.replace(/[\t ]/g, "") !== "") return null;
+    separator = `\t${between}\t`;
+  }
+
   const host = p.runs[tabRun] as TextRun;
+  const tailHost = p.runs[lastTabRun] as TextRun;
   const pre = host.text.slice(0, tabChar);
-  const post = host.text.slice(tabChar + 1);
+  const post = tailHost.text.slice(lastTabChar + 1);
   const before: InlineRun[] = [...p.runs.slice(0, tabRun)];
   if (pre) before.push({ ...host, text: pre });
   const after: InlineRun[] = [];
-  if (post) after.push({ ...host, text: post });
-  after.push(...p.runs.slice(tabRun + 1));
+  if (post) after.push({ ...tailHost, text: post });
+  after.push(...p.runs.slice(lastTabRun + 1));
   if (!hasVisibleContent(after)) return null;
 
   // `w:pos` is measured from the text margin; the paragraph's content
@@ -124,7 +163,7 @@ export function planRightTailTab(
   // For the common TOC case (stop at the column edge) this resolves to
   // ~0; a stop beyond the edge goes slightly negative and the tail
   // overflows — the same thing Word does.
-  const offsetTwips = last.positionTwips - (effective.indent?.leftTwips ?? 0);
+  const offsetTwips = tailStop.positionTwips - (effective.indent?.leftTwips ?? 0);
   if (offsetTwips <= 0) return null;
   const tailMarginRight = `calc(100% - ${twipsToMm(offsetTwips)}mm)`;
 
@@ -139,11 +178,11 @@ export function planRightTailTab(
         ? `-${twipsToMm(hanging)}mm`
         : undefined;
 
-  const leaderChar = last.leader ? LEADER_FILL_CHAR[last.leader] : undefined;
+  const leaderChar = tailStop.leader ? LEADER_FILL_CHAR[tailStop.leader] : undefined;
   return {
     before,
     after,
-    separatorText: "\t",
+    separatorText: separator,
     ...(leaderChar ? { leaderFill: leaderChar.repeat(LEADER_FILL_CAPACITY) } : {}),
     tailMarginRight,
     ...(beforeMarginLeft ? { beforeMarginLeft } : {}),
