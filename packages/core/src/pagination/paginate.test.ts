@@ -276,23 +276,22 @@ describe("forced break followed by leading glue (space-before after a hard break
 });
 
 describe("infeasible keep-with-next chains degrade to natural page breaks", () => {
-  it("a keep-chain longer than the page breaks at capacity, not one block per page", () => {
+  it("a keep-chain longer than the page fills near capacity, not one block per page", () => {
     // A CV styling every job-title / company / spacer paragraph as a
     // keepNext heading chains dozens of blocks: every inter-block break
-    // is forbidden (+Infinity). Word breaks such an infeasible chain at
-    // the natural page boundary; picking the "least bad" infinite
+    // is forbidden (+Infinity). Picking the "least bad" infinite
     // candidate chose the EARLIEST glue and emitted a near-empty page
-    // per block (healthcare CV: 3 pages exploded to 13).
+    // per block (healthcare CV: 3 pages exploded to 13). Word fills
+    // pairwise: 10 boxes fit, but the 10th's keepNext pair (the 11th)
+    // doesn't — so the 10th moves, leaving 9 per page. Ten distinct
+    // paragraph ids so the pullback moves exactly one BLOCK.
     const items: Item[] = [];
     for (let i = 0; i < 30; i++) {
-      items.push(box(60, { keepWithNext: true }));
+      items.push(box(60, { keepWithNext: true, paragraphId: `p${i}` }));
       if (i < 29) items.push(glue(0));
     }
-    const pages = paginate(items, { pageHeight: 600 }); // 10 boxes/page
-    expect(pages).toHaveLength(3);
-    expect(boxCount(pages[0]!.items)).toBe(10);
-    expect(boxCount(pages[1]!.items)).toBe(10);
-    expect(boxCount(pages[2]!.items)).toBe(10);
+    const pages = paginate(items, { pageHeight: 600 }); // 10 boxes fit
+    expect(pages.map((p) => boxCount(p.items))).toEqual([9, 9, 9, 3]);
   });
 
   it("a finite candidate before the chain is still preferred over splitting it", () => {
@@ -328,5 +327,59 @@ describe("consecutive forced breaks coalesce (no blank pages)", () => {
     expect(pages).toHaveLength(2);
     expect(boxCount(pages[0]!.items)).toBe(1);
     expect(boxCount(pages[1]!.items)).toBe(1);
+  });
+});
+
+describe("infeasible chain: trailing keep-pair pulls back ONE block", () => {
+  it("the last block whose keepNext pair broke moves whole to the next page", () => {
+    // Word's pairwise degradation: fill forward; when a block fits but
+    // its keepNext successor's first line doesn't, that ONE block moves
+    // — no cascade. Ten single-line keepNext blocks of 100 on a 550
+    // page: greedy fits 5, but block 5's pair (block 6) fails, so
+    // page 1 carries 4. Breaking at raw overflow instead packed 5 and
+    // ended the page mid keep-pair (a CV's "Achievements:" heading +
+    // bullets landed where Word pushes them).
+    const items: Item[] = [];
+    for (let i = 0; i < 10; i++) {
+      if (i > 0) items.push(glue(0));
+      items.push(box(100, { keepWithNext: true, paragraphId: `p${i}` }));
+    }
+    const pages = paginate(items, { pageHeight: 550 });
+    expect(pages.map((p) => boxCount(p.items))).toEqual([4, 4, 2]);
+  });
+
+  it("multi-line trailing block moves as a whole", () => {
+    // Block C has 3 lines; its last line carries keepWithNext. The
+    // pullback rewinds to C's FIRST line so the block travels whole.
+    const items: Item[] = [
+      box(100, { keepWithNext: true, paragraphId: "a" }),
+      glue(0),
+      box(100, { keepWithNext: true, paragraphId: "b" }),
+      glue(0),
+      box(100, { paragraphId: "c", isFirstLineOfParagraph: true }),
+      box(100, { paragraphId: "c" }),
+      box(100, { paragraphId: "c", isLastLineOfParagraph: true, keepWithNext: true }),
+      glue(0),
+      box(100, { keepWithNext: true, paragraphId: "d" }),
+      glue(0),
+      box(100, { keepWithNext: true, paragraphId: "e" }),
+    ];
+    // Page 600: a(100) b(200) c(500) fit; d fits at 600 but d's pair (e)
+    // does not → pull d; c stays whole on page 1.
+    const pages = paginate(items, { pageHeight: 600 });
+    expect(boxCount(pages[0]!.items)).toBe(5); // a, b, c(3 lines)
+    expect(boxCount(pages[1]!.items)).toBe(2); // d, e
+  });
+
+  it("never empties the page: a chain-block taller than the rest stays at overflow", () => {
+    // Only one block fits at all — pulling it would emit an empty page.
+    const items: Item[] = [
+      box(500, { keepWithNext: true, paragraphId: "a" }),
+      glue(0),
+      box(500, { keepWithNext: true, paragraphId: "b" }),
+    ];
+    const pages = paginate(items, { pageHeight: 550 });
+    expect(pages).toHaveLength(2);
+    expect(boxCount(pages[0]!.items)).toBe(1);
   });
 });
