@@ -125,3 +125,15 @@ describe("convertTable — percent width", () => {
     ).toBeUndefined();
   });
 });
+
+describe("convertTable — tblLayout", () => {
+  it("reads <w:tblLayout w:type='fixed'> as layoutFixed; autofit stays absent", () => {
+    expect(
+      table(`<w:tblPr><w:tblLayout w:type="fixed"/></w:tblPr>${ONE_CELL}`).properties.layoutFixed,
+    ).toBe(true);
+    expect(
+      table(`<w:tblPr><w:tblLayout w:type="autofit"/></w:tblPr>${ONE_CELL}`).properties.layoutFixed,
+    ).toBeUndefined();
+    expect(table(`<w:tblPr/>${ONE_CELL}`).properties.layoutFixed).toBeUndefined();
+  });
+});

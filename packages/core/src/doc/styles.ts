@@ -131,13 +131,39 @@ function mergeParagraphDefaults(
   base: ParagraphProperties,
   over: ParagraphProperties,
 ): ParagraphProperties {
-  return {
+  const merged: ParagraphProperties = {
     ...base,
     ...over,
     spacing: { ...base.spacing, ...over.spacing },
     indent: { ...base.indent, ...over.indent },
     borders: { ...base.borders, ...over.borders },
   };
+  if (base.tabStops && over.tabStops) {
+    merged.tabStops = mergeTabStops(base.tabStops, over.tabStops);
+  }
+  return merged;
+}
+
+/**
+ * Tab stops ACCUMULATE through the property hierarchy (§17.3.1.38): a
+ * layer's stops merge into the inherited list — same-position stops
+ * override, `clear` stops delete the inherited stop at their position.
+ * Word's built-in Footer declares center+right stops; a paragraph
+ * adding its own right stop KEEPS them (replacing the list glued a
+ * footer's three-zone line into a stack). Shared by the style cascade
+ * and the renderer's direct-props merge so both layers agree.
+ */
+export function mergeTabStops(
+  base: NonNullable<ParagraphProperties["tabStops"]>,
+  over: NonNullable<ParagraphProperties["tabStops"]>,
+): NonNullable<ParagraphProperties["tabStops"]> {
+  const byPos = new Map<number, NonNullable<ParagraphProperties["tabStops"]>[number]>();
+  for (const s of base) byPos.set(s.positionTwips, s);
+  for (const s of over) {
+    if (s.alignment === "clear") byPos.delete(s.positionTwips);
+    else byPos.set(s.positionTwips, s);
+  }
+  return [...byPos.values()].sort((a, b) => a.positionTwips - b.positionTwips);
 }
 
 function collectStyleChain(

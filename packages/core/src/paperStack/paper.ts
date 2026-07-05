@@ -291,9 +291,23 @@ export class Paper {
     return frames.map((f) => {
       let anchorParaTopEmu: number | null = null;
       if (f.anchor.verticalFrom === "paragraph" && f.anchor.paragraphIndex !== undefined) {
-        const el = zoneFlow.querySelector<HTMLElement>(
-          `[data-block-index="${f.anchor.paragraphIndex}"]`,
-        );
+        // FLOW-LEVEL blocks only: table-cell paragraphs and inline-frame
+        // bodies carry their own container-LOCAL block indices, and an
+        // unscoped query matched a paragraph INSIDE a table (first in DOM
+        // order) instead of the top-level anchor paragraph — a recipe
+        // card's logo, anchored to the last body paragraph, painted 6in
+        // too high off a checkbox line's index-1 stamp. Top-level blocks
+        // aren't always DIRECT children (list paragraphs render as LIs
+        // inside an OL/UL), so filter out nested-container matches
+        // rather than requiring `:scope >`.
+        const el = [
+          ...zoneFlow.querySelectorAll<HTMLElement>(
+            `[data-block-index="${f.anchor.paragraphIndex}"]`,
+          ),
+        ].find((cand) => {
+          const container = cand.closest("td, th, .sobree-inline-frame");
+          return container === null || !zoneFlow.contains(container);
+        });
         if (el) anchorParaTopEmu = offsetTopWithin(el, this.root) * EMU_PER_PX;
       }
       const geom = {

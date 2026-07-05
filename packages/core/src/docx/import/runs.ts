@@ -116,11 +116,59 @@ export function readRunSegments(r: Element): ImportedRun[] {
       const breakType: "line" | "page" | "column" =
         typeAttr === "page" ? "page" : typeAttr === "column" ? "column" : "line";
       segments.push({ text: "", format: {}, isHardBreak: true, breakType });
+    } else if (child.localName === "sym") {
+      text += symToText(child);
     }
   }
   flushText();
   return segments;
 }
+
+/**
+ * `<w:sym w:font="Wingdings" w:char="F071"/>` — a symbol-font glyph
+ * reference (Word's Insert → Symbol for the legacy symbol fonts). The
+ * common glyphs map to real Unicode so they render on every platform
+ * (a HACCP form's ❑ checkboxes are Wingdings F071); anything unmapped
+ * falls back to the font's private-use codepoint, which renders
+ * correctly wherever the symbol font is installed.
+ */
+function symToText(sym: Element): string {
+  const font = sym.getAttributeNS(NS.w, "font") ?? sym.getAttribute("w:font") ?? "";
+  const charAttr = sym.getAttributeNS(NS.w, "char") ?? sym.getAttribute("w:char") ?? "";
+  const code = Number.parseInt(charAttr, 16);
+  if (!Number.isFinite(code)) return "";
+  // Symbol chars are stored PUA-shifted (F000 + base). Normalise to the
+  // base code for the mapping tables.
+  const base = code >= 0xf000 && code <= 0xf0ff ? code - 0xf000 : code;
+  const mapped = SYMBOL_FONT_GLYPHS[font.toLowerCase()]?.[base];
+  if (mapped) return mapped;
+  return String.fromCodePoint(code);
+}
+
+/** Unicode equivalents for the symbol-font glyphs that show up in real
+ *  forms — checkbox family, check/cross marks, common bullets. Keyed by
+ *  the font's BASE character code (the ASCII key Word maps the glyph to). */
+const SYMBOL_FONT_GLYPHS: Record<string, Record<number, string>> = {
+  wingdings: {
+    110: "■", // n — filled square
+    111: "❏", // o — hollow square
+    112: "❐", // p — shadowed hollow square (upper right)
+    113: "❑", // q — shadowed hollow square (lower right, the ❑ checkbox)
+    114: "❒", // r — shadowed hollow square (upper left)
+    252: "✓", // ü — check mark
+    251: "✗", // û — ballot X
+    254: "☒", // þ — ballot box with X
+    159: "•", // Ÿ — bullet
+    216: "➢", // Ø — three-D arrowhead
+    167: "▪", // § — small filled square
+  },
+  symbol: {
+    183: "•", // · — bullet
+    214: "√", // Ö — radical / check-ish
+    174: "→", // ® — right arrow
+    172: "←", // ¬ — left arrow
+  },
+};
 
 export function readRun(r: Element): ImportedRun {
   // Drawing (image). Inline placement renders in the paragraph; anchor
@@ -208,6 +256,8 @@ export function readRun(r: Element): ImportedRun {
       text += child.textContent ?? "";
     } else if (child.localName === "tab") {
       text += "\t";
+    } else if (child.localName === "sym") {
+      text += symToText(child);
     }
     // Other children (rPr, drawing, footnoteReference, …) are handled
     // by the dedicated branches above before we reach here; `<w:br/>`
@@ -259,9 +309,14 @@ function readRunText(r: Element): string {
 }
 
 export function normaliseRunText(text: string): string {
-  if (!text) return text;
-  if (text.includes("\t")) return text;
-  if (text.length >= 4 && /^[ \u00A0]+$/.test(text)) return " ";
+  // Whitespace passes through VERBATIM. An earlier normalisation
+  // collapsed pure-whitespace runs of 4+ chars to one space — a
+  // compensation for browser FALLBACK fonts rendering spaces wider
+  // than Word's metric fonts, from before the font stack loaded
+  // Calibri/Carlito (and embedded fonts) properly. Authors genuinely
+  // use long space runs as layout ("Recipe Name:" + 40 spaces +
+  // "File No:" pushes the label to the cell's right side); collapsing
+  // glued the labels together.
   return text;
 }
 

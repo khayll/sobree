@@ -213,3 +213,26 @@ describe("readRunSegments — <w:br/> is run content, not a run type", () => {
     expect(segs[0]).toMatchObject({ isHardBreak: true, breakType: "column" });
   });
 });
+
+describe("readRun — <w:sym> symbol-font glyphs", () => {
+  it("maps Wingdings F071 to the ❑ checkbox glyph", () => {
+    const r = runFromXml(
+      `<w:r xmlns:w="${NS_W}"><w:sym w:font="Wingdings" w:char="F071"/><w:t xml:space="preserve"> #1 No Cook</w:t></w:r>`,
+    );
+    expect(readRun(r).text).toBe("❑ #1 No Cook");
+  });
+
+  it("unmapped symbol codes fall back to the raw codepoint", () => {
+    const r = runFromXml(`<w:r xmlns:w="${NS_W}"><w:sym w:font="Webdings" w:char="F0E8"/></w:r>`);
+    expect(readRun(r).text).toBe(String.fromCodePoint(0xf0e8));
+  });
+});
+
+describe("normaliseRunText — whitespace passes through verbatim", () => {
+  it("keeps long space runs (layout spaces push labels right)", () => {
+    const r = runFromXml(
+      `<w:r xmlns:w="${NS_W}"><w:t xml:space="preserve">${" ".repeat(40)}</w:t></w:r>`,
+    );
+    expect(readRun(r).text).toBe(" ".repeat(40));
+  });
+});

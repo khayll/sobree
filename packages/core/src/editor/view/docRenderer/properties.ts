@@ -12,7 +12,7 @@
  * there are no CSS-only typography fallbacks.
  */
 
-import { resolveStyleCascade } from "../../../doc/styles";
+import { mergeTabStops, resolveStyleCascade } from "../../../doc/styles";
 import type { NamedStyle, ParagraphProperties, RunProperties } from "../../../doc/types";
 import { resolveFontFace } from "./fontFallback";
 import { twipsToMm } from "./units";
@@ -282,13 +282,18 @@ function mergeParagraphProperties(
   base: ParagraphProperties,
   over: ParagraphProperties,
 ): ParagraphProperties {
-  return {
+  const merged: ParagraphProperties = {
     ...base,
     ...over,
     spacing: { ...base.spacing, ...over.spacing },
     indent: { ...base.indent, ...over.indent },
     borders: { ...base.borders, ...over.borders },
   };
+  // Direct tabs MERGE with the cascade's (§17.3.1.38) — see mergeTabStops.
+  if (base.tabStops && over.tabStops) {
+    merged.tabStops = mergeTabStops(base.tabStops, over.tabStops);
+  }
+  return merged;
 }
 
 /**

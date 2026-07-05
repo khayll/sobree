@@ -53,6 +53,9 @@ export function convertTable(tbl: Element, ctx: ConvertContext): Table {
       const w = Number.parseInt(tblW.getAttribute("w:w") ?? "", 10);
       if (Number.isFinite(w) && w > 0) properties.widthPct = w / 50;
     }
+    // `<w:tblLayout w:type="fixed"/>` — grid-locked layout (vs autofit).
+    const tblLayout = wFirst(tblPr, "tblLayout");
+    if (tblLayout?.getAttribute("w:type") === "fixed") properties.layoutFixed = true;
     // `<w:jc>` — table horizontal alignment on the page.
     const jc = wVal(wFirst(tblPr, "jc"));
     if (jc === "left" || jc === "center" || jc === "right") properties.alignment = jc;
