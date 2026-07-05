@@ -351,10 +351,25 @@ function applyTableFrame(t: HTMLElement, borders: TableBorders | null): void {
 function applyTableLayout(t: HTMLElement, props: Table["properties"]): void {
   if (props.widthTwips !== undefined) {
     t.style.width = `${twipsToMmExact(props.widthTwips).toFixed(2)}mm`;
+  } else if (props.widthPct !== undefined) {
+    // Percent of the text column — CSS % of the content box gives the
+    // same base. Word's banner tables declare >100% on purpose so they
+    // reach past the margins to meet a page-frame decoration.
+    t.style.width = `${props.widthPct.toFixed(2)}%`;
   }
   if (props.alignment === "center") {
-    t.style.marginLeft = "auto";
-    t.style.marginRight = "auto";
+    if (props.widthPct !== undefined && props.widthPct > 100) {
+      // `margin: auto` cannot centre a block WIDER than its container
+      // (negative free space resolves to 0 and the overhang lands
+      // entirely on the right). Explicit symmetric negative margins —
+      // percentages resolve against the container width — centre it.
+      const m = ((100 - props.widthPct) / 2).toFixed(2);
+      t.style.marginLeft = `${m}%`;
+      t.style.marginRight = `${m}%`;
+    } else {
+      t.style.marginLeft = "auto";
+      t.style.marginRight = "auto";
+    }
   } else if (props.alignment === "right") {
     t.style.marginLeft = "auto";
   }

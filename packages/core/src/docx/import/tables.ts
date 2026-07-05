@@ -40,12 +40,18 @@ export function convertTable(tbl: Element, ctx: ConvertContext): Table {
       const margins = readCellMargins(cellMar);
       if (margins) properties.cellMargins = margins;
     }
-    // `<w:tblW>` — only ABSOLUTE widths (`w:type="dxa"`) map to
-    // `widthTwips`; `pct` / `auto` are content-driven and left unset.
+    // `<w:tblW>` — ABSOLUTE widths (`w:type="dxa"`) map to `widthTwips`;
+    // PERCENT widths (`w:type="pct"`, fiftieths of a percent) map to
+    // `widthPct` — banner tables declare >100% on purpose so they reach
+    // past the margins to meet a page-frame decoration. `auto` stays
+    // content-driven.
     const tblW = wFirst(tblPr, "tblW");
     if (tblW && tblW.getAttribute("w:type") === "dxa") {
       const w = Number.parseInt(tblW.getAttribute("w:w") ?? "", 10);
       if (Number.isFinite(w) && w > 0) properties.widthTwips = w;
+    } else if (tblW && tblW.getAttribute("w:type") === "pct") {
+      const w = Number.parseInt(tblW.getAttribute("w:w") ?? "", 10);
+      if (Number.isFinite(w) && w > 0) properties.widthPct = w / 50;
     }
     // `<w:jc>` — table horizontal alignment on the page.
     const jc = wVal(wFirst(tblPr, "jc"));
