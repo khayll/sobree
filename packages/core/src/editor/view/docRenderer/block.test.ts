@@ -114,11 +114,14 @@ describe("renderBlocks — table style pPr reaches cell paragraphs", () => {
   });
 });
 
-describe("renderTable — explicit-width tables follow the tblGrid", () => {
-  it("stamps grid-share percent widths on cells and pins fixed layout", () => {
+describe("renderTable — grid-locked tables follow the tblGrid", () => {
+  it("emits a colgroup of grid-share percent widths and pins fixed layout (pct table)", () => {
     // A banner table (tblW pct + grid 9501:1028) must keep Word's column
     // proportions whatever the cells contain — CSS auto layout sized the
-    // photo column by content instead.
+    // photo column by content instead. The widths live on a <colgroup>
+    // (not the cells): fixed layout reads only <col>s and the FIRST
+    // row's cells, so per-cell stamping broke whenever the first row
+    // spanned the grid.
     const table: Table = {
       kind: "table",
       grid: [9501, 1028],
@@ -137,12 +140,27 @@ describe("renderTable — explicit-width tables follow the tblGrid", () => {
     const t = host.querySelector("table") as HTMLElement;
     expect(t.style.tableLayout).toBe("fixed");
     expect(t.style.width).toBe("103.3%");
-    const cells = [...t.querySelectorAll("td")] as HTMLElement[];
-    expect(cells[0]?.style.width).toBe("90.236%");
-    expect(cells[1]?.style.width).toBe("9.764%");
+    const cols = [...t.querySelectorAll(":scope > colgroup > col")] as HTMLElement[];
+    expect(cols.map((c) => c.style.width)).toEqual(["90.236%", "9.764%"]);
+    expect((t.querySelector("td") as HTMLElement).style.width).toBe("");
   });
 
-  it("grid-only and dxa-width tables keep auto layout (tcW layer is a follow-up)", () => {
+  it("emits the colgroup for tblLayout=fixed dxa tables too", () => {
+    const table: Table = {
+      kind: "table",
+      grid: [1800, 9090],
+      properties: { widthTwips: 10890, layoutFixed: true },
+      rows: [{ cells: [{ content: [] }, { content: [] }] }],
+    };
+    const host = document.createElement("div");
+    renderBlocks([table], host, [], [], {});
+    const t = host.querySelector("table") as HTMLElement;
+    expect(t.style.tableLayout).toBe("fixed");
+    const cols = [...t.querySelectorAll(":scope > colgroup > col")] as HTMLElement[];
+    expect(cols.map((c) => c.style.width)).toEqual(["16.529%", "83.471%"]);
+  });
+
+  it("grid-only (autofit) tables keep auto layout and no colgroup", () => {
     const table: Table = {
       kind: "table",
       grid: [2000, 2000],
@@ -153,6 +171,7 @@ describe("renderTable — explicit-width tables follow the tblGrid", () => {
     renderBlocks([table], host, [], [], {});
     const t = host.querySelector("table") as HTMLElement;
     expect(t.style.tableLayout).toBe("");
+    expect(t.querySelector(":scope > colgroup")).toBeNull();
     expect((t.querySelector("td") as HTMLElement).style.width).toBe("");
   });
 });

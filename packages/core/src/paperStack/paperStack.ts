@@ -720,14 +720,17 @@ export class PaperStack {
  * class) are stripped on merge so the rejoined LI starts fresh. Without
  * this, every repagination pass would accumulate stale fragments and
  * marker-suppression flags.
+ *
+ * Exported for tests only.
  */
-function mergeConsecutiveFragments(container: HTMLElement): void {
-  // Pass 1: merge top-level <p> and <ol>/<ul>.
+export function mergeConsecutiveFragments(container: HTMLElement): void {
+  // Pass 1: merge top-level <p>, <ol>/<ul>, and <table> fragments.
   let child = container.firstElementChild as HTMLElement | null;
   while (child) {
     const next = child.nextElementSibling as HTMLElement | null;
     if (next && canMergeFragments(child, next)) {
-      mergeInto(child, next);
+      if (child.tagName === "TABLE") mergeTableInto(child, next);
+      else mergeInto(child, next);
       next.remove();
       // `child` may merge with further siblings too — stay put.
       continue;
@@ -767,13 +770,31 @@ function canMergeFragments(a: HTMLElement, b: HTMLElement): boolean {
 }
 
 /**
+ * Rejoin two `<table>` fragments: move only the tail's SECTION children
+ * (THEAD / TBODY) into the head; everything else — the tail's COLGROUP
+ * clone — is dropped, because the head already carries its own.
+ * Blindly concatenating children (the generic `mergeInto`) accumulated
+ * one colgroup copy per merged fragment, and under `table-layout:
+ * fixed` every phantom colgroup multiplies the column count — the real
+ * columns shrank further each repagination pass, so row text wrapped
+ * narrower, rows measured taller, split into MORE fragments, and the
+ * loop ran away (pentest-engineer's one-table CV: 2 pages → 27, one
+ * shrunken row per page).
+ */
+function mergeTableInto(head: HTMLElement, tail: HTMLElement): void {
+  for (const child of Array.from(tail.children)) {
+    if (child.tagName === "THEAD" || child.tagName === "TBODY") head.appendChild(child);
+  }
+}
+
+/**
  * Collapse multiple TBODY children of one `<table>` into a single
  * TBODY (head's own + every following TBODY's TRs append into the
  * head's TBODY). Side-effect of merging two table fragments via
- * `mergeInto` — it dumps the tail's entire child list (one TBODY)
- * into the head, leaving the head with two consecutive TBODY's. The
- * browser tolerates that but it confuses the next pagination pass:
- * `tableRowBoxes` only walks the FIRST TBODY's TRs.
+ * `mergeTableInto` — it moves the tail's TBODY wholesale, leaving the
+ * head with two consecutive TBODY's. The browser tolerates that but it
+ * confuses the next pagination pass: `tableRowBoxes` only walks the
+ * FIRST TBODY's TRs.
  */
 function mergeTableBodyFragments(table: HTMLElement): void {
   const tbodies = Array.from(table.children).filter((c): c is HTMLElement => c.tagName === "TBODY");

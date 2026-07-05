@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { defaultSection } from "../doc/builders/document";
 import type { AnchoredFrame } from "../doc/types";
 import { DEFAULT_PAGE_SETUP } from "./pageSetup";
-import { type AnchorRenderDeps, PaperStack, collapseTrailingEmptyPages } from "./paperStack";
+import {
+  type AnchorRenderDeps,
+  PaperStack,
+  collapseTrailingEmptyPages,
+  mergeConsecutiveFragments,
+} from "./paperStack";
 
 // vitest is configured with `environment: "jsdom"`, so `window.document`
 // is available globally — no need to import jsdom directly.
@@ -103,6 +108,60 @@ describe("collapseTrailingEmptyPages", () => {
     const first = collapseTrailingEmptyPages(pages);
     const second = collapseTrailingEmptyPages(first);
     expect(second).toEqual(first);
+  });
+});
+
+describe("mergeConsecutiveFragments — table fragments", () => {
+  /** A per-page table fragment as `cloneTableContainer` builds it:
+   *  shared data-pag-tid, own colgroup copy, one tbody of rows. */
+  function tableFragment(tid: string, rowTexts: string[]): HTMLElement {
+    const t = doc.createElement("table");
+    t.dataset.pagTid = tid;
+    const colgroup = doc.createElement("colgroup");
+    for (const w of ["16.529%", "83.471%"]) {
+      const col = doc.createElement("col");
+      col.style.width = w;
+      colgroup.appendChild(col);
+    }
+    t.appendChild(colgroup);
+    const tbody = doc.createElement("tbody");
+    for (const text of rowTexts) {
+      const tr = doc.createElement("tr");
+      const td = doc.createElement("td");
+      td.textContent = text;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+    t.appendChild(tbody);
+    return t;
+  }
+
+  it("rejoins fragments into one table with a SINGLE colgroup and tbody", () => {
+    // The generic child-moving merge accumulated one colgroup copy per
+    // fragment; under `table-layout: fixed` each copy multiplies the
+    // column count, shrinking the real columns every repagination pass
+    // (pentest-engineer's one-table CV exploded 2 pages → 27).
+    const container = doc.createElement("div");
+    container.appendChild(tableFragment("t1", ["a", "b"]));
+    container.appendChild(tableFragment("t1", ["c"]));
+    container.appendChild(tableFragment("t1", ["d"]));
+    mergeConsecutiveFragments(container);
+    const tables = container.querySelectorAll("table");
+    expect(tables).toHaveLength(1);
+    const t = tables[0] as HTMLElement;
+    expect(t.querySelectorAll(":scope > colgroup")).toHaveLength(1);
+    expect(t.querySelectorAll(":scope > colgroup > col")).toHaveLength(2);
+    expect(t.querySelectorAll(":scope > tbody")).toHaveLength(1);
+    const rows = [...t.querySelectorAll("tr")].map((tr) => tr.textContent);
+    expect(rows).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("leaves tables with different pag-tids apart", () => {
+    const container = doc.createElement("div");
+    container.appendChild(tableFragment("t1", ["a"]));
+    container.appendChild(tableFragment("t2", ["b"]));
+    mergeConsecutiveFragments(container);
+    expect(container.querySelectorAll("table")).toHaveLength(2);
   });
 });
 
