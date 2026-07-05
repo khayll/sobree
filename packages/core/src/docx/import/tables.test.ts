@@ -111,3 +111,17 @@ describe("convertTable — explicit nil cell borders suppress the grid", () => {
     expect(borders?.left).toMatchObject({ style: "single", color: "#6B7C71" });
   });
 });
+
+describe("convertTable — percent width", () => {
+  it("reads <w:tblW pct> into widthPct (fiftieths of a percent)", () => {
+    // A banner table declares 103.3% of the text column so it reaches
+    // past the margins to meet the page-frame decoration.
+    expect(
+      table(`<w:tblPr><w:tblW w:type="pct" w:w="5165"/></w:tblPr>${ONE_CELL}`).properties.widthPct,
+    ).toBeCloseTo(103.3, 3);
+    expect(
+      table(`<w:tblPr><w:tblW w:type="pct" w:w="5165"/></w:tblPr>${ONE_CELL}`).properties
+        .widthTwips,
+    ).toBeUndefined();
+  });
+});

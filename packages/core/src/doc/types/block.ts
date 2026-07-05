@@ -44,6 +44,12 @@ export interface Table {
 export interface TableProperties {
   /** Total table width in twips, or "auto" for content-driven. */
   widthTwips?: number;
+  /** `<w:tblW w:type="pct">` — table width as a PERCENTAGE of the text
+   *  column (stored unit: fiftieths of a percent; kept here as the
+   *  resolved percentage, e.g. `103.3`). Banner tables deliberately
+   *  exceed 100% so they reach past the margins to meet a page-frame
+   *  decoration. Mutually exclusive with `widthTwips`. */
+  widthPct?: number;
   alignment?: ParagraphAlignment;
   borders?: TableBorders;
   /** Style reference (e.g. "TableGrid"). */
