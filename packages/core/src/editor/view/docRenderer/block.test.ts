@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Block } from "../../../doc/types";
+import type { Block, Table } from "../../../doc/types";
 import { renderBlocks } from "./block";
 
 const doc = window.document;
@@ -111,5 +111,48 @@ describe("renderBlocks — table style pPr reaches cell paragraphs", () => {
     // Cell paragraph: TableGrid's single spacing + after=0 win.
     expect(Number.parseFloat(cellP.style.lineHeight)).toBeCloseTo(1.15, 2);
     expect(cellP.style.marginBottom).toBe("0px");
+  });
+});
+
+describe("renderTable — explicit-width tables follow the tblGrid", () => {
+  it("stamps grid-share percent widths on cells and pins fixed layout", () => {
+    // A banner table (tblW pct + grid 9501:1028) must keep Word's column
+    // proportions whatever the cells contain — CSS auto layout sized the
+    // photo column by content instead.
+    const table: Table = {
+      kind: "table",
+      grid: [9501, 1028],
+      properties: { widthPct: 103.3, alignment: "center" },
+      rows: [
+        {
+          cells: [
+            { content: [{ kind: "paragraph", properties: {}, runs: [] }] },
+            { content: [{ kind: "paragraph", properties: {}, runs: [] }] },
+          ],
+        },
+      ],
+    };
+    const host = document.createElement("div");
+    renderBlocks([table], host, [], [], {});
+    const t = host.querySelector("table") as HTMLElement;
+    expect(t.style.tableLayout).toBe("fixed");
+    expect(t.style.width).toBe("103.3%");
+    const cells = [...t.querySelectorAll("td")] as HTMLElement[];
+    expect(cells[0]?.style.width).toBe("90.236%");
+    expect(cells[1]?.style.width).toBe("9.764%");
+  });
+
+  it("grid-only and dxa-width tables keep auto layout (tcW layer is a follow-up)", () => {
+    const table: Table = {
+      kind: "table",
+      grid: [2000, 2000],
+      properties: { widthTwips: 4000 },
+      rows: [{ cells: [{ content: [] }, { content: [] }] }],
+    };
+    const host = document.createElement("div");
+    renderBlocks([table], host, [], [], {});
+    const t = host.querySelector("table") as HTMLElement;
+    expect(t.style.tableLayout).toBe("");
+    expect((t.querySelector("td") as HTMLElement).style.width).toBe("");
   });
 });

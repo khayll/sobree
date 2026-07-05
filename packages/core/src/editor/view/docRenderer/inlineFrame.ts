@@ -71,7 +71,14 @@ export function renderInlineFrameBlock(
   wrapper.style.removeProperty("-moz-tab-size");
   wrapper.style.position = "relative";
   wrapper.style.boxSizing = "border-box";
-  wrapper.style.width = "100%";
+  // A pure DECORATION frame (shapes only, no textboxes/pictures) is a
+  // fixed-extent box like a glyph — a photo-placeholder rectangle keeps
+  // its declared 0.6×0.7in whatever column it sits in. Stretching it to
+  // 100% squeezed/stretched the shape to its host cell's aspect ratio.
+  // Prose/picture frames keep the body-column contract (100%) below.
+  const decorationOnly =
+    frame.textboxes.length === 0 && frame.pictures.length === 0 && frame.shapes.length > 0;
+  wrapper.style.width = decorationOnly ? `${emuToMm(frame.sizeEmu.wEmu)}mm` : "100%";
   // Frame's intrinsic height — the paginator measures this to decide
   // page boundaries. Width is the content width (100%) so the frame
   // fills the body column; pictures scale by sizeEmu / groupExtentEmu.
