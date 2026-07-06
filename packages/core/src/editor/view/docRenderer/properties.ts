@@ -341,6 +341,12 @@ const FONT_NATURAL_LEADING: Record<string, number> = {
   cambria: 2434 / 2048,
   // Caladea is Cambria's metric-compatible replacement.
   caladea: 2434 / 2048,
+  // Lato: hhea (1974+426+0) and OS/2 usWin (2296+582) DIVERGE — Word
+  // and LibreOffice size the line from the WIN metrics (LO-verified:
+  // 10pt Lato rows measure 14.4pt = 1.439×; the hhea ratio 1.2 came
+  // up ~2pt short per line). Fonts above happen to agree across
+  // tables; when they diverge, the usWin ascent+descent is the rule.
+  lato: 2878 / 2000,
 };
 
 function mapBorderStyle(s: string): string {
