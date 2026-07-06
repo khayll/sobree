@@ -231,7 +231,10 @@ export function distributePages(pages: Page[]): HTMLElement[][] {
           let cloneThead = openContainerClone!.querySelector(":scope > thead");
           if (!cloneThead) {
             cloneThead = document.createElement("thead");
-            openContainerClone!.insertBefore(cloneThead, openContainerClone!.firstChild);
+            // After the colgroup (when present) but before the tbody —
+            // the HTML table content model's section order.
+            const cloneTbody = openContainerClone!.querySelector(":scope > tbody");
+            openContainerClone!.insertBefore(cloneThead, cloneTbody);
           }
           target = cloneThead;
         } else {
@@ -313,19 +316,6 @@ function isListContainer(el: Element): boolean {
 }
 
 /**
- * Clone a `<table>` (and its single `<tbody>`) for a per-page split.
- * Preserves attributes (data-block-id, data-section-index, class,
- * style, …) and `data-pag-tid` so `mergeConsecutiveFragments` can
- * rejoin the split table on the next pagination pass. The clone
- * starts with an empty TBODY; rows are appended in the distribute
- * walk.
- *
- * THEAD / COLGROUP would need to be cloned wholesale (not stripped)
- * so per-page tables retain column widths + repeating headers. Not yet
- * exercised by the corpus — when a fixture demands it, copy them here
- * in source order before the empty TBODY.
- */
-/**
  * Clone a `<tr>` with empty cells preserving structure. Each TD / TH
  * is cloned shallow (attributes only, no children) — paragraph boxes
  * from `tallRowParagraphBoxes` will append into the matching cell.
@@ -348,11 +338,27 @@ function cloneEmptyRow(source: HTMLElement): HTMLElement {
   return trClone;
 }
 
+/**
+ * Clone a `<table>` for a per-page split. Preserves attributes
+ * (data-block-id, data-section-index, class, style, …) and
+ * `data-pag-tid` so `mergeConsecutiveFragments` can rejoin the split
+ * table on the next pagination pass. The clone starts with the
+ * source's COLGROUP (deep-cloned — grid-locked column widths must
+ * survive on every fragment) and an empty TBODY; rows are appended in
+ * the distribute walk, and a THEAD is created on demand.
+ */
 function cloneTableContainer(source: HTMLElement): HTMLElement {
   const clone = document.createElement("table");
   for (const attr of Array.from(source.attributes)) {
     clone.setAttribute(attr.name, attr.value);
   }
+  // Grid-locked tables carry their column widths in a <colgroup>
+  // (`table-layout: fixed` reads only <col>s and first-row cells).
+  // Without it the per-page clone falls back to equal columns and
+  // re-wraps every cell's text — different heights than the source
+  // table the paginator measured.
+  const sourceColgroup = source.querySelector(":scope > colgroup");
+  if (sourceColgroup) clone.appendChild(sourceColgroup.cloneNode(true));
   const sourceTbody = source.querySelector(":scope > tbody");
   if (sourceTbody) {
     const tbodyClone = document.createElement("tbody");
