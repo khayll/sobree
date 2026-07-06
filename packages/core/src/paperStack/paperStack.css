@@ -238,7 +238,7 @@
  * (the runs' Hyperlink character style, injected with Word's latent
  * defaults when the docx doesn't define it). The UA's saturated blue +
  * underline would override the document colours. */
-.paper-content a {
+.sobree-flow a {
   color: inherit;
   text-decoration: none;
 }
@@ -310,10 +310,10 @@
  * point — it's a safety belt against clobbering explicit values that
  * happen to declare line-height in the inline style block).
  */
-.paper-content td p:not([style*="line-height"]),
-.paper-content td li:not([style*="line-height"]),
-.paper-content th p:not([style*="line-height"]),
-.paper-content th li:not([style*="line-height"]) {
+.sobree-flow td p:not([style*="line-height"]),
+.sobree-flow td li:not([style*="line-height"]),
+.sobree-flow th p:not([style*="line-height"]),
+.sobree-flow th li:not([style*="line-height"]) {
   line-height: 1;
 }
 
@@ -343,8 +343,8 @@
  * matching LibreOffice's 16-page rendering without any visible
  * overflow.
  */
-.paper-content td p:not([style*="margin"]),
-.paper-content th p:not([style*="margin"]) {
+.sobree-flow td p:not([style*="margin"]),
+.sobree-flow th p:not([style*="margin"]) {
   margin: 0;
 }
 
@@ -353,7 +353,7 @@
  * number in document order and stamps it as `data-outline-number`; the
  * `::before` paints it so it stays out of the editable text and selection.
  * The trailing gap mimics Word's number-to-text tab. */
-.paper-content [data-outline-number]::before {
+.sobree-flow [data-outline-number]::before {
   content: attr(data-outline-number);
   margin-right: 0.6em;
 }
@@ -370,10 +370,10 @@
  * counter-style; the renderer adds the matching `.lst-*` class and sets
  * the `--mk-pre` / `--mk-suf` literals parsed from `lvlText`. Bullets put
  * the glyph in `--sobree-bullet`. */
-.paper-content .sobree-hang > li {
+.sobree-flow .sobree-hang > li {
   list-style: none;
 }
-.paper-content .sobree-hang > li::before {
+.sobree-flow .sobree-hang > li::before {
   display: inline-block;
   box-sizing: border-box;
   width: var(--sobree-list-hang, 0);
@@ -393,25 +393,25 @@
   font-family: var(--sobree-marker-font, inherit);
   font-size: var(--sobree-marker-size, inherit);
 }
-.paper-content .sobree-hang.lst-bullet > li::before {
+.sobree-flow .sobree-hang.lst-bullet > li::before {
   content: var(--sobree-bullet, "\2022");
 }
-.paper-content .sobree-hang.lst-decimal > li::before {
+.sobree-flow .sobree-hang.lst-decimal > li::before {
   content: var(--mk-pre, "") counter(list-item, decimal) var(--mk-suf, ".");
 }
-.paper-content .sobree-hang.lst-decimal-zero > li::before {
+.sobree-flow .sobree-hang.lst-decimal-zero > li::before {
   content: var(--mk-pre, "") counter(list-item, decimal-leading-zero) var(--mk-suf, ".");
 }
-.paper-content .sobree-hang.lst-lower-latin > li::before {
+.sobree-flow .sobree-hang.lst-lower-latin > li::before {
   content: var(--mk-pre, "") counter(list-item, lower-latin) var(--mk-suf, ".");
 }
-.paper-content .sobree-hang.lst-upper-latin > li::before {
+.sobree-flow .sobree-hang.lst-upper-latin > li::before {
   content: var(--mk-pre, "") counter(list-item, upper-latin) var(--mk-suf, ".");
 }
-.paper-content .sobree-hang.lst-lower-roman > li::before {
+.sobree-flow .sobree-hang.lst-lower-roman > li::before {
   content: var(--mk-pre, "") counter(list-item, lower-roman) var(--mk-suf, ".");
 }
-.paper-content .sobree-hang.lst-upper-roman > li::before {
+.sobree-flow .sobree-hang.lst-upper-roman > li::before {
   content: var(--mk-pre, "") counter(list-item, upper-roman) var(--mk-suf, ".");
 }
 
@@ -422,7 +422,7 @@
  * position when the gap is a collapsed-whitespace run. Flex with
  * `justify-content: space-between` achieves the same visual without
  * depending on the tab-glyph width. */
-:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread {
+.sobree-flow .sobree-tab-spread {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -432,8 +432,8 @@
    * before/after spans still render. */
   white-space: nowrap;
 }
-:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__before,
-:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__after {
+.sobree-flow .sobree-tab-spread .sobree-tab-spread__before,
+.sobree-flow .sobree-tab-spread .sobree-tab-spread__after {
   white-space: pre-wrap;
   min-width: 0;
 }
@@ -443,7 +443,7 @@
  * paragraph's text — but contribute no visual extent: the flex gap /
  * leader carries the geometry. Zero width + hidden overflow keeps the
  * glyphs out of layout without removing them from the document text. */
-:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__sep {
+.sobree-flow .sobree-tab-spread .sobree-tab-spread__sep {
   flex: 0 0 0;
   width: 0;
   min-width: 0;
@@ -456,7 +456,7 @@
  * scales with the paragraph font, matching how Word draws leaders.
  * flex-basis 0 + min-width 0 make it absorb EXACTLY the free space
  * between entry and page number; overflow clips the surplus glyphs. */
-:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__leader {
+.sobree-flow .sobree-tab-spread .sobree-tab-spread__leader {
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
@@ -485,8 +485,8 @@
  * a CSS `border` on every cell can't tell those apart. This rule only
  * supplies the default cell padding (≈ 0.08" / 2mm) so cells don't touch
  * their gridlines; an explicit `<w:tblCellMar>` overrides it inline. */
-.paper-content table.sobree-table-bordered td,
-.paper-content table.sobree-table-bordered th {
+.sobree-flow table.sobree-table-bordered td,
+.sobree-flow table.sobree-table-bordered th {
   padding: 0 4px;
 }
 
@@ -497,10 +497,10 @@
  * unequal columns carry explicit per-column `width` (both set inline by
  * the flow pass). `align-items: flex-start` keeps short columns
  * top-aligned like Word. */
-.paper-content .sobree-cols {
+.sobree-flow .sobree-cols {
   display: flex;
   align-items: flex-start;
 }
-.paper-content .sobree-cols .sobree-col {
+.sobree-flow .sobree-cols .sobree-col {
   flex: 0 0 auto;
 }

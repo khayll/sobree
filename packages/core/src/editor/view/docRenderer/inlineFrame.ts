@@ -45,7 +45,7 @@ export function renderInlineFrameBlock(
   renderBody: RenderBody,
 ): HTMLElement {
   const wrapper = document.createElement("div");
-  wrapper.className = "sobree-inline-frame";
+  wrapper.className = "sobree-inline-frame sobree-flow";
   // The frame's host paragraph contributes its box spacing (commonly
   // Normal's `<w:spacing w:after>`) — the band must reserve the SAME
   // vertical box Word does: drawing height PLUS the paragraph's

@@ -309,12 +309,8 @@
    `\t` characters' tab-stop behaviour, so the form collapses.
    `pre-wrap` keeps wrapping (long lines still break) while preserving
    every space and honouring `tab-size`. */
-.sobree-editor .paper-content p,
-.sobree-editor .paper-content li,
-.sobree-editor .paper-header p,
-.sobree-editor .paper-header li,
-.sobree-editor .paper-footer p,
-.sobree-editor .paper-footer li,
+.sobree-editor .sobree-flow p,
+.sobree-editor .sobree-flow li,
 .sobree-editor .sobree-textbox-frame p {
   white-space: pre-wrap;
 }
