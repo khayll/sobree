@@ -422,7 +422,7 @@
  * position when the gap is a collapsed-whitespace run. Flex with
  * `justify-content: space-between` achieves the same visual without
  * depending on the tab-glyph width. */
-.paper-content .sobree-tab-spread {
+:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -432,8 +432,8 @@
    * before/after spans still render. */
   white-space: nowrap;
 }
-.paper-content .sobree-tab-spread .sobree-tab-spread__before,
-.paper-content .sobree-tab-spread .sobree-tab-spread__after {
+:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__before,
+:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__after {
   white-space: pre-wrap;
   min-width: 0;
 }
@@ -443,7 +443,7 @@
  * paragraph's text — but contribute no visual extent: the flex gap /
  * leader carries the geometry. Zero width + hidden overflow keeps the
  * glyphs out of layout without removing them from the document text. */
-.paper-content .sobree-tab-spread .sobree-tab-spread__sep {
+:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__sep {
   flex: 0 0 0;
   width: 0;
   min-width: 0;
@@ -456,7 +456,7 @@
  * scales with the paragraph font, matching how Word draws leaders.
  * flex-basis 0 + min-width 0 make it absorb EXACTLY the free space
  * between entry and page number; overflow clips the surplus glyphs. */
-.paper-content .sobree-tab-spread .sobree-tab-spread__leader {
+:is(.paper-content, .paper-header, .paper-footer) .sobree-tab-spread .sobree-tab-spread__leader {
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
