@@ -1,6 +1,6 @@
 {
   "name": "@sobree/core",
-  "version": "0.1.57",
+  "version": "0.1.58",
   "publishConfig": {
     "access": "public",
     "exports": {
