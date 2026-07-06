@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.60
+
+### Patch Changes
+
+- c160ef2: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [c160ef2]
+  - @sobree/core@0.1.60
+
 ## 0.1.59
 
 ### Patch Changes
