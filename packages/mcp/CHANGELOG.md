@@ -1,5 +1,14 @@
 # @sobree/mcp
 
+## 0.1.61
+
+### Patch Changes
+
+- 94ee70b: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [94ee70b]
+  - @sobree/core@0.1.61
+
 ## 0.1.60
 
 ### Patch Changes
