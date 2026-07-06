@@ -308,7 +308,7 @@ export class Paper {
           const container = cand.closest("td, th, .sobree-inline-frame");
           return container === null || !zoneFlow.contains(container);
         });
-        if (el) anchorParaTopEmu = offsetTopWithin(el, this.root) * EMU_PER_PX;
+        if (el) anchorParaTopEmu = firstBaselineWithin(el, this.root) * EMU_PER_PX;
       }
       const geom = {
         marginTopEmu,
@@ -430,6 +430,34 @@ export class Paper {
  *  an element's top relative to that ancestor's padding box. `offsetTop`
  *  is logical-px (CSS `zoom` on an ancestor doesn't perturb it in
  *  Chromium), so the result is render-tier-independent. */
+/**
+ * The FIRST BASELINE of a paragraph, in logical px from `ancestor`'s top.
+ * Word and LibreOffice hang `relativeFrom="paragraph"` anchored objects
+ * from the anchor line's baseline, not the paragraph's border-box top —
+ * a recipe card's logo (anchored to its one-line legend paragraph at
+ * posOffset≈0) renders with its top at the legend's baseline in both
+ * references (LO ink profile: logo 7.435in, legend baseline 7.44in),
+ * while the border-box top overlapped the legend's text.
+ *
+ * Measured, not computed: a zero-font-size inline probe's rect top sits
+ * exactly ON the first baseline (an empty inline box has zero ascent
+ * and descent), so no font-metric tables are needed. The probe is
+ * inserted at the paragraph's start and removed immediately; falls back
+ * to the border-box top for empty paragraphs whose probe measures 0.
+ */
+function firstBaselineWithin(el: HTMLElement, ancestor: HTMLElement): number {
+  const probe = document.createElement("span");
+  probe.style.fontSize = "0";
+  probe.textContent = "\u200b";
+  el.insertBefore(probe, el.firstChild);
+  const probeRect = probe.getBoundingClientRect();
+  const ancestorRect = ancestor.getBoundingClientRect();
+  probe.remove();
+  const scale = ancestor.offsetHeight > 0 ? ancestorRect.height / ancestor.offsetHeight : 1;
+  const baseline = (probeRect.top - ancestorRect.top) / (scale || 1);
+  return baseline > 0 ? baseline : offsetTopWithin(el, ancestor);
+}
+
 function offsetTopWithin(el: HTMLElement, ancestor: HTMLElement): number {
   let top = 0;
   let cur: HTMLElement | null = el;
