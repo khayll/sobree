@@ -87,6 +87,32 @@ render Sobree to PNG (headless, same DPI), compare per-region.
 This catches: decoration shapes, fill colours, frame outlines,
 icon positions, dot/atom artwork. Complements the text signal.
 
+## Measurement pitfalls
+
+A mis-measurement costs more than a rendering bug: #225 moved every
+paragraph-anchored frame onto the anchor line's baseline to fit ONE
+logo whose position had been read from its ink, and #227 had to
+revert it. The recipe card's logo frame sits exactly on its anchor
+paragraph's border-box top — the bitmap just carries 27/170 rows of
+transparent padding, so ink-based numbers read it 0.12in lower.
+
+- **Measure frame rects, not ink.** For object placement, read the
+  image XObject's placement from the PDF content stream (the full
+  CTM in effect at the `Do` operator — compose nested `cm`s through
+  the `q`/`Q` stack). Pixel ink profiles measure the artwork inside
+  the frame, not the anchor geometry.
+- **Locate a paragraph's border box with shading.** To learn where
+  LO puts a paragraph's box, add a temporary
+  `<w:shd w:val="clear" w:fill="FFFF00"/>` to its `pPr`, reconvert,
+  and measure the fill rect in the PDF. Computed line tops
+  (baseline minus a guessed ascent) inherit per-font error —
+  especially under font fallback.
+- **Perturb the real document, not only minimal fixtures.** When a
+  controlled fixture and a corpus document seem to disagree, edit
+  the corpus document itself (e.g. `posOffset` +0.5in) and confirm
+  the response is linear before believing a divergent mechanism
+  exists.
+
 ## The loop (one turn = one root-cause fix)
 
 ```
