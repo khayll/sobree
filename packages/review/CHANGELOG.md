@@ -1,5 +1,14 @@
 # @sobree/review
 
+## 0.1.59
+
+### Patch Changes
+
+- 25d35ad: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [25d35ad]
+  - @sobree/core@0.1.59
+
 ## 0.1.58
 
 ### Patch Changes
