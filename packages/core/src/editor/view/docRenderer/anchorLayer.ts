@@ -233,6 +233,10 @@ function paintTextbox(
       `${emuToMm(p.bottomEmu)}mm ` +
       `${emuToMm(p.leftEmu)}mm`;
   }
+  // A textbox hosts BLOCK FLOW — same rendering contract as the body,
+  // so it carries the shared flow class (lists/tables/tab lines inside
+  // anchored boxes style identically to body content).
+  host.classList.add("sobree-flow");
   // The textbox body is the anchor layer's text source. (The legacy
   // lifter that used to emit these paragraphs into body flow is gone;
   // `parseAnchoredFrames` claims the drawing so there's no double

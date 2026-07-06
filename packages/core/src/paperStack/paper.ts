@@ -84,11 +84,11 @@ export class Paper {
     this.root.className = "paper";
 
     this.header = document.createElement("div");
-    this.header.className = "paper-header";
+    this.header.className = "paper-header sobree-flow";
     this.header.contentEditable = "false";
 
     this.content = document.createElement("div");
-    this.content.className = "paper-content";
+    this.content.className = "paper-content sobree-flow";
 
     // The anchor layer is a SIBLING of paper-content (not a child).
     // The editor wipes content via `replaceChildren()` on every render,
@@ -111,11 +111,11 @@ export class Paper {
     this.footerAnchorsBehind = behindLayer();
 
     this.footnotes = document.createElement("div");
-    this.footnotes.className = "paper-footnotes is-empty";
+    this.footnotes.className = "paper-footnotes sobree-flow is-empty";
     this.footnotes.contentEditable = "false";
 
     this.footer = document.createElement("div");
-    this.footer.className = "paper-footer";
+    this.footer.className = "paper-footer sobree-flow";
     this.footer.contentEditable = "false";
 
     this.headerAnchors = document.createElement("div");
