@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { NamedStyle, ParagraphProperties } from "../../../doc/types";
+import type { InlineRun, NamedStyle, ParagraphProperties } from "../../../doc/types";
 import { applyParagraphProps } from "./properties";
 
 const doc = window.document;
@@ -165,12 +165,47 @@ describe("applyParagraphProps", () => {
     expect(runDefaults.bold).toBe(true);
   });
 
-  it("paragraph's own runDefaults override the style cascade", () => {
+  it("the paragraph-MARK rPr sizes only an EMPTY paragraph, not content", () => {
+    // <w:pPr><w:rPr><w:sz> styles ONLY the ¶ glyph (§17.3.1.29). On an
+    // empty paragraph the mark IS the content, so it wins the line box.
     const styles: NamedStyle[] = [
       { id: "Normal", type: "paragraph", displayName: "Normal", runDefaults: { fontSizePt: 12 } },
     ];
-    const el = p({ runDefaults: { fontSizePt: 8 } }, styles);
-    expect(el.style.fontSize).toBe("8pt");
+    const empty = doc.createElement("p");
+    applyParagraphProps(
+      empty,
+      { runDefaults: { fontSizePt: 8 } },
+      styles,
+      undefined,
+      undefined,
+      true,
+      [],
+    );
+    expect(empty.style.fontSize).toBe("8pt");
+  });
+
+  it("the paragraph-mark rPr does NOT resize a CONTENT paragraph (cascade wins)", () => {
+    // The recipe legend bug: a 12pt ¶ mark over content that inherits 10pt
+    // from the cascade must NOT widen the content to 12pt. The element's
+    // strut follows the DOMINANT content size, not the mark.
+    const styles: NamedStyle[] = [
+      { id: "Normal", type: "paragraph", displayName: "Normal", runDefaults: { fontSizePt: 10 } },
+    ];
+    const el = doc.createElement("p");
+    const runs: InlineRun[] = [{ kind: "text", text: "legend text", properties: {} }];
+    const { runDefaults } = applyParagraphProps(
+      el,
+      { runDefaults: { fontSizePt: 12 } },
+      styles,
+      undefined,
+      undefined,
+      false,
+      runs,
+    );
+    // Element strut = the 10pt content, not the 12pt mark.
+    expect(el.style.fontSize).toBe("10pt");
+    // Content runs inherit the 10pt cascade for per-run resolution.
+    expect(runDefaults.fontSizePt).toBe(10);
   });
 
   it("maps a run-default color of 'auto' to currentColor (overrides inherited)", () => {
