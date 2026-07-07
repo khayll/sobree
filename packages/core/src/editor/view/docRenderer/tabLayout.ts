@@ -75,6 +75,15 @@ export interface RightTailPlan {
    *  lose their level offset. The spread renders one visual line, so
    *  the first-line indent IS the entry's indent. */
   beforeMarginLeft?: string;
+  /** CSS `width` for the tail span, in `ch`, sized to the tail's own
+   *  character count. The tail is an atomic flex item (the page number)
+   *  that must never be squeezed, but Chromium mis-computes its
+   *  content-based (`auto` / `max-content`) main size as 0 next to the
+   *  elastic leader, collapsing it so the leader dots bleed across the
+   *  number. A DEFINITE, content-derived width sidesteps that intrinsic
+   *  size entirely; `text-align: right` keeps the number pinned to the
+   *  stop when it is narrower than the reserved `ch` box. */
+  tailWidthCh?: number;
 }
 
 /**
@@ -267,6 +276,15 @@ function buildRightTailPlan(
         : undefined;
 
   const leaderChar = tailStop.leader ? LEADER_FILL_CHAR[tailStop.leader] : undefined;
+  // Size the tail box to its own text, but ONLY for leader lines. The
+  // flex collapse that necessitates a definite width is caused by the
+  // elastic 512-glyph leader beside the tail; a leaderless right-tab
+  // (e.g. a "org … Page N" footer) sizes its tail naturally and must not
+  // get a fixed `ch` box (that clipped/wrapped multi-word tails). Digits
+  // / roman numerals are ~1ch each; `text-align: right` pins the number
+  // to the stop, and a wider glyph overflows LEFT into the leader rather
+  // than clipping, so the tight box keeps the dots against the number.
+  const tailChars = leaderChar ? tailTextLength(after) : 0;
   return {
     before,
     after,
@@ -274,7 +292,25 @@ function buildRightTailPlan(
     ...(leaderChar ? { leaderFill: leaderChar.repeat(LEADER_FILL_CAPACITY) } : {}),
     tailMarginRight,
     ...(beforeMarginLeft ? { beforeMarginLeft } : {}),
+    ...(tailChars > 0 ? { tailWidthCh: tailChars } : {}),
   };
+}
+
+/** Character count of the tail's rendered text (descending into a
+ *  hyperlink), used to size the atomic tail box in `ch`. Internal spaces
+ *  count — only the outer ends are trimmed — so a multi-glyph tail box is
+ *  wide enough for the whole run. */
+function tailTextLength(runs: readonly InlineRun[]): number {
+  return tailText(runs).trim().length;
+}
+
+function tailText(runs: readonly InlineRun[]): string {
+  let s = "";
+  for (const r of runs) {
+    if (r.kind === "text") s += r.text;
+    else if (r.kind === "hyperlink") s += tailText(r.children);
+  }
+  return s;
 }
 
 function hyperlinkContainsTab(children: readonly InlineRun[]): boolean {

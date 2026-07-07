@@ -110,6 +110,9 @@ describe("planRightTailTab", () => {
     expect(plan!.before).toEqual([{ kind: "hyperlink", href: "#toc", children: [text("Entry")] }]);
     expect(plan!.after).toEqual([{ kind: "hyperlink", href: "#toc", children: [text("42")] }]);
     expect(plan!.leaderFill).toMatch(/^\.+$/);
+    // The atomic tail is sized to its own character count ("42" → 2ch) so
+    // the flex algorithm can't collapse it beside the elastic leader.
+    expect(plan!.tailWidthCh).toBe(2);
   });
 
   it("splits a numbered TOC link at its LAST tab (number→title tab stays in the entry)", () => {

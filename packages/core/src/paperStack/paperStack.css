@@ -426,7 +426,12 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 1em;
+  /* No inter-item gap: a right-tab LEADER must run continuously from the
+   * entry to the page number (Word draws the dots flush against both), so
+   * any flex gap would punch a dot-free hole on each side of the leader.
+   * The space-run spread (label/value, no leader) keeps its separation
+   * from `justify-content: space-between`, not a gap. */
+  gap: 0;
   /* The flex container collapses pre-wrap whitespace handling on its
    * own children — restore it so any trailing spaces inside the
    * before/after spans still render. */
