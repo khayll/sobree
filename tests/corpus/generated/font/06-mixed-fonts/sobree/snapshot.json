@@ -12,7 +12,7 @@
       "attrs": {
         "data-block-index": "1",
       },
-      "style": "font-family: Calibri, Carlito, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10pt;",
+      "style": "font-family: Georgia, "Times New Roman", serif; font-size: 10pt;",
       "tag": "P",
       "text": "Whole paragraph in Georgia, with some bold and italic mixed …",
     },

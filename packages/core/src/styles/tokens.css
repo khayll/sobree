@@ -1,25 +1,29 @@
-/* Carlito — Google's open-source, metric-compatible clone of Calibri.
+/* Web fonts for Word-fidelity metrics.
+ *
  * MUST be the first rule in this file: CSS `@import` only fires when
- * it precedes every other declaration. Most Sobree-rendered docs are
- * authored in Word with Calibri as the body font; without Calibri or
- * Carlito on the host, browsers fall back to Helvetica/Arial whose
- * ellipsis (…) glyph is roughly 2× wider than Calibri's. A 60-char
- * dot-leader bullet ("……………") that fits one line in Word then
- * overflows or wraps in Sobree.
+ * it precedes every other declaration.
  *
- * We pull Carlito from Google Fonts so any embedder that imports
- * `@sobree/core/tokens.css` gets Word-fidelity ellipsis (and accurate
- * line metrics) without bundling the ~200 KB font in the package
- * itself. Google Fonts serves subset WOFF2 files (~50 KB per weight)
- * with permissive caching. `font-display: swap` means text reads
- * immediately while Carlito loads — no flash of invisible text.
+ * Substituting a font of a DIFFERENT WIDTH changes where every line
+ * ends — text that fits in Word overflows, wraps, or (for a document
+ * with a behind-text logo pinned to the right) runs UNDERNEATH the
+ * logo (the Wisconsin recipe card: its Lato legend line, rendered in
+ * a ~20% wider Helvetica/Arial fallback, overlapped the corner logo).
+ * So we pull the ACTUAL fonts the corpus authors used:
  *
- * If the host is offline / the CDN is blocked, the cascade falls
- * through to Helvetica → Arial (wider ellipsis but still readable).
- * For deployments that need fully-bundled fonts, override this @import
- * with a local woff2 in the embedder's own CSS.
+ *   - Carlito: Google's open-source metric-compatible clone of Calibri
+ *     (the default Word body font — its ellipsis is ~2× wider in
+ *     Helvetica/Arial, overflowing dot-leader bullets).
+ *   - Lato: the OFL font itself (a common form-template face), so its
+ *     narrow metrics match Word/LibreOffice instead of a wide fallback.
+ *
+ * Both from Google Fonts (subset WOFF2, ~50 KB/weight, permissive
+ * caching) so an embedder importing `@sobree/core/tokens.css` gets
+ * Word metrics without the package bundling the fonts. `display=swap`
+ * reads immediately while they load. Offline / CDN-blocked hosts fall
+ * through to Helvetica → Arial; embedders needing fully-bundled fonts
+ * override this @import with local woff2 in their own CSS.
  */
-@import url("https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Lato:ital,wght@0,400;0,700;1,400;1,700&display=swap");
 
 /* @sobree/core — design tokens (the single source of truth for the brand).
  *

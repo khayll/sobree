@@ -12,8 +12,8 @@
  * there are no CSS-only typography fallbacks.
  */
 
-import { mergeTabStops, resolveStyleCascade } from "../../../doc/styles";
-import type { NamedStyle, ParagraphProperties, RunProperties } from "../../../doc/types";
+import { mergeTabStops, resolveRunStyle, resolveStyleCascade } from "../../../doc/styles";
+import type { InlineRun, NamedStyle, ParagraphProperties, RunProperties } from "../../../doc/types";
 import { resolveFontFace } from "./fontFallback";
 import { twipsToMm } from "./units";
 
@@ -49,6 +49,15 @@ export function applyParagraphProps(
    *  pPr/rPr under the paragraph style (ECMA-376 §17.7.2); see
    *  `resolveStyleCascade`. */
   tableStyleId?: string,
+  /** True when the paragraph has NO content runs. The paragraph-MARK
+   *  rPr (`props.runDefaults`, `<w:pPr><w:rPr>`) styles ONLY the ¶ glyph
+   *  (§17.3.1.29): it governs an EMPTY paragraph's line height, but must
+   *  NOT reach content runs (they inherit from the style cascade). */
+  isEmptyParagraph = false,
+  /** The paragraph's content runs. Used to derive the ELEMENT's own font
+   *  (the line-box strut size + the unitless-line-height leading font)
+   *  from the DOMINANT content rather than the cascade default. */
+  contentRuns: readonly InlineRun[] = [],
 ): AppliedParagraphProps {
   // Resolve the style cascade for both run + paragraph defaults, then
   // overlay the paragraph's own properties so explicit settings win on
@@ -63,26 +72,50 @@ export function applyParagraphProps(
       ? resolveStyleCascade(styles, effectiveStyleId, tableStyleId ? { tableStyleId } : undefined)
       : { runDefaults: {}, paragraphDefaults: {} };
   const effective: ParagraphProperties = mergeParagraphProperties(paragraphDefaults, props);
-  // Overlay the paragraph's OWN `runDefaults` on top of the style
-  // cascade. `pPr/rPr` carries the paragraph-mark font (e.g. an
-  // 8pt Arial in jellap.docx's header contact lines, or 9pt Times
-  // for form-field empties); without overlaying here the cascade
-  // wins and we render those paragraphs at the style's default font
-  // (often 12pt Calibri from DocDefaults), throwing every line-height
-  // calculation off.
-  const runDefaults = { ...cascadeRunDefaults, ...(props.runDefaults ?? {}) };
+  // The paragraph-MARK rPr (`props.runDefaults`, `<w:pPr><w:rPr>`) styles
+  // only the ¶ glyph (§17.3.1.29), so for CONTENT runs it is a FALLBACK
+  // that fills what the style cascade leaves unset — never an override.
+  //   - EMPTY paragraph: the ¶ mark IS the content, so it wins.
+  //   - CONTENT paragraph: the cascade wins; the mark only supplies
+  //     properties the cascade omits (a form whose cascade declares no
+  //     size at all still needs the mark's size).
+  // Overriding with the mark rendered the Wisconsin recipe's legend 12pt
+  // (its 12pt Lato ¶ mark over runs that inherit 10pt from the cascade),
+  // ~20% too wide, running under the behind-text corner logo.
+  const markRpr = props.runDefaults ?? {};
+  let runDefaults: RunProperties;
+  if (isEmptyParagraph) {
+    runDefaults = { ...cascadeRunDefaults, ...markRpr };
+  } else {
+    // Content paragraph: the mark supplies font/colour the cascade omits
+    // (kept), but its SIZE must not override the cascade — that is the
+    // property that widened the recipe legend. Cascade size wins when it
+    // has one; the mark's size only survives where the cascade is silent.
+    runDefaults = { ...cascadeRunDefaults, ...markRpr };
+    if (cascadeRunDefaults.fontSizePt !== undefined) {
+      runDefaults = { ...runDefaults, fontSizePt: cascadeRunDefaults.fontSizePt };
+    }
+  }
 
-  if (runDefaults.fontFamily) {
+  // The ELEMENT's own font drives its line-box STRUT (element font-size ×
+  // the unitless line-height) and the leading FONT (`naturalLeadingFor`),
+  // so it must reflect the paragraph's DOMINANT CONTENT — not the cascade
+  // default. jellap.docx's 9pt Times form under a 12pt-Calibri cascade
+  // otherwise drew 2×1.2217×12px line boxes (Calibri leading, 12pt strut)
+  // and grew a page. Content runs still INHERIT from `runDefaults` above;
+  // a sizeless/fontless run counts at that inherited value.
+  const elementFont = dominantElementFont(contentRuns, runDefaults, isEmptyParagraph, styles);
+  if (elementFont.fontFamily) {
     // A face NAME ("Helvetica Neue Light") resolves to family + implied
     // weight/style; the explicit bold/italic assignments below override
     // the implied ones when the cascade sets them.
-    const face = resolveFontFace(runDefaults.fontFamily);
+    const face = resolveFontFace(elementFont.fontFamily);
     el.style.fontFamily = face.stack;
     if (face.weight !== undefined) el.style.fontWeight = String(face.weight);
     if (face.italic) el.style.fontStyle = "italic";
   }
-  if (runDefaults.fontSizePt !== undefined) {
-    el.style.fontSize = `${runDefaults.fontSizePt}pt`;
+  if (elementFont.fontSizePt !== undefined) {
+    el.style.fontSize = `${elementFont.fontSizePt}pt`;
   }
   // Apply the rest of the run cascade to the block element so per-run
   // children inherit Word's style-defined colour / weight / italic /
@@ -141,7 +174,7 @@ export function applyParagraphProps(
     // LibreOffice always lay out single spacing at the font's design
     // leading (1.15 × 12pt = 13.8pt for Times New Roman, LO-verified),
     // which is exactly this formula at line=240.
-    const naturalLeading = naturalLeadingFor(runDefaults.fontFamily);
+    const naturalLeading = naturalLeadingFor(elementFont.fontFamily);
     el.style.lineHeight = String((effective.spacing.line / 240) * naturalLeading);
   } else if (effective.spacing?.line && effective.spacing.lineRule === "exact") {
     // `exact`: a FIXED line height of `line` twips, independent of the
@@ -162,10 +195,10 @@ export function applyParagraphProps(
     // absolute minimum only when it provably exceeds natural (font size
     // known); otherwise leave `normal` so taller content can still grow.
     const minPt = effective.spacing.line / 20;
-    const fontSizePt = runDefaults.fontSizePt;
+    const fontSizePt = elementFont.fontSizePt;
     if (
       fontSizePt !== undefined &&
-      minPt > naturalLeadingFor(runDefaults.fontFamily) * fontSizePt
+      minPt > naturalLeadingFor(elementFont.fontFamily) * fontSizePt
     ) {
       el.style.lineHeight = `${minPt}pt`;
     }
@@ -308,6 +341,58 @@ function mergeParagraphProperties(
  * Default 1.15 is the Latin-serif baseline (Times / Bookman / Georgia).
  * Add more entries as drift reports show divergence on real docs.
  */
+/**
+ * The ELEMENT's own font — the size and family that drive its line-box
+ * strut and unitless-line-height leading. Derived from the DOMINANT
+ * (modal, by character count) CONTENT run, so the element's line metrics
+ * match the text most of the paragraph is set in, not the cascade
+ * default. A sizeless / fontless run counts at the cascade value (what it
+ * actually inherits). An EMPTY paragraph has no content, so its ¶-mark
+ * rPr (over the cascade) IS the element font.
+ */
+function dominantElementFont(
+  runs: readonly InlineRun[],
+  fallback: RunProperties,
+  isEmpty: boolean,
+  styles: readonly NamedStyle[],
+): { fontFamily: string | undefined; fontSizePt: number | undefined } {
+  if (isEmpty || runs.length === 0) {
+    return { fontFamily: fallback.fontFamily, fontSizePt: fallback.fontSizePt };
+  }
+  const byFont = new Map<string, number>();
+  const bySize = new Map<number, number>();
+  for (const r of runs) {
+    if (r.kind !== "text" || !r.text) continue;
+    // Resolve each run's EFFECTIVE font/size the same way `renderTextRun`
+    // does — direct rPr wins, else the run's CHARACTER STYLE, else the
+    // paragraph run-defaults (`fallback`). Reading only `r.properties`
+    // missed sizes carried by an rStyle (ieee body runs get 8pt from a
+    // char style, not direct rPr) and mis-picked the 12pt docDefault,
+    // inflating the line-box strut.
+    const charStyle =
+      r.properties.styleId && styles.length > 0
+        ? resolveRunStyle(styles, r.properties.styleId)
+        : {};
+    const f = r.properties.fontFamily ?? charStyle.fontFamily ?? fallback.fontFamily;
+    const sz = r.properties.fontSizePt ?? charStyle.fontSizePt ?? fallback.fontSizePt;
+    if (f !== undefined) byFont.set(f, (byFont.get(f) ?? 0) + r.text.length);
+    if (sz !== undefined) bySize.set(sz, (bySize.get(sz) ?? 0) + r.text.length);
+  }
+  const modal = <T>(m: Map<T, number>): T | undefined =>
+    [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  // SIZE + FONT = the DOMINANT (most characters) content value. This sets
+  // the line-box STRUT and the leading multiplier, so it must track the
+  // paragraph's bulk text: a 12pt body with a stray 11pt run stays 12pt
+  // (a MIN rule wrongly deflated wsu's 12pt body to 11pt), and a 9pt form
+  // under a 12pt cascade strut resolves to 9pt (jellap). A larger heading
+  // run keeps its own taller line via its own span; the strut only governs
+  // lines the modal size dominates.
+  return {
+    fontFamily: modal(byFont) ?? fallback.fontFamily,
+    fontSizePt: modal(bySize) ?? fallback.fontSizePt,
+  };
+}
+
 function naturalLeadingFor(fontFamily: string | undefined): number {
   const key =
     fontFamily

@@ -7,7 +7,6 @@
 
 import type { NamedStyle, Paragraph } from "../../../doc/types";
 import { headingLevelOf } from "../../../doc/walk";
-import { resolveFontFace } from "./fontFallback";
 import { appendInlineRuns } from "./inline";
 import { type ContextualNeighbors, applyParagraphProps } from "./properties";
 import { planRightTailTab, splitForTabSpread } from "./tabLayout";
@@ -37,15 +36,9 @@ export function renderParagraph(
     styles,
     contextualNeighbors,
     tableStyleId,
+    isEmpty,
+    p.runs,
   );
-  // Cascade the dominant text run's font onto the paragraph itself when
-  // the paragraph has no explicit font from style cascade. CSS unitless
-  // line-height computes against the element's own font-size — if the
-  // paragraph keeps the browser-default 16px while its runs use 9pt
-  // text, every line box reserves 2.3 × 16 = 36.8px and the form-field
-  // layout balloons (the jellap.docx case). Setting the paragraph's
-  // font to the run's font keeps line-height honest: 2.3 × 9pt ≈ 24px.
-  cascadeDominantRunFont(el, p);
   // Hoist a leading column-break run onto the paragraph element so CSS
   // columns honour it — `break-before: column` doesn't apply to
   // inline-rendered `<br>` / `<span>` markers. This is what makes
@@ -142,36 +135,4 @@ function paragraphLeadsWithColumnBreak(p: Paragraph): boolean {
     return false;
   }
   return false;
-}
-
-function cascadeDominantRunFont(el: HTMLElement, p: Paragraph): void {
-  // Pick the font + size of the FIRST text run with an explicit font;
-  // that's the paragraph's visual dominant. Used to set the paragraph
-  // element's own font so unitless line-height computes correctly.
-  let family: string | undefined;
-  let sizePt: number | undefined;
-  for (const r of p.runs) {
-    if (r.kind !== "text") continue;
-    if (!family && r.properties.fontFamily) family = r.properties.fontFamily;
-    if (sizePt === undefined && r.properties.fontSizePt !== undefined) {
-      sizePt = r.properties.fontSizePt;
-    }
-    if (family && sizePt !== undefined) break;
-  }
-  // Only set when applyParagraphProps didn't already resolve a font
-  // from the style cascade — an explicit style font (e.g. Calibri on
-  // the paragraph's pStyle) must win over the first run's font. The
-  // dominant-run cascade is a FALLBACK for paragraphs whose style
-  // chain leaves the font unset, purely to keep unitless line-height
-  // honest. (Symmetric with the fontSize guard below.)
-  if (family && !el.style.fontFamily) {
-    const face = resolveFontFace(family);
-    el.style.fontFamily = face.stack;
-    if (face.weight !== undefined && !el.style.fontWeight) {
-      el.style.fontWeight = String(face.weight);
-    }
-  }
-  if (sizePt !== undefined && !el.style.fontSize) {
-    el.style.fontSize = `${sizePt}pt`;
-  }
 }
