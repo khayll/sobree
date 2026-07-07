@@ -106,6 +106,71 @@ Dependency graph: `@sobree/core` has **no plugin dependencies** — its runtime 
 - **The document is backed by a Y.Doc.** Every mutation must mirror into `editor.ydoc` inside a `Y.Doc.transact` (origin `"local"`). Paragraph runs are backed by `Y.Text` (char-level CRDT); other blocks store block-level JSON. New mutators must call `mirrorToYDoc()` (or go through `commit()` / `applyDocument()` which already do) so the Y.Doc stays the source of truth for Yjs providers.
 - Docs files under `apps/docs/src/content/docs/` that use JSX components or top-level imports must be `.mdx`, not `.md`.
 
+## Canonical ownership of shared behaviour
+
+Shared behaviour must have exactly one owning module. Do not duplicate
+domain logic across browser/headless adapters, plugins, import/export,
+Y.Doc projection, or tests. Also do not erase ownership by moving logic
+into a generic `utils.ts` / `helpers.ts` module unless the helper is
+purely mechanical and has no domain meaning.
+
+When two places need the same behaviour:
+
+1. Name the concept being shared.
+2. Identify the module that owns that concept.
+3. Move the behaviour into that owner behind a narrow typed contract.
+4. Adapt callers at the edge.
+5. Add a regression test at the owner, plus adapter parity tests when
+   browser/headless/Y.Doc/plugin surfaces are involved.
+
+Ownership defaults:
+
+| Concept | Owner | Callers adapt through |
+|---------|-------|-----------------------|
+| AST shape, block/run/section semantics | `packages/core/src/doc/` | typed document APIs/builders |
+| User-visible document mutations | `packages/core/src/doc/mutations/` | `Editor` / `HeadlessSobree` commit paths |
+| Browser editing orchestration | `packages/core/src/editor/` | command bus + editor public API |
+| Headless automation orchestration | `packages/core/src/headless.ts` | shared mutation engine |
+| Y.Doc schema, projection, CRDT codecs | `packages/core/src/ydoc/` | `seed` / `project` / `apply` helpers |
+| DOCX import/export interpretation | `packages/core/src/docx/` | AST model, never renderer DOM |
+| Pagination model | `packages/core/src/pagination/` | pure page/flow types |
+| DOM layout/render adaptation | `packages/core/src/editor/view/`, `packages/core/src/paperStack/` | renderer contracts/selectors |
+| Rendered DOM protocol read by plugins | `packages/core/src/editor/renderedDocument/` | `editor.renderedDocument`, not hardcoded selectors |
+| Plugin UI behaviour | plugin package that owns the UI | commands/events/public editor APIs |
+| Blob/content-addressed binary storage | `packages/core/src/blob/` | `BlobStore` interface |
+| Font parsing/emission/liveness | `packages/core/src/fonts/` | font module APIs |
+
+Duplication rule:
+
+- Duplicate adapter glue when each side is translating from a different
+  environment into the same canonical contract.
+- Share domain decisions, normalization, validation, conversion, and
+  mutation logic in the owning module.
+- If shared code needs imports from two architectural layers, the owner
+  is wrong or the contract is too wide.
+- If a helper name cannot explain the domain concept it owns, it probably
+  does not belong as shared code.
+
+Shared-behaviour check before adding similar logic to a second place:
+
+- What concept is this logic deciding?
+- Which module owns that concept?
+- Is this a domain rule or adapter glue?
+- Can TypeScript expose every caller if this contract changes?
+- Does the behaviour survive browser/headless/Y.Doc reload paths where
+  applicable?
+
+Architecture checks should fail on:
+
+- Cross-package deep imports into another package's `src/internal` or
+  equivalent.
+- Plugins hardcoding rendered DOM protocol selectors instead of using
+  `editor.renderedDocument`.
+- Pure zones importing DOM/editor/plugin modules.
+- New generic `utils.ts` / `helpers.ts` files without a named domain owner.
+- Browser/headless mutation logic that bypasses `doc/mutations` when the
+  behaviour is shared.
+
 ## Update checklist — when X changes, update Y
 
 ### Any public API export (added / changed / removed)
