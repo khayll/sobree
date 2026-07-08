@@ -5,7 +5,7 @@
  * through this contract. Keeping the surface small and DOM-free here is
  * what lets the retry loop be unit-tested against a fake host.
  */
-import type { SelectionDescriptor } from "../../editor/internal/positionMap";
+import type { SelectionDescriptor } from "../../editor/selectionMap";
 
 export interface RepaginationHost {
   /** Every block element currently distributed across all papers. */
