@@ -21,20 +21,21 @@ import type {
   Selection,
 } from "../doc/api";
 import type { RunPropertiesPatch } from "../doc/runs";
-import type {
-  Block,
-  HeaderFooterRef,
-  NamedStyle,
-  PageMargins,
-  PageSize,
-  ParagraphAlignment,
-  ParagraphProperties,
-  SectionColumns,
-  SectionProperties,
-  SobreeDocument,
-} from "../doc/types";
+import type { Block, ParagraphAlignment, SobreeDocument } from "../doc/types";
 
 export type ApiRangeType = ApiRange;
+
+/**
+ * Document patch vocabulary. The definitions live in the document layer
+ * (`doc/mutations/patches.ts`) next to the merge functions that give them
+ * meaning; re-exported here so the editor's public type surface is
+ * unchanged.
+ */
+export type {
+  NamedStylePatch,
+  ParagraphPropertiesPatch,
+  SectionPropertiesPatch,
+} from "../doc/mutations/patches";
 
 export type {
   CellRef,
@@ -158,38 +159,6 @@ export interface OutlineItem {
   blockIndex: number;
   block: BlockRef;
 }
-
-export type ParagraphPropertiesPatch = {
-  [K in keyof ParagraphProperties]?: ParagraphProperties[K] | undefined;
-};
-
-/**
- * Patch for a section's properties (page geometry, columns, header/footer
- * refs, vertical alignment). `pageSize` / `pageMargins` are FIELD-merged
- * into the existing values (so a partial — e.g. just `orientation` or
- * `topTwips` — stays valid); every other field REPLACES wholesale, and an
- * explicit `undefined` on an optional field clears it.
- */
-export interface SectionPropertiesPatch {
-  pageSize?: Partial<PageSize>;
-  pageMargins?: Partial<PageMargins>;
-  columns?: SectionColumns | undefined;
-  headerRefs?: HeaderFooterRef[];
-  footerRefs?: HeaderFooterRef[];
-  titlePage?: boolean | undefined;
-  type?: SectionProperties["type"];
-  vAlign?: SectionProperties["vAlign"];
-}
-
-/**
- * Patch for an existing named style (everything except its `id`). Each
- * present field replaces the style's corresponding field wholesale; an
- * explicit `undefined` clears an optional one. The required `type` /
- * `displayName` are never cleared.
- */
-export type NamedStylePatch = {
-  [K in keyof Omit<NamedStyle, "id">]?: NamedStyle[K] | undefined;
-};
 
 export type WrapTag = "sup" | "sub" | "strong" | "em" | "u" | "s" | "mark";
 

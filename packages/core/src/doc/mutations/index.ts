@@ -34,6 +34,7 @@
 export * from "./blocks";
 export * from "./numbering";
 export * from "./paragraphs";
+export * from "./patches";
 export * from "./sections";
 export * from "./styles";
 export * from "./types";
