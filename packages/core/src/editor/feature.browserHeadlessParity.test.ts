@@ -11,6 +11,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
+import type { Range as ApiRange, BlockRef } from "../doc/api";
 import {
   appendBlock,
   bulletDefinition,
@@ -258,5 +259,85 @@ describe("numbering parity", () => {
     p.headless.defineNumbering(structuredClone(def));
     expect(p.editor.numbering.define(structuredClone(def)).ok).toBe(false);
     expect(p.headless.defineNumbering(structuredClone(def)).ok).toBe(false);
+  });
+});
+
+// === inline / range mutations ===
+
+/** A model range over one block's `[from, to)` character offsets. A
+ *  `BlockInfo` from `getBlock` satisfies `BlockRef` structurally. */
+function mkRange(block: BlockRef, from: number, to: number): ApiRange {
+  return { from: { block, offset: from }, to: { block, offset: to } };
+}
+
+/** True if any text run in `body[0]` carries a revision of `type`. */
+function firstBlockHasRevision(doc: SobreeDocument, type: "ins" | "del"): boolean {
+  const block = doc.body[0];
+  if (!block || block.kind !== "paragraph") return false;
+  return block.runs.some((r) => r.kind === "text" && r.properties.revision?.type === type);
+}
+
+describe("inline / range parity", () => {
+  it("insertRun — text run mid-paragraph", () => {
+    const p = peers(singleParaDoc());
+    p.editor.insertRun({ block: p.editor.getBlock(0), offset: 2 }, text("XX"));
+    p.headless.insertRun({ block: p.headless.getBlock(0), offset: 2 }, text("XX"));
+    expectParity(p);
+  });
+
+  it("applyRunProperties — bold across a sub-range", () => {
+    const p = peers(singleParaDoc());
+    p.editor.applyRunProperties(mkRange(p.editor.getBlock(0), 0, 2), { bold: true });
+    p.headless.applyRunProperties(mkRange(p.headless.getBlock(0), 0, 2), { bold: true });
+    expectParity(p);
+  });
+
+  it("wrapRange — em across a sub-range", () => {
+    const p = peers(singleParaDoc());
+    p.editor.wrapRange(mkRange(p.editor.getBlock(0), 1, 4), "em");
+    p.headless.wrapRange(mkRange(p.headless.getBlock(0), 1, 4), "em");
+    expectParity(p);
+  });
+
+  it("deleteRange — within a single paragraph", () => {
+    const p = peers(singleParaDoc());
+    p.editor.deleteRange(mkRange(p.editor.getBlock(0), 1, 3));
+    p.headless.deleteRange(mkRange(p.headless.getBlock(0), 1, 3));
+    expectParity(p);
+  });
+
+  it("deleteRange — across two paragraphs merges into one", () => {
+    const p = peers(threeParaDoc());
+    p.editor.deleteRange({
+      from: { block: p.editor.getBlock(0), offset: 1 },
+      to: { block: p.editor.getBlock(2), offset: 2 },
+    });
+    p.headless.deleteRange({
+      from: { block: p.headless.getBlock(0), offset: 1 },
+      to: { block: p.headless.getBlock(2), offset: 2 },
+    });
+    expectParity(p);
+    // "one" + "three" collapse to a single block: "o" + "ree".
+    expect(p.editor.getDocument().body.length).toBe(1);
+  });
+
+  it("tracked insertRun stamps an ins revision identically", () => {
+    const p = peers(singleParaDoc());
+    p.editor.setTrackChanges({ enabled: true, author: "Ada" });
+    p.headless.setTrackChanges({ enabled: true, author: "Ada" });
+    p.editor.insertRun({ block: p.editor.getBlock(0), offset: 2 }, text("NEW"));
+    p.headless.insertRun({ block: p.headless.getBlock(0), offset: 2 }, text("NEW"));
+    expectParity(p);
+    expect(firstBlockHasRevision(p.headless.getDocument(), "ins")).toBe(true);
+  });
+
+  it("tracked deleteRange stamps del revisions identically", () => {
+    const p = peers(singleParaDoc());
+    p.editor.setTrackChanges({ enabled: true, author: "Ada" });
+    p.headless.setTrackChanges({ enabled: true, author: "Ada" });
+    p.editor.deleteRange(mkRange(p.editor.getBlock(0), 0, 4));
+    p.headless.deleteRange(mkRange(p.headless.getBlock(0), 0, 4));
+    expectParity(p);
+    expect(firstBlockHasRevision(p.headless.getDocument(), "del")).toBe(true);
   });
 });

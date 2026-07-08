@@ -6,18 +6,13 @@ import {
   fail,
 } from "../../doc/api";
 import {
-  type RunPropertiesPatch,
-  applyRunPropertiesToRuns,
-  mergeAdjacentTextRuns,
-  splitRunsAt,
-} from "../../doc/runs";
-import type {
-  DrawingRun,
-  InlineRun,
-  Paragraph,
-  ParagraphProperties,
-  RevisionMark,
-} from "../../doc/types";
+  applyRunPropertiesMutation,
+  deleteRangeMutation,
+  insertRunMutation,
+  mutateRunsInRangeMutation,
+} from "../../doc/mutations";
+import { type RunPropertiesPatch, mergeAdjacentTextRuns, splitRunsAt } from "../../doc/runs";
+import type { DrawingRun, InlineRun, Paragraph, ParagraphProperties } from "../../doc/types";
 import type { EditorContext } from "../context";
 import {
   caretRangeFromPoint,
@@ -27,25 +22,20 @@ import {
   readImageDimensions,
   unwrap,
 } from "../dom";
-import {
-  type Mutation,
-  allocateMediaPath,
-  mimeToExtension,
-  pxToEmu,
-  wrapTagToPatch,
-} from "../internal/mutations";
-import { snapshotFormatRevision, stampDeleteRevision, stampInsertRevision } from "../revisionRuns";
+import { applyMutation, mutationInput } from "../internal/applyMutation";
+import { allocateMediaPath, mimeToExtension, pxToEmu, wrapTagToPatch } from "../internal/mutations";
 import type { WrapTag } from "../types";
 import * as parts from "./parts";
 
 /**
- * Inline (run-level) mutations — run properties, wrapping, run/image
- * insertion, paragraph split, and range deletion — plus the image
- * clipboard/drag handlers. `mutateRunsInRange` is the shared engine that
- * applies a run transform to the slice a range covers (single- or
- * multi-block); it's exported because the review module reuses it for
- * accept/reject. Track-changes mode stamps `ins`/`del`/`revisionFormat`
- * markers instead of mutating text outright.
+ * Browser adapters for the inline (run-level) mutations — run properties,
+ * wrapping, run/image insertion, paragraph split, and range deletion —
+ * plus the image clipboard/drag handlers. The pure document transforms
+ * live in the shared `doc/mutations` run engine; these wrappers sync the
+ * DOM (`ensureCurrent`), pass the live doc/registry as the engine input,
+ * hand it the editor's track-changes state, and apply the returned patch
+ * through `ctx.commit`. `mutateRunsInRange` stays exported because the
+ * review (accept/reject) module reuses the engine's range transform.
  */
 
 /** Apply run-level properties across `range`. */
@@ -56,16 +46,10 @@ export function applyRunProperties(
   opts: { expect?: Record<string, number> } = {},
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRange(range, opts.expect);
-  if (lockCheck) return lockCheck;
-  if (ctx.trackChanges.enabled) {
-    const author = ctx.trackChanges.author;
-    return mutateRunsInRange(ctx, range, (runs) => {
-      const snapshotted = runs.map((r) => snapshotFormatRevision(r, author));
-      return applyRunPropertiesToRuns(snapshotted, patch);
-    });
-  }
-  return mutateRunsInRange(ctx, range, (runs) => applyRunPropertiesToRuns(runs, patch));
+  return applyMutation(
+    ctx,
+    applyRunPropertiesMutation(mutationInput(ctx), range, patch, ctx.trackChanges, opts.expect),
+  );
 }
 
 /** Wrap the runs in `range` with semantic formatting. */
@@ -79,9 +63,9 @@ export function wrapRange(
 }
 
 /**
- * Insert a run at `at`. Splits the run list at the offset. In
- * track-changes mode the run is stamped `revision: ins` (unless it
- * already carries one — caller-provided revisions win).
+ * Insert a run at `at`. In track-changes mode the run is stamped
+ * `revision: ins` (unless it already carries one — caller-provided
+ * revisions win).
  */
 export function insertRun(
   ctx: EditorContext,
@@ -89,21 +73,7 @@ export function insertRun(
   run: InlineRun,
 ): EditResult<BlockRef> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRefs([at.block]);
-  if (lockCheck) return lockCheck;
-  const index = ctx.registry.indexOf(at.block.id);
-  const block = ctx.doc.body[index];
-  if (!block || block.kind !== "paragraph") {
-    return fail({ code: "invalid-position", details: "target is not a paragraph" });
-  }
-  const stamped = ctx.trackChanges.enabled
-    ? stampInsertRevision(run, ctx.trackChanges.author)
-    : run;
-  const { before, after } = splitRunsAt(block.runs, at.offset);
-  const merged = mergeAdjacentTextRuns([...before, stamped, ...after]);
-  const next = ctx.doc.body.slice();
-  next[index] = { ...block, runs: merged };
-  return ctx.commit({ body: next }, [{ type: "bump", index }]);
+  return applyMutation(ctx, insertRunMutation(mutationInput(ctx), at, run, ctx.trackChanges));
 }
 
 /**
@@ -201,169 +171,24 @@ export function deleteRange(
   opts: { expect?: Record<string, number> } = {},
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRange(range, opts.expect);
-  if (lockCheck) return lockCheck;
-  if (range.from.block.id !== range.to.block.id) {
-    return ctx.trackChanges.enabled
-      ? deleteRangeAcrossBlocksTracked(ctx, range)
-      : deleteRangeAcrossBlocksPlain(ctx, range);
-  }
-  if (ctx.trackChanges.enabled) {
-    const author = ctx.trackChanges.author;
-    return mutateRunsInRange(ctx, range, (runs) =>
-      runs.flatMap((r) => stampDeleteRevision(r, author)),
-    );
-  }
-  return mutateRunsInRange(ctx, range, () => []);
+  return applyMutation(
+    ctx,
+    deleteRangeMutation(mutationInput(ctx), range, ctx.trackChanges, opts.expect),
+  );
 }
 
 /**
- * Tracked cross-paragraph delete. Stamps `del` on the affected runs of
- * each paragraph and the paragraph-mark of every block after the first,
- * so `acceptAllRevisions` later merges them into the first block.
- */
-function deleteRangeAcrossBlocksTracked(ctx: EditorContext, range: ApiRange): EditResult<void> {
-  const fromIdx = ctx.registry.indexOf(range.from.block.id);
-  const toIdx = ctx.registry.indexOf(range.to.block.id);
-  if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
-    return fail({ code: "range-out-of-order", details: "range endpoints" });
-  }
-  const author = ctx.trackChanges.author;
-  const nextBody = ctx.doc.body.slice();
-  const bumps: Mutation[] = [];
-
-  for (let i = fromIdx; i <= toIdx; i++) {
-    const block = nextBody[i];
-    if (!block || block.kind !== "paragraph") continue;
-
-    let newRuns: InlineRun[];
-    if (i === fromIdx) {
-      const split = splitRunsAt(block.runs, range.from.offset);
-      const tailStamped = split.after.flatMap((r) => stampDeleteRevision(r, author));
-      newRuns = mergeAdjacentTextRuns([...split.before, ...tailStamped]);
-    } else if (i === toIdx) {
-      const split = splitRunsAt(block.runs, range.to.offset);
-      const headStamped = split.before.flatMap((r) => stampDeleteRevision(r, author));
-      newRuns = mergeAdjacentTextRuns([...headStamped, ...split.after]);
-    } else {
-      newRuns = mergeAdjacentTextRuns(block.runs.flatMap((r) => stampDeleteRevision(r, author)));
-    }
-
-    let nextBlock: Paragraph = { ...block, runs: newRuns };
-
-    // Stamp paragraph-mark del on every block AFTER the first — the
-    // break between i-1 and i is part of the deletion. Skip if a
-    // revision is already present (don't overwrite peer markers).
-    if (i > fromIdx && !block.properties.revision) {
-      const revision: RevisionMark =
-        author === undefined ? { type: "del" } : { type: "del", author };
-      nextBlock = {
-        ...nextBlock,
-        properties: { ...nextBlock.properties, revision },
-      };
-    }
-
-    nextBody[i] = nextBlock;
-    bumps.push({ type: "bump", index: i });
-  }
-
-  return ctx.commit({ body: nextBody }, bumps);
-}
-
-/**
- * Non-tracked cross-paragraph delete. Keeps the head of the first block
- * + the tail of the last, splices them into the first as one paragraph,
- * and removes everything in between.
- */
-function deleteRangeAcrossBlocksPlain(ctx: EditorContext, range: ApiRange): EditResult<void> {
-  const fromIdx = ctx.registry.indexOf(range.from.block.id);
-  const toIdx = ctx.registry.indexOf(range.to.block.id);
-  if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
-    return fail({ code: "range-out-of-order", details: "range endpoints" });
-  }
-  const first = ctx.doc.body[fromIdx];
-  const last = ctx.doc.body[toIdx];
-  if (!first || first.kind !== "paragraph" || !last || last.kind !== "paragraph") {
-    return fail({
-      code: "invalid-state",
-      details: "cross-block delete requires paragraph endpoints",
-    });
-  }
-  const head = splitRunsAt(first.runs, range.from.offset).before;
-  const tail = splitRunsAt(last.runs, range.to.offset).after;
-  const merged = mergeAdjacentTextRuns([...head, ...tail]);
-
-  const nextBody = ctx.doc.body.slice();
-  nextBody[fromIdx] = { ...first, runs: merged };
-  nextBody.splice(fromIdx + 1, toIdx - fromIdx);
-  if (nextBody.length === 0) {
-    nextBody.push({ kind: "paragraph", properties: {}, runs: [] });
-  }
-
-  const mutations: Mutation[] = [{ type: "bump", index: fromIdx }];
-  // Top-down removes so each index stays valid as the array shrinks.
-  for (let i = toIdx; i > fromIdx; i--) {
-    mutations.push({ type: "remove", index: i });
-  }
-  return ctx.commit({ body: nextBody }, mutations);
-}
-
-/**
- * Apply a runs transform to the runs covered by `range`. Handles single-
- * and multi-block ranges. Assumes locks have already been checked.
- * Exported for reuse by the review (accept/reject) module.
+ * Apply a runs transform to the runs covered by `range` and commit.
+ * Assumes locks have already been checked. Adapter over the pure
+ * `mutateRunsInRangeMutation`; exported for reuse by the review
+ * (accept/reject) module.
  */
 export function mutateRunsInRange(
   ctx: EditorContext,
   range: ApiRange,
   transform: (runs: InlineRun[]) => InlineRun[],
 ): EditResult<void> {
-  const fromIdx = ctx.registry.indexOf(range.from.block.id);
-  const toIdx = ctx.registry.indexOf(range.to.block.id);
-  if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
-    return fail({ code: "range-out-of-order", details: "range endpoints" });
-  }
-  const nextBody = ctx.doc.body.slice();
-  const bumps: Mutation[] = [];
-
-  if (fromIdx === toIdx) {
-    const block = nextBody[fromIdx];
-    if (!block || block.kind !== "paragraph") {
-      return fail({
-        code: "invalid-state",
-        details: `block ${range.from.block.id} not a paragraph`,
-      });
-    }
-    if (range.from.offset === range.to.offset) {
-      return fail({ code: "range-empty", details: "zero-width range" });
-    }
-    const headSplit = splitRunsAt(block.runs, range.from.offset);
-    const tailSplit = splitRunsAt(headSplit.after, range.to.offset - range.from.offset);
-    const middle = transform(tailSplit.before);
-    const merged = mergeAdjacentTextRuns([...headSplit.before, ...middle, ...tailSplit.after]);
-    nextBody[fromIdx] = { ...block, runs: merged };
-    bumps.push({ type: "bump", index: fromIdx });
-  } else {
-    // Multi-block range: first block's tail, all middle blocks, last
-    // block's head get transformed.
-    for (let i = fromIdx; i <= toIdx; i++) {
-      const block = nextBody[i];
-      if (!block || block.kind !== "paragraph") continue;
-      let newRuns: InlineRun[];
-      if (i === fromIdx) {
-        const split = splitRunsAt(block.runs, range.from.offset);
-        newRuns = mergeAdjacentTextRuns([...split.before, ...transform(split.after)]);
-      } else if (i === toIdx) {
-        const split = splitRunsAt(block.runs, range.to.offset);
-        newRuns = mergeAdjacentTextRuns([...transform(split.before), ...split.after]);
-      } else {
-        newRuns = mergeAdjacentTextRuns(transform(block.runs));
-      }
-      nextBody[i] = { ...block, runs: newRuns };
-      bumps.push({ type: "bump", index: i });
-    }
-  }
-  return ctx.commit({ body: nextBody }, bumps);
+  return applyMutation(ctx, mutateRunsInRangeMutation(mutationInput(ctx), range, transform));
 }
 
 /**

@@ -55,28 +55,40 @@
 
 import type * as Y from "yjs";
 import { BlobCache, type BlobStore } from "./blob";
-import { type BlockRef, type EditError, type EditResult, type Selection, ok } from "./doc/api";
+import {
+  type Range as ApiRange,
+  type BlockRef,
+  type EditError,
+  type EditResult,
+  type InlinePosition,
+  type Selection,
+  ok,
+} from "./doc/api";
 import { emptyDocument } from "./doc/builders";
 import {
   type DocumentMutationResult,
   type Mutation,
   type MutationInput,
   applyBlockPropertiesMutation,
+  applyRunPropertiesMutation,
   applySectionPropertiesMutation,
   defineNumberingMutation,
   defineStyleMutation,
   deleteBlockMutation,
+  deleteRangeMutation,
   insertBlockAfterMutation,
   insertBlockBeforeMutation,
+  insertRunMutation,
   removeNumberingMutation,
   removeStyleMutation,
   replaceBlockMutation,
   updateNumberingMutation,
   updateStyleMutation,
 } from "./doc/mutations";
-import { runsLength } from "./doc/runs";
+import { type RunPropertiesPatch, runsLength } from "./doc/runs";
 import type {
   Block,
+  InlineRun,
   NamedStyle,
   NumberingDefinition,
   NumberingLevel,
@@ -92,8 +104,11 @@ import type {
   NamedStylePatch,
   OutlineItem,
   SectionPropertiesPatch,
+  TrackChangesState,
+  WrapTag,
 } from "./editor";
 import { BlockRegistry } from "./editor/internal/blockRegistry";
+import { wrapTagToPatch } from "./editor/internal/mutations";
 import { TableApi } from "./editor/table";
 import { History } from "./history";
 import { applyDocumentToYDoc, projectYDoc, seedYDoc } from "./ydoc";
@@ -127,6 +142,13 @@ export interface HeadlessSobreeOptions {
    * `EditorOptions.blobStore` for the full contract.
    */
   blobStore?: BlobStore;
+  /**
+   * Initial track-changes mode. When omitted, the peer starts in
+   * direct-edit mode (`{ enabled: false }`); flip it later with
+   * `setTrackChanges`. Mirrors `EditorOptions.trackChanges`, so a headless
+   * agent records `ins`/`del` revisions exactly as the browser editor does.
+   */
+  trackChanges?: TrackChangesState;
 }
 
 export type HeadlessEvent = "change";
@@ -164,6 +186,7 @@ export class HeadlessSobree {
     change: new Set(),
   };
   private lastPartRefs: Record<string, string> = {};
+  private trackChanges: TrackChangesState = { enabled: false };
   private ydocUpdateListener: ((tr: Y.Transaction) => void) | null = null;
 
   constructor(ydoc: Y.Doc, opts: HeadlessSobreeOptions = {}) {
@@ -182,6 +205,7 @@ export class HeadlessSobree {
           onResolved: (hash) => this.onBlobResolved(hash),
         })
       : null;
+    if (opts.trackChanges) this.trackChanges = { ...opts.trackChanges };
 
     // Adopt-or-seed: same logic as the browser Editor. If the Y.Doc
     // already has body content, we're a peer joining an active room
@@ -376,6 +400,62 @@ export class HeadlessSobree {
   /** Remove the definition with `numId`. Fails if missing. */
   removeNumbering(numId: number): EditResult<void> {
     return this.applyPatch(removeNumberingMutation(this.mutationInput(), numId));
+  }
+
+  // === inline / range mutations ===
+
+  /** Current track-changes mode. */
+  getTrackChanges(): TrackChangesState {
+    return { ...this.trackChanges };
+  }
+
+  /** Enable/disable track-changes mode (and set the author). When enabled,
+   *  `insertRun` / `deleteRange` / `applyRunProperties` record `ins` / `del`
+   *  / format revisions instead of editing outright — same semantics as the
+   *  browser `Editor.setTrackChanges`. */
+  setTrackChanges(state: TrackChangesState): void {
+    this.trackChanges = { ...state };
+  }
+
+  /** Apply run-level properties across `range`. In track-changes mode the
+   *  pre-edit formatting is snapshotted as a `revisionFormat`. */
+  applyRunProperties(
+    range: ApiRange,
+    patch: RunPropertiesPatch,
+    opts: { expect?: Record<string, number> } = {},
+  ): EditResult<void> {
+    return this.applyPatch(
+      applyRunPropertiesMutation(
+        this.mutationInput(),
+        range,
+        patch,
+        this.trackChanges,
+        opts.expect,
+      ),
+    );
+  }
+
+  /** Wrap the runs in `range` with a semantic tag (`strong`/`em`/…). */
+  wrapRange(
+    range: ApiRange,
+    tag: WrapTag,
+    opts: { expect?: Record<string, number> } = {},
+  ): EditResult<void> {
+    return this.applyRunProperties(range, wrapTagToPatch(tag), opts);
+  }
+
+  /** Insert `run` at `at`. In track-changes mode it's stamped `revision: ins`
+   *  (unless it already carries one). */
+  insertRun(at: InlinePosition, run: InlineRun): EditResult<BlockRef> {
+    return this.applyPatch(insertRunMutation(this.mutationInput(), at, run, this.trackChanges));
+  }
+
+  /** Delete the content inside `range` (single- or cross-block). In
+   *  track-changes mode the deletion is recorded as `del` revisions. */
+  deleteRange(range: ApiRange, opts: { expect?: Record<string, number> } = {}): EditResult<void> {
+    return this.applyPatch(
+      deleteRangeMutation(this.mutationInput(), range, this.trackChanges, opts.expect),
+    );
   }
 
   // === events ===

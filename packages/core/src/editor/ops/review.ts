@@ -1,4 +1,5 @@
 import { type Range as ApiRange, type BlockRef, type EditResult, fail, ok } from "../../doc/api";
+import { decideFormatRun, decideRevisionRun } from "../../doc/mutations";
 import { mergeAdjacentTextRuns, runLength, runsLength } from "../../doc/runs";
 import type {
   Block,
@@ -11,7 +12,6 @@ import type {
 } from "../../doc/types";
 import type { EditorContext } from "../context";
 import * as query from "../query";
-import { decideFormatRun, decideRevisionRun } from "../revisionRuns";
 import type { RevisionSpan } from "../types";
 import { mutateRunsInRange } from "./runs";
 
@@ -20,8 +20,8 @@ import { mutateRunsInRange } from "./runs";
  * paragraph-mark revisions (single-range, paragraph-level, or
  * whole-document), plus `getRevisions` which enumerates every logical
  * change as coalesced `RevisionSpan`s. The run-level decisions reuse the
- * pure transforms in `revisionRuns`; the engine is `mutateRunsInRange`
- * (shared with the authoring path in `ops/runs`).
+ * pure transforms in `doc/mutations/revisions`; the engine is
+ * `mutateRunsInRange` (shared with the authoring path in `ops/runs`).
  */
 
 /**
