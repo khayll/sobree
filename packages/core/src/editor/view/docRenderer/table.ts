@@ -18,6 +18,7 @@ import type {
   TableStyleCellFormat,
   TableStyleDefinition,
 } from "../../../doc/types";
+import { resolveShadingColor } from "./shadingColor";
 import { twipsToMmExact } from "./units";
 
 /**
@@ -243,16 +244,11 @@ function renderCell(
     ? resolveTableCellFormat(cellCtx.def, cellCtx.look, pos)
     : {};
 
-  // <w:shd w:fill="XXXXXX"/> on the cell — colour the cell background.
-  // We render only the `fill` (most common case); patterned shading
-  // (`pct10`, etc.) collapses to solid fill. A direct cell fill wins;
-  // otherwise the resolved table-style fill applies.
-  const fill =
-    cell.shading?.fill && cell.shading.fill !== "#auto"
-      ? cell.shading.fill
-      : styleFmt.shading?.fill && styleFmt.shading.fill !== "#auto"
-        ? styleFmt.shading.fill
-        : undefined;
+  // <w:shd> on the cell — colour the cell background. The pattern + fill +
+  // foreground composite to one colour (`resolveShadingColor`), so a
+  // patterned grey (`pct40 auto auto`) is not lost. A direct cell shading
+  // wins; otherwise the resolved table-style shading applies.
+  const fill = resolveShadingColor(cell.shading) ?? resolveShadingColor(styleFmt.shading);
   if (fill) el.style.backgroundColor = fill;
 
   // Borders, resolved per edge so the table's INSIDE separators
