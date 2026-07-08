@@ -1,5 +1,14 @@
 # @sobree/zoom-controls
 
+## 0.1.67
+
+### Patch Changes
+
+- 9a6f61f: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [9a6f61f]
+  - @sobree/core@0.1.67
+
 ## 0.1.66
 
 ### Patch Changes
