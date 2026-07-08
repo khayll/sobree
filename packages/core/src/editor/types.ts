@@ -46,39 +46,12 @@ export type {
 } from "./table";
 
 /**
- * One logical tracked change — a maximal run of consecutive inline
- * runs that all carry a `revision` marker by the same author.
- * `getRevisions()` returns these; pass `range` straight to
- * `acceptRevision` / `rejectRevision`.
- *
- * `kinds` is the set of revision types in the span: `["ins"]` or
- * `["del"]` for a plain change, both for a delete-then-insert
- * replacement (which accepts/rejects as a single unit).
+ * `RevisionSpan` — one logical tracked change. Defined in the document
+ * layer (`doc/mutations/review.ts`) next to the `getRevisions` enumerator
+ * that produces it; re-exported here so the editor's public type surface
+ * is unchanged.
  */
-export interface RevisionSpan {
-  range: ApiRange;
-  author?: string;
-  kinds: ("ins" | "del")[];
-  /** ISO date of the span's first revision run, if recorded. */
-  date?: string;
-  /**
-   * Discriminator between revision levels:
-   *   `"inline"` (default for backwards compat) — the span covers
-   *     `ins`/`del` text runs inside a block. Pass `range` to
-   *     `acceptRevision` / `rejectRevision`.
-   *   `"paragraph"` — the span flags the *paragraph mark* itself on
-   *     `range.from.block`. The range covers offset `[0, length]` of
-   *     the block so it still selects the right element for UIs, but
-   *     accept/reject must go through `acceptParagraphRevision` /
-   *     `rejectParagraphRevision`.
-   *   `"format"` — the span flags a tracked format change
-   *     (`<w:rPrChange>`) on contiguous runs by the same author.
-   *     `kinds` always reports `["ins"]` (the marker is binary: a
-   *     format change exists or not). Pass `range` to
-   *     `acceptFormatRevision` / `rejectFormatRevision`.
-   */
-  level?: "inline" | "paragraph" | "format";
-}
+export type { RevisionSpan } from "../doc/mutations/review";
 
 /**
  * Track-changes mode. When `enabled` is true, the editor reinterprets

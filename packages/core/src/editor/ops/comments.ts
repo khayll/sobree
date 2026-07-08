@@ -1,31 +1,23 @@
-import { type EditResult, fail } from "../../doc/api";
+import type { EditResult } from "../../doc/api";
+import { reopenCommentMutation, resolveCommentMutation } from "../../doc/mutations";
 import type { EditorContext } from "../context";
+import { applyMutation, mutationInput } from "../internal/applyMutation";
 
 /**
- * Comment resolve/reopen — flips `Comment.done` on the document's
- * comment map. Comments live outside the body registry, so no block
- * version bumps are needed; the change still commits (and mirrors) so
- * collaborators and the change event see it.
+ * Browser adapters for comment resolve/reopen. The pure patch (flip
+ * `Comment.done`, no block bumps) lives in `doc/mutations/comments`; these
+ * sync the DOM and apply it through `ctx.commit` so the change mirrors to
+ * the Y.Doc and fires the change event.
  */
 
 /** Mark comment `id` resolved (`Comment.done = true`). */
 export function resolveComment(ctx: EditorContext, id: number): EditResult<void> {
-  return setCommentDone(ctx, id, true);
+  ctx.ensureCurrent();
+  return applyMutation(ctx, resolveCommentMutation(mutationInput(ctx), id));
 }
 
 /** Re-open a resolved comment `id` (`Comment.done = false`). */
 export function reopenComment(ctx: EditorContext, id: number): EditResult<void> {
-  return setCommentDone(ctx, id, false);
-}
-
-function setCommentDone(ctx: EditorContext, id: number, done: boolean): EditResult<void> {
   ctx.ensureCurrent();
-  const comments = ctx.doc.comments;
-  const target = comments?.[id];
-  if (!comments || !target) {
-    return fail({ code: "invalid-state", details: `no comment with id ${id}` });
-  }
-  const nextComments = { ...comments, [id]: { ...target, done } };
-  // No block bumps — comments live outside the body registry.
-  return ctx.commit({ comments: nextComments }, []);
+  return applyMutation(ctx, reopenCommentMutation(mutationInput(ctx), id));
 }
