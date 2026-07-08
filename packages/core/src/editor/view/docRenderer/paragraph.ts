@@ -94,6 +94,14 @@ export function renderParagraph(
     appendInlineRuns(after, split.after, rawParts, styles, paraRunDefaults);
     if (rightTail) {
       after.style.marginRight = rightTail.tailMarginRight;
+      // The tail is atomic — give it a definite, content-derived width so
+      // the flex algorithm can't collapse it (Chromium mis-sizes its
+      // `auto` main size to 0 beside the elastic leader). `text-align:
+      // right` keeps the number pinned at the stop within the box.
+      if (rightTail.tailWidthCh !== undefined) {
+        after.style.width = `${rightTail.tailWidthCh}ch`;
+        after.style.textAlign = "right";
+      }
       if (rightTail.beforeMarginLeft) before.style.marginLeft = rightTail.beforeMarginLeft;
       if (rightTail.leaderFill) {
         // Synthetic view-only fill: non-editable (the serializer skips

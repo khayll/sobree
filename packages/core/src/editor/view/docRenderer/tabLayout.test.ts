@@ -90,16 +90,60 @@ describe("planRightTailTab", () => {
     expect(planRightTailTab(para([text("Entry\t42")], leftLast), leftLast)).toBeNull();
   });
 
-  it("bails on two tabs, a tab inside a hyperlink, or an empty tail", () => {
+  it("bails on two top-level tabs or an empty tail", () => {
     expect(planRightTailTab(para([text("A\tB\tC")], RIGHT_DOT_STOP), RIGHT_DOT_STOP)).toBeNull();
-    const linked = para(
-      [{ kind: "hyperlink", href: "#", children: [text("A\t1")] }],
-      RIGHT_DOT_STOP,
-    );
-    expect(planRightTailTab(linked, RIGHT_DOT_STOP)).toBeNull();
     expect(
       planRightTailTab(para([text("Entry\t"), text("  ")], RIGHT_DOT_STOP), RIGHT_DOT_STOP),
     ).toBeNull();
+  });
+
+  it("splits a TOC hyperlink around its tail tab, keeping the href on both sides", () => {
+    // A TOC field's result is ONE link wrapping "entry \t page"; splitting
+    // it lets the page number right-align at the leader stop instead of the
+    // tab-size fallback overflowing long entries onto a second line.
+    const linked = para(
+      [{ kind: "hyperlink", href: "#toc", children: [text("Entry"), text("\t"), text("42")] }],
+      RIGHT_DOT_STOP,
+    );
+    const plan = planRightTailTab(linked, RIGHT_DOT_STOP);
+    expect(plan).not.toBeNull();
+    expect(plan!.before).toEqual([{ kind: "hyperlink", href: "#toc", children: [text("Entry")] }]);
+    expect(plan!.after).toEqual([{ kind: "hyperlink", href: "#toc", children: [text("42")] }]);
+    expect(plan!.leaderFill).toMatch(/^\.+$/);
+    // The atomic tail is sized to its own character count ("42" → 2ch) so
+    // the flex algorithm can't collapse it beside the elastic leader.
+    expect(plan!.tailWidthCh).toBe(2);
+  });
+
+  it("splits a numbered TOC link at its LAST tab (number→title tab stays in the entry)", () => {
+    // "1. \t Executive Summary \t 3": the first tab is the number→title
+    // left stop; only the LAST tab advances to the right leader stop.
+    const props: ParagraphProperties = {
+      tabStops: [
+        { positionTwips: 1080, alignment: "left" },
+        { positionTwips: 9360, alignment: "right", leader: "dot" },
+      ],
+    };
+    const linked = para(
+      [
+        {
+          kind: "hyperlink",
+          href: "#s1",
+          children: [text("1."), text("\t"), text("Executive Summary"), text("\t"), text("3")],
+        },
+      ],
+      props,
+    );
+    const plan = planRightTailTab(linked, props);
+    expect(plan).not.toBeNull();
+    expect(plan!.before).toEqual([
+      {
+        kind: "hyperlink",
+        href: "#s1",
+        children: [text("1."), text("\t"), text("Executive Summary")],
+      },
+    ]);
+    expect(plan!.after).toEqual([{ kind: "hyperlink", href: "#s1", children: [text("3")] }]);
   });
 });
 

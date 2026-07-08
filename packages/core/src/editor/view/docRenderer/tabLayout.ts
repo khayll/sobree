@@ -16,7 +16,14 @@
  * approximation in `properties.ts`.
  */
 
-import type { InlineRun, Paragraph, ParagraphProperties, TextRun } from "../../../doc/types";
+import type {
+  HyperlinkRun,
+  InlineRun,
+  Paragraph,
+  ParagraphProperties,
+  TabStop,
+  TextRun,
+} from "../../../doc/types";
 import { twipsToMm } from "./units";
 
 /**
@@ -68,6 +75,15 @@ export interface RightTailPlan {
    *  lose their level offset. The spread renders one visual line, so
    *  the first-line indent IS the entry's indent. */
   beforeMarginLeft?: string;
+  /** CSS `width` for the tail span, in `ch`, sized to the tail's own
+   *  character count. The tail is an atomic flex item (the page number)
+   *  that must never be squeezed, but Chromium mis-computes its
+   *  content-based (`auto` / `max-content`) main size as 0 next to the
+   *  elastic leader, collapsing it so the leader dots bleed across the
+   *  number. A DEFINITE, content-derived width sidesteps that intrinsic
+   *  size entirely; `text-align: right` keeps the number pinned to the
+   *  stop when it is narrower than the reserved `ch` box. */
+  tailWidthCh?: number;
 }
 
 /**
@@ -90,6 +106,15 @@ export function planRightTailTab(
   if (stops.length === 0) return null;
   const last = stops.reduce((a, b) => (b.positionTwips >= a.positionTwips ? b : a));
   if (last.alignment !== "right") return null;
+
+  // TOC / list-of-* lines wrap the whole "entry `\t` page number" in ONE
+  // hyperlink (a TOC field's result is a single link), so the tail tab
+  // is a link CHILD the top-level scan below can't reach — those lines
+  // fell to the `tab-size` approximation, which overflowed the longer
+  // entries onto a second line. Split the link around its tail tab
+  // instead, so the page number right-aligns at the leader stop like Word.
+  const linkTail = planHyperlinkRightTail(p, last, effective);
+  if (linkTail) return linkTail;
 
   // Locate the tab characters among top-level text runs. ONE tab is
   // the TOC right-tail. SEVERAL CONSECUTIVE tabs (nothing but
@@ -155,6 +180,78 @@ export function planRightTailTab(
   const after: InlineRun[] = [];
   if (post) after.push({ ...tailHost, text: post });
   after.push(...p.runs.slice(lastTabRun + 1));
+
+  return buildRightTailPlan(before, after, separator, tailStop, effective);
+}
+
+/**
+ * TOC / list-of-* entries are emitted as ONE hyperlink wrapping the whole
+ * "[number] `\t` title `\t` page number" (a TOC field's result is a single
+ * link). The top-level {@link planRightTailTab} scan can't split a tab
+ * that lives inside a link's children, so long entries fell to the
+ * `tab-size` fallback and wrapped onto a second line. Split the link
+ * around its LAST tab — the one Word advances to the leader/right stop —
+ * into a before-link (entry, keeping any earlier number/title tab) and an
+ * after-link (page number), each retaining the href. The leader fills the
+ * gap and the page number right-aligns on one line, matching Word.
+ */
+function planHyperlinkRightTail(
+  p: Paragraph,
+  rightStop: TabStop,
+  effective: ParagraphProperties,
+): RightTailPlan | null {
+  // A top-level text tab belongs to the top-level planner; only handle
+  // the pure "link owns the tab" shape here.
+  if (p.runs.some((r) => r.kind === "text" && r.text.includes("\t"))) return null;
+  const hi = p.runs.findIndex((r) => r.kind === "hyperlink" && hyperlinkContainsTab(r.children));
+  if (hi === -1) return null;
+  const link = p.runs[hi] as HyperlinkRun;
+
+  // Split at the LAST tab child: Word advances it to the right leader
+  // stop, right-aligning the page number. An earlier number→title tab
+  // stays in the before-link and renders against its own (left) stop.
+  let tabChild = -1;
+  let tabChar = -1;
+  for (let i = 0; i < link.children.length; i++) {
+    const c = link.children[i]!;
+    if (c.kind !== "text") continue;
+    const idx = c.text.lastIndexOf("\t");
+    if (idx !== -1) {
+      tabChild = i;
+      tabChar = idx;
+    }
+  }
+  if (tabChild === -1) return null;
+
+  const host = link.children[tabChild] as TextRun;
+  const pre = host.text.slice(0, tabChar);
+  const post = host.text.slice(tabChar + 1);
+  const beforeChildren: InlineRun[] = [...link.children.slice(0, tabChild)];
+  if (pre) beforeChildren.push({ ...host, text: pre });
+  const afterChildren: InlineRun[] = [];
+  if (post) afterChildren.push({ ...host, text: post });
+  afterChildren.push(...link.children.slice(tabChild + 1));
+
+  const before: InlineRun[] = [...p.runs.slice(0, hi)];
+  if (beforeChildren.length > 0) before.push({ ...link, children: beforeChildren });
+  const after: InlineRun[] = [{ ...link, children: afterChildren }, ...p.runs.slice(hi + 1)];
+
+  return buildRightTailPlan(before, after, "\t", rightStop, effective);
+}
+
+/**
+ * Shared assembly for a right-tail plan once the runs are split into
+ * `before` / `after` around the tail tab (top-level or link-nested).
+ * Owns the geometry: the tail's distance-from-right, the entry's
+ * first-line indent, and the leader fill.
+ */
+function buildRightTailPlan(
+  before: InlineRun[],
+  after: InlineRun[],
+  separatorText: string,
+  tailStop: TabStop,
+  effective: ParagraphProperties,
+): RightTailPlan | null {
   if (!hasVisibleContent(after)) return null;
 
   // `w:pos` is measured from the text margin; the paragraph's content
@@ -179,14 +276,41 @@ export function planRightTailTab(
         : undefined;
 
   const leaderChar = tailStop.leader ? LEADER_FILL_CHAR[tailStop.leader] : undefined;
+  // Size the tail box to its own text, but ONLY for leader lines. The
+  // flex collapse that necessitates a definite width is caused by the
+  // elastic 512-glyph leader beside the tail; a leaderless right-tab
+  // (e.g. a "org … Page N" footer) sizes its tail naturally and must not
+  // get a fixed `ch` box (that clipped/wrapped multi-word tails). Digits
+  // / roman numerals are ~1ch each; `text-align: right` pins the number
+  // to the stop, and a wider glyph overflows LEFT into the leader rather
+  // than clipping, so the tight box keeps the dots against the number.
+  const tailChars = leaderChar ? tailTextLength(after) : 0;
   return {
     before,
     after,
-    separatorText: separator,
+    separatorText,
     ...(leaderChar ? { leaderFill: leaderChar.repeat(LEADER_FILL_CAPACITY) } : {}),
     tailMarginRight,
     ...(beforeMarginLeft ? { beforeMarginLeft } : {}),
+    ...(tailChars > 0 ? { tailWidthCh: tailChars } : {}),
   };
+}
+
+/** Character count of the tail's rendered text (descending into a
+ *  hyperlink), used to size the atomic tail box in `ch`. Internal spaces
+ *  count — only the outer ends are trimmed — so a multi-glyph tail box is
+ *  wide enough for the whole run. */
+function tailTextLength(runs: readonly InlineRun[]): number {
+  return tailText(runs).trim().length;
+}
+
+function tailText(runs: readonly InlineRun[]): string {
+  let s = "";
+  for (const r of runs) {
+    if (r.kind === "text") s += r.text;
+    else if (r.kind === "hyperlink") s += tailText(r.children);
+  }
+  return s;
 }
 
 function hyperlinkContainsTab(children: readonly InlineRun[]): boolean {
