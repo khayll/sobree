@@ -74,13 +74,19 @@ export function positionFromDomPoint(
  * also used to save/restore a selection across a DOM rebuild (repagination)
  * where raw node references don't survive.
  */
-interface BlockPoint {
+/**
+ * A model-level selection endpoint: a stable `data-block-id` + character
+ * offset (+ optional table-cell address). Unlike a raw DOM `(node, offset)`
+ * it survives a full DOM rebuild, so it's the currency the repagination
+ * selection descriptor is built from (see `editor/selectionMap`).
+ */
+export interface BlockPoint {
   blockId: string;
   offset: number;
   cell?: CellAddress;
 }
 
-function blockPointFromDom(
+export function blockPointFromDom(
   hosts: readonly HTMLElement[],
   node: Node,
   domOffset: number,
@@ -95,7 +101,7 @@ function blockPointFromDom(
   return { blockId, offset: charOffsetToPoint(blockEl, node, domOffset) };
 }
 
-function domPointFromBlockPoint(
+export function domPointFromBlockPoint(
   hosts: readonly HTMLElement[],
   p: BlockPoint,
 ): { node: Node; offset: number } | null {
@@ -180,53 +186,10 @@ export function applySelectionToDom(hosts: readonly HTMLElement[], selection: Se
   return true;
 }
 
-// === selection save/restore across a DOM rebuild (repagination) ===
-//
-// Repagination rebuilds the paper DOM (and re-renders tables that split across
-// pages), so raw `(node, offset)` references don't survive — restoring them
-// silently drops the caret to the top of the page. A descriptor captures the
-// selection in MODEL terms (`data-block-id` + offset + cell address), which
-// re-resolves against the rebuilt DOM by id.
-
-export interface SelectionDescriptor {
-  start: BlockPoint;
-  end: BlockPoint;
-  collapsed: boolean;
-}
-
-/** Capture the live selection as a {@link SelectionDescriptor}, or null. */
-export function captureSelectionDescriptor(
-  hosts: readonly HTMLElement[],
-): SelectionDescriptor | null {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
-  const range = sel.getRangeAt(0);
-  const start = blockPointFromDom(hosts, range.startContainer, range.startOffset);
-  if (!start) return null;
-  const end = sel.isCollapsed
-    ? start
-    : (blockPointFromDom(hosts, range.endContainer, range.endOffset) ?? start);
-  return { start, end, collapsed: sel.isCollapsed };
-}
-
-/** Restore a {@link SelectionDescriptor} to the live DOM (after a rebuild). */
-export function applySelectionDescriptor(
-  hosts: readonly HTMLElement[],
-  desc: SelectionDescriptor | null,
-): boolean {
-  if (!desc) return false;
-  const startPt = domPointFromBlockPoint(hosts, desc.start);
-  const endPt = desc.collapsed ? startPt : domPointFromBlockPoint(hosts, desc.end);
-  if (!startPt || !endPt) return false;
-  const sel = window.getSelection();
-  if (!sel) return false;
-  const range = document.createRange();
-  range.setStart(startPt.node, startPt.offset);
-  range.setEnd(endPt.node, endPt.offset);
-  sel.removeAllRanges();
-  sel.addRange(range);
-  return true;
-}
+// Selection save/restore across a DOM rebuild (repagination) is built on
+// `BlockPoint` above but is a distinct concern — it lives in the
+// non-internal `editor/selectionMap` module so `paperStack` (which drives
+// the rebuild) can own its lifecycle without reaching into editor internals.
 
 // === block length (the key utility used by the rest of the API) ===
 

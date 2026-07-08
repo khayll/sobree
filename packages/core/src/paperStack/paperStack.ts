@@ -6,10 +6,7 @@ import type {
   NumberingDefinition,
   SectionProperties,
 } from "../doc/types";
-import {
-  applySelectionDescriptor,
-  captureSelectionDescriptor,
-} from "../editor/internal/positionMap";
+import { applySelectionDescriptor, captureSelectionDescriptor } from "../editor/selectionMap";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
 import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";

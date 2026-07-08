@@ -203,6 +203,26 @@ async function checkPureZoneImports() {
   }
 }
 
+// `paperStack` is a DOM layout adapter that legitimately depends on
+// `editor/view/docRenderer` — but it must not reach into `editor/internal`
+// (the editor's private surface). Selection preservation across a
+// repagination rebuild lives in the non-internal `editor/selectionMap`
+// instead (Phase 4 of the ownership plan).
+async function checkPaperStackNoEditorInternals() {
+  for await (const file of walk(path.join(coreSrc, "paperStack"))) {
+    if (!sourceExtensions.has(path.extname(file))) continue;
+    const text = await readFile(file, "utf8");
+    for (const spec of importSpecifiers(text)) {
+      const coreRel = resolveCoreRel(file, spec);
+      if (coreRel && inZone(coreRel, ["editor/internal"])) {
+        failures.push(
+          `${rel(file)} must not import editor internals — use a non-internal editor module (e.g. editor/selectionMap): "${spec}"`,
+        );
+      }
+    }
+  }
+}
+
 async function checkMutationEnginePurity() {
   for await (const file of walk(path.join(coreSrc, "doc/mutations"))) {
     if (!sourceExtensions.has(path.extname(file)) || isTestFile(file)) continue;
@@ -298,6 +318,7 @@ await checkForbiddenLockfiles();
 await checkImports();
 await checkPureZoneImports();
 await checkMutationEnginePurity();
+await checkPaperStackNoEditorInternals();
 await checkNoGenericHelperFiles();
 await checkPluginPaperSelectors();
 await checkCrossPackageInternalImports();
