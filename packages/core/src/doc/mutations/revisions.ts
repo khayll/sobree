@@ -1,15 +1,19 @@
 /**
  * Pure run-level transforms for tracked changes. Each takes an
  * `InlineRun` (+ author / decision) and returns the rewritten run(s) —
- * no editor state, no DOM. Shared by the Editor's authoring
- * (`insertRun` / `deleteRange` / `applyRunProperties` in track-changes
- * mode) and review (`accept*` / `reject*`) paths.
+ * no editor state, no DOM. Shared by the run mutation engine's authoring
+ * side (`insertRun` / `deleteRange` / `applyRunProperties` in
+ * track-changes mode) and the review (`accept*` / `reject*`) paths that
+ * consume it through the `Editor` / `HeadlessSobree` adapters.
  *
- * All follow the same text-only contract: non-text runs (drawings,
- * breaks, tabs) pass through unchanged.
+ * Lives in the document layer (not `editor/`) because it's pure domain
+ * logic both peers share — the run engine in `./runs.ts` calls it, and
+ * `editor/ops/review.ts` re-imports the decision helpers. All follow the
+ * same text-only contract: non-text runs (drawings, breaks, tabs) pass
+ * through unchanged.
  */
 
-import type { InlineRun, RevisionMark } from "../doc/types";
+import type { InlineRun, RevisionMark } from "../types";
 
 /**
  * Resolve one run against an accept/reject decision on its tracked

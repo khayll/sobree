@@ -69,6 +69,14 @@ class HeadlessSobree {
     patch: ParagraphPropertiesPatch,
   ): EditResult<void>;
 
+  // Inline / range mutations (same engine + signatures as the browser Editor)
+  insertRun(at: InlinePosition, run: InlineRun): EditResult<BlockRef>;
+  applyRunProperties(range: Range, patch: RunPropertiesPatch, opts?): EditResult<void>;
+  wrapRange(range: Range, tag: WrapTag, opts?): EditResult<void>;
+  deleteRange(range: Range, opts?): EditResult<void>;
+  getTrackChanges(): TrackChangesState;
+  setTrackChanges(state: TrackChangesState): void;
+
   // Events + lifecycle
   // event: HeadlessEvent ("change"); returns a HeadlessUnsubscribe
   on(event: "change", cb: (p: HeadlessChangePayload) => void): HeadlessUnsubscribe;
@@ -79,6 +87,7 @@ interface HeadlessSobreeOptions {
   origin?: string;           // Default "headless"
   initialDocument?: SobreeDocument;
   idPrefix?: string;
+  trackChanges?: TrackChangesState;  // Initial track-changes mode
 }
 
 interface HeadlessChangePayload {
@@ -143,6 +152,18 @@ Each method mirrors the browser `Editor`'s equivalent:
 - **`applyBlockProperties(targets, patch)`** — merge a property
   patch into one or more paragraphs. `undefined` in the patch
   removes a field; everything else overwrites.
+- **`insertRun(at, run)` / `applyRunProperties(range, patch)` /
+  `wrapRange(range, tag)` / `deleteRange(range)`** — the inline /
+  range-based surface, addressed by character offset. Same shared
+  mutation engine (`doc/mutations`) and signatures as the browser
+  `Editor`, so an agent can insert text, format a span, or delete a
+  range without rebuilding whole blocks. `deleteRange` handles
+  cross-paragraph ranges (merging the endpoints into one block).
+- **`getTrackChanges()` / `setTrackChanges(state)`** — when enabled,
+  the inline mutations *record* revisions (`ins` / `del` / format
+  snapshots) instead of editing outright, exactly as the browser editor
+  does; pair with `@sobree/review` on the human side. Set the initial
+  mode via the `trackChanges` constructor option.
 - **`table.*`** — the same granular table surface as `editor.table`
   (`insertRow` / `deleteRow` / `insertColumn` / `deleteColumn`,
   `mergeCells` / `unmergeCell`, `setCellContent` / `setCellProperties`,
@@ -164,19 +185,18 @@ works the same as in the browser editor. See the
 
 ## What's not exposed
 
-`HeadlessSobree` covers block-level and table mutations. The richer
-**range-based** surface — inline edits addressed by character offset —
-lives on the browser `Editor` and is not mirrored here:
+`HeadlessSobree` covers block, table, and inline/range mutations. A few
+browser-only conveniences stay on the DOM `Editor`, because they depend on
+bytes, image dimensions, or a live selection an agent doesn't have:
 
-- `applyRunProperties(range, patch)` — apply run marks to a range
-- `wrapRange(range, tag)`
-- `insertRun(at, run)` / `insertImage(at, bytes, opts)`
-- `deleteRange(range)`
+- `insertImage(at, bytes, opts)` / `insertImageFromFile(file)` — image
+  insertion (dimension probing + blob migration are adapter concerns). An
+  agent that already has a `DrawingRun` can insert it via `insertRun`.
+- accept/reject of tracked changes (`acceptRevision` / `rejectRevision`
+  and friends) — the *authoring* side (recording revisions via
+  `setTrackChanges`) is mirrored; the *review* side is not yet.
 
-For these, an agent can drop down to direct Y.Doc manipulation OR
-build a new block by hand and pass it to `replaceBlock`. The MCP
-wrapper ([`@sobree/mcp`](/api/mcp/)) exposes the block-level surface
-and does not cover these range mutations either.
+The MCP wrapper ([`@sobree/mcp`](/api/mcp/)) builds on this surface.
 
 ## Examples
 
