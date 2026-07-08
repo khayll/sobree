@@ -47,6 +47,40 @@ const warnings = [];
 
 const rel = (file) => path.relative(root, file).split(path.sep).join("/");
 
+const coreSrc = path.join(root, "packages/core/src");
+const isTestFile = (file) => /\.(test|bench)\.[cm]?[jt]sx?$/.test(file);
+
+/**
+ * Every module specifier a source file imports: `from "x"`, side-effect
+ * `import "x"`, `export … from "x"`, dynamic `import("x")`, `require("x")`.
+ * Deliberately regex-based (not a real parser) so it also sees TYPE-ONLY
+ * imports — the class of boundary violation archunit's dependency graph
+ * misses, and the reason these checks exist alongside the fitness tests.
+ */
+function* importSpecifiers(text) {
+  const re =
+    /\bfrom\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']|\brequire\s*\(\s*["']([^"']+)["']/g;
+  for (const match of text.matchAll(re)) {
+    yield match[1] ?? match[2] ?? match[3] ?? match[4];
+  }
+}
+
+/**
+ * Resolve a relative import from `file` to a path relative to
+ * `packages/core/src` (posix-normalized). Returns `null` for bare/package
+ * specifiers — those are handled by the cross-package internal check.
+ */
+function resolveCoreRel(file, spec) {
+  if (!spec.startsWith(".")) return null;
+  const abs = path.resolve(path.dirname(file), spec);
+  return path.relative(coreSrc, abs).split(path.sep).join("/");
+}
+
+/** True when the core-relative path is inside one of `dirs` (a top zone). */
+function inZone(coreRel, dirs) {
+  return dirs.some((dir) => coreRel === dir || coreRel.startsWith(`${dir}/`));
+}
+
 function isIgnored(file) {
   return ignoredPathParts.some((part) => file.includes(part));
 }
@@ -126,13 +160,95 @@ async function checkImports() {
     }
   }
 
-  const coreSrc = path.join(root, "packages/core/src");
   for await (const file of walk(coreSrc)) {
     if (!sourceExtensions.has(path.extname(file))) continue;
     const text = await readFile(file, "utf8");
     for (const framework of forbiddenFrameworks) {
       if (importRegex(framework).test(text)) {
         failures.push(`${rel(file)} must not import forbidden framework ${framework}`);
+      }
+    }
+  }
+}
+
+// Pure document/model zones that must not depend UPWARD on the browser
+// editor, embedder shell, or in-place zone editor. Catches type-only
+// imports too (archunit doesn't). `paperStack` is deliberately absent
+// here — a few pure modules still consume `paperStack/pageSetup` page
+// geometry, which is a separate ownership question (see the plan). The
+// stricter mutation-engine rule below DOES forbid paperStack/ydoc.
+const pureZoneDirs = ["doc", "ydoc", "pagination", "docx"];
+const forbiddenForPureZones = ["editor", "embed", "zoneEdit"];
+
+// The pure mutation engine is the shared owner of user-visible document
+// mutations. It must stay free of DOM / editor / Y.Doc / renderer /
+// paperStack imports so both the browser Editor and HeadlessSobree can
+// call it — see AGENTS.md "HeadlessSobree (Tier 2)".
+const mutationEngineForbidden = ["editor", "embed", "zoneEdit", "paperStack", "ydoc"];
+
+async function checkPureZoneImports() {
+  for (const zone of pureZoneDirs) {
+    for await (const file of walk(path.join(coreSrc, zone))) {
+      if (!sourceExtensions.has(path.extname(file)) || isTestFile(file)) continue;
+      const text = await readFile(file, "utf8");
+      for (const spec of importSpecifiers(text)) {
+        const coreRel = resolveCoreRel(file, spec);
+        if (coreRel && inZone(coreRel, forbiddenForPureZones)) {
+          failures.push(
+            `${rel(file)} (pure ${zone}/ zone) must not import editor/embed/zoneEdit: "${spec}"`,
+          );
+        }
+      }
+    }
+  }
+}
+
+async function checkMutationEnginePurity() {
+  for await (const file of walk(path.join(coreSrc, "doc/mutations"))) {
+    if (!sourceExtensions.has(path.extname(file)) || isTestFile(file)) continue;
+    const text = await readFile(file, "utf8");
+    for (const spec of importSpecifiers(text)) {
+      const coreRel = resolveCoreRel(file, spec);
+      if (coreRel && inZone(coreRel, mutationEngineForbidden)) {
+        failures.push(
+          `${rel(file)} (pure mutation engine) must not import editor/embed/zoneEdit/paperStack/ydoc: "${spec}"`,
+        );
+      }
+    }
+  }
+}
+
+// Every source file allowed to be named exactly `utils.*` / `helpers.*`.
+// Empty by design: AGENTS.md forbids erasing ownership into a generic
+// helper module. Add an exact path here only with a named domain reason.
+const genericHelperAllowlist = new Set([]);
+const genericHelperNames = /^(utils|helpers)\.[cm]?[jt]sx?$/;
+
+async function checkNoGenericHelperFiles() {
+  const roots = ["packages", "apps", "tools"];
+  for (const dirName of roots) {
+    for await (const file of walk(path.join(root, dirName))) {
+      if (!genericHelperNames.test(path.basename(file))) continue;
+      if (genericHelperAllowlist.has(rel(file))) continue;
+      failures.push(
+        `${rel(file)} is a generic helper file — give the module a name that states the domain concept it owns (AGENTS.md)`,
+      );
+    }
+  }
+}
+
+// A package deep-importing another package's `internal` folder bypasses
+// its public surface. Cross-package imports go through the `@sobree/*`
+// specifier, so an internal reach looks like `@sobree/pkg/…/internal…`.
+const crossPackageInternalRe = /^@sobree\/[^/]+\/[^"']*internal/;
+
+async function checkCrossPackageInternalImports() {
+  for await (const file of walk(path.join(root, "packages"))) {
+    if (!sourceExtensions.has(path.extname(file))) continue;
+    const text = await readFile(file, "utf8");
+    for (const spec of importSpecifiers(text)) {
+      if (crossPackageInternalRe.test(spec)) {
+        failures.push(`${rel(file)} deep-imports another package's internal surface: "${spec}"`);
       }
     }
   }
@@ -151,6 +267,10 @@ async function reportLongFiles() {
 await checkCorePackageDeps();
 await checkForbiddenLockfiles();
 await checkImports();
+await checkPureZoneImports();
+await checkMutationEnginePurity();
+await checkNoGenericHelperFiles();
+await checkCrossPackageInternalImports();
 await reportLongFiles();
 
 if (warnings.length) {
