@@ -1,5 +1,5 @@
-import type { Orientation, PageSizeKey, PageSizeMM } from "../../paperStack/pageSetup";
-import { PAGE_SIZES } from "../../paperStack/pageSetup";
+import type { Orientation, PageSizeKey, PageSizeMM } from "../../doc/pageSetup";
+import { PAGE_SIZES } from "../../doc/pageSetup";
 import { mmToTwips, twipsToMm } from "./units";
 
 export interface PageGeometry {

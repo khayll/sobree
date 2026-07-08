@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, text } from "../doc/builders";
+import { DEFAULT_PAGE_SETUP, type PageSetup } from "../doc/pageSetup";
 import { pageSetupToSection, sectionToPageSetup } from "../doc/pageSetupBridge";
-import { DEFAULT_PAGE_SETUP, type PageSetup } from "../paperStack/pageSetup";
 import { exportDocx } from "./export/index";
 import { importDocx } from "./import/index";
 

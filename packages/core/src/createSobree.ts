@@ -15,12 +15,12 @@
  * attach to — no separate wire-adapter plugin needed.
  */
 
+import type { PageSetup } from "./doc/pageSetup";
 import type { SobreeDocument } from "./doc/types";
 import { exportDocx } from "./docx/export/index";
 import type { CommandBus, Editor } from "./editor";
 import { Viewport } from "./embed/viewport";
 import { parseMarkdown } from "./markdown/parse";
-import type { PageSetup } from "./paperStack/pageSetup";
 import type { PluginContext, SobreePlugin, SobreePluginInstance } from "./plugin";
 import { Sobree } from "./sobree";
 import type { SobreeEvent, SobreeEventPayload, SobreeOptions, SobreeUnsubscribe } from "./sobree";

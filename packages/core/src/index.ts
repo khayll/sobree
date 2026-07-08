@@ -140,7 +140,7 @@ export type {
   PaperZoneMatch,
   RenderedPaper,
 } from "./paperStack/paperLayout";
-export { PAGE_SIZES, DEFAULT_PAGE_SETUP } from "./paperStack/pageSetup";
+export { PAGE_SIZES, DEFAULT_PAGE_SETUP } from "./doc/pageSetup";
 export type {
   PageSetup,
   PageSizeKey,
@@ -148,7 +148,7 @@ export type {
   VerticalAlign,
   Orientation,
   Margins,
-} from "./paperStack/pageSetup";
+} from "./doc/pageSetup";
 
 // === viewport ===
 export { Viewport } from "./embed/viewport";

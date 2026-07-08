@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { defaultSection } from "../doc/builders/document";
+import { DEFAULT_PAGE_SETUP } from "../doc/pageSetup";
 import type { AnchoredFrame } from "../doc/types";
-import { DEFAULT_PAGE_SETUP } from "./pageSetup";
 import {
   type AnchorRenderDeps,
   PaperStack,

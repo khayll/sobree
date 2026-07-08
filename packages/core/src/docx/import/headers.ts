@@ -1,11 +1,11 @@
 import { fieldType } from "../../doc/fields";
+import type { PageZoneText } from "../../doc/pageSetup";
 import type {
   HeaderFooterRef,
   SectionColumn,
   SectionColumns,
   SectionProperties,
 } from "../../doc/types";
-import type { PageZoneText } from "../../paperStack/pageSetup";
 import { NS } from "../shared/namespaces";
 import { parseXml, wAll, wChildren, wFirst, wVal } from "../shared/xml";
 import { parseRels } from "./rels";

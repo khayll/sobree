@@ -1,3 +1,4 @@
+import { type PageSetup, type VerticalAlign, resolvedDimensions } from "../doc/pageSetup";
 import type { AnchoredFrame, SectionProperties } from "../doc/types";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import {
@@ -5,7 +6,6 @@ import {
   resolveAnchorSize,
 } from "../editor/view/docRenderer/anchorPosition";
 import { EMU_PER_PX } from "../editor/view/docRenderer/units";
-import { type PageSetup, type VerticalAlign, resolvedDimensions } from "./pageSetup";
 import {
   CLS_PAPER,
   CLS_PAPER_COMMENTS,

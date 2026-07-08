@@ -1,5 +1,5 @@
 import "./zoneEdit.css";
-import type { PageSetup } from "../paperStack/pageSetup";
+import type { PageSetup } from "../doc/pageSetup";
 
 export type ZoneKind = "header" | "footer";
 

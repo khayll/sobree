@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_PAGE_SETUP } from "../doc/pageSetup";
 import type { SectionProperties } from "../doc/types";
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
-import { DEFAULT_PAGE_SETUP } from "./pageSetup";
 import { Paper } from "./paper";
 
 function makePaper(): Paper {
