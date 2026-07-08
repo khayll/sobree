@@ -44,6 +44,24 @@ describe("readShading", () => {
     expect(readShading(parentWith('w:fill="auto"'))).toBeUndefined();
   });
 
+  it("keeps a compositing pattern over an auto fill (the pctN grey divider)", () => {
+    // `pct40 auto auto` paints a ~40% grey — NOT nothing. Keep it, with the
+    // auto foreground preserved so the render-time composite is reproducible.
+    expect(readShading(parentWith('w:val="pct40" w:color="auto" w:fill="auto"'))).toEqual({
+      pattern: "pct40",
+      fill: "auto",
+      color: "auto",
+    });
+  });
+
+  it("keeps solid over an auto fill without forcing a foreground", () => {
+    // `solid` shows the fill; it does not composite a foreground.
+    expect(readShading(parentWith('w:val="solid" w:fill="auto"'))).toEqual({
+      pattern: "solid",
+      fill: "auto",
+    });
+  });
+
   it("omits color when color is auto", () => {
     const shd = readShading(parentWith('w:fill="FF0000" w:color="auto"'));
     expect(shd).toEqual({ pattern: "clear", fill: "#FF0000" });

@@ -15,6 +15,7 @@
 import { mergeTabStops, resolveRunStyle, resolveStyleCascade } from "../../../doc/styles";
 import type { InlineRun, NamedStyle, ParagraphProperties, RunProperties } from "../../../doc/types";
 import { resolveFontFace } from "./fontFallback";
+import { resolveShadingColor } from "./shadingColor";
 import { twipsToMm } from "./units";
 
 /**
@@ -262,10 +263,9 @@ export function applyParagraphProps(
         `${px}px ${mapBorderStyle(b.style)} ${mapBorderColor(b.color)}`;
     }
   }
-  // <w:shd w:fill="…"/> on the paragraph — paragraph background colour.
-  if (effective.shading?.fill && effective.shading.fill !== "#auto") {
-    el.style.backgroundColor = effective.shading.fill;
-  }
+  // <w:shd> on the paragraph — background colour, pattern composited.
+  const shadingBg = resolveShadingColor(effective.shading);
+  if (shadingBg) el.style.backgroundColor = shadingBg;
   if (effective.pageBreakBefore) {
     el.setAttribute("data-page-break-before", "");
   }

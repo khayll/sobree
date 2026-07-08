@@ -17,6 +17,7 @@ import {
   REVISION_FORMAT_DATE_ATTR,
 } from "../../renderedDocument/selectors";
 import { resolveFontFace } from "./fontFallback";
+import { resolveShadingColor } from "./shadingColor";
 
 /**
  * Render a list of InlineRuns into DOM children of `parent`. Empty run
@@ -432,12 +433,11 @@ function cssFromRunProps(p: RunProperties): string | null {
   // overrides any inherited colour back to the document text colour.
   if (p.color) decls.push(`color:${p.color === "auto" ? "currentColor" : p.color}`);
   if (p.highlight) decls.push(`background:${normaliseHighlight(p.highlight)}`);
-  // `<w:shd w:fill>` on the run — a background fill distinct from
-  // `<w:highlight>` (highlight is a fixed palette; shd is any colour).
+  // `<w:shd>` on the run — a background distinct from `<w:highlight>`
+  // (highlight is a fixed palette; shd is any colour, pattern composited).
   // A real fill wins over highlight when both are present.
-  if (p.shading?.fill && p.shading.fill !== "auto" && p.shading.fill !== "#auto") {
-    decls.push(`background:${p.shading.fill}`);
-  }
+  const runShadingBg = resolveShadingColor(p.shading);
+  if (runShadingBg) decls.push(`background:${runShadingBg}`);
   if (p.fontFamily) {
     const face = resolveFontFace(p.fontFamily);
     decls.push(`font-family:${face.stack}`);
