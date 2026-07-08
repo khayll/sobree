@@ -39,6 +39,7 @@ export function blockTools(opts: BlockToolsPluginOptions = {}): SobreePlugin {
       const tools = new BlockTools({
         stackRoot: sobree.stackRoot,
         editor,
+        paperLayout: sobree.paperLayout,
         renderingArea: host,
         viewport,
         getSetup: () => sobree.getPageSetup(),

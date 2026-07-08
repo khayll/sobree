@@ -4,6 +4,7 @@ import { exportDocx } from "./docx/export/index";
 import { importDocx } from "./docx/import/index";
 import { Editor, type OutlineItem, type TrackChangesState } from "./editor";
 import { DEFAULT_PAGE_SETUP, type PageSetup } from "./paperStack/pageSetup";
+import { PaperLayout, type PaperLayoutIndex } from "./paperStack/paperLayout";
 import { type AnchorRenderDeps, PaperStack } from "./paperStack/paperStack";
 import { attachSections } from "./plugins/sections";
 import { mountVersionBadge } from "./versionBadge";
@@ -95,6 +96,12 @@ export interface SobreeOptions {
  */
 export class Sobree {
   readonly editor: Editor;
+  /**
+   * Typed page-layout lookup for plugins — page cards, the page a given
+   * element sits on, header/footer zone detection. Plugins call this
+   * instead of hardcoding `.paper*` selectors. See `paperStack/paperLayout`.
+   */
+  readonly paperLayout: PaperLayoutIndex;
   private readonly stack: PaperStack;
   private setup: PageSetup;
   private mode: SobreeMode = "edit";
@@ -130,6 +137,7 @@ export class Sobree {
   constructor(container: HTMLElement, options: SobreeOptions = {}) {
     this.setup = options.pageSetup ?? deriveSetupFromDocument(options.initialDocument);
     this.stack = new PaperStack(container, this.setup);
+    this.paperLayout = new PaperLayout(() => this.stack.root);
     const editorOpts: ConstructorParameters<typeof Editor>[1] = {
       contentHosts: () => this.stack.contentHosts,
     };
