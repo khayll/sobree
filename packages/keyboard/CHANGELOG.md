@@ -1,5 +1,14 @@
 # @sobree/keyboard
 
+## 0.1.66
+
+### Patch Changes
+
+- 2d0e43a: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [2d0e43a]
+  - @sobree/core@0.1.66
+
 ## 0.1.65
 
 ### Patch Changes
