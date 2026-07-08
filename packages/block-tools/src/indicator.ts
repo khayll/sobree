@@ -1,4 +1,4 @@
-import type { Editor } from "@sobree/core";
+import type { Editor, PaperLayoutIndex } from "@sobree/core";
 import {
   BLOCK_KINDS,
   type BlockTarget,
@@ -12,6 +12,8 @@ export interface IndicatorOptions {
   /** Editor instance — used for the `selection` event subscription so
    *  the indicator doesn't have to listen to the global document event. */
   editor: Editor;
+  /** Typed page-layout lookup — resolves the page card a block sits on. */
+  paperLayout: PaperLayoutIndex;
   /** Fires when the user clicks the indicator (Esc also triggers this). */
   onActivate: (target: BlockTarget) => void;
 }
@@ -27,6 +29,7 @@ export interface IndicatorOptions {
 export class BlockIndicator {
   private readonly stackRoot: HTMLElement;
   private readonly editor: Editor;
+  private readonly paperLayout: PaperLayoutIndex;
   private readonly onActivate: (target: BlockTarget) => void;
   private readonly root: HTMLButtonElement;
   private current: BlockTarget | null = null;
@@ -40,6 +43,7 @@ export class BlockIndicator {
   constructor(opts: IndicatorOptions) {
     this.stackRoot = opts.stackRoot;
     this.editor = opts.editor;
+    this.paperLayout = opts.paperLayout;
     this.onActivate = opts.onActivate;
 
     this.root = document.createElement("button");
@@ -109,7 +113,7 @@ export class BlockIndicator {
     if (this.current.blockId && !document.contains(this.current.element)) {
       const fresh = this.editor.renderedDocument.elementForBlockId(this.current.blockId);
       if (fresh) {
-        const paper = fresh.closest(".paper") as HTMLElement | null;
+        const paper = this.paperLayout.nearestPaper(fresh);
         if (paper) this.current = { ...this.current, element: fresh, paper };
       } else {
         // Block was deleted — hide.
@@ -127,7 +131,7 @@ export class BlockIndicator {
     if (!this.enabled) return;
     const target = e.target as HTMLElement;
     if (this.root.contains(target)) return;
-    const block = blockTargetFrom(target, this.stackRoot, this.editor.renderedDocument);
+    const block = blockTargetFrom(target, this.paperLayout, this.editor.renderedDocument);
     if (block) this.setTarget(block);
   }
 
@@ -138,7 +142,7 @@ export class BlockIndicator {
     const anchor = sel.anchorNode;
     if (!anchor) return;
     if (!this.stackRoot.contains(anchor)) return;
-    const block = blockTargetFromNode(anchor, this.stackRoot, this.editor.renderedDocument);
+    const block = blockTargetFromNode(anchor, this.paperLayout, this.editor.renderedDocument);
     if (block) this.setTarget(block);
   }
 

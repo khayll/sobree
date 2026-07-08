@@ -237,6 +237,35 @@ async function checkNoGenericHelperFiles() {
   }
 }
 
+// Plugins must not hardcode the paper-stack layout protocol — the
+// `.paper` / `.paper-row` / `.paper-comments` / `.paper-header` /
+// `.paper-footer` page-DOM class names. They go through the typed
+// `sobree.paperLayout` bridge (AGENTS.md: "Plugins hardcoding rendered
+// DOM protocol selectors" is a fail). Matches those exact class tokens
+// inside a quoted string (selector args); the negative lookahead keeps
+// sibling classes like `.paper-content` out of scope. Backtick-quoted
+// prose in comments (`` `.paper` ``) is not a string literal, so it's
+// naturally excluded.
+const paperSelectorRe = /["']\.paper(-row|-comments|-header|-footer)?(?![\w-])/;
+
+async function checkPluginPaperSelectors() {
+  for (const { dir } of siblingPlugins.map((name) => ({
+    dir: path.join(root, "packages", name.replace("@sobree/", ""), "src"),
+  }))) {
+    for await (const file of walk(dir)) {
+      if (!sourceExtensions.has(path.extname(file))) continue;
+      const text = await readFile(file, "utf8");
+      for (const line of text.split("\n")) {
+        if (paperSelectorRe.test(line)) {
+          failures.push(
+            `${rel(file)} hardcodes a paper-stack layout selector — use the typed \`sobree.paperLayout\` bridge: ${line.trim().slice(0, 80)}`,
+          );
+        }
+      }
+    }
+  }
+}
+
 // A package deep-importing another package's `internal` folder bypasses
 // its public surface. Cross-package imports go through the `@sobree/*`
 // specifier, so an internal reach looks like `@sobree/pkg/…/internal…`.
@@ -270,6 +299,7 @@ await checkImports();
 await checkPureZoneImports();
 await checkMutationEnginePurity();
 await checkNoGenericHelperFiles();
+await checkPluginPaperSelectors();
 await checkCrossPackageInternalImports();
 await reportLongFiles();
 

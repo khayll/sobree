@@ -5,7 +5,7 @@
  * state colour.
  */
 
-import type { RenderedDocumentIndex } from "@sobree/core";
+import type { PaperLayoutIndex, RenderedDocumentIndex } from "@sobree/core";
 
 export type BlockKind =
   | "paragraph"
@@ -61,7 +61,7 @@ export interface BlockTarget {
   kind: BlockKind;
   /** DOM element representing the block — used for positioning. */
   element: HTMLElement;
-  /** Enclosing `.paper` element. */
+  /** Enclosing page-card element (from `sobree.paperLayout`). */
   paper: HTMLElement;
   /**
    * Stable block id (registry) if available — resolved via
@@ -79,21 +79,19 @@ export interface BlockTarget {
  */
 export function blockTargetFrom(
   node: Node,
-  stackRoot: HTMLElement,
+  paperLayout: PaperLayoutIndex,
   rendered: RenderedDocumentIndex,
 ): BlockTarget | null {
-  if (!stackRoot.contains(node)) return null;
   const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
   if (!el) return null;
 
-  const paper = el.closest(".paper") as HTMLElement | null;
+  // `nearestPaper` returns null when the node is outside the paper stack,
+  // which subsumes the old stack-containment guard.
+  const paper = paperLayout.nearestPaper(el);
   if (!paper) return null;
 
-  const header = el.closest(".paper-header") as HTMLElement | null;
-  if (header && paper.contains(header)) return { kind: "header", element: header, paper };
-
-  const footer = el.closest(".paper-footer") as HTMLElement | null;
-  if (footer && paper.contains(footer)) return { kind: "footer", element: footer, paper };
+  const zone = paperLayout.nearestZone(el);
+  if (zone) return { kind: zone.zone, element: zone.element, paper };
 
   const image = el.closest("img") as HTMLElement | null;
   if (image && paper.contains(image)) {
@@ -143,9 +141,9 @@ function withBlockId(rendered: RenderedDocumentIndex, t: BlockTarget): BlockTarg
 /** Same lookup by arbitrary `Node` (handles TEXT_NODE). */
 export function blockTargetFromNode(
   node: Node | null,
-  stackRoot: HTMLElement,
+  paperLayout: PaperLayoutIndex,
   rendered: RenderedDocumentIndex,
 ): BlockTarget | null {
   if (!node) return null;
-  return blockTargetFrom(node, stackRoot, rendered);
+  return blockTargetFrom(node, paperLayout, rendered);
 }

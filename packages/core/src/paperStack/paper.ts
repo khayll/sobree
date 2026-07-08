@@ -6,6 +6,13 @@ import {
 } from "../editor/view/docRenderer/anchorPosition";
 import { EMU_PER_PX } from "../editor/view/docRenderer/units";
 import { type PageSetup, type VerticalAlign, resolvedDimensions } from "./pageSetup";
+import {
+  CLS_PAPER,
+  CLS_PAPER_COMMENTS,
+  CLS_PAPER_FOOTER,
+  CLS_PAPER_HEADER,
+  CLS_PAPER_ROW,
+} from "./paperClasses";
 import { type ZoneRenderContext, paintZoneFrames, renderZone, setZoneText } from "./paperZone";
 
 export type { ZoneRenderContext } from "./paperZone";
@@ -78,13 +85,13 @@ export class Paper {
 
   constructor(container: HTMLElement, setup: PageSetup) {
     this.outer = document.createElement("div");
-    this.outer.className = "paper-row";
+    this.outer.className = CLS_PAPER_ROW;
 
     this.root = document.createElement("div");
-    this.root.className = "paper";
+    this.root.className = CLS_PAPER;
 
     this.header = document.createElement("div");
-    this.header.className = "paper-header sobree-flow";
+    this.header.className = `${CLS_PAPER_HEADER} sobree-flow`;
     this.header.contentEditable = "false";
 
     this.content = document.createElement("div");
@@ -115,7 +122,7 @@ export class Paper {
     this.footnotes.contentEditable = "false";
 
     this.footer = document.createElement("div");
-    this.footer.className = "paper-footer sobree-flow";
+    this.footer.className = `${CLS_PAPER_FOOTER} sobree-flow`;
     this.footer.contentEditable = "false";
 
     this.headerAnchors = document.createElement("div");
@@ -143,7 +150,7 @@ export class Paper {
     );
 
     this.comments = document.createElement("div");
-    this.comments.className = "paper-comments is-empty";
+    this.comments.className = `${CLS_PAPER_COMMENTS} is-empty`;
     this.comments.contentEditable = "false";
 
     this.outer.append(this.root, this.comments);

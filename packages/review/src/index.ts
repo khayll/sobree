@@ -28,6 +28,7 @@ import type {
   Editor,
   FloatingCornerPlacement,
   InlineRun,
+  PaperLayoutIndex,
   PluginContext,
   RenderedDocumentIndex,
   SobreePlugin,
@@ -79,6 +80,7 @@ const CARD_GAP = 8;
 class ReviewController {
   private readonly editor: Editor;
   private readonly stackRoot: HTMLElement;
+  private readonly paperLayout: PaperLayoutIndex;
   private readonly showComments: boolean;
   private readonly unsubs: SobreeUnsubscribe[] = [];
   private readonly revisionActions: RevisionActions;
@@ -90,6 +92,7 @@ class ReviewController {
   constructor(ctx: PluginContext, opts: ReviewOptions) {
     this.editor = ctx.editor;
     this.stackRoot = ctx.sobree.stackRoot;
+    this.paperLayout = ctx.sobree.paperLayout;
     this.showComments = opts.showComments ?? true;
     // Hover-popover accept/reject for tracked-change marks. It fetches
     // `editor.getRevisions()` live on each hover, so the range it
@@ -156,7 +159,7 @@ class ReviewController {
     colourMarks(this.editor.renderedDocument);
     if (this.showComments) {
       const comments = this.editor.getDocument().comments ?? {};
-      renderComments(this.stackRoot, comments, this.editor);
+      renderComments(this.paperLayout, comments, this.editor);
     }
     // Dock reads `editor.getRevisions()` itself; refresh paints the
     // count + author summary and auto-shows/hides based on the result.
@@ -185,11 +188,9 @@ class ReviewController {
           break;
       }
     }
-    for (const slot of Array.from(
-      this.stackRoot.querySelectorAll<HTMLElement>(".paper-comments"),
-    )) {
-      slot.replaceChildren();
-      slot.classList.add("is-empty");
+    for (const { commentSlot } of this.paperLayout.papers()) {
+      commentSlot.replaceChildren();
+      commentSlot.classList.add("is-empty");
     }
   }
 }
@@ -228,11 +229,12 @@ function colourMarks(rendered: RenderedDocumentIndex): void {
 
 /**
  * Build the post-it comment cards for every paper and place them in
- * the per-paper `.paper-comments` sidebar slot, vertically aligned to
- * the comment ranges they annotate.
+ * the per-paper comment gutter slot, vertically aligned to the comment
+ * ranges they annotate. The pages + their mount slots come from the
+ * typed `paperLayout` bridge, not hardcoded `.paper*` selectors.
  */
 function renderComments(
-  root: HTMLElement,
+  paperLayout: PaperLayoutIndex,
   comments: Record<number, Comment>,
   editor: Editor,
 ): void {
@@ -249,17 +251,12 @@ function renderComments(
   }
   for (const list of repliesByParent.values()) list.sort((a, b) => a.id - b.id);
 
-  for (const row of Array.from(root.querySelectorAll<HTMLElement>(".paper-row"))) {
-    const paper = row.querySelector<HTMLElement>(".paper");
-    const slot = row.querySelector<HTMLElement>(".paper-comments");
-    if (!paper || !slot) continue;
+  for (const { root: paper, commentSlot: slot } of paperLayout.papers()) {
     slot.replaceChildren();
 
     // Collect (commentId, anchorTopPx) for top-level comments whose
     // range starts on this paper, in document order. The comment-range
-    // elements + their ids come from the typed lookup (no selector here);
-    // the `.paper-comments` slot navigation above is review's own card
-    // layout, not a document concept.
+    // elements + their ids come from the typed rendered-document lookup.
     const placements: { id: number; top: number }[] = [];
     const seen = new Set<number>();
     for (const anchor of editor.renderedDocument.commentRanges(paper)) {

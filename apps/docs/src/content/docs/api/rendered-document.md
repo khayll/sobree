@@ -102,9 +102,57 @@ interface RenderedDocumentIndex
 The concrete implementation is exported as the `RenderedDocument` class
 for headless tests; embedders normally just use `editor.renderedDocument`.
 
+## Page layout — `sobree.paperLayout`
+
+`editor.renderedDocument` answers *content* questions ("what document
+concept is this element?"). Its sibling `sobree.paperLayout` answers
+*page-layout* questions about the paper stack — the page cards, gutters,
+and header/footer zones the paginator builds. Plugins that position UI
+(the `@sobree/block-tools` indicator/toolbar) or mount per-page chrome
+(the `@sobree/review` comment gutter) use it instead of hardcoding the
+`.paper*` page-DOM class names.
+
+It lives on the `Sobree` façade (the paper stack is a Sobree concern, not
+an Editor one), so reach it via the handle:
+
+```ts
+const layout = handle.sobree.paperLayout; // a PaperLayoutIndex
+```
+
+```ts
+type PaperZone = "header" | "footer";
+
+interface RenderedPaper {
+  root: HTMLElement;        // the .paper page card (geometry / positioning anchor)
+  commentSlot: HTMLElement; // per-page right-margin gutter — a plugin mount slot
+}
+
+interface PaperZoneMatch {
+  zone: PaperZone;
+  element: HTMLElement; // the .paper-header / .paper-footer container
+}
+
+interface PaperLayoutIndex {
+  papers(): RenderedPaper[];
+  nearestPaper(target: Element): HTMLElement | null;
+  nearestZone(target: Element): PaperZoneMatch | null;
+}
+```
+
+`papers()` enumerates every rendered page top-to-bottom; each carries its
+page card and its `commentSlot` — the one sanctioned writable surface,
+where a plugin appends per-page UI. `nearestPaper(target)` returns the
+page card an element sits on (or `null` outside the stack).
+`nearestZone(target)` reports whether an element is in a running header or
+footer (`null` for body flow) — how `block-tools` distinguishes a
+header/footer edit from a body edit.
+
+The concrete implementation is exported as the `PaperLayout` class for
+tests; embedders use `sobree.paperLayout`.
+
 ## Scope
 
-This surface answers *"what document concept is this element?"* and
-nothing more. It performs no toolbar positioning, no accept/reject
-logic, no renderer mutation, and no document writes — those stay in the
-plugins and the editor's edit API.
+These surfaces answer *"what document concept is this element?"* and
+*"where does it sit on the page?"* — nothing more. They perform no
+toolbar positioning, no accept/reject logic, no renderer mutation, and no
+document writes — those stay in the plugins and the editor's edit API.

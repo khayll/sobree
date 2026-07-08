@@ -36,7 +36,7 @@ describe("block-tools block lookup via renderedDocument", () => {
     // the block, carrying the renderer-stamped id — without block-tools
     // ever naming the selector.
     const target = blockEl!.firstChild ?? blockEl!;
-    const result = blockTargetFrom(target, h.sobree.stackRoot, h.editor.renderedDocument);
+    const result = blockTargetFrom(target, h.sobree.paperLayout, h.editor.renderedDocument);
     expect(result?.kind).toBe("paragraph");
     expect(result?.blockId).toBe(h.editor.getBlock(1).id);
   });

@@ -131,6 +131,15 @@ export type { Selection, BlockRef, InlinePosition, Range } from "./doc/api";
 // === paper stack + page setup model ===
 export { PaperStack } from "./paperStack/paperStack";
 export { Paper } from "./paperStack/paper";
+// Paper-layout lookup surface (`sobree.paperLayout`) — the typed bridge
+// plugins use instead of hardcoding `.paper*` page-stack selectors.
+export { PaperLayout } from "./paperStack/paperLayout";
+export type {
+  PaperLayoutIndex,
+  PaperZone,
+  PaperZoneMatch,
+  RenderedPaper,
+} from "./paperStack/paperLayout";
 export { PAGE_SIZES, DEFAULT_PAGE_SETUP } from "./paperStack/pageSetup";
 export type {
   PageSetup,

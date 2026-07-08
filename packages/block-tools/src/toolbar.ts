@@ -1,4 +1,4 @@
-import type { Editor, Viewport } from "@sobree/core";
+import type { Editor, PaperLayoutIndex, Viewport } from "@sobree/core";
 import type { BlockTarget } from "./blockKinds";
 
 export interface FloatingToolbarOptions {
@@ -7,6 +7,9 @@ export interface FloatingToolbarOptions {
    * a commit replaces the body DOM.
    */
   editor: Editor;
+  /** Typed page-layout lookup — resolves the page card of a re-resolved
+   *  target after the body DOM is rebuilt. */
+  paperLayout: PaperLayoutIndex;
   /**
    * Rendering area — the element inside which the toolbar must fit.
    * Typically the demo viewport (`.demo-viewport`). Used for Case-A
@@ -34,6 +37,7 @@ export interface FloatingToolbarOptions {
 export class FloatingToolbar {
   readonly root: HTMLElement;
   private readonly editor: Editor;
+  private readonly paperLayout: PaperLayoutIndex;
   private readonly renderingArea: HTMLElement;
   private readonly viewport: Viewport | null;
   private target: BlockTarget | null = null;
@@ -41,6 +45,7 @@ export class FloatingToolbar {
 
   constructor(opts: FloatingToolbarOptions) {
     this.editor = opts.editor;
+    this.paperLayout = opts.paperLayout;
     this.renderingArea = opts.renderingArea;
     this.viewport = opts.viewport ?? null;
 
@@ -140,7 +145,7 @@ export class FloatingToolbar {
     if (this.target.blockId && !document.contains(this.target.element)) {
       const fresh = this.editor.renderedDocument.elementForBlockId(this.target.blockId);
       if (fresh) {
-        const paper = fresh.closest(".paper") as HTMLElement | null;
+        const paper = this.paperLayout.nearestPaper(fresh);
         if (paper) this.target = { ...this.target, element: fresh, paper };
       } else {
         // Block was deleted — nothing to anchor to.

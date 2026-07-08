@@ -3,6 +3,7 @@ import type { BlockRef } from "@sobree/core";
 import { enterZoneEdit } from "@sobree/core";
 import type { PageSetup } from "@sobree/core";
 import type { Editor } from "@sobree/core";
+import type { PaperLayoutIndex } from "@sobree/core";
 import type { Viewport } from "@sobree/core";
 import type { BlockTarget } from "./blockKinds";
 import { BlockIndicator } from "./indicator";
@@ -27,6 +28,8 @@ import { buildTextToolsHtml, wireTextTools } from "./tools/text";
 export interface BlockToolsOptions {
   stackRoot: HTMLElement;
   editor: Editor;
+  /** Typed page-layout lookup — for resolving the page card of a block. */
+  paperLayout: PaperLayoutIndex;
   /** The scrollable area containing the stack (for toolbar positioning). */
   renderingArea: HTMLElement;
   /** Viewport handle — used for animated pans when the toolbar needs room. */
@@ -54,6 +57,7 @@ export interface BlockToolsOptions {
 export class BlockTools {
   private readonly stackRoot: HTMLElement;
   private readonly editor: Editor;
+  private readonly paperLayout: PaperLayoutIndex;
   private readonly getSetup: () => PageSetup;
   private readonly setSetup: (s: PageSetup) => void;
   private readonly getSectionCount: () => number;
@@ -76,6 +80,7 @@ export class BlockTools {
   constructor(opts: BlockToolsOptions) {
     this.stackRoot = opts.stackRoot;
     this.editor = opts.editor;
+    this.paperLayout = opts.paperLayout;
     this.getSetup = opts.getSetup;
     this.setSetup = opts.setSetup;
     // Section APIs default to a single-section view backed by getSetup /
@@ -92,6 +97,7 @@ export class BlockTools {
 
     this.toolbar = new FloatingToolbar({
       editor: this.editor,
+      paperLayout: this.paperLayout,
       renderingArea: opts.renderingArea,
       viewport: opts.viewport ?? null,
     });
@@ -99,6 +105,7 @@ export class BlockTools {
     this.indicator = new BlockIndicator({
       stackRoot: this.stackRoot,
       editor: this.editor,
+      paperLayout: this.paperLayout,
       onActivate: (target) => this.handleActivate(target),
     });
 
