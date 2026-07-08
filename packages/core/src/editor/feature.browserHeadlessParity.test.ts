@@ -23,6 +23,7 @@ import {
   paragraph,
   text,
 } from "../doc/builders";
+import type { RevisionSpan } from "../doc/mutations";
 import type { SectionBreak, SobreeDocument } from "../doc/types";
 import { HeadlessSobree } from "../headless";
 import { projectYDoc } from "../ydoc";
@@ -95,6 +96,14 @@ function singleParaDoc(): SobreeDocument {
   const d = emptyDocument();
   d.body = [];
   appendBlock(d, paragraph([text("only")]));
+  return d;
+}
+
+function commentDoc(): SobreeDocument {
+  const d = emptyDocument();
+  d.body = [];
+  appendBlock(d, paragraph([text("hello")]));
+  d.comments = { 1: { id: 1, author: "Ada", body: [paragraph([text("note")])], done: false } };
   return d;
 }
 
@@ -339,5 +348,75 @@ describe("inline / range parity", () => {
     p.headless.deleteRange(mkRange(p.headless.getBlock(0), 0, 4));
     expectParity(p);
     expect(firstBlockHasRevision(p.headless.getDocument(), "del")).toBe(true);
+  });
+});
+
+// === tracked-change review (consumption) + comments ===
+
+describe("review + comment parity", () => {
+  /** Span shape without the per-peer block id (ids live in the registry). */
+  const normSpan = (s: RevisionSpan) => ({
+    from: s.range.from.offset,
+    to: s.range.to.offset,
+    kinds: s.kinds,
+    level: s.level,
+    author: s.author,
+  });
+
+  function trackedInsert(p: Peers): void {
+    p.editor.setTrackChanges({ enabled: true, author: "Ada" });
+    p.headless.setTrackChanges({ enabled: true, author: "Ada" });
+    p.editor.insertRun({ block: p.editor.getBlock(0), offset: 2 }, text("NEW"));
+    p.headless.insertRun({ block: p.headless.getBlock(0), offset: 2 }, text("NEW"));
+  }
+
+  it("getRevisions enumerates a tracked insert identically", () => {
+    const p = peers(singleParaDoc());
+    trackedInsert(p);
+    const e = p.editor.getRevisions().map(normSpan);
+    const h = p.headless.getRevisions().map(normSpan);
+    expect(e).toEqual(h);
+    expect(e.length).toBeGreaterThan(0);
+  });
+
+  it("acceptRevision after a tracked insert — parity", () => {
+    const p = peers(singleParaDoc());
+    trackedInsert(p);
+    const eSpan = p.editor.getRevisions()[0];
+    const hSpan = p.headless.getRevisions()[0];
+    expect(eSpan).toBeDefined();
+    expect(hSpan).toBeDefined();
+    p.editor.acceptRevision(eSpan!.range);
+    p.headless.acceptRevision(hSpan!.range);
+    expectParity(p);
+    expect(p.headless.getRevisions().length).toBe(0);
+  });
+
+  it("rejectRevision after a tracked delete — parity", () => {
+    const p = peers(singleParaDoc());
+    p.editor.setTrackChanges({ enabled: true, author: "Ada" });
+    p.headless.setTrackChanges({ enabled: true, author: "Ada" });
+    p.editor.deleteRange(mkRange(p.editor.getBlock(0), 0, 4));
+    p.headless.deleteRange(mkRange(p.headless.getBlock(0), 0, 4));
+    p.editor.rejectRevision(p.editor.getRevisions()[0]!.range);
+    p.headless.rejectRevision(p.headless.getRevisions()[0]!.range);
+    expectParity(p);
+    expect(p.headless.getRevisions().length).toBe(0);
+  });
+
+  it("resolveComment / reopenComment — parity", () => {
+    const p = peers(commentDoc());
+    expect(p.editor.resolveComment(1).ok).toBe(true);
+    expect(p.headless.resolveComment(1).ok).toBe(true);
+    expect(p.editor.getDocument().comments?.[1]?.done).toBe(true);
+    expect(p.headless.getDocument().comments?.[1]?.done).toBe(true);
+
+    expect(p.editor.reopenComment(1).ok).toBe(true);
+    expect(p.headless.reopenComment(1).ok).toBe(true);
+    expect(p.headless.getDocument().comments?.[1]?.done).toBe(false);
+
+    // unknown id fails identically
+    expect(p.editor.resolveComment(99).ok).toBe(false);
+    expect(p.headless.resolveComment(99).ok).toBe(false);
   });
 });

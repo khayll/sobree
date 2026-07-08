@@ -69,6 +69,9 @@ import {
   type DocumentMutationResult,
   type Mutation,
   type MutationInput,
+  type RevisionSpan,
+  acceptFormatRevisionMutation,
+  acceptRevisionMutation,
   applyBlockPropertiesMutation,
   applyRunPropertiesMutation,
   applySectionPropertiesMutation,
@@ -76,12 +79,17 @@ import {
   defineStyleMutation,
   deleteBlockMutation,
   deleteRangeMutation,
+  getRevisionsFromDoc,
   insertBlockAfterMutation,
   insertBlockBeforeMutation,
   insertRunMutation,
+  rejectFormatRevisionMutation,
+  rejectRevisionMutation,
   removeNumberingMutation,
   removeStyleMutation,
+  reopenCommentMutation,
   replaceBlockMutation,
+  resolveCommentMutation,
   updateNumberingMutation,
   updateStyleMutation,
 } from "./doc/mutations";
@@ -456,6 +464,57 @@ export class HeadlessSobree {
     return this.applyPatch(
       deleteRangeMutation(this.mutationInput(), range, this.trackChanges, opts.expect),
     );
+  }
+
+  // === tracked-change review (consumption side) ===
+
+  /** Enumerate every logical tracked change as a coalesced `RevisionSpan`.
+   *  Re-query after each edit — the ranges are positional. */
+  getRevisions(): RevisionSpan[] {
+    return getRevisionsFromDoc(this.doc, this.registry);
+  }
+
+  /** Accept the tracked changes inside `range` (insertions kept, deletions
+   *  applied). */
+  acceptRevision(
+    range: ApiRange,
+    opts: { expect?: Record<string, number> } = {},
+  ): EditResult<void> {
+    return this.applyPatch(acceptRevisionMutation(this.mutationInput(), range, opts.expect));
+  }
+
+  /** Reject the tracked changes inside `range`. Inverse of `acceptRevision`. */
+  rejectRevision(
+    range: ApiRange,
+    opts: { expect?: Record<string, number> } = {},
+  ): EditResult<void> {
+    return this.applyPatch(rejectRevisionMutation(this.mutationInput(), range, opts.expect));
+  }
+
+  /** Accept tracked format changes inside `range` (drop the snapshot). */
+  acceptFormatRevision(
+    range: ApiRange,
+    opts: { expect?: Record<string, number> } = {},
+  ): EditResult<void> {
+    return this.applyPatch(acceptFormatRevisionMutation(this.mutationInput(), range, opts.expect));
+  }
+
+  /** Reject tracked format changes inside `range` (revert to `before`). */
+  rejectFormatRevision(
+    range: ApiRange,
+    opts: { expect?: Record<string, number> } = {},
+  ): EditResult<void> {
+    return this.applyPatch(rejectFormatRevisionMutation(this.mutationInput(), range, opts.expect));
+  }
+
+  /** Mark comment `id` resolved (`Comment.done = true`). */
+  resolveComment(id: number): EditResult<void> {
+    return this.applyPatch(resolveCommentMutation(this.mutationInput(), id));
+  }
+
+  /** Re-open a resolved comment `id` (`Comment.done = false`). */
+  reopenComment(id: number): EditResult<void> {
+    return this.applyPatch(reopenCommentMutation(this.mutationInput(), id));
   }
 
   // === events ===

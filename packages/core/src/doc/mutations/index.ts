@@ -32,9 +32,11 @@
  */
 
 export * from "./blocks";
+export * from "./comments";
 export * from "./numbering";
 export * from "./paragraphs";
 export * from "./patches";
+export * from "./review";
 export * from "./revisions";
 export * from "./runs";
 export * from "./sections";

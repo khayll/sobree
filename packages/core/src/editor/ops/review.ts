@@ -1,6 +1,15 @@
 import { type Range as ApiRange, type BlockRef, type EditResult, fail, ok } from "../../doc/api";
-import { decideFormatRun, decideRevisionRun } from "../../doc/mutations";
-import { mergeAdjacentTextRuns, runLength, runsLength } from "../../doc/runs";
+import {
+  type RevisionSpan,
+  acceptFormatRevisionMutation,
+  acceptRevisionMutation,
+  decideFormatRun,
+  decideRevisionRun,
+  getRevisionsFromDoc,
+  rejectFormatRevisionMutation,
+  rejectRevisionMutation,
+} from "../../doc/mutations";
+import { mergeAdjacentTextRuns } from "../../doc/runs";
 import type {
   Block,
   InlineRun,
@@ -11,17 +20,14 @@ import type {
   TableRow,
 } from "../../doc/types";
 import type { EditorContext } from "../context";
-import * as query from "../query";
-import type { RevisionSpan } from "../types";
-import { mutateRunsInRange } from "./runs";
+import { applyMutation, mutationInput } from "../internal/applyMutation";
 
 /**
- * Tracked-change review: accept/reject of inline, format, and
- * paragraph-mark revisions (single-range, paragraph-level, or
- * whole-document), plus `getRevisions` which enumerates every logical
- * change as coalesced `RevisionSpan`s. The run-level decisions reuse the
- * pure transforms in `doc/mutations/revisions`; the engine is
- * `mutateRunsInRange` (shared with the authoring path in `ops/runs`).
+ * Browser adapters for tracked-change review — accept/reject of inline,
+ * format, and paragraph-mark revisions, plus `getRevisions`. The inline/
+ * format accept/reject and the enumeration are pure (`doc/mutations/review`);
+ * these wrappers sync the DOM and commit. Paragraph-mark accept/reject
+ * (which merges blocks) and accept-all still live here.
  */
 
 /**
@@ -35,11 +41,7 @@ export function acceptRevision(
   opts: { expect?: Record<string, number> } = {},
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRange(range, opts.expect);
-  if (lockCheck) return lockCheck;
-  return mutateRunsInRange(ctx, range, (runs) =>
-    runs.flatMap((r) => decideRevisionRun(r, "accept")),
-  );
+  return applyMutation(ctx, acceptRevisionMutation(mutationInput(ctx), range, opts.expect));
 }
 
 /** Reject the tracked changes inside `range`. Inverse of `acceptRevision`. */
@@ -49,11 +51,7 @@ export function rejectRevision(
   opts: { expect?: Record<string, number> } = {},
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRange(range, opts.expect);
-  if (lockCheck) return lockCheck;
-  return mutateRunsInRange(ctx, range, (runs) =>
-    runs.flatMap((r) => decideRevisionRun(r, "reject")),
-  );
+  return applyMutation(ctx, rejectRevisionMutation(mutationInput(ctx), range, opts.expect));
 }
 
 /** Accept tracked format changes inside `range` (drop the snapshot). */
@@ -63,9 +61,7 @@ export function acceptFormatRevision(
   opts: { expect?: Record<string, number> } = {},
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRange(range, opts.expect);
-  if (lockCheck) return lockCheck;
-  return mutateRunsInRange(ctx, range, (runs) => runs.map((r) => decideFormatRun(r, "accept")));
+  return applyMutation(ctx, acceptFormatRevisionMutation(mutationInput(ctx), range, opts.expect));
 }
 
 /** Reject tracked format changes inside `range` (revert to `before`). */
@@ -75,9 +71,7 @@ export function rejectFormatRevision(
   opts: { expect?: Record<string, number> } = {},
 ): EditResult<void> {
   ctx.ensureCurrent();
-  const lockCheck = ctx.checkRange(range, opts.expect);
-  if (lockCheck) return lockCheck;
-  return mutateRunsInRange(ctx, range, (runs) => runs.map((r) => decideFormatRun(r, "reject")));
+  return applyMutation(ctx, rejectFormatRevisionMutation(mutationInput(ctx), range, opts.expect));
 }
 
 /**
@@ -218,133 +212,7 @@ export function markParagraphBreakForDelete(ctx: EditorContext, index: number): 
  */
 export function getRevisions(ctx: EditorContext): RevisionSpan[] {
   ctx.ensureCurrent();
-  const spans: RevisionSpan[] = [];
-  for (let i = 0; i < ctx.doc.body.length; i++) {
-    const block = ctx.doc.body[i];
-    if (!block) continue;
-    if (block.kind === "table") {
-      // Walk into table cells. Cell paragraphs aren't registry-tracked,
-      // so we surface their revisions under the containing table's ref.
-      const info = query.getBlock(ctx, i);
-      const tableRef: BlockRef = { id: info.id, version: info.version };
-      for (const row of block.rows) {
-        for (const cell of row.cells) {
-          for (const inner of cell.content) {
-            if (inner.kind !== "paragraph") continue;
-            collectParagraphRevisions(inner, tableRef, spans);
-          }
-        }
-      }
-      continue;
-    }
-    if (block.kind !== "paragraph") continue;
-    const info = query.getBlock(ctx, i);
-    const ref: BlockRef = { id: info.id, version: info.version };
-    collectParagraphRevisions(block, ref, spans);
-  }
-  return spans;
-}
-
-/**
- * Walk one paragraph and append its revision spans to `out`. Emits a
- * three-level shape: paragraph-mark first, then coalesced inline ins/del
- * spans, then coalesced format-change spans.
- */
-function collectParagraphRevisions(block: Paragraph, ref: BlockRef, out: RevisionSpan[]): void {
-  const length = runsLength(block.runs);
-
-  // Paragraph-mark
-  const pRev = block.properties.revision;
-  if (pRev) {
-    out.push({
-      range: {
-        from: { block: ref, offset: 0 },
-        to: { block: ref, offset: length },
-      },
-      ...(pRev.author !== undefined ? { author: pRev.author } : {}),
-      kinds: [pRev.type],
-      ...(pRev.date !== undefined ? { date: pRev.date } : {}),
-      level: "paragraph",
-    });
-  }
-
-  let offset = 0;
-  let open: {
-    start: number;
-    end: number;
-    author: string | undefined;
-    kinds: Set<"ins" | "del">;
-    date: string | undefined;
-  } | null = null;
-  let openFmt: {
-    start: number;
-    end: number;
-    author: string | undefined;
-    date: string | undefined;
-  } | null = null;
-  const flush = (): void => {
-    if (!open) return;
-    out.push({
-      range: {
-        from: { block: ref, offset: open.start },
-        to: { block: ref, offset: open.end },
-      },
-      ...(open.author !== undefined ? { author: open.author } : {}),
-      kinds: [...open.kinds],
-      ...(open.date !== undefined ? { date: open.date } : {}),
-      level: "inline",
-    });
-    open = null;
-  };
-  const flushFmt = (): void => {
-    if (!openFmt) return;
-    out.push({
-      range: {
-        from: { block: ref, offset: openFmt.start },
-        to: { block: ref, offset: openFmt.end },
-      },
-      ...(openFmt.author !== undefined ? { author: openFmt.author } : {}),
-      kinds: ["ins"],
-      ...(openFmt.date !== undefined ? { date: openFmt.date } : {}),
-      level: "format",
-    });
-    openFmt = null;
-  };
-  for (const run of block.runs) {
-    const len = runLength(run);
-    const rev = run.kind === "text" ? run.properties.revision : undefined;
-    if (rev) {
-      if (open && open.author === rev.author) {
-        open.end = offset + len;
-        open.kinds.add(rev.type);
-      } else {
-        flush();
-        open = {
-          start: offset,
-          end: offset + len,
-          author: rev.author,
-          kinds: new Set<"ins" | "del">([rev.type]),
-          date: rev.date,
-        };
-      }
-    } else {
-      flush();
-    }
-    const rf = run.kind === "text" ? run.properties.revisionFormat : undefined;
-    if (rf) {
-      if (openFmt && openFmt.author === rf.author) {
-        openFmt.end = offset + len;
-      } else {
-        flushFmt();
-        openFmt = { start: offset, end: offset + len, author: rf.author, date: rf.date };
-      }
-    } else {
-      flushFmt();
-    }
-    offset += len;
-  }
-  flush();
-  flushFmt();
+  return getRevisionsFromDoc(ctx.doc, ctx.registry);
 }
 
 /**

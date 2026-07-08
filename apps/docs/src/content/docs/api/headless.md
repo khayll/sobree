@@ -77,6 +77,15 @@ class HeadlessSobree {
   getTrackChanges(): TrackChangesState;
   setTrackChanges(state: TrackChangesState): void;
 
+  // Tracked-change review (consumption) + comments
+  getRevisions(): RevisionSpan[];
+  acceptRevision(range: Range, opts?): EditResult<void>;
+  rejectRevision(range: Range, opts?): EditResult<void>;
+  acceptFormatRevision(range: Range, opts?): EditResult<void>;
+  rejectFormatRevision(range: Range, opts?): EditResult<void>;
+  resolveComment(id: number): EditResult<void>;
+  reopenComment(id: number): EditResult<void>;
+
   // Events + lifecycle
   // event: HeadlessEvent ("change"); returns a HeadlessUnsubscribe
   on(event: "change", cb: (p: HeadlessChangePayload) => void): HeadlessUnsubscribe;
@@ -164,6 +173,13 @@ Each method mirrors the browser `Editor`'s equivalent:
   snapshots) instead of editing outright, exactly as the browser editor
   does; pair with `@sobree/review` on the human side. Set the initial
   mode via the `trackChanges` constructor option.
+- **`getRevisions()` + `acceptRevision` / `rejectRevision` /
+  `acceptFormatRevision` / `rejectFormatRevision`** — the *consumption*
+  side of tracked changes. `getRevisions()` enumerates every logical
+  change as a coalesced `RevisionSpan`; pass a span's `range` straight to
+  accept/reject. So an agent can review and resolve inline + format
+  revisions, not just author them.
+- **`resolveComment(id)` / `reopenComment(id)`** — flip `Comment.done`.
 - **`table.*`** — the same granular table surface as `editor.table`
   (`insertRow` / `deleteRow` / `insertColumn` / `deleteColumn`,
   `mergeCells` / `unmergeCell`, `setCellContent` / `setCellProperties`,
@@ -192,9 +208,10 @@ bytes, image dimensions, or a live selection an agent doesn't have:
 - `insertImage(at, bytes, opts)` / `insertImageFromFile(file)` — image
   insertion (dimension probing + blob migration are adapter concerns). An
   agent that already has a `DrawingRun` can insert it via `insertRun`.
-- accept/reject of tracked changes (`acceptRevision` / `rejectRevision`
-  and friends) — the *authoring* side (recording revisions via
-  `setTrackChanges`) is mirrored; the *review* side is not yet.
+- **Paragraph-mark** accept/reject (`acceptParagraphRevision` /
+  `rejectParagraphRevision`, which merge blocks) and the whole-document
+  `acceptAllRevisions` / `rejectAllRevisions` sweeps stay on the browser
+  `Editor` for now. Inline and format revision accept/reject *are* mirrored.
 
 The MCP wrapper ([`@sobree/mcp`](/api/mcp/)) builds on this surface.
 
