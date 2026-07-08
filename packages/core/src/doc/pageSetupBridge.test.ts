@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PAGE_SETUP } from "../paperStack/pageSetup";
+import { DEFAULT_PAGE_SETUP } from "./pageSetup";
 import { pageSetupToSection, sectionToPageSetup } from "./pageSetupBridge";
 import type { SectionProperties } from "./types";
 

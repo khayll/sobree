@@ -1,7 +1,7 @@
-import type { PageSetup, PageZoneText } from "../paperStack/pageSetup";
-import { PAGE_SIZES } from "../paperStack/pageSetup";
 import { text as textRun } from "./builders";
 import { fieldType } from "./fields";
+import type { PageSetup, PageZoneText } from "./pageSetup";
+import { PAGE_SIZES } from "./pageSetup";
 import type {
   Block,
   FieldRun,

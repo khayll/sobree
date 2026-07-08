@@ -1,4 +1,10 @@
 import "./paperStack.css";
+import {
+  type PageSetup,
+  resolvedDimensions,
+  substituteVariables,
+  zoneTemplateFor,
+} from "../doc/pageSetup";
 import type {
   AnchoredFrame,
   Block,
@@ -10,12 +16,6 @@ import { applySelectionDescriptor, captureSelectionDescriptor } from "../editor/
 import type { AnchorLayerContext } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
 import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
-import {
-  type PageSetup,
-  resolvedDimensions,
-  substituteVariables,
-  zoneTemplateFor,
-} from "./pageSetup";
 import { paginateBlocks } from "./paginationAdapter";
 import { flowColumnSections } from "./paginationAdapter/columnFlow";
 import { Paper } from "./paper";

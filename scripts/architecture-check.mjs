@@ -173,12 +173,11 @@ async function checkImports() {
 
 // Pure document/model zones that must not depend UPWARD on the browser
 // editor, embedder shell, or in-place zone editor. Catches type-only
-// imports too (archunit doesn't). `paperStack` is deliberately absent
-// here — a few pure modules still consume `paperStack/pageSetup` page
-// geometry, which is a separate ownership question (see the plan). The
-// stricter mutation-engine rule below DOES forbid paperStack/ydoc.
+// imports too (archunit doesn't). `paperStack` is included now that the
+// pure page-setup model it used to host lives in `doc/pageSetup` — pure
+// zones render nothing, so they never depend on the paper stack.
 const pureZoneDirs = ["doc", "ydoc", "pagination", "docx"];
-const forbiddenForPureZones = ["editor", "embed", "zoneEdit"];
+const forbiddenForPureZones = ["editor", "embed", "zoneEdit", "paperStack"];
 
 // The pure mutation engine is the shared owner of user-visible document
 // mutations. It must stay free of DOM / editor / Y.Doc / renderer /
@@ -195,7 +194,7 @@ async function checkPureZoneImports() {
         const coreRel = resolveCoreRel(file, spec);
         if (coreRel && inZone(coreRel, forbiddenForPureZones)) {
           failures.push(
-            `${rel(file)} (pure ${zone}/ zone) must not import editor/embed/zoneEdit: "${spec}"`,
+            `${rel(file)} (pure ${zone}/ zone) must not import ${forbiddenForPureZones.join("/")}: "${spec}"`,
           );
         }
       }

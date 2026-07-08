@@ -1,9 +1,9 @@
+import { DEFAULT_PAGE_SETUP, type PageSetup } from "./doc/pageSetup";
 import { pageSetupToSection, sectionToPageSetup } from "./doc/pageSetupBridge";
 import type { SectionProperties, SobreeDocument } from "./doc/types";
 import { exportDocx } from "./docx/export/index";
 import { importDocx } from "./docx/import/index";
 import { Editor, type OutlineItem, type TrackChangesState } from "./editor";
-import { DEFAULT_PAGE_SETUP, type PageSetup } from "./paperStack/pageSetup";
 import { PaperLayout, type PaperLayoutIndex } from "./paperStack/paperLayout";
 import { type AnchorRenderDeps, PaperStack } from "./paperStack/paperStack";
 import { attachSections } from "./plugins/sections";

@@ -1,3 +1,15 @@
+/**
+ * The pure page-setup model — page sizes, orientation, margins, vertical
+ * alignment, header/footer zone text, and the dimension/template helpers
+ * derived from them. No DOM, no rendering.
+ *
+ * Lives in the document layer because it's page geometry the AST bridge
+ * (`doc/pageSetupBridge`, mapping `PageSetup` ↔ `SectionProperties`) and
+ * DOCX I/O (`docx/shared/pageSize`, `docx/import/headers`) consume — pure
+ * zones that must not depend upward on `paperStack`. `paperStack` renders
+ * a `PageSetup`; it imports this, not the other way round.
+ */
+
 export type PageSizeKey = "A3" | "A4" | "A5" | "B5" | "Letter" | "Legal" | "Tabloid";
 
 export interface PageSizeMM {
