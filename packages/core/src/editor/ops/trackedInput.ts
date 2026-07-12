@@ -28,6 +28,16 @@ export interface TrackedInput {
    */
   handleBeforeInput(ie: InputEvent): boolean;
   /**
+   * A paragraph-BOUNDARY Backspace / Delete (a paragraph MERGE) routed
+   * through the typed API even when tracked mode is OFF. Returns `true` if
+   * it performed the merge (caller should `preventDefault`), `false` for
+   * anything else — non-boundary deletes and non-paragraph neighbours keep
+   * the light native + read-back path. The native contentEditable merge is
+   * lossy (Chromium strips inline run formatting — small-caps / colour /
+   * size — off the merged-in content), so the merge must run on the AST.
+   */
+  handleBoundaryMerge(ie: InputEvent): boolean;
+  /**
    * True when the caret sits in a block containing any revision wrapper
    * (`<ins>` / `<del>` / `.sobree-revision-format`). `beforeinput` uses
    * this in mode-OFF to take over the insert path so the browser doesn't
@@ -96,6 +106,45 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     const info = query.getBlockById(ctx, at.block.id);
     if (!info || at.offset >= info.length) return null;
     return { from: at, to: { block: at.block, offset: at.offset + 1 } };
+  }
+
+  /**
+   * Merge the two ADJACENT paragraphs at body indices `firstIdx` /
+   * `secondIdx` through the AST (a cross-block `deleteRange` concatenates
+   * their runs, formatting intact) and land the caret at the join. `true`
+   * once consumed — even on failure, so the lossy native merge never runs.
+   */
+  function mergeParagraphs(firstIdx: number, secondIdx: number): boolean {
+    const first = query.getBlock(ctx, firstIdx);
+    const second = query.getBlock(ctx, secondIdx);
+    if (first.kind !== "paragraph" || second.kind !== "paragraph") return false;
+    const firstRef = ctx.registry.refAt(firstIdx);
+    const secondRef = ctx.registry.refAt(secondIdx);
+    const result = runs.deleteRange(ctx, {
+      from: { block: firstRef, offset: first.length },
+      to: { block: secondRef, offset: 0 },
+    });
+    if (result.ok) query.placeCaret(ctx, firstRef.id, first.length);
+    return true;
+  }
+
+  function handleBoundaryMerge(ie: InputEvent): boolean {
+    const sel = ctx.selection.get();
+    if (!sel || sel.kind !== "caret") return false;
+    const back = ie.inputType === "deleteContentBackward" || ie.inputType === "deleteWordBackward";
+    const fwd = ie.inputType === "deleteContentForward" || ie.inputType === "deleteWordForward";
+    if (!back && !fwd) return false;
+    const info = query.getBlockById(ctx, sel.at.block.id);
+    if (!info || info.kind !== "paragraph") return false;
+    // Backspace merges with the previous block only at the paragraph START;
+    // Delete merges with the next only at its END. Anywhere else this is an
+    // ordinary character delete — leave it to the native path.
+    if (back) {
+      if (sel.at.offset !== 0 || info.index <= 0) return false;
+      return mergeParagraphs(info.index - 1, info.index);
+    }
+    if (sel.at.offset < info.length || info.index >= ctx.doc.body.length - 1) return false;
+    return mergeParagraphs(info.index, info.index + 1);
   }
 
   function handleBeforeInput(ie: InputEvent): boolean {
@@ -331,6 +380,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
 
   return {
     handleBeforeInput,
+    handleBoundaryMerge,
     caretInsideRevisionWrapper,
     handleCompositionStart,
     handleCompositionEnd,
