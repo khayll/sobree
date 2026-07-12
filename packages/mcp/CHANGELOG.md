@@ -1,5 +1,14 @@
 # @sobree/mcp
 
+## 0.1.68
+
+### Patch Changes
+
+- 9f488ba: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [9f488ba]
+  - @sobree/core@0.1.68
+
 ## 0.1.67
 
 ### Patch Changes
