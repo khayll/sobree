@@ -91,6 +91,11 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
     const inRevisionWrapper = !inTracked && hooks.trackedInput.caretInsideRevisionWrapper();
     if ((inTracked || inRevisionWrapper) && hooks.trackedInput.handleBeforeInput(ie)) {
       e.preventDefault();
+    } else if (!inTracked && !inRevisionWrapper && hooks.trackedInput.handleBoundaryMerge(ie)) {
+      // Even untracked, a paragraph-boundary Backspace/Delete (a MERGE) must
+      // run through the API — the native contentEditable merge strips inline
+      // run formatting (small-caps / colour / size) off the joined content.
+      e.preventDefault();
     }
   });
 
