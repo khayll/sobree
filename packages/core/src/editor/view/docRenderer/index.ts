@@ -21,6 +21,13 @@ export function renderSobreeDocument(
   doc: SobreeDocument,
   host: HTMLElement,
   blockIds?: readonly string[],
+  /** Incremental render: existing block elements to MOVE into the fresh tree
+   *  instead of re-rendering, keyed by `data-block-id`. The caller (the change
+   *  pipeline) harvests these from the live hosts BEFORE wiping and gates the
+   *  set on an unchanged document structure signature, so a reused node's
+   *  render context is provably identical (see
+   *  `devdocs/plan-model-first-editing.md`, PR 2). Absent ⇒ full re-render. */
+  reuse?: ReadonlyMap<string, HTMLElement>,
 ): void {
   host.replaceChildren();
   // Per-document layout settings: stamp `<w:defaultTabStop>` as a CSS
@@ -51,10 +58,36 @@ export function renderSobreeDocument(
     doc.sections,
     frameAnchoredIndices,
     doc.settings?.noColumnBalance ?? false,
+    undefined,
+    reuse,
   );
   if (doc.footnotes && Object.keys(doc.footnotes).length > 0) {
     renderFootnotesAside(doc, host);
   }
+}
+
+/**
+ * Collect the live top-level block elements the pipeline marked reusable,
+ * keyed by `data-block-id`, across all content hosts — called BEFORE the
+ * hosts are wiped so the references survive. First occurrence wins, so a
+ * table's own element (which precedes its cell paragraphs in DOM order) is
+ * kept, not a nested cell paragraph. `undefined` when nothing is reusable
+ * (⇒ full render). Owner of the `data-block-id` DOM protocol, so it lives
+ * with the renderer.
+ */
+export function harvestReusableBlocks(
+  hosts: readonly HTMLElement[],
+  reuseIds: ReadonlySet<string> | undefined,
+): ReadonlyMap<string, HTMLElement> | undefined {
+  if (!reuseIds || reuseIds.size === 0) return undefined;
+  const map = new Map<string, HTMLElement>();
+  for (const host of hosts) {
+    for (const el of host.querySelectorAll<HTMLElement>("[data-block-id]")) {
+      const id = el.getAttribute("data-block-id");
+      if (id && !map.has(id) && reuseIds.has(id)) map.set(id, el);
+    }
+  }
+  return map.size > 0 ? map : undefined;
 }
 
 function applyDefaultTabStop(host: HTMLElement, tabStopTwips: number): void {

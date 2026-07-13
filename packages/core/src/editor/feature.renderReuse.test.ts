@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { InlinePosition } from "../doc/api";
-import { emptyDocument, paragraph, text } from "../doc/builders";
+import { emptyDocument, heading, paragraph, text } from "../doc/builders";
 import type { SobreeDocument } from "../doc/types";
 import { Editor } from "./";
 import type { EditorContext } from "./context";
 import * as runs from "./ops/runs";
+import { renderSobreeDocument } from "./view/docRenderer/index";
 
 /**
  * Perf bench / fitness baseline for the model-first editing work
@@ -15,11 +16,10 @@ import * as runs from "./ops/runs";
  * identity across the re-render. Wall-clock timing would be flaky in CI;
  * node identity is exact.
  *
- * TODAY: an API edit runs `renderSobreeDocument` → `host.replaceChildren()`,
- * so EVERY block's DOM node is rebuilt (0 reused). This test pins that
- * baseline. When incremental render lands, a one-block edit must reuse every
- * OTHER block's node (reused === N − 1); flip the assertion then — that's the
- * whole point of the milestone, and this test is its guard.
+ * A single-block edit must reuse every OTHER block's DOM node (reused ===
+ * N − 1) — only the edited block is re-rendered. This is the guard for the
+ * incremental render (PR 2): a regression back to the full `replaceChildren`
+ * rebuild would drop `reused` to 0 and fail here.
  */
 
 const N = 25;
@@ -42,8 +42,8 @@ function blockEls(ed: Editor): Map<string, Element> {
   return map;
 }
 
-describe("render node reuse across an edit (Stage-1 baseline)", () => {
-  it("a single-block edit currently rebuilds every block node (0 reused)", () => {
+describe("render node reuse across an edit (incremental render)", () => {
+  it("a single-block edit reuses every OTHER block's node (N − 1 reused)", () => {
     const ed = new Editor(document.createElement("div"), { initialDocument: longDoc() });
     document.body.appendChild((ed as unknown as { host: HTMLElement }).host);
 
@@ -65,11 +65,101 @@ describe("render node reuse across an edit (Stage-1 baseline)", () => {
     let reused = 0;
     for (const [id, el] of before) if (after.get(id) === el) reused += 1;
 
-    // BASELINE (full rebuild). Incremental render flips this to N − 1.
-    expect(reused).toBe(0);
+    // Only the edited block (#12) is re-rendered; the other 24 keep their node.
+    expect(reused).toBe(N - 1);
 
     // The edited block's text did change (sanity: the edit landed).
     expect(ed.getBlock(12).text.startsWith("X")).toBe(true);
     ed.destroy();
+  });
+});
+
+/**
+ * The correctness guard: an incremental render must produce DOM
+ * BYTE-IDENTICAL to a full render of the same resulting document. We drive a
+ * real edit (incremental), then full-render the editor's current doc with the
+ * SAME block ids into a scratch host, and compare innerHTML. Runs across a
+ * spread of edit shapes — content edits (reuse path) and structural edits
+ * (full-render fallback) — so a wrong reuse (stale context) shows up here.
+ */
+describe("incremental render === full render (byte-identical)", () => {
+  function mixedDoc(): SobreeDocument {
+    const d = emptyDocument();
+    d.body = [
+      heading(1, [text("Title")]),
+      paragraph([text("Intro paragraph.")]),
+      paragraph([text("Body one, "), text("bold bit", { bold: true }), text(", tail.")]),
+      heading(2, [text("Section")]),
+      paragraph([text("Body two.")], { alignment: "center" }),
+      paragraph([text("Body three.")]),
+    ];
+    return d;
+  }
+
+  function fullRenderHtml(ed: Editor): string {
+    const doc = ed.getDocument();
+    const ids = doc.body.map((_, i) => ed.getBlock(i).id);
+    const scratch = document.createElement("div");
+    renderSobreeDocument(doc, scratch, ids);
+    return scratch.innerHTML;
+  }
+
+  function withEditor(run: (ed: Editor, ctx: EditorContext) => void): void {
+    const ed = new Editor(document.createElement("div"), { initialDocument: mixedDoc() });
+    document.body.appendChild((ed as unknown as { host: HTMLElement }).host);
+    const ctx = (ed as unknown as { ctx: EditorContext }).ctx;
+    run(ed, ctx);
+    const host = (ed as unknown as { host: HTMLElement }).host;
+    expect(host.innerHTML).toBe(fullRenderHtml(ed));
+    ed.destroy();
+  }
+
+  const ref = (ed: Editor, i: number) => {
+    const b = ed.getBlock(i);
+    return { id: b.id, version: b.version };
+  };
+
+  it("matches after inserting text mid-paragraph (reuse path)", () => {
+    withEditor((ed, ctx) => {
+      runs.insertRun(
+        ctx,
+        { block: ref(ed, 2), offset: 4 },
+        { kind: "text", text: "ZZ", properties: {} },
+      );
+    });
+  });
+
+  it("matches after deleting a range (reuse path)", () => {
+    withEditor((ed, ctx) => {
+      runs.deleteRange(ctx, {
+        from: { block: ref(ed, 1), offset: 0 },
+        to: { block: ref(ed, 1), offset: 5 },
+      });
+    });
+  });
+
+  it("matches after applying a run property / bold (reuse path)", () => {
+    withEditor((ed, ctx) => {
+      runs.applyRunProperties(
+        ctx,
+        { from: { block: ref(ed, 4), offset: 0 }, to: { block: ref(ed, 4), offset: 4 } },
+        { bold: true },
+      );
+    });
+  });
+
+  it("matches after splitting a paragraph (structural → full-render fallback)", () => {
+    withEditor((ed, ctx) => {
+      runs.splitBlock(ctx, { block: ref(ed, 5), offset: 4 });
+    });
+  });
+
+  it("matches after a paragraph-boundary merge (structural)", () => {
+    withEditor((ed, ctx) => {
+      runs.deleteRange(ctx, {
+        from: { block: ref(ed, 4), offset: ed.getBlock(4).text.length },
+        to: { block: ref(ed, 5), offset: 0 },
+      });
+    });
   });
 });
