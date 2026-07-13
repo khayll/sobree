@@ -36,6 +36,31 @@ import { renderTable } from "./table";
  * `rawParts` is threaded to image rendering so `<img src>` can be
  * populated from embedded bytes via a blob URL.
  */
+/**
+ * True when a block occupies no visible body flow — an empty paragraph with
+ * no text / drawing / tab / field / link / footnote-ref. Load-bearing for
+ * page-break deferral (a break skips over these) and for the incremental
+ * render's structure signature, so both must agree on "empty". Exported so
+ * `reuseSignature` shares this one definition.
+ */
+export function isVisuallyEmptyBlock(b: Block): boolean {
+  if (b.kind !== "paragraph") return false;
+  for (const r of b.runs) {
+    if (r.kind === "text" && r.text.trim().length > 0) return false;
+    if (r.kind === "drawing") return false;
+    if (r.kind === "tab") return false;
+    if (r.kind === "field") return false;
+    if (r.kind === "hyperlink") return false;
+    if (r.kind === "footnoteRef") return false;
+  }
+  return true;
+}
+
+/** True when a paragraph carries a `<w:br type="page">` run. */
+export function paragraphHasPageBreakRun(b: Block): boolean {
+  return b.kind === "paragraph" && b.runs.some((r) => r.kind === "break" && r.type === "page");
+}
+
 export function renderBlocks(
   blocks: readonly Block[],
   host: HTMLElement,
@@ -56,6 +81,16 @@ export function renderBlocks(
    *  paragraph's style (ECMA-376 §17.7.2). Threaded from `renderTable`
    *  via the cell-renderer wrapper below. */
   tableStyleId?: string,
+  /** Incremental render: existing block elements to REUSE instead of
+   *  re-rendering, keyed by `data-block-id`. Only supplied by the pipeline
+   *  when the document STRUCTURE is unchanged and only content-unchanged
+   *  blocks are in the map, so a reused node's render context (deferral,
+   *  section, list, outline, contextual spacing) is provably identical —
+   *  the state machine below still runs for every block, only the render of
+   *  a reused block is skipped. Empty / absent ⇒ render everything (today's
+   *  path); table-internal cells never reuse (v1). See
+   *  `devdocs/plan-model-first-editing.md`, PR 2. */
+  reuse?: ReadonlyMap<string, HTMLElement>,
 ): void {
   // Outline numbers ("1", "1.1", …) for headings whose style links a
   // numbering definition — computed in one document-order pass, stamped as
@@ -98,24 +133,6 @@ export function renderBlocks(
   // but the previous page packs whatever could fit, killing the
   // 11-of-26 wasteful-pages problem on complex-multipage.docx.
   let pendingPageBreak = false;
-  const isVisuallyEmptyBlock = (b: Block): boolean => {
-    if (b.kind === "section_break") return false;
-    if (b.kind === "table") return false;
-    if (b.kind !== "paragraph") return false;
-    for (const r of b.runs) {
-      if (r.kind === "text" && r.text.trim().length > 0) return false;
-      if (r.kind === "drawing") return false;
-      if (r.kind === "tab") return false;
-      if (r.kind === "field") return false;
-      if (r.kind === "hyperlink") return false;
-      if (r.kind === "footnoteRef") return false;
-    }
-    return true;
-  };
-
-  const paragraphHasPageBreakRun = (b: Block): boolean =>
-    b.kind === "paragraph" && b.runs.some((r) => r.kind === "break" && r.type === "page");
-
   const flushList = () => {
     currentList = null;
   };
@@ -175,20 +192,25 @@ export function renderBlocks(
         appendTarget.appendChild(listEl);
         currentList = { el: listEl, numId: listInfo.numId };
       }
-      const li = document.createElement("li");
-      if (id) li.setAttribute(BLOCK_ID_ATTR, id);
+      const reusedLi = id ? reuse?.get(id) : undefined;
+      const li = reusedLi ?? document.createElement("li");
+      if (!reusedLi) {
+        if (id) li.setAttribute(BLOCK_ID_ATTR, id);
+        const { runDefaults: liRunDefaults } = applyParagraphProps(
+          li,
+          (block as Paragraph).properties,
+          styles,
+          contextualNeighborsFor(i),
+          tableStyleId,
+        );
+        applyListItemLevel(li, block, numbering);
+        stampBlockRevision(li, (block as Paragraph).properties);
+        appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles, liRunDefaults);
+      }
+      // Positional attrs may shift even when content is reused — re-stamp
+      // (cheap; a no-op when the structure is truly unchanged).
       li.dataset.sectionIndex = String(sectionIndex);
       li.dataset.blockIndex = String(i);
-      const { runDefaults: liRunDefaults } = applyParagraphProps(
-        li,
-        (block as Paragraph).properties,
-        styles,
-        contextualNeighborsFor(i),
-        tableStyleId,
-      );
-      applyListItemLevel(li, block, numbering);
-      stampBlockRevision(li, (block as Paragraph).properties);
-      appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles, liRunDefaults);
       currentList.el.appendChild(li);
       continue;
     }
@@ -200,15 +222,18 @@ export function renderBlocks(
     // stays section-array-agnostic.
     const nextSectionForBreak =
       block.kind === "section_break" ? sections[block.toSectionIndex] : undefined;
-    const rendered = renderBlock(
-      block,
-      numbering,
-      styles,
-      rawParts,
-      nextSectionForBreak,
-      block.kind === "paragraph" ? contextualNeighborsFor(i) : undefined,
-      tableStyleId,
-    );
+    const reused = id ? reuse?.get(id) : undefined;
+    const rendered =
+      reused ??
+      renderBlock(
+        block,
+        numbering,
+        styles,
+        rawParts,
+        nextSectionForBreak,
+        block.kind === "paragraph" ? contextualNeighborsFor(i) : undefined,
+        tableStyleId,
+      );
     if (rendered) {
       if (id) rendered.setAttribute(BLOCK_ID_ATTR, id);
       rendered.dataset.sectionIndex = String(sectionIndex);

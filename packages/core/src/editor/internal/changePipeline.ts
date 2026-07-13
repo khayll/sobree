@@ -23,7 +23,8 @@ import { applyDocumentToYDoc, projectYDoc } from "../../ydoc";
 import type { EditorContext } from "../context";
 import type { EditorEvents } from "../events";
 import * as parts from "../ops/parts";
-import { renderSobreeDocument } from "../view/docRenderer/index";
+import { harvestReusableBlocks, renderSobreeDocument } from "../view/docRenderer/index";
+import { bodyStructureSignature } from "../view/docRenderer/reuseSignature";
 import { serializeHostsWithSources } from "../view/docSerialize/index";
 import type { FrameController } from "./frames";
 import type { Mutation } from "./mutations";
@@ -119,12 +120,19 @@ export class ChangePipeline {
       else if (m.type === "bump") affected.push(this.ctx.registry.bump(m.index));
     }
 
+    // Incremental render: decide which blocks can keep their existing DOM
+    // node (structure unchanged AND content byte-identical), then harvest
+    // those nodes from the live hosts BEFORE the wipe below.
+    const nextJson = next.body.map((b) => JSON.stringify(b));
+    const reuseIds = this.computeReuseIds(next, nextJson);
+
     this.ctx.setDoc(next);
-    this.lastSerialisedBlocks = next.body.map((b) => JSON.stringify(b));
+    this.lastSerialisedBlocks = nextJson;
     const hosts = this.ctx.getContentHosts();
+    const reuse = harvestReusableBlocks(hosts, reuseIds);
     for (const h of hosts) h.replaceChildren();
     const firstHost = hosts[0] ?? this.ctx.host;
-    renderSobreeDocument(this.ctx.doc, firstHost, this.blockIdsArray());
+    renderSobreeDocument(this.ctx.doc, firstHost, this.blockIdsArray(), reuse);
 
     // Best-effort selection restore (block must still exist + offset still valid).
     if (savedSelection) applySelectionToDom(this.ctx._hosts(), savedSelection);
@@ -133,6 +141,45 @@ export class ChangePipeline {
     this.mirrorToYDoc();
     this.emitChangeNow();
     return ok<T>(value as T, affected);
+  }
+
+  /**
+   * Which body block ids may keep their existing DOM node this render.
+   *
+   * `prev` is the LIVE `ctx.doc` (not a cache), so it's always coherent with
+   * what's currently in the DOM — whatever last rendered it (a commit, a
+   * remote update, undo, or a native-typing read-back). Reuse is allowed only
+   * when the document STRUCTURE is unchanged (same length, same doc-level
+   * object refs, same context signature) AND a block's own JSON is
+   * byte-identical — then its render context is provably identical, so moving
+   * its old node is exactly what a full render would produce. Any structural
+   * change ⇒ `undefined` ⇒ full render. See `plan-model-first-editing.md`.
+   */
+  private computeReuseIds(
+    next: SobreeDocument,
+    nextJson: readonly string[],
+  ): ReadonlySet<string> | undefined {
+    const prev = this.ctx.doc;
+    if (prev.body.length !== next.body.length) return undefined;
+    const docLevelSame =
+      prev.styles === next.styles &&
+      prev.numbering === next.numbering &&
+      prev.sections === next.sections &&
+      prev.settings === next.settings &&
+      prev.anchoredFrames === next.anchoredFrames;
+    if (!docLevelSame) return undefined;
+    const num = next.numbering ?? [];
+    if (bodyStructureSignature(prev.body, num) !== bodyStructureSignature(next.body, num)) {
+      return undefined;
+    }
+    const prevJson = prev.body.map((b) => JSON.stringify(b));
+    const ids = this.blockIdsArray();
+    const reuse = new Set<string>();
+    for (let i = 0; i < nextJson.length; i++) {
+      const id = ids[i];
+      if (id && prevJson[i] === nextJson[i]) reuse.add(id);
+    }
+    return reuse.size > 0 ? reuse : undefined;
   }
 
   /**
