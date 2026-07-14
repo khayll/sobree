@@ -38,6 +38,16 @@ export interface TrackedInput {
    */
   handleBoundaryMerge(ie: InputEvent): boolean;
   /**
+   * Untracked `insertText` / `insertReplacementText` routed through the typed
+   * API (model-first typing — Phase 3-2 of the model-first-editing plan).
+   * Returns `true` if consumed (caller should `preventDefault`), `false` to
+   * leave to the native path — composition (IME), empty data, or any other
+   * inputType. Inserts a PLAIN run (`insertRun` reads `ctx.trackChanges`, which
+   * is off here); tracked-mode insertText still goes through
+   * {@link handleBeforeInput}.
+   */
+  handleUntrackedInsert(ie: InputEvent): boolean;
+  /**
    * True when the caret sits in a block containing any revision wrapper
    * (`<ins>` / `<del>` / `.sobree-revision-format`). `beforeinput` uses
    * this in mode-OFF to take over the insert path so the browser doesn't
@@ -147,6 +157,35 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     return mergeParagraphs(info.index, info.index + 1);
   }
 
+  /**
+   * Insert `text` at `sel` through the typed API. `insertRun` reads
+   * `ctx.trackChanges`, so this stamps an `ins` run in tracked mode and a plain
+   * run untracked — the one code path shared by tracked `insertText` and the
+   * untracked model-first insert. Returns `true` once consumed (even on a
+   * failed insert, so the caller never falls through to the lossy native path).
+   */
+  function insertTextRun(sel: Selection, text: string): boolean {
+    const insertAt = markedRangeForReplace(sel);
+    if (!insertAt) return false;
+    const run: InlineRun = { kind: "text", text, properties: {} };
+    const result = runs.insertRun(ctx, insertAt, run);
+    if (!result.ok) return true; // consumed but failed — don't fall through
+    query.placeCaret(ctx, insertAt.block.id, insertAt.offset + text.length);
+    return true;
+  }
+
+  function handleUntrackedInsert(ie: InputEvent): boolean {
+    // Composition (IME) stays native-then-reconcile — never intercept it,
+    // even if it surfaces as insertText.
+    if (ie.isComposing) return false;
+    if (ie.inputType !== "insertText" && ie.inputType !== "insertReplacementText") return false;
+    const text = ie.data ?? "";
+    if (!text) return false;
+    const sel = ctx.selection.get();
+    if (!sel) return false;
+    return insertTextRun(sel, text);
+  }
+
   function handleBeforeInput(ie: InputEvent): boolean {
     const sel = ctx.selection.get();
     if (!sel) return false;
@@ -156,13 +195,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
       case "insertReplacementText": {
         const text = ie.data ?? "";
         if (!text) return false;
-        const insertAt = markedRangeForReplace(sel);
-        if (!insertAt) return false;
-        const run: InlineRun = { kind: "text", text, properties: {} };
-        const result = runs.insertRun(ctx, insertAt, run);
-        if (!result.ok) return true; // consumed but failed — don't fall through
-        query.placeCaret(ctx, insertAt.block.id, insertAt.offset + text.length);
-        return true;
+        return insertTextRun(sel, text);
       }
       case "deleteContentBackward":
       case "deleteWordBackward": {
@@ -381,6 +414,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   return {
     handleBeforeInput,
     handleBoundaryMerge,
+    handleUntrackedInsert,
     caretInsideRevisionWrapper,
     handleCompositionStart,
     handleCompositionEnd,
