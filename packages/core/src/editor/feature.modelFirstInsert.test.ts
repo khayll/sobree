@@ -110,3 +110,59 @@ describe("untracked insertText is model-first (Phase 3-2)", () => {
     ed.destroy();
   });
 });
+
+describe("untracked char deletes are model-first (Phase 3-3)", () => {
+  it("deleteContentBackward removes the char before the caret via the API", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("Hello") });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 5); // end of "Hello"
+
+    const ev = fire(ed, { inputType: "deleteContentBackward" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("Hell");
+    ed.destroy();
+  });
+
+  it("deleteContentForward removes the char after the caret via the API", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("Hello") });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 0); // start
+
+    const ev = fire(ed, { inputType: "deleteContentForward" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("ello");
+    ed.destroy();
+  });
+
+  it("Backspace over a selection deletes the range", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("Hello") });
+    document.body.appendChild(host(ed));
+    const b = ed.getBlock(0);
+    ed.selection.set({
+      kind: "range",
+      range: {
+        from: { block: { id: b.id, version: b.version }, offset: 1 },
+        to: { block: { id: b.id, version: b.version }, offset: 4 },
+      },
+    });
+
+    const ev = fire(ed, { inputType: "deleteContentBackward" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("Ho");
+    ed.destroy();
+  });
+
+  it("leaves a WORD delete to the native path (API would only remove one char)", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("Hello") });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 5);
+
+    const ev = fire(ed, { inputType: "deleteWordBackward" });
+
+    expect(ev.defaultPrevented).toBe(false);
+    ed.destroy();
+  });
+});

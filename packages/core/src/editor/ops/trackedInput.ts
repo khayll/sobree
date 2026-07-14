@@ -48,6 +48,14 @@ export interface TrackedInput {
    */
   handleUntrackedInsert(ie: InputEvent): boolean;
   /**
+   * Untracked `deleteContentBackward` / `deleteContentForward` routed through
+   * the typed API (model-first — Phase 3-3). `true` if consumed (caller
+   * `preventDefault`s), `false` to leave to native (composition, word deletes,
+   * or a document-edge no-op). A paragraph-boundary caret merges via
+   * {@link handleBoundaryMerge}.
+   */
+  handleUntrackedDelete(ie: InputEvent): boolean;
+  /**
    * True when the caret sits in a block containing any revision wrapper
    * (`<ins>` / `<del>` / `.sobree-revision-format`). `beforeinput` uses
    * this in mode-OFF to take over the insert path so the browser doesn't
@@ -184,6 +192,34 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     const sel = ctx.selection.get();
     if (!sel) return false;
     return insertTextRun(sel, text);
+  }
+
+  /**
+   * Untracked `deleteContentBackward` / `deleteContentForward` routed through the
+   * typed API (model-first — Phase 3-3). Covers the single-char delete and a
+   * range delete (Backspace/Delete over a selection); a caret at a paragraph
+   * boundary delegates to {@link handleBoundaryMerge} (the MERGE, already on the
+   * API). WORD deletes (`deleteWord*`) stay native — the API's one-char range
+   * would silently downgrade a word delete to a char delete. Returns `false`
+   * (native) for composition or any other inputType.
+   */
+  function handleUntrackedDelete(ie: InputEvent): boolean {
+    if (ie.isComposing) return false;
+    const back = ie.inputType === "deleteContentBackward";
+    const fwd = ie.inputType === "deleteContentForward";
+    if (!back && !fwd) return false;
+    const sel = ctx.selection.get();
+    if (!sel) return false;
+    const target = back ? rangeForBackwardDelete(sel) : rangeForForwardDelete(sel);
+    // A null range means the caret sits at a paragraph boundary (start for
+    // Backspace, end for Delete) — that's a MERGE, or a no-op at the document
+    // edge; `handleBoundaryMerge` owns both (and returns false ⇒ native at the
+    // edge).
+    if (!target) return handleBoundaryMerge(ie);
+    const result = runs.deleteRange(ctx, target);
+    if (!result.ok) return true; // consumed but failed — don't fall through
+    query.placeCaret(ctx, target.from.block.id, target.from.offset);
+    return true;
   }
 
   function handleBeforeInput(ie: InputEvent): boolean {
@@ -415,6 +451,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     handleBeforeInput,
     handleBoundaryMerge,
     handleUntrackedInsert,
+    handleUntrackedDelete,
     caretInsideRevisionWrapper,
     handleCompositionStart,
     handleCompositionEnd,

@@ -92,14 +92,15 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
     if ((inTracked || inRevisionWrapper) && hooks.trackedInput.handleBeforeInput(ie)) {
       e.preventDefault();
     } else if (!inTracked && !inRevisionWrapper) {
-      // Untracked: text insertion goes model-first through the API (Phase 3-2),
-      // and a paragraph-boundary Backspace/Delete (a MERGE) also runs through
-      // the API — the native contentEditable merge strips inline run formatting
-      // (small-caps / colour / size) off the joined content. Everything else
-      // (mid-line deletes, IME, …) still falls through to the native path.
+      // Untracked model-first path: text insertion (Phase 3-2) and single-char
+      // deletes incl. the paragraph-boundary MERGE (Phase 3-3) run through the
+      // typed API. `handleUntrackedDelete` folds in the boundary merge — the
+      // native contentEditable merge strips inline run formatting (small-caps /
+      // colour / size) off the joined content. Word deletes, IME, and other
+      // inputTypes still fall through to native.
       if (
         hooks.trackedInput.handleUntrackedInsert(ie) ||
-        hooks.trackedInput.handleBoundaryMerge(ie)
+        hooks.trackedInput.handleUntrackedDelete(ie)
       ) {
         e.preventDefault();
       }
