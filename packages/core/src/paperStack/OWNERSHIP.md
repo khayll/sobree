@@ -16,6 +16,9 @@ top of the pure `pagination/` engine.
 - Footnote harvesting + per-page footnote zones (`footnoteFlow.ts`).
 - Repagination orchestration: the retry loop that feeds footnote-shrunk page
   budgets back into the next pagination pass (`repagination/`).
+- The incremental-pagination fast path: a validatable snapshot of the last
+  distributed layout (`paginationSnapshot.ts`) that lets `repaginate` PROVE a
+  re-flow is unnecessary and skip it (the common in-place keystroke).
 - Header/footer + anchored-frame zone rendering per paper (`paperZone.ts`,
   `renderAllZones`, `paintAnchorLayers`).
 - Per-section setting application (vAlign) and the `paginate` event.
@@ -42,6 +45,15 @@ render zones → apply section settings → emit `paginate`. Convergence is dual
 (stable footnote heights + overflow within `OVERFLOW_TOLERANCE_PX`); the cap
 is `MAX_REPAGINATE_RETRIES`. Changing timing or event order is a behavior
 change, not a refactor.
+
+`repaginate` guards this loop with an incremental fast path
+(`paginationSnapshot.ts`): after each real re-flow it records every top-level
+block's node reference + `offsetHeight` + the page budget, and on the next call
+skips the whole loop when that snapshot still matches (same nodes, same heights,
+same budget — and, for split fragments / column containers, same text). A skip
+still fires `paginate` but touches no DOM. It is provably byte-identical to a
+full re-flow, so it's a perf optimization, not a behavior change; footnote docs
+opt out (their per-page budgets aren't modeled) and always take the full path.
 
 ## AST fields consumed / preserved
 

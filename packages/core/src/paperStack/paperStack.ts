@@ -18,6 +18,12 @@ import { renderBlocks } from "../editor/view/docRenderer/block";
 import { distributeFootnotes, footnotePageHeights } from "./footnoteFlow";
 import { paginateBlocks } from "./paginationAdapter";
 import { flowColumnSections } from "./paginationAdapter/columnFlow";
+import {
+  type PaginationSnapshot,
+  capturePaginationSnapshot,
+  layoutStable,
+  paginationUnchanged,
+} from "./paginationSnapshot";
 import { Paper } from "./paper";
 import { type RepaginationHost, repaginate as runRepagination } from "./repagination";
 
@@ -105,6 +111,14 @@ export class PaperStack {
   private anchorRenderDeps: AnchorRenderDeps | null = null;
   /** Reused blob-URL cache across renders so the same image isn't re-uploaded. */
   private readonly anchorPictureUrlCache = new Map<string, string>();
+  /**
+   * Validatable memory of the last distributed layout, so `repaginate` can
+   * PROVE a re-flow is unnecessary and skip it (the incremental-pagination
+   * fast path — see `paginationSnapshot.ts`). `null` disarms the fast path
+   * (no prior pagination yet, or a footnote doc whose per-page budgets this
+   * snapshot deliberately doesn't model).
+   */
+  private pagSnapshot: PaginationSnapshot | null = null;
 
   constructor(container: HTMLElement, setup: PageSetup) {
     this.setup = setup;
@@ -228,11 +242,44 @@ export class PaperStack {
    * flow instead of accumulating inter-fragment margins.
    */
   repaginate(): void {
+    // Incremental-pagination fast path: the common edit (a character typed
+    // in place that doesn't wrap) moves no page break, so re-collecting +
+    // re-measuring + re-distributing every block would just reproduce the
+    // current papers. Prove that against the last snapshot and skip the whole
+    // cycle. Footnote docs opt out — their per-page budgets depend on
+    // footnote-zone heights this snapshot doesn't track, so we never risk a
+    // wrong skip there (correctness over the marginal win).
+    if (
+      this.pagSnapshot &&
+      !this.anyPaperHasFootnotes() &&
+      paginationUnchanged(this.pagSnapshot, this.collectAllBlocks(), this.pageContentHeightPx())
+    ) {
+      this.emitPaginate();
+      return;
+    }
+    // Snapshot the layout ENTERING this re-flow, to detect afterwards whether
+    // the re-flow actually moved anything (see the fixpoint reasoning below).
+    const before = capturePaginationSnapshot(this.collectAllBlocks(), this.pageContentHeightPx());
     // The retry loop lives in `repagination/run.ts`; this method is the
     // DOM-owning host it drives. The adapter literal binds each host
     // method to a private PaperStack operation, so the orchestrator never
     // touches the DOM directly and stays unit-testable with a fake host.
     runRepagination(this.repaginationHost);
+    // Re-arm the snapshot from the freshly distributed layout so the NEXT edit
+    // can skip against it — but ONLY when this re-flow reached a FIXPOINT (it
+    // left the layout unchanged from `before`). `repaginate` is not idempotent:
+    // the first pass after a load/edit can land a break one line off, which a
+    // later pass corrects. Arming on such an intermediate would freeze it —
+    // skipping the corrective pass (a wrong skip). Footnote docs stay disarmed
+    // (null) — their per-page budgets aren't modeled here.
+    const after = capturePaginationSnapshot(this.collectAllBlocks(), this.pageContentHeightPx());
+    this.pagSnapshot = !this.anyPaperHasFootnotes() && layoutStable(before, after) ? after : null;
+  }
+
+  /** Any paper carrying a non-empty footnote zone. Disarms the fast path:
+   *  footnotes steal per-page budget the snapshot doesn't model. */
+  private anyPaperHasFootnotes(): boolean {
+    return this.papers.some((p) => !p.footnotes.classList.contains("is-empty"));
   }
 
   /** Adapter exposing the DOM-owning steps the repagination orchestrator
