@@ -10,6 +10,10 @@
  * live, leaving every other paper untouched — so the pagination survives and an
  * edit that moved no break skips the re-flow entirely.
  *
+ * Only the changed blocks are rendered (via {@link renderBlockForPatch}), not
+ * the whole doc — so the per-edit cost is O(changed blocks), and no images are
+ * re-rendered unless they're inside an edited block.
+ *
  * The morph rule preserves node identity where it matters:
  *   - Same tag + same block-level attributes (the run-level case: typing,
  *     inline formatting — only the block's CHILDREN changed) → keep the live
@@ -20,21 +24,21 @@
  *     the paginator re-flow (acceptable: property edits are rarer and usually
  *     change geometry anyway).
  *
- * Correctness: the fresh nodes come from the real renderer over the current
- * doc, so each patched block is byte-identical to a full render; unchanged
- * blocks keep nodes the caller already proved byte-identical (the reuse gate).
- * So the patched DOM equals a full render — the invariant the PR guards.
+ * Correctness: each patched block is byte-identical to a full render (enforced
+ * by the "incremental render === full render" test); unchanged blocks keep
+ * nodes the caller already proved byte-identical (the reuse gate). So the
+ * patched DOM equals a full render — the invariant the PR guards.
  */
 
 import type { SobreeDocument } from "../../../doc/types";
-import { renderSobreeDocument } from "./index";
+import { renderBlockForPatch } from "./block";
 
 /**
- * Patch the `changedIds` blocks of `doc` in place across `hosts`, sourcing
- * byte-correct nodes from a fresh off-DOM render. Returns `false` when the
- * live DOM can't be patched safely (a changed block is missing, or is split
- * into multiple fragments across papers) — the caller must then fall back to
- * the full wipe-and-render path.
+ * Patch the `changedIds` blocks of `doc` in place across `hosts`. Returns
+ * `false` when a changed block can't be patched safely — missing, split into
+ * multiple fragments across papers, or a kind `renderBlockForPatch` doesn't
+ * handle (only paragraphs / list items) — so the caller falls back to the full
+ * wipe-and-render path.
  */
 export function patchChangedBlocksInPlace(
   doc: SobreeDocument,
@@ -44,55 +48,23 @@ export function patchChangedBlocksInPlace(
 ): boolean {
   if (changedIds.size === 0) return true;
 
-  // Fresh full render off-DOM (no layout cost) so every changed block is
-  // rendered with its real document-order context; we graft only the changed
-  // ones into the live DOM and discard the rest.
-  const scratch = document.createElement("div");
-  renderSobreeDocument(doc, scratch, blockIds);
-  const freshById = indexTopLevelBlocks(scratch);
-
-  // Resolve every target first so a mid-loop bail leaves the live DOM
+  // Resolve + render every target first so a mid-loop bail leaves the live DOM
   // untouched (all-or-nothing patch; the caller's fallback then re-renders).
   const patches: Array<{ live: HTMLElement; fresh: HTMLElement }> = [];
   for (const id of changedIds) {
-    const fresh = freshById.get(id);
     const live = liveBlock(hosts, id);
     // `live === null` means missing OR split into multiple fragments (a
     // paragraph straddling a page break): either way, not safe to patch here.
-    if (!fresh || !live) {
-      revokeDiscardedObjectUrls(scratch);
-      return false;
-    }
+    if (!live) return false;
+    const index = blockIds.indexOf(id);
+    const block = index >= 0 ? doc.body[index] : undefined;
+    if (!block) return false;
+    const fresh = renderBlockForPatch(block, id, live, index, doc);
+    if (!fresh) return false; // a kind the single-block renderer doesn't handle
     patches.push({ live, fresh });
   }
   for (const { live, fresh } of patches) morphBlockInPlace(live, fresh);
-  // The unchanged blocks in `scratch` are thrown away — but the renderer minted
-  // fresh `blob:` object URLs for any images they contain. Revoke them, or a
-  // doc with images would leak one URL per image on every keystroke. Images in
-  // the GRAFTED nodes have already moved into the live DOM, so they're no
-  // longer under `scratch` and are correctly kept.
-  revokeDiscardedObjectUrls(scratch);
   return true;
-}
-
-/** Revoke every `blob:` object URL still referenced under `root` (the
- *  about-to-be-discarded scratch tree). */
-function revokeDiscardedObjectUrls(root: HTMLElement): void {
-  if (typeof URL === "undefined" || typeof URL.revokeObjectURL !== "function") return;
-  for (const img of root.querySelectorAll<HTMLImageElement>('img[src^="blob:"]')) {
-    URL.revokeObjectURL(img.src);
-  }
-}
-
-/** First top-level `[data-block-id]` element per id in a freshly-rendered
- *  tree. First occurrence wins (a table precedes its cell paragraphs). */
-function indexTopLevelBlocks(root: HTMLElement): Map<string, HTMLElement> {
-  const map = new Map<string, HTMLElement>();
-  for (const el of root.querySelectorAll<HTMLElement>("[data-block-id]")) {
-    const id = el.getAttribute("data-block-id");
-    if (id && !map.has(id)) map.set(id, el);
-  }
-  return map;
 }
 
 /** The single live element carrying `id`, or `null` if absent OR present more
