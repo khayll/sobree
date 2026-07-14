@@ -23,6 +23,7 @@ import { applyDocumentToYDoc, projectYDoc } from "../../ydoc";
 import type { EditorContext } from "../context";
 import type { EditorEvents } from "../events";
 import * as parts from "../ops/parts";
+import { patchChangedBlocksInPlace } from "../view/docRenderer/incrementalPatch";
 import { harvestReusableBlocks, renderSobreeDocument } from "../view/docRenderer/index";
 import { bodyStructureSignature } from "../view/docRenderer/reuseSignature";
 import { serializeHostsWithSources } from "../view/docSerialize/index";
@@ -121,18 +122,35 @@ export class ChangePipeline {
     }
 
     // Incremental render: decide which blocks can keep their existing DOM
-    // node (structure unchanged AND content byte-identical), then harvest
-    // those nodes from the live hosts BEFORE the wipe below.
+    // node (structure unchanged AND content byte-identical). A defined
+    // `reuseIds` means the structure is unchanged — the case where we can
+    // patch just the changed blocks IN PLACE instead of wiping the paginated
+    // DOM (see below).
     const nextJson = next.body.map((b) => JSON.stringify(b));
     const reuseIds = this.computeReuseIds(next, nextJson);
 
     this.ctx.setDoc(next);
     this.lastSerialisedBlocks = nextJson;
     const hosts = this.ctx.getContentHosts();
-    const reuse = harvestReusableBlocks(hosts, reuseIds);
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.ctx.host;
-    renderSobreeDocument(this.ctx.doc, firstHost, this.blockIdsArray(), reuse);
+    const blockIds = this.blockIdsArray();
+
+    // Structure unchanged → morph only the changed blocks in place, leaving
+    // every other paper untouched, so pagination survives and PR 3a's skip can
+    // fire. `patchChangedBlocksInPlace` returns false when the live DOM can't
+    // be patched safely (a changed block is split across a page break, or
+    // missing) — then, and for any structural change, fall back to the full
+    // wipe-and-render into paper 0 (the paginator redistributes afterwards).
+    const changedIds =
+      reuseIds !== undefined ? new Set(blockIds.filter((id) => !reuseIds.has(id))) : undefined;
+    const patched =
+      changedIds !== undefined &&
+      patchChangedBlocksInPlace(this.ctx.doc, hosts, blockIds, changedIds);
+    if (!patched) {
+      const reuse = harvestReusableBlocks(hosts, reuseIds);
+      for (const h of hosts) h.replaceChildren();
+      const firstHost = hosts[0] ?? this.ctx.host;
+      renderSobreeDocument(this.ctx.doc, firstHost, blockIds, reuse);
+    }
 
     // Best-effort selection restore (block must still exist + offset still valid).
     if (savedSelection) applySelectionToDom(this.ctx._hosts(), savedSelection);
