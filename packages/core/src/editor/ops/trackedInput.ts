@@ -56,6 +56,12 @@ export interface TrackedInput {
    */
   handleUntrackedDelete(ie: InputEvent): boolean;
   /**
+   * Untracked `insertParagraph` (Enter) / `insertLineBreak` (Shift+Enter) routed
+   * through the typed API (model-first — Phase 3-4). `true` if consumed, `false`
+   * to leave to native (composition or any other inputType).
+   */
+  handleUntrackedNewline(ie: InputEvent): boolean;
+  /**
    * True when the caret sits in a block containing any revision wrapper
    * (`<ins>` / `<del>` / `.sobree-revision-format`). `beforeinput` uses
    * this in mode-OFF to take over the insert path so the browser doesn't
@@ -182,6 +188,46 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     return true;
   }
 
+  /**
+   * Enter — split the current paragraph at the caret (replacing any selected
+   * range first, matching browser semantics). `splitBlock` reads
+   * `ctx.trackChanges`, so the new paragraph mark is `ins`-stamped in tracked
+   * mode and plain untracked. Shared by the tracked and untracked paths.
+   */
+  function splitParagraphAt(sel: Selection): boolean {
+    const at = markedRangeForReplace(sel);
+    if (!at) return false;
+    const result = runs.splitBlock(ctx, at);
+    if (!result.ok) return true;
+    query.placeCaret(ctx, result.value.id, 0);
+    return true;
+  }
+
+  /**
+   * Shift+Enter — a soft `<br>` BreakRun. Carries `revision: ins` in tracked
+   * mode, plain untracked. Shared by the tracked and untracked paths.
+   */
+  function insertLineBreakAt(sel: Selection): boolean {
+    const at = markedRangeForReplace(sel);
+    if (!at) return false;
+    const breakRun: InlineRun = {
+      kind: "break",
+      type: "line",
+      properties: ctx.trackChanges.enabled
+        ? {
+            revision:
+              ctx.trackChanges.author === undefined
+                ? { type: "ins" }
+                : { type: "ins", author: ctx.trackChanges.author },
+          }
+        : {},
+    };
+    const result = runs.insertRun(ctx, at, breakRun);
+    if (!result.ok) return true;
+    query.placeCaret(ctx, at.block.id, at.offset + 1);
+    return true;
+  }
+
   function handleUntrackedInsert(ie: InputEvent): boolean {
     // Composition (IME) stays native-then-reconcile — never intercept it,
     // even if it surfaces as insertText.
@@ -220,6 +266,22 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     if (!result.ok) return true; // consumed but failed — don't fall through
     query.placeCaret(ctx, target.from.block.id, target.from.offset);
     return true;
+  }
+
+  /**
+   * Untracked `insertParagraph` (Enter) / `insertLineBreak` (Shift+Enter)
+   * routed through the typed API (model-first — Phase 3-4). Enter is a
+   * STRUCTURAL edit (block count changes), so the in-place render patch falls
+   * back to a full render for it — correct, and the paginator reflows. Returns
+   * `false` (native) for composition or any other inputType.
+   */
+  function handleUntrackedNewline(ie: InputEvent): boolean {
+    if (ie.isComposing) return false;
+    const sel = ctx.selection.get();
+    if (!sel) return false;
+    if (ie.inputType === "insertParagraph") return splitParagraphAt(sel);
+    if (ie.inputType === "insertLineBreak") return insertLineBreakAt(sel);
+    return false;
   }
 
   function handleBeforeInput(ie: InputEvent): boolean {
@@ -273,35 +335,10 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
         query.placeCaret(ctx, sel.range.from.block.id, sel.range.from.offset);
         return true;
       }
-      case "insertParagraph": {
-        // Enter — split the current paragraph at the caret (replacing any
-        // selected range first, matching browser semantics).
-        const at = markedRangeForReplace(sel);
-        if (!at) return false;
-        const result = runs.splitBlock(ctx, at);
-        if (!result.ok) return true;
-        query.placeCaret(ctx, result.value.id, 0);
-        return true;
-      }
-      case "insertLineBreak": {
-        // Shift+Enter — a soft `<br>` BreakRun carrying `revision: ins`.
-        const at = markedRangeForReplace(sel);
-        if (!at) return false;
-        const breakRun: InlineRun = {
-          kind: "break",
-          type: "line",
-          properties: {
-            revision:
-              ctx.trackChanges.author === undefined
-                ? { type: "ins" }
-                : { type: "ins", author: ctx.trackChanges.author },
-          },
-        };
-        const result = runs.insertRun(ctx, at, breakRun);
-        if (!result.ok) return true;
-        query.placeCaret(ctx, at.block.id, at.offset + 1);
-        return true;
-      }
+      case "insertParagraph":
+        return splitParagraphAt(sel);
+      case "insertLineBreak":
+        return insertLineBreakAt(sel);
       default:
         if (!warned.has(ie.inputType)) {
           warned.add(ie.inputType);
@@ -452,6 +489,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     handleBoundaryMerge,
     handleUntrackedInsert,
     handleUntrackedDelete,
+    handleUntrackedNewline,
     caretInsideRevisionWrapper,
     handleCompositionStart,
     handleCompositionEnd,

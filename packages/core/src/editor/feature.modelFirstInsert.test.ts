@@ -166,3 +166,57 @@ describe("untracked char deletes are model-first (Phase 3-3)", () => {
     ed.destroy();
   });
 });
+
+describe("untracked Enter / line break are model-first (Phase 3-4)", () => {
+  it("insertParagraph splits the paragraph at the caret via the API", () => {
+    const ed = new Editor(document.createElement("div"), {
+      initialDocument: oneLine("HelloWorld"),
+    });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 5); // between "Hello" and "World"
+
+    const ev = fire(ed, { inputType: "insertParagraph" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    const body = ed.getDocument().body as Paragraph[];
+    expect(body).toHaveLength(2);
+    expect(textOf(body[0]!)).toBe("Hello");
+    expect(textOf(body[1]!)).toBe("World");
+    // Untracked ⇒ the new paragraph mark is not a tracked insert.
+    expect(body[1]!.properties.revision).toBeUndefined();
+    ed.destroy();
+  });
+
+  it("insertLineBreak inserts a plain soft break run via the API", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("AB") });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 1); // between A and B
+
+    const ev = fire(ed, { inputType: "insertLineBreak" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    const p = ed.getDocument().body[0] as Paragraph;
+    // Still one block, now with a line break between A and B.
+    expect(ed.getDocument().body).toHaveLength(1);
+    const br = p.runs.find((r) => r.kind === "break");
+    expect(br).toBeDefined();
+    expect((br as { properties: { revision?: unknown } }).properties.revision).toBeUndefined();
+    ed.destroy();
+  });
+
+  it("stamps the split's new paragraph as ins when tracked", () => {
+    const ed = new Editor(document.createElement("div"), {
+      initialDocument: oneLine("HelloWorld"),
+    });
+    document.body.appendChild(host(ed));
+    ed.setTrackChanges({ enabled: true, author: "A" });
+    caret(ed, 0, 5);
+
+    const ev = fire(ed, { inputType: "insertParagraph" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    const body = ed.getDocument().body as Paragraph[];
+    expect(body[1]!.properties.revision?.type).toBe("ins");
+    ed.destroy();
+  });
+});
