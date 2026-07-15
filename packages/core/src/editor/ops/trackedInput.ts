@@ -2,6 +2,7 @@ import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api
 import type { InlineRun, SobreeDocument } from "../../doc/types";
 import type { EditorContext } from "../context";
 import * as query from "../query";
+import { pasteHtmlAtCaret } from "./pasteHtml";
 import * as review from "./review";
 import * as runs from "./runs";
 
@@ -418,8 +419,10 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   }
 
   /**
-   * Insert `text` at the current selection in tracked mode, each `\n`
-   * becoming a `splitBlock`. Used by `onPaste` for plain-text paste.
+   * Insert plain `text` at the current selection, each `\n` becoming a
+   * `splitBlock`. The plain-text fallback for `onPaste` (used tracked AND
+   * untracked — `insertRun` stamps `ins` only when tracked); rich `text/html`
+   * paste goes through `pasteHtmlAtCaret` first.
    */
   function pasteTrackedText(text: string): void {
     const sel = ctx.selection.get();
@@ -473,15 +476,19 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
       return;
     }
 
-    // Tracked-mode text paste — route plain text through insertRun /
-    // splitBlock so the runs carry markers. HTML/rich paste falls back to
-    // plain text by design.
-    if (ctx.trackChanges.enabled) {
-      const text = e.clipboardData?.getData("text/plain") ?? "";
-      if (text === "") return;
+    // Model-first paste (tracked AND untracked — Phase 3-5). Rich `text/html`
+    // is parsed to AST and inserted with formatting; plain text is the
+    // fallback. `insertRun` / `pasteHtmlAtCaret` read `ctx.trackChanges`, so
+    // tracked paste stamps `ins`.
+    const html = e.clipboardData?.getData("text/html") ?? "";
+    if (html !== "") {
       e.preventDefault();
-      pasteTrackedText(text);
+      if (pasteHtmlAtCaret(ctx, html)) return;
     }
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (text === "") return;
+    e.preventDefault();
+    pasteTrackedText(text);
   }
 
   return {
