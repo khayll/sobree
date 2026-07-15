@@ -1,10 +1,46 @@
 import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api";
-import type { InlineRun, SobreeDocument } from "../../doc/types";
+import type { InlineRun, Paragraph, SobreeDocument } from "../../doc/types";
 import type { EditorContext } from "../context";
 import * as query from "../query";
 import { pasteHtmlAtCaret } from "./pasteHtml";
 import * as review from "./review";
 import * as runs from "./runs";
+
+/**
+ * Offset-aligned plain text of a paragraph for word-boundary math: text runs
+ * contribute their characters; every other inline (image, tab, field, …)
+ * contributes ONE object-replacement char, so an index into this string IS an
+ * `InlinePosition` offset (which counts each non-text run as 1) and a word
+ * boundary never runs across a non-text run.
+ */
+function offsetAlignedText(block: Paragraph): string {
+  let out = "";
+  for (const run of block.runs) out += run.kind === "text" ? run.text : "￼";
+  return out;
+}
+
+/** Start offset of a `deleteWordBackward` from `offset`: back over any trailing
+ *  whitespace, then over the preceding word (Unicode word segmentation). */
+function wordBackwardStart(text: string, offset: number): number {
+  if (offset <= 0) return 0;
+  const segs = [
+    ...new Intl.Segmenter(undefined, { granularity: "word" }).segment(text.slice(0, offset)),
+  ];
+  let i = segs.length - 1;
+  while (i >= 0 && !segs[i]!.isWordLike && segs[i]!.segment.trim() === "") i--;
+  return i >= 0 ? segs[i]!.index : 0;
+}
+
+/** End offset of a `deleteWordForward` from `offset`: forward over any leading
+ *  whitespace, then over the following word. */
+function wordForwardEnd(text: string, offset: number): number {
+  if (offset >= text.length) return text.length;
+  const after = text.slice(offset);
+  const segs = [...new Intl.Segmenter(undefined, { granularity: "word" }).segment(after)];
+  let i = 0;
+  while (i < segs.length && !segs[i]!.isWordLike && segs[i]!.segment.trim() === "") i++;
+  return i < segs.length ? offset + segs[i]!.index + segs[i]!.segment.length : text.length;
+}
 
 /**
  * Track-changes *authoring* input — the DOM event handlers that route
@@ -49,10 +85,11 @@ export interface TrackedInput {
    */
   handleUntrackedInsert(ie: InputEvent): boolean;
   /**
-   * Untracked `deleteContentBackward` / `deleteContentForward` routed through
-   * the typed API (model-first — Phase 3-3). `true` if consumed (caller
-   * `preventDefault`s), `false` to leave to native (composition, word deletes,
-   * or a document-edge no-op). A paragraph-boundary caret merges via
+   * Untracked deletes routed through the typed API (model-first): char
+   * (`deleteContent*`), word (`deleteWord*`, Unicode word boundaries), a range
+   * delete over a selection, and `deleteByCut`. `true` if consumed (caller
+   * `preventDefault`s), `false` to leave to native (composition, or a
+   * document-edge no-op). A paragraph-boundary caret merges via
    * {@link handleBoundaryMerge}.
    */
   handleUntrackedDelete(ie: InputEvent): boolean;
@@ -241,28 +278,62 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     return insertTextRun(sel, text);
   }
 
+  /** The word-granularity range a `deleteWord*` removes from the caret, or
+   *  `null` at a paragraph edge (⇒ boundary merge) / non-paragraph. */
+  function wordDeleteRange(at: InlinePosition, backward: boolean): ApiRange | null {
+    const pos = query.refreshedPosition(ctx, at);
+    if (!pos) return null;
+    const block = ctx.doc.body[ctx.registry.indexOf(pos.block.id)];
+    if (block?.kind !== "paragraph") return null;
+    const text = offsetAlignedText(block);
+    if (backward) {
+      if (pos.offset <= 0) return null;
+      const start = wordBackwardStart(text, pos.offset);
+      return start < pos.offset ? { from: { block: pos.block, offset: start }, to: pos } : null;
+    }
+    if (pos.offset >= text.length) return null;
+    const end = wordForwardEnd(text, pos.offset);
+    return end > pos.offset ? { from: pos, to: { block: pos.block, offset: end } } : null;
+  }
+
   /**
-   * Untracked `deleteContentBackward` / `deleteContentForward` routed through the
-   * typed API (model-first — Phase 3-3). Covers the single-char delete and a
-   * range delete (Backspace/Delete over a selection); a caret at a paragraph
-   * boundary delegates to {@link handleBoundaryMerge} (the MERGE, already on the
-   * API). WORD deletes (`deleteWord*`) stay native — the API's one-char range
-   * would silently downgrade a word delete to a char delete. Returns `false`
-   * (native) for composition or any other inputType.
+   * Untracked deletes routed through the typed API (model-first — Phase 3-3 for
+   * char, 3-6 for word / cut). Covers `deleteContent*` (one char), `deleteWord*`
+   * (a Unicode word), a range delete over a selection, and `deleteByCut`. A
+   * caret at a paragraph boundary delegates to {@link handleBoundaryMerge} (the
+   * MERGE, already on the API). Returns `false` (native) for composition or any
+   * other inputType.
    */
   function handleUntrackedDelete(ie: InputEvent): boolean {
     if (ie.isComposing) return false;
-    const back = ie.inputType === "deleteContentBackward";
-    const fwd = ie.inputType === "deleteContentForward";
-    if (!back && !fwd) return false;
     const sel = ctx.selection.get();
     if (!sel) return false;
-    const target = back ? rangeForBackwardDelete(sel) : rangeForForwardDelete(sel);
+
+    // Cut removes the selection only (the `cut` event already copied it).
+    if (ie.inputType === "deleteByCut") {
+      if (sel.kind !== "range") return false;
+      return applyDelete(sel.range);
+    }
+
+    const back = ie.inputType === "deleteContentBackward" || ie.inputType === "deleteWordBackward";
+    const fwd = ie.inputType === "deleteContentForward" || ie.inputType === "deleteWordForward";
+    if (!back && !fwd) return false;
+    const word = ie.inputType === "deleteWordBackward" || ie.inputType === "deleteWordForward";
+
+    let target: ApiRange | null;
+    if (sel.kind === "range") target = sel.range;
+    else if (word) target = wordDeleteRange(sel.at, back);
+    else target = back ? rangeForBackwardDelete(sel) : rangeForForwardDelete(sel);
     // A null range means the caret sits at a paragraph boundary (start for
     // Backspace, end for Delete) — that's a MERGE, or a no-op at the document
     // edge; `handleBoundaryMerge` owns both (and returns false ⇒ native at the
     // edge).
     if (!target) return handleBoundaryMerge(ie);
+    return applyDelete(target);
+  }
+
+  /** Delete `target` and land the caret at its start. `true` once consumed. */
+  function applyDelete(target: ApiRange): boolean {
     const result = runs.deleteRange(ctx, target);
     if (!result.ok) return true; // consumed but failed — don't fall through
     query.placeCaret(ctx, target.from.block.id, target.from.offset);

@@ -155,14 +155,59 @@ describe("untracked char deletes are model-first (Phase 3-3)", () => {
     ed.destroy();
   });
 
-  it("leaves a WORD delete to the native path (API would only remove one char)", () => {
-    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("Hello") });
+  it("deleteWordBackward removes the whole word before the caret", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("foo bar") });
     document.body.appendChild(host(ed));
-    caret(ed, 0, 5);
+    caret(ed, 0, 7); // end
 
     const ev = fire(ed, { inputType: "deleteWordBackward" });
 
-    expect(ev.defaultPrevented).toBe(false);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("foo ");
+    ed.destroy();
+  });
+
+  it("deleteWordForward removes the whole word after the caret", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("foo bar") });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 0); // start
+
+    const ev = fire(ed, { inputType: "deleteWordForward" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe(" bar");
+    ed.destroy();
+  });
+
+  it("deletes only ONE word, stopping at the preceding space", () => {
+    const ed = new Editor(document.createElement("div"), {
+      initialDocument: oneLine("hello world foo"),
+    });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 15); // end
+
+    fire(ed, { inputType: "deleteWordBackward" });
+
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("hello world ");
+    ed.destroy();
+  });
+
+  it("deleteByCut removes the selected range", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: oneLine("Hello") });
+    document.body.appendChild(host(ed));
+    const b = ed.getBlock(0);
+    ed.selection.set({
+      kind: "range",
+      range: {
+        from: { block: { id: b.id, version: b.version }, offset: 1 },
+        to: { block: { id: b.id, version: b.version }, offset: 4 },
+      },
+    });
+
+    const ev = fire(ed, { inputType: "deleteByCut" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("Ho");
     ed.destroy();
   });
 });
