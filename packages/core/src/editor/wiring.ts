@@ -17,6 +17,7 @@ import type * as Y from "yjs";
 import type { History } from "../history";
 import type { EditorContext } from "./context";
 import * as clipboard from "./ops/clipboard";
+import { handleHtmlDrop } from "./ops/pasteDrop";
 import * as runs from "./ops/runs";
 import type { TrackedInput } from "./ops/trackedInput";
 import { attachImageResize } from "./view/imageResize";
@@ -139,8 +140,23 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
       void hooks.trackedInput.onPaste(e as ClipboardEvent);
     }
   });
+  // Internal drag-move (text dragged WITHIN the editor) stays on the native
+  // path for now — routing it as a model-first insert would COPY, not move
+  // (the delete-source half is a follow-up). Only EXTERNAL drops go model-first.
+  let internalDrag = false;
+  listen(host, "dragstart", () => {
+    internalDrag = true;
+  });
+  listen(host, "dragend", () => {
+    internalDrag = false;
+  });
   listen(host, "dragover", (e) => runs.onDragOver(hooks.ctx, e as DragEvent));
-  listen(host, "drop", (e) => void runs.onDrop(hooks.ctx, e as DragEvent));
+  listen(host, "drop", (e) => {
+    const de = e as DragEvent;
+    // External HTML/text drop → model-first insert; an internal move, image
+    // drop, or empty payload falls through (native move / image handler).
+    if (internalDrag || !handleHtmlDrop(hooks.ctx, de)) void runs.onDrop(hooks.ctx, de);
+  });
 
   const detachImageResize = attachImageResize(host);
   cleanups.push(detachImageResize);

@@ -3,6 +3,7 @@ import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument, TextRun } from "../doc/types";
 import { Editor } from "./";
 import type { EditorContext } from "./context";
+import { handleHtmlDrop } from "./ops/pasteDrop";
 import { pasteHtmlAtCaret } from "./ops/pasteInsert";
 
 /**
@@ -128,6 +129,59 @@ describe("model-first rich paste", () => {
     const ed = editor(oneLine("x"));
     caret(ed, 0, 1);
     expect(pasteHtmlAtCaret(ctxOf(ed), "<meta charset='utf-8'>")).toBe(false);
+    ed.destroy();
+  });
+});
+
+/** A DragEvent stub — jsdom has no layout, so `caretRangeFromPoint` returns null
+ *  and the drop falls back to the current selection (which the test sets). */
+function dropEvent(html: string, plain = ""): DragEvent {
+  const dt = {
+    types: [html ? "text/html" : "", plain ? "text/plain" : ""].filter(Boolean),
+    files: [] as unknown,
+    items: [] as unknown,
+    getData: (t: string) => (t === "text/html" ? html : t === "text/plain" ? plain : ""),
+  };
+  return {
+    dataTransfer: dt,
+    clientX: 0,
+    clientY: 0,
+    preventDefault() {},
+  } as unknown as DragEvent;
+}
+
+describe("model-first drop", () => {
+  it("inserts a dropped HTML fragment at the caret via the API", () => {
+    const ed = editor(oneLine("Hello"));
+    caret(ed, 0, 5);
+
+    expect(handleHtmlDrop(ctxOf(ed), dropEvent("<b>DROP</b>"))).toBe(true);
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("HelloDROP");
+    ed.destroy();
+  });
+
+  it("wraps a plain-text drop into paragraphs", () => {
+    const ed = editor(oneLine("X"));
+    caret(ed, 0, 1);
+
+    handleHtmlDrop(ctxOf(ed), dropEvent("", "a\nb"));
+
+    const texts = (ed.getDocument().body as Paragraph[]).map(textOf);
+    expect(texts).toEqual(["Xa", "b"]);
+    ed.destroy();
+  });
+
+  it("falls through (returns false) for an image drop", () => {
+    const ed = editor(oneLine("x"));
+    const dt = {
+      types: ["Files"],
+      files: [{ type: "image/png" }],
+      items: [],
+      getData: () => "",
+    };
+    const ev = { dataTransfer: dt, preventDefault() {} } as unknown as DragEvent;
+
+    expect(handleHtmlDrop(ctxOf(ed), ev)).toBe(false);
     ed.destroy();
   });
 });
