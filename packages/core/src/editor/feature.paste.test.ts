@@ -3,7 +3,7 @@ import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument, TextRun } from "../doc/types";
 import { Editor } from "./";
 import type { EditorContext } from "./context";
-import { handleHtmlDrop } from "./ops/pasteDrop";
+import { handleHtmlDrop, handleInternalDragMove, moveContent } from "./ops/pasteDrop";
 import { pasteHtmlAtCaret } from "./ops/pasteInsert";
 
 /**
@@ -182,6 +182,90 @@ describe("model-first drop", () => {
     const ev = { dataTransfer: dt, preventDefault() {} } as unknown as DragEvent;
 
     expect(handleHtmlDrop(ctxOf(ed), ev)).toBe(false);
+    ed.destroy();
+  });
+});
+
+describe("internal drag-move", () => {
+  const ref = (ed: Editor, i: number) => {
+    const b = ed.getBlock(i);
+    return { id: b.id, version: b.version };
+  };
+  const twoLines = (a: string, b: string): SobreeDocument => {
+    const d = emptyDocument();
+    d.body = [paragraph([text(a)]), paragraph([text(b)])];
+    return d;
+  };
+
+  it("moves a same-block selection to before itself", () => {
+    const ed = editor(oneLine("ABCDEF"));
+    const r = ref(ed, 0);
+    moveContent(
+      ctxOf(ed),
+      { from: { block: r, offset: 2 }, to: { block: r, offset: 4 } },
+      { block: r, offset: 0 },
+      "CD",
+    );
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("CDABEF");
+    ed.destroy();
+  });
+
+  it("moves a same-block selection to after itself (offset adjusted for the delete)", () => {
+    const ed = editor(oneLine("ABCDEF"));
+    const r = ref(ed, 0);
+    moveContent(
+      ctxOf(ed),
+      { from: { block: r, offset: 2 }, to: { block: r, offset: 4 } },
+      { block: r, offset: 6 },
+      "CD",
+    );
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("ABEFCD");
+    ed.destroy();
+  });
+
+  it("no-ops a drop inside the moved range", () => {
+    const ed = editor(oneLine("ABCDEF"));
+    const r = ref(ed, 0);
+    moveContent(
+      ctxOf(ed),
+      { from: { block: r, offset: 2 }, to: { block: r, offset: 4 } },
+      { block: r, offset: 3 },
+      "CD",
+    );
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("ABCDEF");
+    ed.destroy();
+  });
+
+  it("moves a selection into another block", () => {
+    const ed = editor(twoLines("ABC", "XYZ"));
+    const r0 = ref(ed, 0);
+    const r1 = ref(ed, 1);
+    moveContent(
+      ctxOf(ed),
+      { from: { block: r0, offset: 0 }, to: { block: r0, offset: 3 } },
+      { block: r1, offset: 3 },
+      "ABC",
+    );
+    const body = ed.getDocument().body as Paragraph[];
+    expect(textOf(body[0]!)).toBe("");
+    expect(textOf(body[1]!)).toBe("XYZABC");
+    ed.destroy();
+  });
+
+  it("leaves a cross-block SOURCE to the native path (returns false)", () => {
+    const ed = editor(oneLine("AB"));
+    const r = ref(ed, 0);
+    const source = {
+      from: { block: r, offset: 0 },
+      to: { block: { id: "other-block", version: 0 }, offset: 1 },
+    };
+    const ev = {
+      dataTransfer: { getData: () => "x" },
+      clientX: 0,
+      clientY: 0,
+      preventDefault() {},
+    } as unknown as DragEvent;
+    expect(handleInternalDragMove(ctxOf(ed), ev, source)).toBe(false);
     ed.destroy();
   });
 });

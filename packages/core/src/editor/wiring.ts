@@ -14,10 +14,11 @@
  */
 
 import type * as Y from "yjs";
+import type { Range as ApiRange } from "../doc/api";
 import type { History } from "../history";
 import type { EditorContext } from "./context";
 import * as clipboard from "./ops/clipboard";
-import { handleHtmlDrop } from "./ops/pasteDrop";
+import { handleHtmlDrop, handleInternalDragMove } from "./ops/pasteDrop";
 import * as runs from "./ops/runs";
 import type { TrackedInput } from "./ops/trackedInput";
 import { attachImageResize } from "./view/imageResize";
@@ -140,22 +141,30 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
       void hooks.trackedInput.onPaste(e as ClipboardEvent);
     }
   });
-  // Internal drag-move (text dragged WITHIN the editor) stays on the native
-  // path for now — routing it as a model-first insert would COPY, not move
-  // (the delete-source half is a follow-up). Only EXTERNAL drops go model-first.
-  let internalDrag = false;
+  // Capture the dragged selection at dragstart: a non-null `dragSource` marks an
+  // INTERNAL drag (text dragged within the editor) and carries its source range.
+  let dragSource: ApiRange | null = null;
   listen(host, "dragstart", () => {
-    internalDrag = true;
+    const sel = hooks.ctx.selection.get();
+    dragSource = sel?.kind === "range" ? sel.range : null;
   });
   listen(host, "dragend", () => {
-    internalDrag = false;
+    dragSource = null;
   });
   listen(host, "dragover", (e) => runs.onDragOver(hooks.ctx, e as DragEvent));
   listen(host, "drop", (e) => {
     const de = e as DragEvent;
-    // External HTML/text drop → model-first insert; an internal move, image
-    // drop, or empty payload falls through (native move / image handler).
-    if (internalDrag || !handleHtmlDrop(hooks.ctx, de)) void runs.onDrop(hooks.ctx, de);
+    const source = dragSource;
+    dragSource = null;
+    if (source) {
+      // Internal drag-MOVE — model-first for a same-block source, native
+      // fallback otherwise.
+      if (!handleInternalDragMove(hooks.ctx, de, source)) void runs.onDrop(hooks.ctx, de);
+    } else if (!handleHtmlDrop(hooks.ctx, de)) {
+      // External HTML/text drop → model-first insert; image / empty falls
+      // through to the image handler.
+      void runs.onDrop(hooks.ctx, de);
+    }
   });
 
   const detachImageResize = attachImageResize(host);
