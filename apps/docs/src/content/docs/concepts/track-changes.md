@@ -132,7 +132,7 @@ land with the right markers:
 | `insertParagraph` | `splitBlock` | `revision: ins` on the new paragraph's properties |
 | `insertLineBreak` (Shift+Enter) | `insertRun(BreakRun)` | `revision: ins` on the break run's properties |
 | `deleteContentBackward` / `Forward` / `deleteWord…` / `deleteByCut` | `deleteRange` | `revision: del` on each text run in range |
-| Paste (`text/plain`) | `onPaste` → `insertRun` + `splitBlock` per `\n` | each line ins, each break ins |
+| Paste (`text/html` / `text/plain`) | `onPaste` → `pasteHtmlAtCaret` (rich HTML → AST), plain-text fallback | pasted runs + new paragraph marks `ins` |
 | IME composition | `compositionstart`/`compositionend` snapshot-restore | final composed string lands via `insertRun` |
 | `applyRunProperties` | direct (no input event) | snapshot to `revisionFormat.before`, then apply patch |
 
@@ -236,11 +236,10 @@ reviewer might hit.
   applies as a direct edit. Word records this as a paragraph-property
   revision (`<w:pPrChange>`); we'd model it as
   `ParagraphProperties.revisionFormat` parallel to the run-level field.
-- **Image-file paste / drag-drop in tracked mode** doesn't stamp the
-  drawing as a revision. The `stampInsertRevision` helper is text-only
-  (mirrors `decideRevisionRun`); extending to non-text runs is small.
-- **Rich HTML paste** in tracked mode falls back to `text/plain` by
-  design — the marker contract is easier to keep tight that way.
+- **Image / non-text runs in a tracked paste or drag-drop** aren't
+  stamped as a revision. `pasteHtmlAtCaret` stamps `ins` on text runs
+  and hyperlink children (via `stampInsertRevision`, which is text-only,
+  mirroring `decideRevisionRun`); extending it to drawings is small.
 - **Cell paragraph-mark del** falls back to strip-the-marker rather
   than merging cell paragraphs across boundaries; cross-cell merge
   is a structural edit kept separate.
