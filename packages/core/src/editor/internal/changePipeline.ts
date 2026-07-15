@@ -38,12 +38,17 @@ export class ChangePipeline {
   /** Cached last-seen per-block JSON strings, for diff-based version bumps. */
   private lastSerialisedBlocks: string[] = [];
   /**
-   * True when DOM mutations since the last sync were user-driven (typing,
-   * paste, drag-drop image). False right after we render from AST — the
-   * DOM is then a projection of the doc, and reading it back can't tell us
-   * anything the AST doesn't already know, while losing any fidelity the
-   * serializer drops (column widths, vAlign, …). `getDocument` and
-   * `emitChangeNow` sync only when this flag is set.
+   * True when the DOM was mutated NATIVELY since the last sync — i.e. by a path
+   * that isn't model-first. Since Phase 3 the common edits (type, delete, Enter,
+   * paste, drop) are intercepted at `beforeinput` and routed through the ops
+   * API, so they never set this. What still does: IME composition
+   * (native-then-reconcile by design), internal drag-MOVE, and any un-routed
+   * `inputType` that falls through to native — the remaining consumers of the
+   * `syncFromDom` read-back. False right after we render from AST — the DOM is
+   * then a projection of the doc, and reading it back can't tell us anything the
+   * AST doesn't already know, while losing any fidelity the serializer drops
+   * (column widths, vAlign, …). `getDocument` and `emitChangeNow` sync only when
+   * this flag is set.
    */
   private domDirty = false;
   /**
@@ -201,10 +206,11 @@ export class ChangePipeline {
   }
 
   /**
-   * Ensure the doc reflects the latest edits. If the DOM has been dirtied
-   * by user typing / paste / drop, pull the latest content out of it and
-   * bump affected block versions. If the last mutation came from the API,
-   * the AST is already current — skip the (lossy) DOM-to-AST round-trip.
+   * Ensure the doc reflects the latest edits. If the DOM was dirtied by a
+   * NATIVE edit (IME composition, internal drag-move, an un-routed inputType),
+   * pull the latest content out of it and bump affected block versions. The
+   * model-first edits (type / delete / Enter / paste / drop) already mutated the
+   * AST, so the DOM isn't dirty and this skips the (lossy) DOM-to-AST round-trip.
    */
   ensureCurrent(): SobreeDocument {
     if (!this.domDirty && !this.frames.hasDirtyFrames()) return this.ctx.doc;
