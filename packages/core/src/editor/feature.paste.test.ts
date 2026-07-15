@@ -3,7 +3,7 @@ import { emptyDocument, paragraph, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument, TextRun } from "../doc/types";
 import { Editor } from "./";
 import type { EditorContext } from "./context";
-import { pasteHtmlAtCaret } from "./ops/pasteHtml";
+import { pasteHtmlAtCaret } from "./ops/pasteInsert";
 
 /**
  * Model-first rich paste (Phase 3-5): clipboard HTML is parsed to AST and
