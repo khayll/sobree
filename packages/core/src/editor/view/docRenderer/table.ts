@@ -192,7 +192,7 @@ function renderRow(
     if (row.heightRule === "exact") tr.dataset.rowHeightExact = "";
   }
   let col = 0;
-  for (const cell of row.cells) {
+  for (const [cellIndex, cell] of row.cells.entries()) {
     const gridSpan = cell.gridSpan ?? 1;
     if (cell.vMerge === "continue") {
       col += gridSpan;
@@ -218,6 +218,14 @@ function renderRow(
     );
     if (gridSpan > 1) el.setAttribute("colspan", String(gridSpan));
     if (rowSpan > 1) el.setAttribute("rowspan", String(rowSpan));
+    // Publish this cell's AST address (`rows[rowIndex].cells[cellIndex]`).
+    // The renderer is the only thing that knows it: `vMerge: "continue"`
+    // cells emit no element and page fragments carry a subset of the rows,
+    // so a consumer counting `<td>`s or `<tr>`s reads an address that
+    // diverges from the AST under merges, splits and repeated headers.
+    // Stamping it here keeps that geometry single-owned, and the stamp
+    // survives fragmentation because fragments CLONE these nodes.
+    el.dataset.cell = `${rowIndex},${cellIndex}`;
     tr.appendChild(el);
     col += gridSpan;
   }

@@ -1,5 +1,6 @@
 import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api";
-import { runPropertiesAt } from "../../doc/runs";
+import { paragraphTargetAt } from "../../doc/mutations/paragraphTarget";
+import { runPropertiesAt, runsLength } from "../../doc/runs";
 import type { InlineRun, Paragraph, SobreeDocument } from "../../doc/types";
 import type { EditorContext } from "../context";
 import * as query from "../query";
@@ -122,7 +123,10 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     if (sel.at.offset === 0) return null;
     const at = query.refreshedPosition(ctx, sel.at);
     if (!at) return null;
-    return { from: { block: at.block, offset: at.offset - 1 }, to: at };
+    // Spread `at` so both endpoints keep the same `cell` address — building
+    // `{ block, offset }` fresh would leave `from` outside the cell, and the
+    // range would read as spanning two of them.
+    return { from: { ...at, offset: at.offset - 1 }, to: at };
   }
 
   /** Forward-delete equivalent of `rangeForBackwardDelete`. */
@@ -131,9 +135,13 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     if (sel.kind === "range") return sel.range;
     const at = query.refreshedPosition(ctx, sel.at);
     if (!at) return null;
-    const info = query.getBlockById(ctx, at.block.id);
-    if (!info || at.offset >= info.length) return null;
-    return { from: at, to: { block: at.block, offset: at.offset + 1 } };
+    // Bound by the addressed PARAGRAPH's length — inside a cell the block's
+    // own length is the whole table's, which would let Delete run past the
+    // end of the cell text.
+    const para = paragraphAt(at);
+    if (!para) return null;
+    if (at.offset >= runsLength(para.runs)) return null;
+    return { from: at, to: { ...at, offset: at.offset + 1 } };
   }
 
   /**
@@ -183,22 +191,49 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
    * failed insert, so the caller never falls through to the lossy native path).
    */
   /**
-   * The BODY paragraph `at` targets, or `null` when the ops can't act there.
-   * `insertRun` / `splitBlock` / `deleteRange` all require a body paragraph, so
-   * a caret inside a table cell is unsupported — the untracked handlers must
-   * DECLINE those and let the native path run, or the keystroke is consumed and
-   * silently dropped (table cells become uneditable).
+   * The paragraph `at` targets — a body paragraph, or one inside a table cell
+   * — or `null` when the ops can't act there (a non-paragraph block, or a cell
+   * whose content isn't addressable by index; see `paragraphTargetAt`).
+   *
+   * Every caller must DECLINE a `null` so the native path runs. Consuming a
+   * position the ops then fail on `preventDefault`s the keystroke and drops it
+   * silently, which is what made table cells uneditable.
    */
-  function bodyParagraphAt(at: InlinePosition): Paragraph | null {
-    if (at.cell) return null;
-    const block = ctx.doc.body[ctx.registry.indexOf(at.block.id)];
-    return block?.kind === "paragraph" ? block : null;
+  function paragraphAt(at: InlinePosition): Paragraph | null {
+    return paragraphTargetAt(ctx.doc, ctx.registry, at)?.paragraph ?? null;
   }
 
   /** Whether the typed-API handlers can act on this selection at all. */
+  function inParagraph(sel: Selection): boolean {
+    if (!sel) return false;
+    if (sel.kind === "range" && !sameCellAddress(sel.range.from, sel.range.to)) return false;
+    return paragraphAt(sel.kind === "caret" ? sel.at : sel.range.from) !== null;
+  }
+
+  /**
+   * Whether both endpoints sit in the same cell (or both outside any cell).
+   * A range from a cell to elsewhere is a structural edit the ops don't model.
+   */
+  function sameCellAddress(a: InlinePosition, b: InlinePosition): boolean {
+    if (!a.cell || !b.cell) return !a.cell && !b.cell;
+    return (
+      a.cell.row === b.cell.row &&
+      a.cell.col === b.cell.col &&
+      a.cell.blockIndex === b.cell.blockIndex
+    );
+  }
+
+  /**
+   * Structural block ops (`splitBlock`, the paragraph-boundary merge) address
+   * `doc.body` directly, so they're body-only even though inline edits now work
+   * inside cells. Enter and a boundary Backspace/Delete in a cell decline here
+   * and take the native path.
+   */
   function inBodyParagraph(sel: Selection): boolean {
     if (!sel) return false;
-    return bodyParagraphAt(sel.kind === "caret" ? sel.at : sel.range.from) !== null;
+    const at = sel.kind === "caret" ? sel.at : sel.range.from;
+    if (at.cell) return false;
+    return inParagraph(sel);
   }
 
   function insertTextRun(sel: Selection, text: string): boolean {
@@ -207,12 +242,12 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     // Typing CONTINUES the formatting under the caret. The native path
     // inherited it implicitly (the browser typed into the existing styled
     // span); an API insert must reproduce it or a styled run comes out plain.
-    const para = bodyParagraphAt(insertAt);
+    const para = paragraphAt(insertAt);
     const properties = para ? runPropertiesAt(para.runs, insertAt.offset) : {};
     const run: InlineRun = { kind: "text", text, properties };
     const result = runs.insertRun(ctx, insertAt, run);
     if (!result.ok) return true; // consumed but failed — don't fall through
-    query.placeCaret(ctx, insertAt.block.id, insertAt.offset + text.length);
+    query.placeCaretAt(ctx, { ...insertAt, offset: insertAt.offset + text.length });
     return true;
   }
 
@@ -252,7 +287,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     };
     const result = runs.insertRun(ctx, at, breakRun);
     if (!result.ok) return true;
-    query.placeCaret(ctx, at.block.id, at.offset + 1);
+    query.placeCaretAt(ctx, { ...at, offset: at.offset + 1 });
     return true;
   }
 
@@ -264,7 +299,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     const text = ie.data ?? "";
     if (!text) return false;
     const sel = ctx.selection.get();
-    if (!sel || !inBodyParagraph(sel)) return false;
+    if (!sel || !inParagraph(sel)) return false;
     return insertTextRun(sel, text);
   }
 
@@ -273,17 +308,17 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   function wordDeleteRange(at: InlinePosition, backward: boolean): ApiRange | null {
     const pos = query.refreshedPosition(ctx, at);
     if (!pos) return null;
-    const block = ctx.doc.body[ctx.registry.indexOf(pos.block.id)];
-    if (block?.kind !== "paragraph") return null;
+    const block = paragraphAt(pos);
+    if (!block) return null;
     const text = offsetAlignedText(block);
     if (backward) {
       if (pos.offset <= 0) return null;
       const start = wordBackwardStart(text, pos.offset);
-      return start < pos.offset ? { from: { block: pos.block, offset: start }, to: pos } : null;
+      return start < pos.offset ? { from: { ...pos, offset: start }, to: pos } : null;
     }
     if (pos.offset >= text.length) return null;
     const end = wordForwardEnd(text, pos.offset);
-    return end > pos.offset ? { from: pos, to: { block: pos.block, offset: end } } : null;
+    return end > pos.offset ? { from: pos, to: { ...pos, offset: end } } : null;
   }
 
   /**
@@ -297,7 +332,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   function handleUntrackedDelete(ie: InputEvent): boolean {
     if (ie.isComposing) return false;
     const sel = ctx.selection.get();
-    if (!sel || !inBodyParagraph(sel)) return false;
+    if (!sel || !inParagraph(sel)) return false;
 
     // Cut removes the selection only (the `cut` event already copied it).
     if (ie.inputType === "deleteByCut") {
@@ -326,7 +361,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   function applyDelete(target: ApiRange): boolean {
     const result = runs.deleteRange(ctx, target);
     if (!result.ok) return true; // consumed but failed — don't fall through
-    query.placeCaret(ctx, target.from.block.id, target.from.offset);
+    query.placeCaretAt(ctx, target.from);
     return true;
   }
 
@@ -340,15 +375,26 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   function handleUntrackedNewline(ie: InputEvent): boolean {
     if (ie.isComposing) return false;
     const sel = ctx.selection.get();
-    if (!sel || !inBodyParagraph(sel)) return false;
-    if (ie.inputType === "insertParagraph") return splitParagraphAt(sel);
-    if (ie.inputType === "insertLineBreak") return insertLineBreakAt(sel);
+    if (!sel) return false;
+    // Enter SPLITS a block (`doc.body` splice) — body-only. Shift+Enter just
+    // inserts a BreakRun, which works in a cell like any other run.
+    if (ie.inputType === "insertParagraph") {
+      return inBodyParagraph(sel) ? splitParagraphAt(sel) : false;
+    }
+    if (ie.inputType === "insertLineBreak") {
+      return inParagraph(sel) ? insertLineBreakAt(sel) : false;
+    }
     return false;
   }
 
   function handleBeforeInput(ie: InputEvent): boolean {
     const sel = ctx.selection.get();
     if (!sel) return false;
+    // Inline edits (insert / delete) work in body paragraphs AND table cells;
+    // the structural cases below re-check with `inBodyParagraph`. A position
+    // the ops can't serve must fall through to native rather than be consumed
+    // and dropped — in tracked mode that dropped every keystroke in a cell.
+    if (!inParagraph(sel)) return false;
 
     switch (ie.inputType) {
       case "insertText":
@@ -362,8 +408,14 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
         // Caret at offset 0 of a paragraph: "delete the paragraph break
         // before this paragraph" → mark its paragraph-mark del (merge on
         // accept). Own pending `ins` cancels instead. See
-        // markParagraphBreakForDelete.
-        if (ctx.trackChanges.enabled && sel.kind === "caret" && sel.at.offset === 0) {
+        // markParagraphBreakForDelete. Body-only — it indexes `doc.body`, and
+        // a cell paragraph has no preceding body break to mark.
+        if (
+          ctx.trackChanges.enabled &&
+          sel.kind === "caret" &&
+          sel.at.offset === 0 &&
+          !sel.at.cell
+        ) {
           const idx = ctx.registry.indexOf(sel.at.block.id);
           if (idx > 0) {
             const result = review.markParagraphBreakForDelete(ctx, idx);
@@ -378,7 +430,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
         if (!target) return false;
         const result = runs.deleteRange(ctx, target);
         if (!result.ok) return true;
-        query.placeCaret(ctx, target.from.block.id, target.from.offset);
+        query.placeCaretAt(ctx, target.from);
         return true;
       }
       case "deleteContentForward":
@@ -387,17 +439,21 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
         if (!target) return false;
         const result = runs.deleteRange(ctx, target);
         if (!result.ok) return true;
-        query.placeCaret(ctx, target.from.block.id, target.from.offset);
+        query.placeCaretAt(ctx, target.from);
         return true;
       }
       case "deleteByCut": {
         if (sel.kind !== "range") return false;
         const result = runs.deleteRange(ctx, sel.range);
         if (!result.ok) return true;
-        query.placeCaret(ctx, sel.range.from.block.id, sel.range.from.offset);
+        query.placeCaretAt(ctx, sel.range.from);
         return true;
       }
       case "insertParagraph":
+        // `splitBlock` splices `doc.body`, so Enter inside a cell declines to
+        // the native path (which handles it, untracked — see the class of gap
+        // the `default:` warning below describes).
+        if (!inBodyParagraph(sel)) return false;
         return splitParagraphAt(sel);
       case "insertLineBreak":
         return insertLineBreakAt(sel);

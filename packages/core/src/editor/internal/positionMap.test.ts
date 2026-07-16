@@ -267,12 +267,16 @@ describe("positionMap — table cell addressing", () => {
   // A table is ONE registered block, but its cells hold their own content.
   // A caret in a cell must capture (and restore) the cell address so undo
   // lands back in the cell, not at the table boundary.
+  //
+  // `data-cell` is part of the render protocol (like `data-block-id`): the
+  // renderer stamps each cell's AST address because a counted `<td>`/`<tr>`
+  // index diverges from the AST under merges and page splits.
   function setupTable(): { host: HTMLElement; registry: BlockRegistry } {
     const host = document.createElement("div");
     host.innerHTML = `
       <table data-block-id="b1" data-block-index="0"><tbody>
-        <tr><td><p>Genus</p></td><td><p>Storey</p></td></tr>
-        <tr><td><p>Cirrus</p></td><td><p>High</p></td></tr>
+        <tr><td data-cell="0,0"><p>Genus</p></td><td data-cell="0,1"><p>Storey</p></td></tr>
+        <tr><td data-cell="1,0"><p>Cirrus</p></td><td data-cell="1,1"><p>High</p></td></tr>
       </tbody></table>`.trim();
     document.body.appendChild(host);
     const registry = new BlockRegistry();
@@ -291,6 +295,56 @@ describe("positionMap — table cell addressing", () => {
     expect(pos?.block.id).toBe("b1");
     expect(pos?.cell).toEqual({ row: 1, col: 0, blockIndex: 0 });
     expect(pos?.offset).toBe(6);
+  });
+
+  it("reads the AST address off the stamp, not the rendered <td> index", () => {
+    // `vMerge: "continue"` cells render NOTHING, so in a row occluded by a
+    // merge above, the surviving cell's rendered index is 0 while its AST
+    // index is 1. Counting `<td>`s would address the wrong cell — and a
+    // write there would land in the wrong cell's runs.
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <table data-block-id="b1" data-block-index="0"><tbody>
+        <tr><td data-cell="0,0" rowspan="2"><p>Merged</p></td><td data-cell="0,1"><p>Top</p></td></tr>
+        <tr><td data-cell="1,1"><p>Under</p></td></tr>
+      </tbody></table>`.trim();
+    document.body.appendChild(host);
+    const registry = new BlockRegistry();
+    registry.reset(1);
+
+    const under = [...host.querySelectorAll("td")].find((td) => td.textContent === "Under")!;
+    const pos = positionFromDomPoint([host], registry, under.querySelector("p")!.firstChild!, 5);
+    // Rendered index in its row is 0; the AST address is col 1.
+    expect(under.previousElementSibling).toBeNull();
+    expect(pos?.cell).toEqual({ row: 1, col: 1, blockIndex: 0 });
+
+    // …and it round-trips back to that same cell rather than to col 0.
+    const pt = domPointFromPosition([host], {
+      block: registry.refAt(0),
+      offset: 5,
+      cell: { row: 1, col: 1, blockIndex: 0 },
+    });
+    const node = pt?.node ?? null;
+    const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element | null);
+    expect(el?.closest("td")?.textContent).toBe("Under");
+  });
+
+  it("reports no cell address for a table the renderer didn't stamp", () => {
+    // Foreign markup (e.g. a pasted table) carries no AST address. Guessing
+    // one by counting would silently point at some other cell, so callers
+    // get `undefined` and decline instead.
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <table data-block-id="b1" data-block-index="0"><tbody>
+        <tr><td><p>Foreign</p></td></tr>
+      </tbody></table>`.trim();
+    document.body.appendChild(host);
+    const registry = new BlockRegistry();
+    registry.reset(1);
+    const td = host.querySelector("td")!;
+    const pos = positionFromDomPoint([host], registry, td.querySelector("p")!.firstChild!, 3);
+    expect(pos?.block.id).toBe("b1");
+    expect(pos?.cell).toBeUndefined();
   });
 
   it("restores a cell caret to the SAME cell (round-trip), not the table start", () => {

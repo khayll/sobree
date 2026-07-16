@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyDocument, paragraph, table, tableCell, tableRow, text } from "../doc/builders";
-import type { Paragraph, SobreeDocument, TextRun } from "../doc/types";
+import type { Paragraph, SobreeDocument, Table, TextRun } from "../doc/types";
 import { Editor } from "./";
 
 /**
@@ -250,37 +250,162 @@ describe("untracked char deletes are model-first (Phase 3-3)", () => {
   });
 });
 
-describe("positions the ops can't handle fall through to native (not swallowed)", () => {
-  /** A caret inside a TABLE CELL. `insertRun`/`splitBlock`/`deleteRange` all
-   *  require a BODY paragraph, so the handlers must decline — consuming the
-   *  event there would silently drop the keystroke (uneditable cells). */
+describe("table cells are editable through the ops", () => {
+  /** One table, one cell, one paragraph — the addressable shape. */
   function tableDoc(): SobreeDocument {
     const d = emptyDocument();
     d.body = [table([tableRow([tableCell([paragraph([text("cell")])])])])];
     return d;
   }
 
-  for (const inputType of ["insertText", "deleteContentBackward", "insertParagraph"]) {
-    it(`declines ${inputType} when the caret is in a table cell`, () => {
-      const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
-      document.body.appendChild(host(ed));
-      const b = ed.getBlock(0);
-      ed.selection.set({
-        kind: "caret",
-        at: {
-          block: { id: b.id, version: b.version },
-          offset: 2,
-          cell: { row: 0, col: 0, blockIndex: 0 },
-        },
-      });
-
-      const ev = fire(ed, { inputType, ...(inputType === "insertText" ? { data: "Z" } : {}) });
-
-      // NOT consumed ⇒ the browser's native path still handles the edit.
-      expect(ev.defaultPrevented).toBe(false);
-      ed.destroy();
+  function cellCaret(ed: Editor, offset: number): void {
+    const b = ed.getBlock(0);
+    ed.selection.set({
+      kind: "caret",
+      at: {
+        block: { id: b.id, version: b.version },
+        offset,
+        cell: { row: 0, col: 0, blockIndex: 0 },
+      },
     });
   }
+
+  function cellParagraph(ed: Editor, row = 0, col = 0): Paragraph {
+    const t = ed.getDocument().body[0] as Table;
+    return t.rows[row]!.cells[col]!.content[0] as Paragraph;
+  }
+
+  it("types into the cell's own paragraph", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
+    document.body.appendChild(host(ed));
+    cellCaret(ed, 4);
+
+    const ev = fire(ed, { inputType: "insertText", data: "Z" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(textOf(cellParagraph(ed))).toBe("cellZ");
+    ed.destroy();
+  });
+
+  it("deletes backward inside the cell", () => {
+    const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
+    document.body.appendChild(host(ed));
+    cellCaret(ed, 4);
+
+    fire(ed, { inputType: "deleteContentBackward" });
+
+    expect(textOf(cellParagraph(ed))).toBe("cel");
+    ed.destroy();
+  });
+
+  it("RECORDS a tracked insert in a cell rather than dropping the keystroke", () => {
+    // The reported gap: tracked-mode typing in a cell was consumed and
+    // silently dropped, so cells were uneditable with track changes ON.
+    const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
+    document.body.appendChild(host(ed));
+    ed.setTrackChanges({ enabled: true, author: "Ada" });
+    cellCaret(ed, 4);
+
+    const ev = fire(ed, { inputType: "insertText", data: "Z" });
+
+    expect(ev.defaultPrevented).toBe(true);
+    const runs = cellParagraph(ed).runs as TextRun[];
+    const inserted = runs.find((r) => r.text === "Z");
+    // …and it's MARKED — falling through to native would have typed an
+    // untracked character, which for track changes is silent data loss.
+    expect(inserted?.properties.revision).toEqual({ type: "ins", author: "Ada" });
+    ed.destroy();
+  });
+
+  it("writes to the cell the ADDRESS names, not the one at that rendered index", () => {
+    const ed = new Editor(document.createElement("div"), {
+      initialDocument: (() => {
+        const d = emptyDocument();
+        d.body = [
+          table([
+            tableRow([tableCell([paragraph([text("a")])]), tableCell([paragraph([text("b")])])]),
+          ]),
+        ];
+        return d;
+      })(),
+    });
+    document.body.appendChild(host(ed));
+    const b = ed.getBlock(0);
+    ed.selection.set({
+      kind: "caret",
+      at: {
+        block: { id: b.id, version: b.version },
+        offset: 1,
+        cell: { row: 0, col: 1, blockIndex: 0 },
+      },
+    });
+
+    fire(ed, { inputType: "insertText", data: "!" });
+
+    expect(textOf(cellParagraph(ed, 0, 1))).toBe("b!");
+    expect(textOf(cellParagraph(ed, 0, 0))).toBe("a"); // untouched
+    ed.destroy();
+  });
+
+  it("declines insertParagraph in a cell (structural — stays native)", () => {
+    // `splitBlock` splices `doc.body`; a cell paragraph isn't in it. Declining
+    // leaves the native path to handle Enter, as before.
+    const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
+    document.body.appendChild(host(ed));
+    cellCaret(ed, 2);
+
+    const ev = fire(ed, { inputType: "insertParagraph" });
+
+    expect(ev.defaultPrevented).toBe(false);
+    ed.destroy();
+  });
+
+  it("declines a range that spans two cells", () => {
+    // Both endpoints share the TABLE's block id, so a same-block delete would
+    // otherwise rewrite one cell's runs using the other cell's offsets.
+    const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
+    document.body.appendChild(host(ed));
+    const b = ed.getBlock(0);
+    ed.selection.set({
+      kind: "range",
+      range: {
+        from: {
+          block: { id: b.id, version: b.version },
+          offset: 1,
+          cell: { row: 0, col: 0, blockIndex: 0 },
+        },
+        to: {
+          block: { id: b.id, version: b.version },
+          offset: 1,
+          cell: { row: 0, col: 1, blockIndex: 0 },
+        },
+      },
+    });
+
+    const ev = fire(ed, { inputType: "deleteContentBackward" });
+
+    expect(ev.defaultPrevented).toBe(false);
+    expect(textOf(cellParagraph(ed))).toBe("cell");
+    ed.destroy();
+  });
+
+  it("declines a cell whose content isn't addressable by index (a list)", () => {
+    // `renderBlocks` groups numbered paragraphs into one <ul>, so the rendered
+    // child index no longer maps onto `cell.content` — guessing would edit the
+    // wrong paragraph.
+    const listPara = paragraph([text("one")]);
+    listPara.properties.numbering = { numId: 1, level: 0 };
+    const d = emptyDocument();
+    d.body = [table([tableRow([tableCell([listPara])])])];
+    const ed = new Editor(document.createElement("div"), { initialDocument: d });
+    document.body.appendChild(host(ed));
+    cellCaret(ed, 3);
+
+    const ev = fire(ed, { inputType: "insertText", data: "Z" });
+
+    expect(ev.defaultPrevented).toBe(false);
+    ed.destroy();
+  });
 });
 
 describe("untracked Enter / line break are model-first (Phase 3-4)", () => {

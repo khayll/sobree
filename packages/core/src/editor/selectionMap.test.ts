@@ -39,7 +39,7 @@ describe("selectionMap — selection descriptor survives a DOM rebuild", () => {
   it("re-resolves a table-cell caret to the same cell after a rebuild", () => {
     const host = document.createElement("div");
     host.innerHTML = `<table data-block-id="t1" data-block-index="0"><tbody>
-      <tr><td><p>a</p></td><td><p>Cirrus</p></td></tr></tbody></table>`;
+      <tr><td data-cell="0,0"><p>a</p></td><td data-cell="0,1"><p>Cirrus</p></td></tr></tbody></table>`;
     document.body.appendChild(host);
     const cellP = (host.querySelectorAll("td")[1] as HTMLElement).querySelector("p")!;
     place(cellP.firstChild!, 6);
@@ -49,7 +49,7 @@ describe("selectionMap — selection descriptor survives a DOM rebuild", () => {
     expect(desc?.start.cell).toEqual({ row: 0, col: 1, blockIndex: 0 });
 
     host.innerHTML = `<div class="paper"><table data-block-id="t1" data-block-index="0"><tbody>
-      <tr><td><p>a</p></td><td><p>Cirrus</p></td></tr></tbody></table></div>`;
+      <tr><td data-cell="0,0"><p>a</p></td><td data-cell="0,1"><p>Cirrus</p></td></tr></tbody></table></div>`;
     expect(applySelectionDescriptor([host], desc)).toBe(true);
     const an = window.getSelection()!.anchorNode;
     const el = an?.nodeType === Node.TEXT_NODE ? an.parentElement : (an as Element | null);

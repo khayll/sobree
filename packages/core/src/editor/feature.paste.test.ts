@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { emptyDocument, paragraph, text } from "../doc/builders";
-import type { Paragraph, SobreeDocument, TextRun } from "../doc/types";
+import { emptyDocument, paragraph, table, tableCell, tableRow, text } from "../doc/builders";
+import type { Paragraph, SobreeDocument, Table, TextRun } from "../doc/types";
 import { Editor } from "./";
 import type { EditorContext } from "./context";
 import { handleHtmlDrop, handleInternalDragMove, moveContent } from "./ops/pasteDrop";
@@ -266,6 +266,111 @@ describe("internal drag-move", () => {
       preventDefault() {},
     } as unknown as DragEvent;
     expect(handleInternalDragMove(ctxOf(ed), ev, source)).toBe(false);
+    ed.destroy();
+  });
+});
+
+describe("paste inside a table cell", () => {
+  // Reported: select a cell's contents, copy, put the caret at the end of that
+  // cell and paste — the pasted text appeared BELOW the table instead of in the
+  // cell. The block ops address `doc.body`, so a cell caret resolved to the
+  // TABLE and the paste was appended after it.
+  function tableDoc(cellText = "Cirrus"): SobreeDocument {
+    const d = emptyDocument();
+    d.body = [table([tableRow([tableCell([paragraph([text(cellText)])])])])];
+    return d;
+  }
+
+  function cellCaret(ed: Editor, offset: number, blockIndex = 0): void {
+    const b = ed.getBlock(0);
+    ed.selection.set({
+      kind: "caret",
+      at: {
+        block: { id: b.id, version: b.version },
+        offset,
+        cell: { row: 0, col: 0, blockIndex },
+      },
+    });
+  }
+
+  function cellContent(ed: Editor): Paragraph[] {
+    const t = ed.getDocument().body[0] as Table;
+    return t.rows[0]!.cells[0]!.content as Paragraph[];
+  }
+
+  it("splices a pasted paragraph INTO the cell, not after the table", () => {
+    const ed = editor(tableDoc());
+    cellCaret(ed, 6); // "Cirrus|"
+
+    pasteHtmlAtCaret(ctxOf(ed), "<b>Cirrus</b>");
+
+    const body = ed.getDocument().body;
+    expect(body).toHaveLength(1); // nothing appended after the table
+    expect(body[0]!.kind).toBe("table");
+    const content = cellContent(ed);
+    expect(content).toHaveLength(1); // inline splice keeps ONE paragraph
+    expect(textOf(content[0]!)).toBe("CirrusCirrus");
+    ed.destroy();
+  });
+
+  it("splices at the caret, not just at the end", () => {
+    const ed = editor(tableDoc());
+    cellCaret(ed, 3); // "Cir|rus"
+
+    pasteHtmlAtCaret(ctxOf(ed), "XX");
+
+    expect(textOf(cellContent(ed)[0]!)).toBe("CirXXrus");
+    ed.destroy();
+  });
+
+  it("keeps the pasted run's formatting", () => {
+    const ed = editor(tableDoc());
+    cellCaret(ed, 6);
+
+    pasteHtmlAtCaret(ctxOf(ed), "<b>B</b>");
+
+    const runs = cellContent(ed)[0]!.runs as TextRun[];
+    expect(runs.find((r) => r.text === "B")?.properties.bold).toBe(true);
+    ed.destroy();
+  });
+
+  it("puts multi-paragraph content in the CELL's content, not the body", () => {
+    const ed = editor(tableDoc());
+    cellCaret(ed, 6);
+
+    pasteHtmlAtCaret(ctxOf(ed), "<p>one</p><p>two</p>");
+
+    expect(ed.getDocument().body).toHaveLength(1); // still just the table
+    const content = cellContent(ed);
+    expect(content.map(textOf)).toEqual(["Cirrusone", "two"]);
+    ed.destroy();
+  });
+
+  it("stamps a tracked paste in the cell as an insert", () => {
+    const ed = editor(tableDoc());
+    ed.setTrackChanges({ enabled: true, author: "Ada" });
+    cellCaret(ed, 6);
+
+    pasteHtmlAtCaret(ctxOf(ed), "New");
+
+    const runs = cellContent(ed)[0]!.runs as TextRun[];
+    expect(runs.find((r) => r.text === "New")?.properties.revision).toEqual({
+      type: "ins",
+      author: "Ada",
+    });
+    ed.destroy();
+  });
+
+  it("declines (rather than pasting elsewhere) when the cell isn't addressable", () => {
+    const listPara = paragraph([text("one")]);
+    listPara.properties.numbering = { numId: 1, level: 0 };
+    const d = emptyDocument();
+    d.body = [table([tableRow([tableCell([listPara])])])];
+    const ed = editor(d);
+    cellCaret(ed, 3);
+
+    expect(pasteHtmlAtCaret(ctxOf(ed), "<p>x</p>")).toBe(false);
+    expect(ed.getDocument().body).toHaveLength(1); // nothing appended
     ed.destroy();
   });
 });

@@ -58,13 +58,20 @@ export interface InlinePosition {
   block: BlockRef;
   offset: number;
   /**
-   * Set when the position is inside a table cell: the rendered cell address
-   * the `offset` is measured within — `row` (the cell's `<tr>` index in the
-   * table), `col` (its cell index in that row), `blockIndex` (which content
-   * block inside the cell). Absent for ordinary block positions, where
-   * `offset` is the character offset into `block` itself. Lets caret capture
-   * / restore (e.g. undo) land back in the same cell instead of collapsing to
-   * the table boundary.
+   * Set when the position is inside a table cell: the AST address of the cell
+   * the `offset` is measured within — `row` indexes `table.rows`, `col`
+   * indexes that row's `cells`, and `blockIndex` indexes the cell's `content`.
+   * Absent for ordinary block positions, where `offset` is the character
+   * offset into `block` itself.
+   *
+   * These are AST indices, NOT rendered ones: `vMerge: "continue"` cells emit
+   * no element, tables fragment across pages, and header rows repeat, so a
+   * counted `<td>`/`<tr>` index diverges from the AST exactly where merges and
+   * page splits occur. The renderer stamps the address it used (`data-cell`)
+   * and `positionMap` reads it back.
+   *
+   * Lets caret capture / restore (e.g. undo) land back in the same cell, and
+   * lets the ops address the cell's paragraph — see `paragraphTargetAt`.
    */
   cell?: { row: number; col: number; blockIndex: number };
 }

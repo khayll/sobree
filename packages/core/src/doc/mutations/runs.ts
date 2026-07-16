@@ -18,6 +18,7 @@ import {
   splitRunsAt,
 } from "../runs";
 import type { InlineRun, Paragraph, RevisionMark } from "../types";
+import { paragraphTargetAt } from "./paragraphTarget";
 import { snapshotFormatRevision, stampDeleteRevision, stampInsertRevision } from "./revisions";
 import {
   type BlockRegistryView,
@@ -57,6 +58,19 @@ export function checkRangeRefs(
 }
 
 /**
+ * Whether two positions address the same cell — true when neither is in a
+ * cell (both plain body positions), false when only one is.
+ */
+function sameCell(a: InlinePosition, b: InlinePosition): boolean {
+  if (!a.cell || !b.cell) return !a.cell && !b.cell;
+  return (
+    a.cell.row === b.cell.row &&
+    a.cell.col === b.cell.col &&
+    a.cell.blockIndex === b.cell.blockIndex
+  );
+}
+
+/**
  * Apply a runs transform to the runs covered by `range` (single- or
  * multi-block). Assumes locks are already checked — the public entry
  * points ({@link applyRunPropertiesMutation}, {@link deleteRangeMutation})
@@ -72,12 +86,26 @@ export function mutateRunsInRangeMutation(
   if (fromIdx < 0 || toIdx < 0 || fromIdx > toIdx) {
     return fail({ code: "range-out-of-order", details: "range endpoints" });
   }
+  // A range from a cell out to another block (or across cells of different
+  // tables) is a structural, multi-block edit the cell path doesn't model —
+  // the loop below indexes `doc.body` directly and would rewrite the TABLE
+  // block as if it were a paragraph. Decline; the caller falls back.
+  if (fromIdx !== toIdx && (range.from.cell || range.to.cell)) {
+    return fail({ code: "invalid-position", details: "range crosses a table cell boundary" });
+  }
   const nextBody = input.doc.body.slice();
   const bumps: Mutation[] = [];
 
   if (fromIdx === toIdx) {
-    const block = nextBody[fromIdx];
-    if (!block || block.kind !== "paragraph") {
+    // One paragraph — a body block, or one inside a table cell. A range
+    // spanning two different cells of the same table shares the table's
+    // block id and would land here too; `sameCell` sends it to the caller
+    // to decline rather than silently rewriting one cell's runs.
+    if (!sameCell(range.from, range.to)) {
+      return fail({ code: "invalid-position", details: "range spans two cells" });
+    }
+    const target = paragraphTargetAt(input.doc, input.registry, range.from);
+    if (!target) {
       return fail({
         code: "invalid-state",
         details: `block ${range.from.block.id} not a paragraph`,
@@ -86,31 +114,31 @@ export function mutateRunsInRangeMutation(
     if (range.from.offset === range.to.offset) {
       return fail({ code: "range-empty", details: "zero-width range" });
     }
-    const headSplit = splitRunsAt(block.runs, range.from.offset);
+    const headSplit = splitRunsAt(target.paragraph.runs, range.from.offset);
     const tailSplit = splitRunsAt(headSplit.after, range.to.offset - range.from.offset);
     const middle = transform(tailSplit.before);
     const merged = mergeAdjacentTextRuns([...headSplit.before, ...middle, ...tailSplit.after]);
-    nextBody[fromIdx] = { ...block, runs: merged };
-    bumps.push({ type: "bump", index: fromIdx });
-  } else {
-    // Multi-block range: first block's tail, all middle blocks, last
-    // block's head get transformed.
-    for (let i = fromIdx; i <= toIdx; i++) {
-      const block = nextBody[i];
-      if (!block || block.kind !== "paragraph") continue;
-      let newRuns: InlineRun[];
-      if (i === fromIdx) {
-        const split = splitRunsAt(block.runs, range.from.offset);
-        newRuns = mergeAdjacentTextRuns([...split.before, ...transform(split.after)]);
-      } else if (i === toIdx) {
-        const split = splitRunsAt(block.runs, range.to.offset);
-        newRuns = mergeAdjacentTextRuns([...transform(split.before), ...split.after]);
-      } else {
-        newRuns = mergeAdjacentTextRuns(transform(block.runs));
-      }
-      nextBody[i] = { ...block, runs: newRuns };
-      bumps.push({ type: "bump", index: i });
+    return okPatch({ body: target.withParagraph({ ...target.paragraph, runs: merged }) }, [
+      { type: "bump", index: target.index },
+    ]);
+  }
+  // Multi-block range: first block's tail, all middle blocks, last
+  // block's head get transformed.
+  for (let i = fromIdx; i <= toIdx; i++) {
+    const block = nextBody[i];
+    if (!block || block.kind !== "paragraph") continue;
+    let newRuns: InlineRun[];
+    if (i === fromIdx) {
+      const split = splitRunsAt(block.runs, range.from.offset);
+      newRuns = mergeAdjacentTextRuns([...split.before, ...transform(split.after)]);
+    } else if (i === toIdx) {
+      const split = splitRunsAt(block.runs, range.to.offset);
+      newRuns = mergeAdjacentTextRuns([...transform(split.before), ...split.after]);
+    } else {
+      newRuns = mergeAdjacentTextRuns(transform(block.runs));
     }
+    nextBody[i] = { ...block, runs: newRuns };
+    bumps.push({ type: "bump", index: i });
   }
   return okPatch({ body: nextBody }, bumps);
 }
@@ -150,17 +178,17 @@ export function insertRunMutation(
 ): DocumentMutationResult<BlockRef> {
   const lock = checkRefs(input.registry, [at.block]);
   if (lock) return lock;
-  const index = input.registry.indexOf(at.block.id);
-  const block = input.doc.body[index];
-  if (!block || block.kind !== "paragraph") {
+  // Resolves a body paragraph OR a paragraph inside a table cell; a cell
+  // position bumps its TABLE, which rides the ordinary version model.
+  const target = paragraphTargetAt(input.doc, input.registry, at);
+  if (!target) {
     return fail({ code: "invalid-position", details: "target is not a paragraph" });
   }
   const stamped = track.enabled ? stampInsertRevision(run, track.author) : run;
-  const { before, after } = splitRunsAt(block.runs, at.offset);
+  const { before, after } = splitRunsAt(target.paragraph.runs, at.offset);
   const merged = mergeAdjacentTextRuns([...before, stamped, ...after]);
-  const next = input.doc.body.slice();
-  next[index] = { ...block, runs: merged };
-  return okPatch({ body: next }, [{ type: "bump", index }]);
+  const next = target.withParagraph({ ...target.paragraph, runs: merged });
+  return okPatch({ body: next }, [{ type: "bump", index: target.index }]);
 }
 
 /**
@@ -180,6 +208,13 @@ export function deleteRangeMutation(
   const lock = checkRangeRefs(input.registry, range, expect);
   if (lock) return lock;
   if (range.from.block.id !== range.to.block.id) {
+    // Cross-BLOCK deletes walk `doc.body` and merge paragraph marks; a cell
+    // endpoint isn't a body paragraph, so decline rather than corrupt the
+    // table. (Same-table cross-cell ranges share one block id and are caught
+    // by `sameCell` in `mutateRunsInRangeMutation`.)
+    if (range.from.cell || range.to.cell) {
+      return fail({ code: "invalid-position", details: "range crosses a table cell boundary" });
+    }
     return track.enabled
       ? deleteRangeAcrossBlocksTracked(input, range, track.author)
       : deleteRangeAcrossBlocksPlain(input, range);

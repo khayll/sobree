@@ -118,6 +118,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "0,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -133,6 +136,9 @@
                   "text": "Key",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "0,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -160,6 +166,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "1,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -175,6 +184,9 @@
                   "text": "alpha",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "1,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -196,6 +208,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "2,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -211,6 +226,9 @@
                   "text": "beta",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "2,1",
+                  },
                   "children": [
                     {
                       "attrs": {
