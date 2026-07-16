@@ -1,5 +1,38 @@
 # @sobree/core
 
+## 0.1.69
+
+### Patch Changes
+
+- 4e28281: Incremental render: an edit now re-renders only the block(s) that actually
+  changed, moving every other block's existing DOM node into the new tree
+  instead of rebuilding the whole document. Before, every edit ran
+  `renderSobreeDocument` → `host.replaceChildren()`, discarding and rebuilding
+  all block nodes.
+
+  Gated on an unchanged document structure signature (the context-affecting
+  fields a block's render depends on — page-break deferral, section index,
+  list grouping, outline, contextual spacing) AND byte-identical block JSON,
+  so a reused node's render context is provably identical; any structural
+  change falls back to the full render. Output is byte-identical to the full
+  render (guarded by a parity test) — this is a pure performance / node-stability
+  change. Preserved DOM nodes mean a caret or overlay in an untouched block
+  survives an edit, which also steadies remote-cursor overlays and avoids
+  re-rendering the whole document when a collaborator edits elsewhere.
+
+- f31ff2f: Model-first editing: every common edit path now flows through the typed ops
+  API into the AST, and the DOM is re-rendered from it. Previously most edits
+  were applied by the browser's native contentEditable and read back out of the
+  DOM — a lossy seam where anything the renderer couldn't express in HTML (and
+  anything the browser normalised on its way in) could be silently dropped.
+  Typing, Enter, Backspace/Delete (including word-wise), paste and drag-move
+  are now all AST mutations; the native path remains only as a fallback for
+  positions the ops don't yet cover, such as table cells.
+
+  Rich HTML paste is the visible upshot: pasted content is parsed to blocks and
+  runs, so formatting, headings, lists, links and tables survive. It previously
+  fell back to `text/plain`, pasting styled content as bare text.
+
 ## 0.1.68
 
 ### Patch Changes
