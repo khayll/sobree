@@ -42,6 +42,34 @@ describe("parseClipboardHtml", () => {
     expect(run.properties.bold).toBe(true);
   });
 
+  it("keeps inline CSS carried on a SEMANTIC tag, not just a span", () => {
+    // Chrome's clipboard HTML inlines computed styles onto whatever element it
+    // copied — for text inside `<strong>`, that's the <strong> itself. Dropping
+    // its style attr loses colour/small-caps on paste (the reported bug: copying
+    // an orange small-caps word and pasting it back rendered plain black bold).
+    const { blocks } = parseClipboardHtml(
+      "<meta charset='utf-8'><strong style=\"color:#F2A900;font-size:11pt;font-variant-caps:small-caps\">almanac</strong>",
+    );
+    const run = runsOf(blocks[0] as Paragraph)[0]!;
+    expect(run.properties.bold).toBe(true);
+    expect(run.properties.color).toBe("#F2A900");
+    expect(run.properties.smallCaps).toBe(true);
+    expect(run.properties.fontSizePt).toBe(11);
+  });
+
+  it("keeps inline CSS on other semantic tags (em / u)", () => {
+    const { blocks } = parseClipboardHtml(
+      "<p><em style='color:#112233'>a</em><u style='font-size:9pt'>b</u></p>",
+    );
+    const p = blocks[0] as Paragraph;
+    const a = p.runs.find((r) => r.kind === "text" && r.text === "a") as TextRun;
+    const b = p.runs.find((r) => r.kind === "text" && r.text === "b") as TextRun;
+    expect(a.properties.italic).toBe(true);
+    expect(a.properties.color).toBe("#112233");
+    expect(b.properties.underline).toBe("single");
+    expect(b.properties.fontSizePt).toBe(9);
+  });
+
   it("maps headings to Heading styles", () => {
     const { blocks } = parseClipboardHtml("<h1>Title</h1><h3>Sub</h3>");
     expect((blocks[0] as Paragraph).properties.styleId).toBe("Heading1");

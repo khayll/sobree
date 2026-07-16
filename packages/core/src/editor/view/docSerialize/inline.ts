@@ -56,39 +56,40 @@ function walk(node: Node, inherited: RunProperties, out: InlineRun[]): void {
     case "a": {
       const href = node.getAttribute("href") ?? "";
       const children: InlineRun[] = [];
-      for (const child of Array.from(node.childNodes)) walk(child, inherited, children);
+      const linkProps = withStyle(node, inherited, {});
+      for (const child of Array.from(node.childNodes)) walk(child, linkProps, children);
       const link: HyperlinkRun = { kind: "hyperlink", href, children };
       out.push(link);
       return;
     }
     case "strong":
     case "b":
-      descend(node, { ...inherited, bold: true }, out);
+      descend(node, withStyle(node, inherited, { bold: true }), out);
       return;
     case "em":
     case "i":
-      descend(node, { ...inherited, italic: true }, out);
+      descend(node, withStyle(node, inherited, { italic: true }), out);
       return;
     case "u":
     case "ins":
-      descend(node, { ...inherited, underline: "single" }, out);
+      descend(node, withStyle(node, inherited, { underline: "single" }), out);
       return;
     case "s":
     case "del":
     case "strike":
-      descend(node, { ...inherited, strike: true }, out);
+      descend(node, withStyle(node, inherited, { strike: true }), out);
       return;
     case "sup":
-      descend(node, { ...inherited, verticalAlign: "superscript" }, out);
+      descend(node, withStyle(node, inherited, { verticalAlign: "superscript" }), out);
       return;
     case "sub":
-      descend(node, { ...inherited, verticalAlign: "subscript" }, out);
+      descend(node, withStyle(node, inherited, { verticalAlign: "subscript" }), out);
       return;
     case "mark":
-      descend(node, { ...inherited, highlight: "yellow" }, out);
+      descend(node, withStyle(node, inherited, { highlight: "yellow" }), out);
       return;
     case "code":
-      descend(node, { ...inherited, fontFamily: "Consolas" }, out);
+      descend(node, withStyle(node, inherited, { fontFamily: "Consolas" }), out);
       return;
     case "span": {
       const merged = mergeStyleAttribute(inherited, node.getAttribute("style"));
@@ -102,6 +103,22 @@ function walk(node: Node, inherited: RunProperties, out: InlineRun[]): void {
       descend(node, mergeStyleAttribute(inherited, node.getAttribute("style")), out);
       return;
   }
+}
+
+/**
+ * Run properties for a semantic inline element: the tag's own mark (bold /
+ * italic / …) layered over `inherited`, then the element's own inline `style`
+ * merged ON TOP so an explicit declaration wins.
+ *
+ * Load-bearing for PASTE: foreign clipboard HTML inlines computed styles onto
+ * whichever element it copied — for text inside a `<strong>`, that's the
+ * `<strong>` itself — so reading only the tag's mark and ignoring its `style`
+ * silently drops colour / small-caps / size (a copied orange small-caps word
+ * pasted back as plain bold). Sobree's own render never puts a `style` on a
+ * semantic tag, so this is a no-op for the read-back path.
+ */
+function withStyle(el: HTMLElement, inherited: RunProperties, mark: RunProperties): RunProperties {
+  return mergeStyleAttribute({ ...inherited, ...mark }, el.getAttribute("style"));
 }
 
 function descend(el: HTMLElement, inherited: RunProperties, out: InlineRun[]): void {

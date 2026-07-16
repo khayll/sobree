@@ -130,6 +130,42 @@ function mergeRunProps(prev: RunProperties, patch: RunPropertiesPatch): RunPrope
 }
 
 /**
+ * The run formatting a character typed at `offset` should INHERIT — the
+ * formatting of the character to its LEFT, which is what every editor
+ * continues; at the very start there is none, so the first run's is used.
+ *
+ * Load-bearing for model-first typing: the native contentEditable path used to
+ * inherit implicitly (the browser typed into the existing styled span), so an
+ * API insert must reproduce it or typing in a styled run comes out unformatted.
+ *
+ * Tracking metadata (`revision` / `revisionFormat`) and comment membership
+ * (`commentIds`) are deliberately NOT inherited — they're owned by the mutation
+ * engine / comment API, not by character formatting.
+ */
+export function runPropertiesAt(runs: readonly InlineRun[], offset: number): RunProperties {
+  if (runs.length === 0) return {};
+  const target = Math.max(0, offset - 1);
+  let pos = 0;
+  for (const run of runs) {
+    const len = runLength(run);
+    if (target < pos + len) return formattingOf(run);
+    pos += len;
+  }
+  return formattingOf(runs[runs.length - 1]!);
+}
+
+/** A run's character formatting, minus the metadata typing must not carry. */
+function formattingOf(run: InlineRun): RunProperties {
+  const props = (run as { properties?: RunProperties }).properties;
+  if (!props) return {};
+  const { revision, revisionFormat, commentIds, ...formatting } = props;
+  void revision;
+  void revisionFormat;
+  void commentIds;
+  return formatting;
+}
+
+/**
  * Concatenate runs and merge adjacent TextRuns with identical property
  * shapes. Minor cleanup for operations that leave fragmentation behind.
  */
