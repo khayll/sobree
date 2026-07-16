@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as Y from "yjs";
 import { defaultSection, emptyDocument, paragraph, text } from "./doc/builders";
 import type { SobreeDocument } from "./doc/types";
 import { Sobree } from "./sobree";
@@ -102,6 +103,35 @@ describe("Sobree façade: vAlign through PageSetup", () => {
     // Round-trip: getSectionSetup should return what we set.
     expect(sobree.getSectionSetup(0).verticalAlign).toBe("center");
     sobree.destroy();
+  });
+
+  it("applies section[0] vAlign when the doc arrives via ydoc (the refresh path)", () => {
+    // The reported bug: refreshing the almanac rendered a vertically CENTRED
+    // page 1 top-aligned. On refresh the host passes only `ydoc` — no
+    // `initialDocument` — so `this.setup` starts as DEFAULT_PAGE_SETUP
+    // (verticalAlign "top"). `syncStackSections` composes section 0 FROM
+    // `this.setup`, so seeding the stack before `syncSetupFromDocument` had
+    // re-derived the setup from the AST published vAlign "top", and nothing
+    // re-pushed sections afterwards. Not a Y.Doc parity issue — the AST's
+    // vAlign round-trips fine; it was the ORDER of the two syncs.
+    const seed = new Y.Doc();
+    const first = new Sobree(document.createElement("div"), {
+      ydoc: seed,
+      initialDocument: multiSectionDoc(),
+    });
+
+    // Refresh: a fresh peer hydrated from the persisted state, ydoc ONLY.
+    const fresh = new Y.Doc();
+    Y.applyUpdate(fresh, Y.encodeStateAsUpdate(seed));
+    const { sobree } = setupSobree({ ydoc: fresh });
+
+    expect(sobree.getSectionSetup(0).verticalAlign).toBe("center");
+    const paper0 = (sobree as unknown as { stack: { papers: { content: HTMLElement }[] } }).stack
+      .papers[0]!;
+    expect(paper0.content.style.justifyContent).toBe("center");
+
+    sobree.destroy();
+    first.destroy();
   });
 
   it("getSectionCount() returns 1 for an empty-default doc", () => {

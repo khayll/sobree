@@ -161,14 +161,21 @@ export class Sobree {
     // Optional renderer-version badge (debug aid, off by default).
     if (options.versionBadge) this.versionBadgeTeardown = mountVersionBadge();
 
+    // Re-derive `setup` from doc.sections[0] in case the doc was
+    // pre-hydrated (e.g. from IndexedDB) before Sobree existed — the
+    // change-event-driven sync below only fires on subsequent edits.
+    //
+    // MUST run BEFORE `syncStackSections`, which composes section 0 FROM
+    // `this.setup` (only refs / titlePage / zone offsets are read back off the
+    // AST). Seeding sections first composes them from DEFAULT_PAGE_SETUP —
+    // whose `verticalAlign` is "top" — and nothing re-pushes them afterwards,
+    // so a vertically centred page 1 rendered top-aligned on every reload. The
+    // `change` listener below already sequences these two the same way.
+    this.syncSetupFromDocument();
     // Seed the stack with the initial document's sections so the very
     // first pagination applies per-section vAlign correctly. Subsequent
     // changes refresh sections through the `change` listener below.
     this.syncStackSections();
-    // Re-derive `setup` from doc.sections[0] in case the doc was
-    // pre-hydrated (e.g. from IndexedDB) before Sobree existed — the
-    // change-event-driven sync below only fires on subsequent edits.
-    this.syncSetupFromDocument();
     // Initial pagination. Without this, a doc that was already loaded
     // into the editor (via Y.Doc hydration, pre-seeded `initialDocument`,
     // or any path that didn't fire a `change` after Sobree subscribed)
