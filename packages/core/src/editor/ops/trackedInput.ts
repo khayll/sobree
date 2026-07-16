@@ -1,5 +1,6 @@
 import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api";
-import type { InlineRun, SobreeDocument } from "../../doc/types";
+import { runPropertiesAt } from "../../doc/runs";
+import type { InlineRun, Paragraph, SobreeDocument } from "../../doc/types";
 import type { EditorContext } from "../context";
 import * as query from "../query";
 import { pasteHtmlAtCaret } from "./pasteInsert";
@@ -181,10 +182,34 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
    * untracked model-first insert. Returns `true` once consumed (even on a
    * failed insert, so the caller never falls through to the lossy native path).
    */
+  /**
+   * The BODY paragraph `at` targets, or `null` when the ops can't act there.
+   * `insertRun` / `splitBlock` / `deleteRange` all require a body paragraph, so
+   * a caret inside a table cell is unsupported — the untracked handlers must
+   * DECLINE those and let the native path run, or the keystroke is consumed and
+   * silently dropped (table cells become uneditable).
+   */
+  function bodyParagraphAt(at: InlinePosition): Paragraph | null {
+    if (at.cell) return null;
+    const block = ctx.doc.body[ctx.registry.indexOf(at.block.id)];
+    return block?.kind === "paragraph" ? block : null;
+  }
+
+  /** Whether the typed-API handlers can act on this selection at all. */
+  function inBodyParagraph(sel: Selection): boolean {
+    if (!sel) return false;
+    return bodyParagraphAt(sel.kind === "caret" ? sel.at : sel.range.from) !== null;
+  }
+
   function insertTextRun(sel: Selection, text: string): boolean {
     const insertAt = markedRangeForReplace(sel);
     if (!insertAt) return false;
-    const run: InlineRun = { kind: "text", text, properties: {} };
+    // Typing CONTINUES the formatting under the caret. The native path
+    // inherited it implicitly (the browser typed into the existing styled
+    // span); an API insert must reproduce it or a styled run comes out plain.
+    const para = bodyParagraphAt(insertAt);
+    const properties = para ? runPropertiesAt(para.runs, insertAt.offset) : {};
+    const run: InlineRun = { kind: "text", text, properties };
     const result = runs.insertRun(ctx, insertAt, run);
     if (!result.ok) return true; // consumed but failed — don't fall through
     query.placeCaret(ctx, insertAt.block.id, insertAt.offset + text.length);
@@ -239,7 +264,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     const text = ie.data ?? "";
     if (!text) return false;
     const sel = ctx.selection.get();
-    if (!sel) return false;
+    if (!sel || !inBodyParagraph(sel)) return false;
     return insertTextRun(sel, text);
   }
 
@@ -272,7 +297,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   function handleUntrackedDelete(ie: InputEvent): boolean {
     if (ie.isComposing) return false;
     const sel = ctx.selection.get();
-    if (!sel) return false;
+    if (!sel || !inBodyParagraph(sel)) return false;
 
     // Cut removes the selection only (the `cut` event already copied it).
     if (ie.inputType === "deleteByCut") {
@@ -315,7 +340,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   function handleUntrackedNewline(ie: InputEvent): boolean {
     if (ie.isComposing) return false;
     const sel = ctx.selection.get();
-    if (!sel) return false;
+    if (!sel || !inBodyParagraph(sel)) return false;
     if (ie.inputType === "insertParagraph") return splitParagraphAt(sel);
     if (ie.inputType === "insertLineBreak") return insertLineBreakAt(sel);
     return false;

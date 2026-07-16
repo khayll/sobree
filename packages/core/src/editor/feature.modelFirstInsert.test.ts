@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyDocument, paragraph, text } from "../doc/builders";
+import { emptyDocument, paragraph, table, tableCell, tableRow, text } from "../doc/builders";
 import type { Paragraph, SobreeDocument, TextRun } from "../doc/types";
 import { Editor } from "./";
 
@@ -79,6 +79,44 @@ describe("untracked insertText is model-first (Phase 3-2)", () => {
 
     expect(ev.defaultPrevented).toBe(true);
     expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("Bye");
+    ed.destroy();
+  });
+
+  it("inherits the formatting under the caret (typing continues the run's style)", () => {
+    // The native path inherited implicitly (browser typed into the styled span);
+    // the API insert must reproduce it or a styled run comes out plain.
+    const d = emptyDocument();
+    d.body = [paragraph([text("Hi", { bold: true, color: "#F2A900", smallCaps: true })])];
+    const ed = new Editor(document.createElement("div"), { initialDocument: d });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 2); // end of the styled run
+
+    fire(ed, { inputType: "insertText", data: "!" });
+
+    const runsOut = (ed.getDocument().body[0] as Paragraph).runs as TextRun[];
+    expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("Hi!");
+    // Merged into the styled run ⇒ one run, formatting intact.
+    for (const r of runsOut) {
+      expect(r.properties.bold).toBe(true);
+      expect(r.properties.color).toBe("#F2A900");
+      expect(r.properties.smallCaps).toBe(true);
+    }
+    ed.destroy();
+  });
+
+  it("inherits from the char to the LEFT at a formatting boundary", () => {
+    const d = emptyDocument();
+    d.body = [paragraph([text("ab", { bold: true }), text("cd", { italic: true })])];
+    const ed = new Editor(document.createElement("div"), { initialDocument: d });
+    document.body.appendChild(host(ed));
+    caret(ed, 0, 2); // between the bold and italic runs → continues BOLD
+
+    fire(ed, { inputType: "insertText", data: "X" });
+
+    const body = ed.getDocument().body[0] as Paragraph;
+    const x = body.runs.find((r) => (r as TextRun).text.includes("X")) as TextRun;
+    expect(x.properties.bold).toBe(true);
+    expect(x.properties.italic).toBeUndefined();
     ed.destroy();
   });
 
@@ -210,6 +248,39 @@ describe("untracked char deletes are model-first (Phase 3-3)", () => {
     expect(textOf(ed.getDocument().body[0] as Paragraph)).toBe("Ho");
     ed.destroy();
   });
+});
+
+describe("positions the ops can't handle fall through to native (not swallowed)", () => {
+  /** A caret inside a TABLE CELL. `insertRun`/`splitBlock`/`deleteRange` all
+   *  require a BODY paragraph, so the handlers must decline — consuming the
+   *  event there would silently drop the keystroke (uneditable cells). */
+  function tableDoc(): SobreeDocument {
+    const d = emptyDocument();
+    d.body = [table([tableRow([tableCell([paragraph([text("cell")])])])])];
+    return d;
+  }
+
+  for (const inputType of ["insertText", "deleteContentBackward", "insertParagraph"]) {
+    it(`declines ${inputType} when the caret is in a table cell`, () => {
+      const ed = new Editor(document.createElement("div"), { initialDocument: tableDoc() });
+      document.body.appendChild(host(ed));
+      const b = ed.getBlock(0);
+      ed.selection.set({
+        kind: "caret",
+        at: {
+          block: { id: b.id, version: b.version },
+          offset: 2,
+          cell: { row: 0, col: 0, blockIndex: 0 },
+        },
+      });
+
+      const ev = fire(ed, { inputType, ...(inputType === "insertText" ? { data: "Z" } : {}) });
+
+      // NOT consumed ⇒ the browser's native path still handles the edit.
+      expect(ev.defaultPrevented).toBe(false);
+      ed.destroy();
+    });
+  }
 });
 
 describe("untracked Enter / line break are model-first (Phase 3-4)", () => {
