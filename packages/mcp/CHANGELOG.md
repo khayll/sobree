@@ -1,5 +1,13 @@
 # @sobree/mcp
 
+## 0.1.70
+
+### Patch Changes
+
+- Updated dependencies [9ca43ae]
+- Updated dependencies [5abf030]
+  - @sobree/core@0.1.70
+
 ## 0.1.69
 
 ### Patch Changes
