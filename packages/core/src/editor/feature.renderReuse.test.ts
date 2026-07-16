@@ -16,10 +16,12 @@ import { renderSobreeDocument } from "./view/docRenderer/index";
  * identity across the re-render. Wall-clock timing would be flaky in CI;
  * node identity is exact.
  *
- * A single-block edit must reuse every OTHER block's DOM node (reused ===
- * N − 1) — only the edited block is re-rendered. This is the guard for the
- * incremental render (PR 2): a regression back to the full `replaceChildren`
- * rebuild would drop `reused` to 0 and fail here.
+ * Since PR 3-1 (in-place block patch) a single-block edit reuses EVERY block's
+ * DOM node — the edited block is morphed IN PLACE (its children swapped, its
+ * element reference preserved), not re-created. So `reused === N`. This node
+ * stability is what lets the incremental-pagination skip (PR 3a) fire: the
+ * paginator sees the same nodes and skips the re-flow. A regression back to the
+ * full `replaceChildren` rebuild would drop `reused` to 0 and fail here.
  */
 
 const N = 25;
@@ -43,7 +45,7 @@ function blockEls(ed: Editor): Map<string, Element> {
 }
 
 describe("render node reuse across an edit (incremental render)", () => {
-  it("a single-block edit reuses every OTHER block's node (N − 1 reused)", () => {
+  it("a single-block edit keeps EVERY block's node (edited one morphed in place, N reused)", () => {
     const ed = new Editor(document.createElement("div"), { initialDocument: longDoc() });
     document.body.appendChild((ed as unknown as { host: HTMLElement }).host);
 
@@ -65,8 +67,9 @@ describe("render node reuse across an edit (incremental render)", () => {
     let reused = 0;
     for (const [id, el] of before) if (after.get(id) === el) reused += 1;
 
-    // Only the edited block (#12) is re-rendered; the other 24 keep their node.
-    expect(reused).toBe(N - 1);
+    // Every block keeps its node — the edited block (#12) is morphed in place
+    // (children swapped, reference preserved), the other 24 are untouched.
+    expect(reused).toBe(N);
 
     // The edited block's text did change (sanity: the edit landed).
     expect(ed.getBlock(12).text.startsWith("X")).toBe(true);

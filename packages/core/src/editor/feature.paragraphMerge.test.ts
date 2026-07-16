@@ -75,7 +75,7 @@ describe("paragraph-boundary merge preserves run formatting (untracked)", () => 
     ed.destroy();
   });
 
-  it("a mid-line Backspace is left to the native path (not intercepted)", () => {
+  it("a mid-line Backspace deletes one char through the API (model-first, no merge)", () => {
     const ed = new Editor(document.createElement("div"), { initialDocument: twoStyledLines() });
     document.body.appendChild(host(ed));
     caret(ed, 1, 2); // inside "Beta", not a boundary
@@ -87,9 +87,13 @@ describe("paragraph-boundary merge preserves run formatting (untracked)", () => 
     });
     host(ed).dispatchEvent(ev);
 
-    // Not a merge, so our handler doesn't consume it — two blocks remain.
-    expect(ev.defaultPrevented).toBe(false);
-    expect(ed.getDocument().body).toHaveLength(2);
+    // Since Phase 3-3 untracked char deletes are model-first: consumed
+    // (defaultPrevented) and the char before the caret is removed on the AST —
+    // still TWO blocks (a mid-line delete is not a merge).
+    expect(ev.defaultPrevented).toBe(true);
+    const body = ed.getDocument().body as Paragraph[];
+    expect(body).toHaveLength(2);
+    expect(textOf(body[1]!)).toBe("Bta"); // "Beta" − the 'e' before offset 2
     ed.destroy();
   });
 });

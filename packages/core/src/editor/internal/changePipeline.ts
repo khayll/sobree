@@ -23,6 +23,7 @@ import { applyDocumentToYDoc, projectYDoc } from "../../ydoc";
 import type { EditorContext } from "../context";
 import type { EditorEvents } from "../events";
 import * as parts from "../ops/parts";
+import { patchChangedBlocksInPlace } from "../view/docRenderer/incrementalPatch";
 import { harvestReusableBlocks, renderSobreeDocument } from "../view/docRenderer/index";
 import { bodyStructureSignature } from "../view/docRenderer/reuseSignature";
 import { serializeHostsWithSources } from "../view/docSerialize/index";
@@ -37,12 +38,17 @@ export class ChangePipeline {
   /** Cached last-seen per-block JSON strings, for diff-based version bumps. */
   private lastSerialisedBlocks: string[] = [];
   /**
-   * True when DOM mutations since the last sync were user-driven (typing,
-   * paste, drag-drop image). False right after we render from AST — the
-   * DOM is then a projection of the doc, and reading it back can't tell us
-   * anything the AST doesn't already know, while losing any fidelity the
-   * serializer drops (column widths, vAlign, …). `getDocument` and
-   * `emitChangeNow` sync only when this flag is set.
+   * True when the DOM was mutated NATIVELY since the last sync — i.e. by a path
+   * that isn't model-first. Since Phase 3 the common edits (type, delete, Enter,
+   * paste, drop) are intercepted at `beforeinput` and routed through the ops
+   * API, so they never set this. What still does: IME composition
+   * (native-then-reconcile by design), internal drag-MOVE, and any un-routed
+   * `inputType` that falls through to native — the remaining consumers of the
+   * `syncFromDom` read-back. False right after we render from AST — the DOM is
+   * then a projection of the doc, and reading it back can't tell us anything the
+   * AST doesn't already know, while losing any fidelity the serializer drops
+   * (column widths, vAlign, …). `getDocument` and `emitChangeNow` sync only when
+   * this flag is set.
    */
   private domDirty = false;
   /**
@@ -121,18 +127,35 @@ export class ChangePipeline {
     }
 
     // Incremental render: decide which blocks can keep their existing DOM
-    // node (structure unchanged AND content byte-identical), then harvest
-    // those nodes from the live hosts BEFORE the wipe below.
+    // node (structure unchanged AND content byte-identical). A defined
+    // `reuseIds` means the structure is unchanged — the case where we can
+    // patch just the changed blocks IN PLACE instead of wiping the paginated
+    // DOM (see below).
     const nextJson = next.body.map((b) => JSON.stringify(b));
     const reuseIds = this.computeReuseIds(next, nextJson);
 
     this.ctx.setDoc(next);
     this.lastSerialisedBlocks = nextJson;
     const hosts = this.ctx.getContentHosts();
-    const reuse = harvestReusableBlocks(hosts, reuseIds);
-    for (const h of hosts) h.replaceChildren();
-    const firstHost = hosts[0] ?? this.ctx.host;
-    renderSobreeDocument(this.ctx.doc, firstHost, this.blockIdsArray(), reuse);
+    const blockIds = this.blockIdsArray();
+
+    // Structure unchanged → morph only the changed blocks in place, leaving
+    // every other paper untouched, so pagination survives and PR 3a's skip can
+    // fire. `patchChangedBlocksInPlace` returns false when the live DOM can't
+    // be patched safely (a changed block is split across a page break, or
+    // missing) — then, and for any structural change, fall back to the full
+    // wipe-and-render into paper 0 (the paginator redistributes afterwards).
+    const changedIds =
+      reuseIds !== undefined ? new Set(blockIds.filter((id) => !reuseIds.has(id))) : undefined;
+    const patched =
+      changedIds !== undefined &&
+      patchChangedBlocksInPlace(this.ctx.doc, hosts, blockIds, changedIds);
+    if (!patched) {
+      const reuse = harvestReusableBlocks(hosts, reuseIds);
+      for (const h of hosts) h.replaceChildren();
+      const firstHost = hosts[0] ?? this.ctx.host;
+      renderSobreeDocument(this.ctx.doc, firstHost, blockIds, reuse);
+    }
 
     // Best-effort selection restore (block must still exist + offset still valid).
     if (savedSelection) applySelectionToDom(this.ctx._hosts(), savedSelection);
@@ -183,10 +206,11 @@ export class ChangePipeline {
   }
 
   /**
-   * Ensure the doc reflects the latest edits. If the DOM has been dirtied
-   * by user typing / paste / drop, pull the latest content out of it and
-   * bump affected block versions. If the last mutation came from the API,
-   * the AST is already current — skip the (lossy) DOM-to-AST round-trip.
+   * Ensure the doc reflects the latest edits. If the DOM was dirtied by a
+   * NATIVE edit (IME composition, internal drag-move, an un-routed inputType),
+   * pull the latest content out of it and bump affected block versions. The
+   * model-first edits (type / delete / Enter / paste / drop) already mutated the
+   * AST, so the DOM isn't dirty and this skips the (lossy) DOM-to-AST round-trip.
    */
   ensureCurrent(): SobreeDocument {
     if (!this.domDirty && !this.frames.hasDirtyFrames()) return this.ctx.doc;

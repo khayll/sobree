@@ -2,8 +2,10 @@ import type { Range as ApiRange, InlinePosition, Selection } from "../../doc/api
 import type { InlineRun, SobreeDocument } from "../../doc/types";
 import type { EditorContext } from "../context";
 import * as query from "../query";
+import { pasteHtmlAtCaret } from "./pasteInsert";
 import * as review from "./review";
 import * as runs from "./runs";
+import { offsetAlignedText, wordBackwardStart, wordForwardEnd } from "./wordBoundary";
 
 /**
  * Track-changes *authoring* input — the DOM event handlers that route
@@ -37,6 +39,31 @@ export interface TrackedInput {
    * size — off the merged-in content), so the merge must run on the AST.
    */
   handleBoundaryMerge(ie: InputEvent): boolean;
+  /**
+   * Untracked `insertText` / `insertReplacementText` routed through the typed
+   * API (model-first typing — Phase 3-2 of the model-first-editing plan).
+   * Returns `true` if consumed (caller should `preventDefault`), `false` to
+   * leave to the native path — composition (IME), empty data, or any other
+   * inputType. Inserts a PLAIN run (`insertRun` reads `ctx.trackChanges`, which
+   * is off here); tracked-mode insertText still goes through
+   * {@link handleBeforeInput}.
+   */
+  handleUntrackedInsert(ie: InputEvent): boolean;
+  /**
+   * Untracked deletes routed through the typed API (model-first): char
+   * (`deleteContent*`), word (`deleteWord*`, Unicode word boundaries), a range
+   * delete over a selection, and `deleteByCut`. `true` if consumed (caller
+   * `preventDefault`s), `false` to leave to native (composition, or a
+   * document-edge no-op). A paragraph-boundary caret merges via
+   * {@link handleBoundaryMerge}.
+   */
+  handleUntrackedDelete(ie: InputEvent): boolean;
+  /**
+   * Untracked `insertParagraph` (Enter) / `insertLineBreak` (Shift+Enter) routed
+   * through the typed API (model-first — Phase 3-4). `true` if consumed, `false`
+   * to leave to native (composition or any other inputType).
+   */
+  handleUntrackedNewline(ie: InputEvent): boolean;
   /**
    * True when the caret sits in a block containing any revision wrapper
    * (`<ins>` / `<del>` / `.sobree-revision-format`). `beforeinput` uses
@@ -147,6 +174,153 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
     return mergeParagraphs(info.index, info.index + 1);
   }
 
+  /**
+   * Insert `text` at `sel` through the typed API. `insertRun` reads
+   * `ctx.trackChanges`, so this stamps an `ins` run in tracked mode and a plain
+   * run untracked — the one code path shared by tracked `insertText` and the
+   * untracked model-first insert. Returns `true` once consumed (even on a
+   * failed insert, so the caller never falls through to the lossy native path).
+   */
+  function insertTextRun(sel: Selection, text: string): boolean {
+    const insertAt = markedRangeForReplace(sel);
+    if (!insertAt) return false;
+    const run: InlineRun = { kind: "text", text, properties: {} };
+    const result = runs.insertRun(ctx, insertAt, run);
+    if (!result.ok) return true; // consumed but failed — don't fall through
+    query.placeCaret(ctx, insertAt.block.id, insertAt.offset + text.length);
+    return true;
+  }
+
+  /**
+   * Enter — split the current paragraph at the caret (replacing any selected
+   * range first, matching browser semantics). `splitBlock` reads
+   * `ctx.trackChanges`, so the new paragraph mark is `ins`-stamped in tracked
+   * mode and plain untracked. Shared by the tracked and untracked paths.
+   */
+  function splitParagraphAt(sel: Selection): boolean {
+    const at = markedRangeForReplace(sel);
+    if (!at) return false;
+    const result = runs.splitBlock(ctx, at);
+    if (!result.ok) return true;
+    query.placeCaret(ctx, result.value.id, 0);
+    return true;
+  }
+
+  /**
+   * Shift+Enter — a soft `<br>` BreakRun. Carries `revision: ins` in tracked
+   * mode, plain untracked. Shared by the tracked and untracked paths.
+   */
+  function insertLineBreakAt(sel: Selection): boolean {
+    const at = markedRangeForReplace(sel);
+    if (!at) return false;
+    const breakRun: InlineRun = {
+      kind: "break",
+      type: "line",
+      properties: ctx.trackChanges.enabled
+        ? {
+            revision:
+              ctx.trackChanges.author === undefined
+                ? { type: "ins" }
+                : { type: "ins", author: ctx.trackChanges.author },
+          }
+        : {},
+    };
+    const result = runs.insertRun(ctx, at, breakRun);
+    if (!result.ok) return true;
+    query.placeCaret(ctx, at.block.id, at.offset + 1);
+    return true;
+  }
+
+  function handleUntrackedInsert(ie: InputEvent): boolean {
+    // Composition (IME) stays native-then-reconcile — never intercept it,
+    // even if it surfaces as insertText.
+    if (ie.isComposing) return false;
+    if (ie.inputType !== "insertText" && ie.inputType !== "insertReplacementText") return false;
+    const text = ie.data ?? "";
+    if (!text) return false;
+    const sel = ctx.selection.get();
+    if (!sel) return false;
+    return insertTextRun(sel, text);
+  }
+
+  /** The word-granularity range a `deleteWord*` removes from the caret, or
+   *  `null` at a paragraph edge (⇒ boundary merge) / non-paragraph. */
+  function wordDeleteRange(at: InlinePosition, backward: boolean): ApiRange | null {
+    const pos = query.refreshedPosition(ctx, at);
+    if (!pos) return null;
+    const block = ctx.doc.body[ctx.registry.indexOf(pos.block.id)];
+    if (block?.kind !== "paragraph") return null;
+    const text = offsetAlignedText(block);
+    if (backward) {
+      if (pos.offset <= 0) return null;
+      const start = wordBackwardStart(text, pos.offset);
+      return start < pos.offset ? { from: { block: pos.block, offset: start }, to: pos } : null;
+    }
+    if (pos.offset >= text.length) return null;
+    const end = wordForwardEnd(text, pos.offset);
+    return end > pos.offset ? { from: pos, to: { block: pos.block, offset: end } } : null;
+  }
+
+  /**
+   * Untracked deletes routed through the typed API (model-first — Phase 3-3 for
+   * char, 3-6 for word / cut). Covers `deleteContent*` (one char), `deleteWord*`
+   * (a Unicode word), a range delete over a selection, and `deleteByCut`. A
+   * caret at a paragraph boundary delegates to {@link handleBoundaryMerge} (the
+   * MERGE, already on the API). Returns `false` (native) for composition or any
+   * other inputType.
+   */
+  function handleUntrackedDelete(ie: InputEvent): boolean {
+    if (ie.isComposing) return false;
+    const sel = ctx.selection.get();
+    if (!sel) return false;
+
+    // Cut removes the selection only (the `cut` event already copied it).
+    if (ie.inputType === "deleteByCut") {
+      if (sel.kind !== "range") return false;
+      return applyDelete(sel.range);
+    }
+
+    const back = ie.inputType === "deleteContentBackward" || ie.inputType === "deleteWordBackward";
+    const fwd = ie.inputType === "deleteContentForward" || ie.inputType === "deleteWordForward";
+    if (!back && !fwd) return false;
+    const word = ie.inputType === "deleteWordBackward" || ie.inputType === "deleteWordForward";
+
+    let target: ApiRange | null;
+    if (sel.kind === "range") target = sel.range;
+    else if (word) target = wordDeleteRange(sel.at, back);
+    else target = back ? rangeForBackwardDelete(sel) : rangeForForwardDelete(sel);
+    // A null range means the caret sits at a paragraph boundary (start for
+    // Backspace, end for Delete) — that's a MERGE, or a no-op at the document
+    // edge; `handleBoundaryMerge` owns both (and returns false ⇒ native at the
+    // edge).
+    if (!target) return handleBoundaryMerge(ie);
+    return applyDelete(target);
+  }
+
+  /** Delete `target` and land the caret at its start. `true` once consumed. */
+  function applyDelete(target: ApiRange): boolean {
+    const result = runs.deleteRange(ctx, target);
+    if (!result.ok) return true; // consumed but failed — don't fall through
+    query.placeCaret(ctx, target.from.block.id, target.from.offset);
+    return true;
+  }
+
+  /**
+   * Untracked `insertParagraph` (Enter) / `insertLineBreak` (Shift+Enter)
+   * routed through the typed API (model-first — Phase 3-4). Enter is a
+   * STRUCTURAL edit (block count changes), so the in-place render patch falls
+   * back to a full render for it — correct, and the paginator reflows. Returns
+   * `false` (native) for composition or any other inputType.
+   */
+  function handleUntrackedNewline(ie: InputEvent): boolean {
+    if (ie.isComposing) return false;
+    const sel = ctx.selection.get();
+    if (!sel) return false;
+    if (ie.inputType === "insertParagraph") return splitParagraphAt(sel);
+    if (ie.inputType === "insertLineBreak") return insertLineBreakAt(sel);
+    return false;
+  }
+
   function handleBeforeInput(ie: InputEvent): boolean {
     const sel = ctx.selection.get();
     if (!sel) return false;
@@ -156,13 +330,7 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
       case "insertReplacementText": {
         const text = ie.data ?? "";
         if (!text) return false;
-        const insertAt = markedRangeForReplace(sel);
-        if (!insertAt) return false;
-        const run: InlineRun = { kind: "text", text, properties: {} };
-        const result = runs.insertRun(ctx, insertAt, run);
-        if (!result.ok) return true; // consumed but failed — don't fall through
-        query.placeCaret(ctx, insertAt.block.id, insertAt.offset + text.length);
-        return true;
+        return insertTextRun(sel, text);
       }
       case "deleteContentBackward":
       case "deleteWordBackward": {
@@ -204,35 +372,10 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
         query.placeCaret(ctx, sel.range.from.block.id, sel.range.from.offset);
         return true;
       }
-      case "insertParagraph": {
-        // Enter — split the current paragraph at the caret (replacing any
-        // selected range first, matching browser semantics).
-        const at = markedRangeForReplace(sel);
-        if (!at) return false;
-        const result = runs.splitBlock(ctx, at);
-        if (!result.ok) return true;
-        query.placeCaret(ctx, result.value.id, 0);
-        return true;
-      }
-      case "insertLineBreak": {
-        // Shift+Enter — a soft `<br>` BreakRun carrying `revision: ins`.
-        const at = markedRangeForReplace(sel);
-        if (!at) return false;
-        const breakRun: InlineRun = {
-          kind: "break",
-          type: "line",
-          properties: {
-            revision:
-              ctx.trackChanges.author === undefined
-                ? { type: "ins" }
-                : { type: "ins", author: ctx.trackChanges.author },
-          },
-        };
-        const result = runs.insertRun(ctx, at, breakRun);
-        if (!result.ok) return true;
-        query.placeCaret(ctx, at.block.id, at.offset + 1);
-        return true;
-      }
+      case "insertParagraph":
+        return splitParagraphAt(sel);
+      case "insertLineBreak":
+        return insertLineBreakAt(sel);
       default:
         if (!warned.has(ie.inputType)) {
           warned.add(ie.inputType);
@@ -312,8 +455,10 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
   }
 
   /**
-   * Insert `text` at the current selection in tracked mode, each `\n`
-   * becoming a `splitBlock`. Used by `onPaste` for plain-text paste.
+   * Insert plain `text` at the current selection, each `\n` becoming a
+   * `splitBlock`. The plain-text fallback for `onPaste` (used tracked AND
+   * untracked — `insertRun` stamps `ins` only when tracked); rich `text/html`
+   * paste goes through `pasteHtmlAtCaret` first.
    */
   function pasteTrackedText(text: string): void {
     const sel = ctx.selection.get();
@@ -367,20 +512,27 @@ export function createTrackedInput(ctx: EditorContext): TrackedInput {
       return;
     }
 
-    // Tracked-mode text paste — route plain text through insertRun /
-    // splitBlock so the runs carry markers. HTML/rich paste falls back to
-    // plain text by design.
-    if (ctx.trackChanges.enabled) {
-      const text = e.clipboardData?.getData("text/plain") ?? "";
-      if (text === "") return;
+    // Model-first paste (tracked AND untracked — Phase 3-5). Rich `text/html`
+    // is parsed to AST and inserted with formatting; plain text is the
+    // fallback. `insertRun` / `pasteHtmlAtCaret` read `ctx.trackChanges`, so
+    // tracked paste stamps `ins`.
+    const html = e.clipboardData?.getData("text/html") ?? "";
+    if (html !== "") {
       e.preventDefault();
-      pasteTrackedText(text);
+      if (pasteHtmlAtCaret(ctx, html)) return;
     }
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (text === "") return;
+    e.preventDefault();
+    pasteTrackedText(text);
   }
 
   return {
     handleBeforeInput,
     handleBoundaryMerge,
+    handleUntrackedInsert,
+    handleUntrackedDelete,
+    handleUntrackedNewline,
     caretInsideRevisionWrapper,
     handleCompositionStart,
     handleCompositionEnd,

@@ -49,6 +49,10 @@ describe("paragraphListInfo", () => {
       counterStyle: "decimal",
       markerPrefix: "",
       markerSuffix: ".",
+      // No `<w:ind>` on the (missing) level → Word's default list geometry so
+      // the marker still gets a box.
+      leftTwips: 720,
+      hangingTwips: 360,
     });
   });
 

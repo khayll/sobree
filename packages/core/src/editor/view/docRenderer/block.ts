@@ -193,20 +193,12 @@ export function renderBlocks(
         currentList = { el: listEl, numId: listInfo.numId };
       }
       const reusedLi = id ? reuse?.get(id) : undefined;
-      const li = reusedLi ?? document.createElement("li");
-      if (!reusedLi) {
-        if (id) li.setAttribute(BLOCK_ID_ATTR, id);
-        const { runDefaults: liRunDefaults } = applyParagraphProps(
-          li,
-          (block as Paragraph).properties,
-          styles,
-          contextualNeighborsFor(i),
+      const li =
+        reusedLi ??
+        buildListItem(block as Paragraph, id, styles, numbering, rawParts, {
+          neighbors: contextualNeighborsFor(i),
           tableStyleId,
-        );
-        applyListItemLevel(li, block, numbering);
-        stampBlockRevision(li, (block as Paragraph).properties);
-        appendInlineRuns(li, (block as Paragraph).runs, rawParts, styles, liRunDefaults);
-      }
+        });
       // Positional attrs may shift even when content is reused — re-stamp
       // (cheap; a no-op when the structure is truly unchanged).
       li.dataset.sectionIndex = String(sectionIndex);
@@ -333,6 +325,89 @@ function renderBlock(
     return renderInlineFrameBlock(block, numbering, styles, rawParts, renderBlocks);
   }
   return null;
+}
+
+/**
+ * Build a list-item `<li>` from a paragraph block — the fresh-render branch of
+ * `renderBlocks`' list path, extracted so the incremental patch
+ * ({@link renderBlockForPatch}) produces byte-identical `<li>`s. Positional
+ * attrs (`data-section-index` / `data-block-index`) are the caller's job — they
+ * shift independently of content.
+ */
+export function buildListItem(
+  block: Paragraph,
+  id: string | undefined,
+  styles: readonly NamedStyle[],
+  numbering: readonly NumberingDefinition[],
+  rawParts: Record<string, Uint8Array>,
+  ctx: { neighbors?: ContextualNeighbors | undefined; tableStyleId?: string | undefined },
+): HTMLElement {
+  const li = document.createElement("li");
+  if (id) li.setAttribute(BLOCK_ID_ATTR, id);
+  const { runDefaults } = applyParagraphProps(
+    li,
+    block.properties,
+    styles,
+    ctx.neighbors,
+    ctx.tableStyleId,
+  );
+  applyListItemLevel(li, block, numbering);
+  stampBlockRevision(li, block.properties);
+  appendInlineRuns(li, block.runs, rawParts, styles, runDefaults);
+  return li;
+}
+
+/**
+ * Render ONE changed block for the in-place incremental patch
+ * (`incrementalPatch.ts`), producing an element byte-identical to what
+ * `renderBlocks` would produce for it in a full render. The patch only runs
+ * when the document STRUCTURE is unchanged, so the render CONTEXT — section
+ * index, block index, outline number, list membership — is invariant and read
+ * straight off the `live` element being replaced; only same-style neighbours
+ * (for contextual spacing) are re-derived from `body`.
+ *
+ * Paragraphs and list items only (the typing / inline-formatting hot path).
+ * Returns `null` for any other kind so the caller falls back to a full render.
+ *
+ * Byte-identity with `renderBlocks` is enforced by the "incremental render ===
+ * full render" test — keep the stamp ORDER here in step with the list / block
+ * paths above (id → section-index → block-index → revision → outline).
+ */
+export function renderBlockForPatch(
+  block: Block,
+  id: string,
+  live: HTMLElement,
+  index: number,
+  doc: {
+    body: readonly Block[];
+    styles: readonly NamedStyle[];
+    numbering: readonly NumberingDefinition[];
+    rawParts: Record<string, Uint8Array>;
+  },
+): HTMLElement | null {
+  if (block.kind !== "paragraph") return null;
+  const neighbors: ContextualNeighbors = {
+    prevSameStyle: sameParagraphStyle(block, doc.body[index - 1]),
+    nextSameStyle: sameParagraphStyle(block, doc.body[index + 1]),
+  };
+  const sectionIndex = live.dataset.sectionIndex;
+  const blockIndex = live.dataset.blockIndex;
+  const outlineNumber = live.dataset.outlineNumber;
+
+  if (live.tagName === "LI") {
+    const li = buildListItem(block, id, doc.styles, doc.numbering, doc.rawParts, { neighbors });
+    if (sectionIndex !== undefined) li.dataset.sectionIndex = sectionIndex;
+    if (blockIndex !== undefined) li.dataset.blockIndex = blockIndex;
+    return li;
+  }
+
+  const el = renderParagraph(block, doc.styles, doc.rawParts, neighbors);
+  el.setAttribute(BLOCK_ID_ATTR, id);
+  if (sectionIndex !== undefined) el.dataset.sectionIndex = sectionIndex;
+  if (blockIndex !== undefined) el.dataset.blockIndex = blockIndex;
+  stampBlockRevision(el, block.properties);
+  if (outlineNumber !== undefined) el.dataset.outlineNumber = outlineNumber;
+  return el;
 }
 
 /** Cell-content renderer handed to `renderTable`: plain `renderBlocks`

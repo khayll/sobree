@@ -14,9 +14,11 @@
  */
 
 import type * as Y from "yjs";
+import type { Range as ApiRange } from "../doc/api";
 import type { History } from "../history";
 import type { EditorContext } from "./context";
 import * as clipboard from "./ops/clipboard";
+import { handleHtmlDrop, handleInternalDragMove } from "./ops/pasteDrop";
 import * as runs from "./ops/runs";
 import type { TrackedInput } from "./ops/trackedInput";
 import { attachImageResize } from "./view/imageResize";
@@ -91,11 +93,21 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
     const inRevisionWrapper = !inTracked && hooks.trackedInput.caretInsideRevisionWrapper();
     if ((inTracked || inRevisionWrapper) && hooks.trackedInput.handleBeforeInput(ie)) {
       e.preventDefault();
-    } else if (!inTracked && !inRevisionWrapper && hooks.trackedInput.handleBoundaryMerge(ie)) {
-      // Even untracked, a paragraph-boundary Backspace/Delete (a MERGE) must
-      // run through the API — the native contentEditable merge strips inline
-      // run formatting (small-caps / colour / size) off the joined content.
-      e.preventDefault();
+    } else if (!inTracked && !inRevisionWrapper) {
+      // Untracked model-first path: text insertion (Phase 3-2), single-char
+      // deletes incl. the paragraph-boundary MERGE (Phase 3-3), and Enter /
+      // Shift+Enter (Phase 3-4) run through the typed API.
+      // `handleUntrackedDelete` folds in the boundary merge — the native
+      // contentEditable merge strips inline run formatting (small-caps / colour
+      // / size) off the joined content. Word deletes, IME, and other inputTypes
+      // still fall through to native.
+      if (
+        hooks.trackedInput.handleUntrackedInsert(ie) ||
+        hooks.trackedInput.handleUntrackedDelete(ie) ||
+        hooks.trackedInput.handleUntrackedNewline(ie)
+      ) {
+        e.preventDefault();
+      }
     }
   });
 
@@ -129,8 +141,31 @@ export function wireEditorDom(hooks: EditorDomHooks): () => void {
       void hooks.trackedInput.onPaste(e as ClipboardEvent);
     }
   });
+  // Capture the dragged selection at dragstart: a non-null `dragSource` marks an
+  // INTERNAL drag (text dragged within the editor) and carries its source range.
+  let dragSource: ApiRange | null = null;
+  listen(host, "dragstart", () => {
+    const sel = hooks.ctx.selection.get();
+    dragSource = sel?.kind === "range" ? sel.range : null;
+  });
+  listen(host, "dragend", () => {
+    dragSource = null;
+  });
   listen(host, "dragover", (e) => runs.onDragOver(hooks.ctx, e as DragEvent));
-  listen(host, "drop", (e) => void runs.onDrop(hooks.ctx, e as DragEvent));
+  listen(host, "drop", (e) => {
+    const de = e as DragEvent;
+    const source = dragSource;
+    dragSource = null;
+    if (source) {
+      // Internal drag-MOVE — model-first for a same-block source, native
+      // fallback otherwise.
+      if (!handleInternalDragMove(hooks.ctx, de, source)) void runs.onDrop(hooks.ctx, de);
+    } else if (!handleHtmlDrop(hooks.ctx, de)) {
+      // External HTML/text drop → model-first insert; image / empty falls
+      // through to the image handler.
+      void runs.onDrop(hooks.ctx, de);
+    }
+  });
 
   const detachImageResize = attachImageResize(host);
   cleanups.push(detachImageResize);

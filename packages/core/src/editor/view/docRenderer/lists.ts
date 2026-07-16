@@ -27,6 +27,12 @@ import type { Block, NumberingDefinition } from "../../../doc/types";
 import { resolveFontFace } from "./fontFallback";
 import { twipsToMm } from "./units";
 
+/** Word's default list indent when a numbering level declares no `<w:ind>`:
+ *  text column at 0.5" (720 twips), marker hanging 0.25" (360 twips). Used only
+ *  as a fallback — an explicit indent (real .docx) always wins. */
+const DEFAULT_LIST_LEFT_TWIPS = 720;
+const DEFAULT_LIST_HANGING_TWIPS = 360;
+
 export interface ListInfo {
   numId: number;
   ordered: boolean;
@@ -77,12 +83,14 @@ export function paragraphListInfo(
     numId: num.numId,
     ordered: format !== "bullet",
   };
-  if (lvl0?.paragraphIndent?.leftTwips !== undefined) {
-    result.leftTwips = lvl0.paragraphIndent.leftTwips;
-  }
-  if (lvl0?.paragraphIndent?.hangingTwips !== undefined) {
-    result.hangingTwips = lvl0.paragraphIndent.hangingTwips;
-  }
+  // A numbering def with no `<w:ind>` (a markdown- or HTML-paste-authored list,
+  // which carry no indent geometry) must still get a hanging marker BOX, or the
+  // `::before` collapses to zero width and the glyph renders on top of the text
+  // — invisibly. Fall back to Word's default list geometry (left 0.5",
+  // hanging 0.25") so the marker always has room. `?? default` honours an
+  // explicit `0` and only fills in when the attribute is absent.
+  result.leftTwips = lvl0?.paragraphIndent?.leftTwips ?? DEFAULT_LIST_LEFT_TWIPS;
+  result.hangingTwips = lvl0?.paragraphIndent?.hangingTwips ?? DEFAULT_LIST_HANGING_TWIPS;
   if (result.ordered) {
     result.counterStyle = counterStyleFor(format);
     const { prefix, suffix } = parseLvlText(lvl?.text ?? "", num.level);
