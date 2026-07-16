@@ -1,5 +1,12 @@
 # @sobree/block-tools
 
+## 0.1.71
+
+### Patch Changes
+
+- b4c8f37: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+
 ## 0.1.70
 
 ### Patch Changes
