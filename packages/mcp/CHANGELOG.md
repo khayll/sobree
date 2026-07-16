@@ -1,5 +1,15 @@
 # @sobree/mcp
 
+## 0.1.69
+
+### Patch Changes
+
+- 4e28281: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [4e28281]
+- Updated dependencies [f31ff2f]
+  - @sobree/core@0.1.69
+
 ## 0.1.68
 
 ### Patch Changes
