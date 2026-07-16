@@ -20,6 +20,16 @@ export interface ParagraphTarget {
   index: number;
   /** A new `doc.body` with `next` written back in the paragraph's place. */
   withParagraph(next: Paragraph): Block[];
+  /**
+   * A new `doc.body` with the addressed paragraph replaced by `next` — one
+   * block or several.
+   *
+   * `null` for a BODY paragraph: changing how many blocks the body holds has
+   * to go through the block ops so the registry learns their ids. Inside a
+   * cell there's nothing to tell — the content isn't registry-tracked and
+   * rides the table's version — so the table bump covers it.
+   */
+  withBlocks(next: readonly Block[]): Block[] | null;
 }
 
 /**
@@ -51,6 +61,7 @@ export function paragraphTargetAt(
         body[index] = next;
         return body;
       },
+      withBlocks: () => null,
     };
   }
 
@@ -63,21 +74,30 @@ export function paragraphTargetAt(
   const paragraph = cell.content[blockIndex];
   if (paragraph?.kind !== "paragraph") return null;
 
+  /** Rebuild the document with the cell's content blocks replaced wholesale. */
+  const withCellContent = (content: readonly Block[]): Block[] => {
+    const cells = row.cells.slice();
+    cells[colIndex] = { ...cell, content: content.slice() };
+    const rows = block.rows.slice();
+    rows[rowIndex] = { ...row, cells };
+    const table: Table = { ...block, rows };
+    const body = doc.body.slice();
+    body[index] = table;
+    return body;
+  };
+
+  /** The cell's content with the addressed paragraph replaced by `next`. */
+  const contentWith = (next: readonly Block[]): Block[] => {
+    const content = cell.content.slice();
+    content.splice(blockIndex, 1, ...next);
+    return content;
+  };
+
   return {
     paragraph,
     index,
-    withParagraph: (next) => {
-      const content = cell.content.slice();
-      content[blockIndex] = next;
-      const cells = row.cells.slice();
-      cells[colIndex] = { ...cell, content };
-      const rows = block.rows.slice();
-      rows[rowIndex] = { ...row, cells };
-      const table: Table = { ...block, rows };
-      const body = doc.body.slice();
-      body[index] = table;
-      return body;
-    },
+    withParagraph: (next) => withCellContent(contentWith([next])),
+    withBlocks: (next) => withCellContent(contentWith(next)),
   };
 }
 
