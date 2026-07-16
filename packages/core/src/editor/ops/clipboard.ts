@@ -1,26 +1,38 @@
 /**
- * Whole-block clipboard: copy the block(s) a selection covers as
- * structured JSON, and paste them back as real blocks below the caret.
+ * Structured clipboard: copy exactly what the selection covers as JSON,
+ * and paste it back with full fidelity.
  *
  * Without this, copy/paste rides the browser's contentEditable default:
  * the clipboard carries only text/HTML, and a pasted styled paragraph or
  * table comes back as plain runs in the current block (a lossy DOM
- * readback) — so "copy a block, paste it below, get two similar blocks"
- * silently degrades. Here a structured payload (`BLOCKS_MIME`) carries the
- * exact AST; paste deserialises it and inserts fresh blocks via
- * `insertBlockAfter`, which mints new ids and stamps track-changes marks.
- * A `text/plain` fallback is always written too, so pasting into another
- * app still yields the text.
+ * readback). Here a structured payload (`BLOCKS_MIME`) carries the exact
+ * AST. A `text/plain` fallback is always written too, so pasting into
+ * another app still yields the text.
  *
- * Trigger (copy): a range that spans MORE THAN ONE block copies those
- * whole blocks; a range INSIDE one block copies it only when it covers the
- * block end-to-end (a partial text selection stays a plain-text copy, as
- * users expect). A collapsed caret copies nothing structured.
+ * The payload mirrors Word's paragraph-mark distinction:
+ *   - a selection that covers its endpoint blocks END-TO-END copies WHOLE
+ *     blocks; pasting inserts them as new blocks after the caret's block
+ *     ("copy a block, paste it below, get two similar blocks");
+ *   - a selection that ends PARTWAY through a block copies a FRAGMENT —
+ *     the endpoint paragraphs sliced to the selected offsets (`fragment:
+ *     true`); pasting splices it at the caret through the same machinery
+ *     as rich HTML paste, so only what was selected appears. Copying the
+ *     whole blocks here pasted back text the user never selected.
+ *
+ * A range inside ONE block copies structurally only when it covers the
+ * block end-to-end — a partial in-block selection stays on the browser's
+ * default copy, whose HTML the rich-paste path already handles. A
+ * collapsed caret copies nothing structured.
  */
 
+import type { InlinePosition } from "../../doc/api";
+import { sliceRuns } from "../../doc/runs";
 import type { Block, InlineRun } from "../../doc/types";
 import type { EditorContext } from "../context";
+import * as query from "../query";
 import { deleteBlock, insertBlockAfter } from "./blocks";
+import { pasteBlocksAtCaret } from "./pasteInsert";
+import { deleteRange } from "./runs";
 
 /** Clipboard MIME for a Sobree block payload. The `+json` suffix and the
  *  `web ` prefix browsers add for custom types both round-trip our reader. */
@@ -29,17 +41,24 @@ export const BLOCKS_MIME = "application/x-sobree-blocks+json";
 interface BlocksPayload {
   v: 1;
   blocks: Block[];
+  /** True when the endpoint blocks are SLICED to the selection (the copy
+   *  didn't cover them end-to-end) — the paste splices at the caret instead
+   *  of inserting whole blocks. Absent (older payloads) means whole. */
+  fragment?: boolean;
 }
 
 /** Serialise blocks for the clipboard. */
-export function serializeBlocks(blocks: readonly Block[]): string {
+export function serializeBlocks(blocks: readonly Block[], opts?: { fragment?: boolean }): string {
   const payload: BlocksPayload = { v: 1, blocks: blocks as Block[] };
+  if (opts?.fragment) payload.fragment = true;
   return JSON.stringify(payload);
 }
 
-/** Parse a clipboard payload back to blocks, or `null` when the data isn't
- *  ours / is malformed (caller then falls back to plain-text paste). */
-export function parseBlocks(data: string | undefined | null): Block[] | null {
+/** Parse a clipboard payload, or `null` when the data isn't ours / is
+ *  malformed (caller then falls back to the text/HTML paste path). */
+export function parseBlocks(
+  data: string | undefined | null,
+): { blocks: Block[]; fragment: boolean } | null {
   if (!data) return null;
   let parsed: unknown;
   try {
@@ -53,7 +72,7 @@ export function parseBlocks(data: string | undefined | null): Block[] | null {
   if (!blocks.every((b) => typeof b === "object" && b !== null && typeof b.kind === "string")) {
     return null;
   }
-  return blocks as Block[];
+  return { blocks: blocks as Block[], fragment: (parsed as BlocksPayload).fragment === true };
 }
 
 /** Plain-text projection of a block (the `text/plain` clipboard fallback). */
@@ -84,69 +103,121 @@ function paragraphLength(block: Block): number {
   return block.runs.reduce((n, r) => n + (r.kind === "text" ? r.text.length : 1), 0);
 }
 
-/**
- * The whole blocks a selection covers, or `null` when the selection isn't
- * block-level (a caret, or a partial selection inside one block).
- */
-export function selectedWholeBlocks(ctx: EditorContext): Block[] | null {
-  const range = coveredBlockIndices(ctx);
-  if (!range) return null;
-  return ctx.doc.body.slice(range.lo, range.hi + 1).map(cloneBlock);
+/** What the selection covers, in document order. `full` = both endpoint
+ *  blocks are covered end-to-end (⇒ whole-block copy semantics). */
+interface SelectionCoverage {
+  lo: number;
+  hi: number;
+  /** Document-order endpoints (a backwards selection is normalised). */
+  from: InlinePosition;
+  to: InlinePosition;
+  full: boolean;
 }
 
-/** Body-index range `[lo, hi]` the selection covers as WHOLE blocks, or
- *  `null` when the selection is a caret / a partial in-block range. */
-function coveredBlockIndices(ctx: EditorContext): { lo: number; hi: number } | null {
+/**
+ * Resolve the selection to covered block indices + normalised endpoints,
+ * or `null` when there's nothing structurally copyable: a caret, or a
+ * PARTIAL selection inside one block (that stays on the browser's default
+ * copy — its HTML fragment already carries the selected slice).
+ */
+function selectionCoverage(ctx: EditorContext): SelectionCoverage | null {
   const sel = ctx.selection.get();
   if (!sel || sel.kind !== "range") return null;
   const fromIdx = ctx.registry.indexOf(sel.range.from.block.id);
   const toIdx = ctx.registry.indexOf(sel.range.to.block.id);
   if (fromIdx < 0 || toIdx < 0) return null;
-  const lo = Math.min(fromIdx, toIdx);
-  const hi = Math.max(fromIdx, toIdx);
+  // Normalise to document order — selections made bottom-up arrive reversed.
+  const backwards =
+    fromIdx > toIdx || (fromIdx === toIdx && sel.range.from.offset > sel.range.to.offset);
+  const [lo, hi] = backwards ? [toIdx, fromIdx] : [fromIdx, toIdx];
+  const from = backwards ? sel.range.to : sel.range.from;
+  const to = backwards ? sel.range.from : sel.range.to;
 
-  // Spanning several blocks → whole-block range.
-  if (lo !== hi) return { lo, hi };
+  // End-to-end coverage of an endpoint. Non-paragraph endpoints (tables —
+  // their flat offsets don't map to slices) always count as fully covered,
+  // preserving the whole-block behaviour for them.
+  const first = ctx.doc.body[lo];
+  const last = ctx.doc.body[hi];
+  if (!first || !last) return null;
+  const firstLen = paragraphLength(first);
+  const lastLen = paragraphLength(last);
+  const firstFull = firstLen < 0 || from.offset === 0;
+  const lastFull = lastLen < 0 || to.offset >= lastLen;
 
-  // One block → only when the range covers it end-to-end.
-  const block = ctx.doc.body[lo];
-  if (!block) return null;
-  const len = paragraphLength(block);
-  const a = Math.min(sel.range.from.offset, sel.range.to.offset);
-  const b = Math.max(sel.range.from.offset, sel.range.to.offset);
-  return len >= 0 && a === 0 && b >= len ? { lo, hi } : null;
+  // One block, partially covered → not structurally copyable.
+  if (lo === hi && !(firstFull && lastFull)) return null;
+  return { lo, hi, from, to, full: firstFull && lastFull };
 }
 
-/** Write `blocks` to the clipboard (structured payload + text fallback). */
-function writeBlocks(e: ClipboardEvent, blocks: readonly Block[]): void {
+/**
+ * EXACTLY the content the selection covers, cloned: whole blocks when the
+ * endpoints are covered end-to-end, otherwise the endpoint paragraphs are
+ * SLICED to the selected offsets (`fragment: true`). Copying whole blocks
+ * for a partial selection pasted back text the user never selected.
+ */
+export function selectedBlocks(ctx: EditorContext): { blocks: Block[]; fragment: boolean } | null {
+  const cov = selectionCoverage(ctx);
+  if (!cov) return null;
+  const blocks = ctx.doc.body.slice(cov.lo, cov.hi + 1).map(cloneBlock);
+  if (!cov.full) {
+    const first = blocks[0];
+    if (first?.kind === "paragraph") {
+      first.runs = sliceRuns(first.runs, cov.from.offset, paragraphLength(first));
+    }
+    const last = blocks[blocks.length - 1];
+    if (last?.kind === "paragraph" && blocks.length > 1) {
+      last.runs = sliceRuns(last.runs, 0, cov.to.offset);
+    }
+  }
+  return { blocks, fragment: !cov.full };
+}
+
+/** Write blocks to the clipboard (structured payload + text fallback). */
+function writeBlocks(e: ClipboardEvent, blocks: readonly Block[], fragment: boolean): void {
   if (!e.clipboardData) return;
   e.preventDefault();
-  e.clipboardData.setData(BLOCKS_MIME, serializeBlocks(blocks));
+  e.clipboardData.setData(BLOCKS_MIME, serializeBlocks(blocks, { fragment }));
   e.clipboardData.setData("text/plain", blocks.map(blockText).join("\n"));
 }
 
-/** `copy` handler: write the covered whole blocks, or let the browser run
- *  its default plain-text copy when none are covered. */
+/** `copy` handler: write exactly the covered content, or let the browser
+ *  run its default copy when nothing is structurally covered. */
 export function onCopy(ctx: EditorContext, e: ClipboardEvent): void {
-  const blocks = selectedWholeBlocks(ctx);
-  if (blocks) writeBlocks(e, blocks);
+  const selected = selectedBlocks(ctx);
+  if (selected) writeBlocks(e, selected.blocks, selected.fragment);
 }
 
-/** `cut` handler: copy the covered whole blocks AND remove them (in
- *  track-changes mode `deleteBlock` marks them instead). A partial in-block
- *  selection falls through to the browser's default text cut. */
+/**
+ * `cut` handler: copy exactly the covered content AND remove it. Fully
+ * covered blocks are removed whole (`deleteBlock` — marks them in tracked
+ * mode); a partial cross-block selection deletes only the selected RANGE
+ * (`deleteRange` merges the endpoint paragraphs, as Backspace over the same
+ * selection would) — it used to delete the WHOLE endpoint blocks, taking
+ * text the user never selected with it. A partial in-block selection falls
+ * through to the browser's default cut (the model catches it at
+ * `beforeinput` as `deleteByCut`).
+ */
 export function onCut(ctx: EditorContext, e: ClipboardEvent): void {
-  const range = coveredBlockIndices(ctx);
-  if (!range || !e.clipboardData) return;
-  writeBlocks(e, ctx.doc.body.slice(range.lo, range.hi + 1).map(cloneBlock));
+  const cov = selectionCoverage(ctx);
+  const selected = selectedBlocks(ctx);
+  if (!cov || !selected || !e.clipboardData) return;
+  writeBlocks(e, selected.blocks, selected.fragment);
+
+  if (!cov.full) {
+    if (deleteRange(ctx, { from: cov.from, to: cov.to }).ok) {
+      query.placeCaretAt(ctx, cov.from);
+    }
+    return;
+  }
+
   // Capture refs up front — deleting shifts indices, but ref ids are stable.
   const refs: ReturnType<EditorContext["registry"]["refAt"]>[] = [];
-  for (let i = range.lo; i <= range.hi; i++) refs.push(ctx.registry.refAt(i));
+  for (let i = cov.lo; i <= cov.hi; i++) refs.push(ctx.registry.refAt(i));
   for (const ref of refs) {
     if (!deleteBlock(ctx, ref).ok) break;
   }
   // Caret to the block now at the cut site (or the last surviving block).
-  const idx = Math.min(range.lo, ctx.doc.body.length - 1);
+  const idx = Math.min(cov.lo, ctx.doc.body.length - 1);
   if (idx >= 0) {
     ctx.selection.set({ kind: "caret", at: { block: ctx.registry.refAt(idx), offset: 0 } });
   }
@@ -155,13 +226,20 @@ export function onCut(ctx: EditorContext, e: ClipboardEvent): void {
 /**
  * Paste handler hook for a structured block payload. Returns `true` when it
  * consumed the event (block paste), `false` to let the normal text/image
- * paste run. Inserts the pasted blocks after the caret's block, in order.
+ * paste run. A whole-block payload inserts new blocks after the caret's
+ * block; a FRAGMENT payload splices at the caret through the same machinery
+ * as rich HTML paste (first/last plain paragraphs merge into the caret
+ * paragraph's halves) — mirroring Word's paragraph-mark distinction.
  */
 export function tryPasteBlocks(ctx: EditorContext, e: ClipboardEvent): boolean {
-  const blocks = parseBlocks(e.clipboardData?.getData(BLOCKS_MIME));
-  if (!blocks) return false;
+  const payload = parseBlocks(e.clipboardData?.getData(BLOCKS_MIME));
+  if (!payload) return false;
   e.preventDefault();
-  pasteBlocksAfterCaret(ctx, blocks);
+  if (payload.fragment) {
+    pasteBlocksAtCaret(ctx, payload.blocks.map(cloneBlock));
+  } else {
+    pasteBlocksAfterCaret(ctx, payload.blocks);
+  }
   return true;
 }
 

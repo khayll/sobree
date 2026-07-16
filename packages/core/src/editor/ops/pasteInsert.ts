@@ -46,11 +46,23 @@ export function pasteHtmlAtCaret(ctx: EditorContext, html: string): boolean {
   if (addedNumbering.length > 0) {
     ctx.commit({ numbering: [...(ctx.doc.numbering ?? []), ...addedNumbering] }, []);
   }
+  return pasteBlocksAtCaret(ctx, remapped);
+}
 
+/**
+ * Insert ready-made AST `blocks` at the current selection with the paste
+ * semantics above (inline splice for one plain paragraph; split-and-merge
+ * for block structure; cell carets paste into the cell). Shared by the
+ * HTML paste (after parsing) and the structured-clipboard FRAGMENT paste —
+ * one owner for "what pasting at a caret means". Unlike the HTML path, no
+ * numbering remap happens here: a structured payload's numIds come from
+ * this document and still resolve.
+ */
+export function pasteBlocksAtCaret(ctx: EditorContext, input: Block[]): boolean {
+  if (input.length === 0) return false;
+  ctx.ensureCurrent();
   const author = ctx.trackChanges.enabled ? ctx.trackChanges.author : undefined;
-  const blocks = ctx.trackChanges.enabled
-    ? remapped.map((b) => stampBlockRuns(b, author))
-    : remapped;
+  const blocks = ctx.trackChanges.enabled ? input.map((b) => stampBlockRuns(b, author)) : input;
 
   const caret = collapseToCaret(ctx);
   if (!caret) return false;
