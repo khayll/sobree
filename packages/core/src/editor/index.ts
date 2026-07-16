@@ -40,6 +40,7 @@ import { EditorSections } from "./sections";
 import { EditorSelection } from "./selection";
 import { EditorStyles } from "./styles";
 import { TableApi } from "./table";
+import { registerTableNavCommands } from "./tableNav";
 import { renderSobreeDocument } from "./view/docRenderer/index";
 import { type EditorDomHooks, wireEditorDom } from "./wiring";
 // EditorSelection + EditorCommands moved to ./selection / ./commands;
@@ -323,6 +324,9 @@ export class Editor {
     // History + mark commands live on the bus (not the keyboard plugin)
     // so headless callers and Cmd+Z share one dispatch surface.
     registerCoreCommands(this.commands, this, this.history);
+    // Table cell navigation (`table.cellNext` / `table.cellPrev`) — Tab /
+    // Shift+Tab in the keyboard plugin, same bus for every other caller.
+    registerTableNavCommands(this.commands, this);
 
     this.mountHost(options);
     // All host/document listeners + image-resize + the remote-Y.Doc

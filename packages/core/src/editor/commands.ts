@@ -26,6 +26,12 @@ export class EditorCommands implements CommandBus {
     };
   }
 
+  isAvailable(name: string): boolean {
+    const cmd = this.commands.get(name);
+    if (!cmd) return false;
+    return cmd.isAvailable?.() ?? true;
+  }
+
   execute<Args = void>(name: string, args?: Args): void {
     const cmd = this.commands.get(name);
     if (!cmd) {

@@ -10,12 +10,15 @@ import { DEFAULT_BINDINGS, attachKeyboard } from "./index";
 
 interface Stub {
   editor: Editor;
-  fire: (combo: Partial<KeyDownPayload>) => void;
+  fire: (combo: Partial<KeyDownPayload>) => KeyDownPayload;
   executed: string[];
+  /** Command names `commands.isAvailable` reports as available. */
+  availableCommands: Set<string>;
 }
 
 function makeStub(): Stub {
   const executed: string[] = [];
+  const availableCommands = new Set<string>();
   const listeners: Array<(p: KeyDownPayload) => void> = [];
   const stubEditor = {
     on: (event: string, cb: (p: KeyDownPayload) => void) => {
@@ -30,10 +33,11 @@ function makeStub(): Stub {
       execute: vi.fn((name: string) => {
         executed.push(name);
       }),
+      isAvailable: (name: string) => availableCommands.has(name),
     },
   } as unknown as Editor;
 
-  function fire(combo: Partial<KeyDownPayload>): void {
+  function fire(combo: Partial<KeyDownPayload>): KeyDownPayload {
     const payload: KeyDownPayload = {
       key: "",
       code: "",
@@ -47,9 +51,10 @@ function makeStub(): Stub {
       ...combo,
     };
     for (const l of listeners) l(payload);
+    return payload;
   }
 
-  return { editor: stubEditor, fire, executed };
+  return { editor: stubEditor, fire, executed, availableCommands };
 }
 
 describe("attachKeyboard — default bindings", () => {
@@ -112,6 +117,61 @@ describe("attachKeyboard — default bindings", () => {
       expect(typeof b.match).toBe("function");
       expect(typeof b.command).toBe("string");
     }
+  });
+});
+
+describe("attachKeyboard — Tab in tables (availability-gated)", () => {
+  it("Tab dispatches table.cellNext when the caret is in a table cell", () => {
+    const { editor, fire, executed, availableCommands } = makeStub();
+    attachKeyboard(editor);
+    availableCommands.add("table.cellNext");
+    const ev = fire({ key: "Tab", code: "Tab" });
+    expect(executed).toEqual(["table.cellNext"]);
+    expect(ev.preventDefault).toHaveBeenCalled();
+  });
+
+  it("Shift+Tab dispatches table.cellPrev when available", () => {
+    const { editor, fire, executed, availableCommands } = makeStub();
+    attachKeyboard(editor);
+    availableCommands.add("table.cellPrev");
+    fire({ key: "Tab", code: "Tab", shift: true });
+    expect(executed).toEqual(["table.cellPrev"]);
+  });
+
+  it("Tab OUTSIDE a table is not consumed — browser default preserved", () => {
+    // The command is unavailable (caret not in a cell): the binding must
+    // decline, not preventDefault-and-noop, or Tab stops working as
+    // focus navigation everywhere in the editor.
+    const { editor, fire, executed } = makeStub();
+    attachKeyboard(editor);
+    const ev = fire({ key: "Tab", code: "Tab" });
+    expect(executed).toEqual([]);
+    expect(ev.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("modifier combos with Tab stay native (no dispatch)", () => {
+    const { editor, fire, executed, availableCommands } = makeStub();
+    attachKeyboard(editor);
+    availableCommands.add("table.cellNext");
+    fire({ key: "Tab", code: "Tab", meta: true });
+    fire({ key: "Tab", code: "Tab", ctrl: true });
+    fire({ key: "Tab", code: "Tab", alt: true });
+    expect(executed).toEqual([]);
+  });
+
+  it("an unavailable gated binding lets other matching bindings run", () => {
+    const { editor, fire, executed } = makeStub();
+    // Bindings are matched in REVERSE order, so the gated binding (last)
+    // is consulted first. Unavailable → it must decline and let the scan
+    // continue to the earlier fallback, not stop the dispatch outright.
+    attachKeyboard(editor, {
+      bindings: [
+        { match: (e) => e.key === "Tab", command: "my.fallback" },
+        { match: (e) => e.key === "Tab", command: "my.gated", onlyWhenAvailable: true },
+      ],
+    });
+    fire({ key: "Tab", code: "Tab" });
+    expect(executed).toEqual(["my.fallback"]);
   });
 });
 

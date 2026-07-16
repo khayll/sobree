@@ -279,6 +279,15 @@ export interface CommandBus {
   list(): CommandSnapshot[];
   /** Whether the named command is currently registered. */
   has(name: string): boolean;
+  /**
+   * Whether the named command would run right now — `false` for an
+   * unregistered command or one whose `isAvailable()` declines. Cheaper
+   * than `list()` (evaluates one command, not every command's state);
+   * lets a caller decide whether to CONSUME a trigger before executing —
+   * e.g. the keyboard plugin only swallows Tab when `table.cellNext` is
+   * available, so Tab outside a table keeps its browser behaviour.
+   */
+  isAvailable(name: string): boolean;
 }
 
 export interface EditorOptions {
