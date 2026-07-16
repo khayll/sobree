@@ -19,6 +19,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "0,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -34,6 +37,9 @@
                   "text": "Header A",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "0,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -49,6 +55,9 @@
                   "text": "Header B",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "0,2",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -71,6 +80,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "1,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -86,6 +98,9 @@
                   "text": "Cell 1A",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "1,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -101,6 +116,9 @@
                   "text": "Cell 1B",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "1,2",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -123,6 +141,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "2,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -138,6 +159,9 @@
                   "text": "Cell 2A",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "2,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -153,6 +177,9 @@
                   "text": "Cell 2B",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "2,2",
+                  },
                   "children": [
                     {
                       "attrs": {

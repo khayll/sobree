@@ -95,8 +95,9 @@ export function blockPointFromDom(
   const { blockEl, blockId } = findBlockElement(node, hosts);
   if (!blockEl || !blockId) return null;
   if (isInsideTable(blockEl)) {
-    const { offset, cell } = tableCellPosition(blockEl, node, domOffset);
-    return { blockId, offset, cell };
+    const inCell = tableCellPosition(blockEl, node, domOffset);
+    if (inCell) return { blockId, offset: inCell.offset, cell: inCell.cell };
+    return { blockId, offset: 0 };
   }
   return { blockId, offset: charOffsetToPoint(blockEl, node, domOffset) };
 }
@@ -281,48 +282,59 @@ function isInsideTable(blockEl: Element): boolean {
 
 type CellAddress = NonNullable<InlinePosition["cell"]>;
 
-function isCellEl(el: Element): boolean {
-  const t = el.tagName.toLowerCase();
-  return t === "td" || t === "th";
+/**
+ * The AST address the renderer stamped on a `<td>` (`rows[row].cells[col]`),
+ * or `null` on a cell it didn't render (e.g. foreign pasted markup).
+ *
+ * Read the stamp rather than counting `<td>`/`<tr>` indices: `vMerge:
+ * "continue"` cells emit no element, page fragments carry only a subset of
+ * the rows, and header rows repeat per page — so a counted index is
+ * fragment-relative and diverges from the AST exactly where merges and page
+ * splits occur. The renderer owns that geometry and publishes the address.
+ */
+function stampedCellAddress(td: HTMLElement): { row: number; col: number } | null {
+  const raw = td.dataset.cell;
+  if (raw === undefined) return null;
+  const [row, col] = raw.split(",").map(Number);
+  if (row === undefined || col === undefined) return null;
+  if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0) return null;
+  return { row, col };
 }
 
-/** The `<tr>` rows belonging directly to `tableEl` (excludes nested tables). */
-function tableRows(tableEl: Element): HTMLElement[] {
-  return Array.from(tableEl.querySelectorAll<HTMLElement>("tr")).filter(
-    (tr) => tr.closest("table") === tableEl,
-  );
-}
-
-/** Compute the cell address + in-cell offset for a caret inside a table. */
+/**
+ * Compute the cell address + in-cell offset for a caret inside a table.
+ * `null` when the cell carries no AST address — callers then treat the
+ * caret as a plain table position rather than guessing a wrong cell.
+ */
 function tableCellPosition(
   tableEl: Element,
   node: Node,
   domOffset: number,
-): { offset: number; cell: CellAddress } {
+): { offset: number; cell: CellAddress } | null {
   const start = node instanceof Element ? node : node.parentElement;
   const td = start?.closest("td,th") as HTMLElement | null;
-  if (!td || !tableEl.contains(td)) {
-    return { offset: 0, cell: { row: 0, col: 0, blockIndex: 0 } };
-  }
-  const tr = td.closest("tr");
-  const row = tr ? tableRows(tableEl).indexOf(tr as HTMLElement) : 0;
-  const cells = tr ? (Array.from(tr.children).filter(isCellEl) as HTMLElement[]) : [];
-  const col = cells.indexOf(td);
+  if (!td || !tableEl.contains(td)) return null;
+  const address = stampedCellAddress(td);
+  if (!address) return null;
   const blocks = Array.from(td.children) as HTMLElement[];
   let blockIndex = blocks.findIndex((b) => b.contains(node));
   if (blockIndex < 0) blockIndex = 0;
   const contentBlock = blocks[blockIndex] ?? td;
   return {
     offset: charOffsetToPoint(contentBlock, node, domOffset),
-    cell: { row: Math.max(0, row), col: Math.max(0, col), blockIndex },
+    cell: { ...address, blockIndex },
   };
 }
 
-/** The rendered content-block element for a cell address, or null. */
+/**
+ * The rendered content-block element for a cell address, or null. Finds the
+ * `<td>` by its stamped AST address — an index lookup would land in the
+ * wrong cell for a merged column or a table fragmented across pages.
+ */
 function cellContentBlock(tableEl: Element, cell: CellAddress): HTMLElement | null {
-  const tr = tableRows(tableEl)[cell.row];
-  if (!tr) return null;
-  const td = (Array.from(tr.children).filter(isCellEl) as HTMLElement[])[cell.col];
+  const td = Array.from(tableEl.querySelectorAll<HTMLElement>("td,th")).find(
+    (el) => el.closest("table") === tableEl && el.dataset.cell === `${cell.row},${cell.col}`,
+  );
   if (!td) return null;
   const blocks = Array.from(td.children) as HTMLElement[];
   return blocks[cell.blockIndex] ?? td;

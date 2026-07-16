@@ -67,6 +67,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "0,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -82,6 +85,9 @@
                   "text": "Client name",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "0,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -103,6 +109,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "1,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -118,6 +127,9 @@
                   "text": "Address",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "1,1",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -139,6 +151,9 @@
             {
               "children": [
                 {
+                  "attrs": {
+                    "data-cell": "2,0",
+                  },
                   "children": [
                     {
                       "attrs": {
@@ -154,6 +169,9 @@
                   "text": "Contact",
                 },
                 {
+                  "attrs": {
+                    "data-cell": "2,1",
+                  },
                   "children": [
                     {
                       "attrs": {

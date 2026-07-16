@@ -1,4 +1,5 @@
 import type { InlinePosition } from "../doc/api";
+import { paragraphTargetAt } from "../doc/mutations/paragraphTarget";
 import { runsLength } from "../doc/runs";
 import type { Block, Paragraph } from "../doc/types";
 import { headingLevelOf, runsToText } from "../doc/walk";
@@ -92,16 +93,36 @@ export function summariseBlock(ctx: EditorContext, block: Block, index: number):
 export function refreshedPosition(ctx: EditorContext, at: InlinePosition): InlinePosition | null {
   const info = getBlockById(ctx, at.block.id);
   if (!info) return null;
-  return { block: { id: info.id, version: info.version }, offset: at.offset };
+  // Carry `cell` through. Dropping it silently re-points a position inside a
+  // table cell at the TABLE itself, at the same numeric offset.
+  const next: InlinePosition = { block: { id: info.id, version: info.version }, offset: at.offset };
+  return at.cell ? { ...next, cell: at.cell } : next;
 }
 
 /** Place the caret at `(blockId, offset)` using a fresh block ref. */
 export function placeCaret(ctx: EditorContext, blockId: string, offset: number): void {
   const info = getBlockById(ctx, blockId);
   if (!info) return;
-  const clamped = Math.max(0, Math.min(offset, info.length));
+  placeCaretAt(ctx, { block: { id: info.id, version: info.version }, offset });
+}
+
+/**
+ * Place the caret at `at` (a fresh block ref), keeping any `cell` address.
+ *
+ * Clamps to the addressed PARAGRAPH's length: for a position inside a table
+ * cell, `offset` is measured within the cell's paragraph, while the block's
+ * own `length` is the whole table's — clamping to that would let the offset
+ * run past the end of the cell text.
+ */
+export function placeCaretAt(ctx: EditorContext, at: InlinePosition): void {
+  const info = getBlockById(ctx, at.block.id);
+  if (!info) return;
+  const target = paragraphTargetAt(ctx.doc, ctx.registry, at);
+  const max = target ? runsLength(target.paragraph.runs) : info.length;
+  const block = { id: info.id, version: info.version };
+  const offset = Math.max(0, Math.min(at.offset, max));
   ctx.selection.set({
     kind: "caret",
-    at: { block: { id: info.id, version: info.version }, offset: clamped },
+    at: at.cell ? { block, offset, cell: at.cell } : { block, offset },
   });
 }
