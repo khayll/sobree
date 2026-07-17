@@ -13,10 +13,12 @@
  *   - a selection that covers its endpoint blocks END-TO-END copies WHOLE
  *     blocks; pasting inserts them as new blocks after the caret's block
  *     ("copy a block, paste it below, get two similar blocks");
- *   - a selection that ends PARTWAY through a block copies a FRAGMENT —
- *     the endpoint paragraphs sliced to the selected offsets (`fragment:
- *     true`); pasting splices it at the caret through the same machinery
- *     as rich HTML paste, so only what was selected appears. Copying the
+ *   - a selection that ends PARTWAY through a block copies a FRAGMENT:
+ *     the sliced endpoint paragraphs lose their paragraph mark and MERGE
+ *     into the caret paragraph's halves on paste, while a COMPLETE
+ *     endpoint (e.g. a fully-selected heading followed by a partial
+ *     paragraph) keeps its paragraph identity and stands as its own
+ *     block, splitting the caret paragraph when needed. Copying the
  *     whole blocks here pasted back text the user never selected.
  *
  * A range inside ONE block copies structurally only when it covers the
@@ -41,16 +43,24 @@ export const BLOCKS_MIME = "application/x-sobree-blocks+json";
 interface BlocksPayload {
   v: 1;
   blocks: Block[];
-  /** True when the endpoint blocks are SLICED to the selection (the copy
-   *  didn't cover them end-to-end) — the paste splices at the caret instead
-   *  of inserting whole blocks. Absent (older payloads) means whole. */
-  fragment?: boolean;
+  /** Present when the copy didn't cover its endpoint blocks end-to-end.
+   *  `first` / `last` say WHICH endpoint was sliced to the selection — a
+   *  sliced endpoint lost its paragraph mark, so pasting merges it into the
+   *  caret paragraph's halves; a complete endpoint keeps its paragraph
+   *  identity and stands as its own block (splitting the caret paragraph
+   *  when needed). Absent (older payloads) means whole blocks. */
+  fragment?: { first: boolean; last: boolean };
 }
 
+export type FragmentEnds = { first: boolean; last: boolean };
+
 /** Serialise blocks for the clipboard. */
-export function serializeBlocks(blocks: readonly Block[], opts?: { fragment?: boolean }): string {
+export function serializeBlocks(
+  blocks: readonly Block[],
+  opts?: { fragment?: FragmentEnds },
+): string {
   const payload: BlocksPayload = { v: 1, blocks: blocks as Block[] };
-  if (opts?.fragment) payload.fragment = true;
+  if (opts?.fragment) payload.fragment = opts.fragment;
   return JSON.stringify(payload);
 }
 
@@ -58,7 +68,7 @@ export function serializeBlocks(blocks: readonly Block[], opts?: { fragment?: bo
  *  malformed (caller then falls back to the text/HTML paste path). */
 export function parseBlocks(
   data: string | undefined | null,
-): { blocks: Block[]; fragment: boolean } | null {
+): { blocks: Block[]; fragment: FragmentEnds | null } | null {
   if (!data) return null;
   let parsed: unknown;
   try {
@@ -72,7 +82,15 @@ export function parseBlocks(
   if (!blocks.every((b) => typeof b === "object" && b !== null && typeof b.kind === "string")) {
     return null;
   }
-  return { blocks: blocks as Block[], fragment: (parsed as BlocksPayload).fragment === true };
+  const rawFragment = (parsed as BlocksPayload).fragment;
+  const fragment =
+    typeof rawFragment === "object" &&
+    rawFragment !== null &&
+    typeof rawFragment.first === "boolean" &&
+    typeof rawFragment.last === "boolean"
+      ? { first: rawFragment.first, last: rawFragment.last }
+      : null;
+  return { blocks: blocks as Block[], fragment };
 }
 
 /** Plain-text projection of a block (the `text/plain` clipboard fallback). */
@@ -111,6 +129,9 @@ interface SelectionCoverage {
   /** Document-order endpoints (a backwards selection is normalised). */
   from: InlinePosition;
   to: InlinePosition;
+  /** Per-endpoint end-to-end coverage; `full` = both. */
+  firstFull: boolean;
+  lastFull: boolean;
   full: boolean;
 }
 
@@ -146,7 +167,7 @@ function selectionCoverage(ctx: EditorContext): SelectionCoverage | null {
 
   // One block, partially covered → not structurally copyable.
   if (lo === hi && !(firstFull && lastFull)) return null;
-  return { lo, hi, from, to, full: firstFull && lastFull };
+  return { lo, hi, from, to, firstFull, lastFull, full: firstFull && lastFull };
 }
 
 /**
@@ -155,28 +176,34 @@ function selectionCoverage(ctx: EditorContext): SelectionCoverage | null {
  * SLICED to the selected offsets (`fragment: true`). Copying whole blocks
  * for a partial selection pasted back text the user never selected.
  */
-export function selectedBlocks(ctx: EditorContext): { blocks: Block[]; fragment: boolean } | null {
+export function selectedBlocks(
+  ctx: EditorContext,
+): { blocks: Block[]; fragment: FragmentEnds | null } | null {
   const cov = selectionCoverage(ctx);
   if (!cov) return null;
   const blocks = ctx.doc.body.slice(cov.lo, cov.hi + 1).map(cloneBlock);
   if (!cov.full) {
     const first = blocks[0];
-    if (first?.kind === "paragraph") {
+    if (!cov.firstFull && first?.kind === "paragraph") {
       first.runs = sliceRuns(first.runs, cov.from.offset, paragraphLength(first));
     }
     const last = blocks[blocks.length - 1];
-    if (last?.kind === "paragraph" && blocks.length > 1) {
+    if (!cov.lastFull && last?.kind === "paragraph" && blocks.length > 1) {
       last.runs = sliceRuns(last.runs, 0, cov.to.offset);
     }
   }
-  return { blocks, fragment: !cov.full };
+  return { blocks, fragment: cov.full ? null : { first: !cov.firstFull, last: !cov.lastFull } };
 }
 
 /** Write blocks to the clipboard (structured payload + text fallback). */
-function writeBlocks(e: ClipboardEvent, blocks: readonly Block[], fragment: boolean): void {
+function writeBlocks(
+  e: ClipboardEvent,
+  blocks: readonly Block[],
+  fragment: FragmentEnds | null,
+): void {
   if (!e.clipboardData) return;
   e.preventDefault();
-  e.clipboardData.setData(BLOCKS_MIME, serializeBlocks(blocks, { fragment }));
+  e.clipboardData.setData(BLOCKS_MIME, serializeBlocks(blocks, fragment ? { fragment } : {}));
   e.clipboardData.setData("text/plain", blocks.map(blockText).join("\n"));
 }
 
@@ -236,7 +263,9 @@ export function tryPasteBlocks(ctx: EditorContext, e: ClipboardEvent): boolean {
   if (!payload) return false;
   e.preventDefault();
   if (payload.fragment) {
-    pasteBlocksAtCaret(ctx, payload.blocks.map(cloneBlock));
+    // A SLICED endpoint lost its paragraph mark → merge; a complete one
+    // stands as its own block (splitting the caret paragraph when needed).
+    pasteBlocksAtCaret(ctx, payload.blocks.map(cloneBlock), payload.fragment);
   } else {
     pasteBlocksAfterCaret(ctx, payload.blocks);
   }
