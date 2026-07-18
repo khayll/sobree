@@ -168,8 +168,17 @@ function.
 `editor.commands.execute("mark.toggle.bold")`. `list()` returns
 `CommandSnapshot[]` (`{ name, title, isActive, isAvailable }`) for
 everything registered — how generic surfaces (command palettes, MCP
-tool catalogues) discover what's available. `ApiRangeType` is an alias
-of the editing-model `Range` for consumers that import types only.
+tool catalogues) discover what's available. `isAvailable(name)` answers
+the same question for ONE command without snapshotting the rest — how a
+caller decides whether to consume a trigger before executing (the
+keyboard plugin gates Tab on `table.cellNext` this way). `ApiRangeType`
+is an alias of the editing-model `Range` for consumers that import
+types only.
+
+Core registers table cell navigation on the bus: `table.cellNext` /
+`table.cellPrev` move the selection between a table's rendered cells in
+reading order (selecting the target cell's content, as in Word),
+available only while the selection sits in a table cell.
 
 ## Reads
 

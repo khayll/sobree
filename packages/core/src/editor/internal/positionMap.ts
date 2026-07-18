@@ -312,8 +312,19 @@ function tableCellPosition(
   domOffset: number,
 ): { offset: number; cell: CellAddress } | null {
   const start = node instanceof Element ? node : node.parentElement;
-  const td = start?.closest("td,th") as HTMLElement | null;
+  let td = start?.closest("td,th") as HTMLElement | null;
   if (!td || !tableEl.contains(td)) return null;
+  // Anchor to the OUTERMOST cell within `tableEl`. A caret inside a NESTED
+  // table would otherwise read the inner table's stamp — addresses relative
+  // to the inner table — against the outer block id, resolving to whatever
+  // outer cell happens to sit at those indices (a wrong-cell write, not a
+  // decline). The outer cell's address is the one `tableEl`'s AST can
+  // resolve; the nested table is just one of that cell's content blocks.
+  for (;;) {
+    const outer = td.parentElement?.closest("td,th") as HTMLElement | null;
+    if (!outer || !tableEl.contains(outer)) break;
+    td = outer;
+  }
   const address = stampedCellAddress(td);
   if (!address) return null;
   const blocks = Array.from(td.children) as HTMLElement[];

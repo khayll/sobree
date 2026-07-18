@@ -40,6 +40,8 @@ createSobree("#editor", {
 
 | Combo                          | Command                       |
 | ------------------------------ | ----------------------------- |
+| Tab (in a table cell)          | `table.cellNext`              |
+| Shift + Tab (in a table cell)  | `table.cellPrev`              |
 | Cmd / Ctrl + Z                 | `history.undo`                |
 | Cmd / Ctrl + Shift + Z         | `history.redo` (macOS-style)  |
 | Cmd / Ctrl + Y                 | `history.redo` (Windows-style) |
@@ -50,6 +52,14 @@ createSobree("#editor", {
 | Cmd / Ctrl + Shift + S         | `mark.toggle.strike`          |
 | Cmd / Ctrl + .                 | `mark.toggle.superscript`     |
 | Cmd / Ctrl + ,                 | `mark.toggle.subscript`       |
+
+Tab / Shift+Tab move between table cells in reading order (the target
+cell's content is selected, as in Word), skipping cells occluded by a
+vertical merge. They fire only while the caret is in a table cell — the
+bindings are availability-gated (see `onlyWhenAvailable` below), so Tab
+everywhere else keeps its browser default. At the table boundary the key
+is consumed but nothing moves; inserting a new row Word-style is not
+implemented yet.
 
 ## Direct usage (without `createSobree`)
 
@@ -76,6 +86,10 @@ interface KeyboardOptions {
 interface KeyBinding {
   match: (e: KeyDownPayload) => boolean;
   command: string;
+  /** Consume the key only while the command is available
+   *  (`editor.commands.isAvailable`); otherwise the binding is skipped and
+   *  the key keeps its browser default. Used by the Tab bindings. */
+  onlyWhenAvailable?: boolean;
 }
 ```
 

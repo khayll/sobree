@@ -329,6 +329,34 @@ describe("positionMap — table cell addressing", () => {
     expect(el?.closest("td")?.textContent).toBe("Under");
   });
 
+  it("anchors a caret in a NESTED table to the OUTER cell's address", () => {
+    // The inner table stamps its own data-cell addresses, relative to
+    // ITSELF. Reading the closest <td>'s stamp against the outer block id
+    // would resolve inner (0,1) as outer (0,1) — a different, wrong cell
+    // (a write there would edit that cell's text). The outermost cell is
+    // the one the outer table's AST can resolve.
+    const host = document.createElement("div");
+    host.innerHTML = `
+      <table data-block-id="b1" data-block-index="0"><tbody>
+        <tr>
+          <td data-cell="0,0">
+            <table><tbody><tr>
+              <td data-cell="0,0"><p>ia</p></td><td data-cell="0,1"><p>ib</p></td>
+            </tr></tbody></table>
+          </td>
+          <td data-cell="0,1"><p>outer</p></td>
+        </tr>
+      </tbody></table>`.trim();
+    document.body.appendChild(host);
+    const registry = new BlockRegistry();
+    registry.reset(1);
+
+    const inner = [...host.querySelectorAll("td")].find((td) => td.textContent === "ib")!;
+    const pos = positionFromDomPoint([host], registry, inner.querySelector("p")!.firstChild!, 1);
+    expect(pos?.cell?.row).toBe(0);
+    expect(pos?.cell?.col).toBe(0); // the OUTER cell containing the nested table
+  });
+
   it("reports no cell address for a table the renderer didn't stamp", () => {
     // Foreign markup (e.g. a pasted table) carries no AST address. Guessing
     // one by counting would silently point at some other cell, so callers

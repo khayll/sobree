@@ -31,6 +31,17 @@ export interface KeyboardOptions {
 export interface KeyBinding {
   match: (e: KeyDownPayload) => boolean;
   command: string;
+  /**
+   * Consume the key only when the command is currently available
+   * (`editor.commands.isAvailable`). When it isn't, the binding is skipped —
+   * LATER bindings may still match, and an unmatched key keeps its browser
+   * default. Used for keys with a real default worth preserving: Tab maps to
+   * `table.cellNext` only while the caret is in a table cell; everywhere
+   * else it stays the browser's Tab. Modifier combos like Cmd+B don't set
+   * this — they're consumed even when the command no-ops, so the browser
+   * never acts on a combo the editor owns.
+   */
+  onlyWhenAvailable?: boolean;
 }
 
 /**
@@ -73,12 +84,12 @@ export function attachKeyboard(editor: Editor, opts: KeyboardOptions = {}): () =
     // Reverse order so user-supplied overrides shadow defaults.
     for (let i = all.length - 1; i >= 0; i--) {
       const b = all[i]!;
-      if (b.match(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        editor.commands.execute(b.command);
-        return;
-      }
+      if (!b.match(e)) continue;
+      if (b.onlyWhenAvailable && !editor.commands.isAvailable(b.command)) continue;
+      e.preventDefault();
+      e.stopPropagation();
+      editor.commands.execute(b.command);
+      return;
     }
   });
 }
@@ -88,6 +99,20 @@ export function attachKeyboard(editor: Editor, opts: KeyboardOptions = {}): () =
  * Exported so embedders extending the bindings can spread them in.
  */
 export const DEFAULT_BINDINGS: readonly KeyBinding[] = [
+  // Tab / Shift+Tab move between table cells (Word behaviour: the target
+  // cell's content is selected). Gated on availability — the commands are
+  // available only while the caret is in a table cell, so Tab everywhere
+  // else keeps its browser default instead of being swallowed.
+  {
+    match: (e) => !e.ctrl && !e.meta && !e.alt && !e.shift && e.key === "Tab",
+    command: "table.cellNext",
+    onlyWhenAvailable: true,
+  },
+  {
+    match: (e) => !e.ctrl && !e.meta && !e.alt && e.shift && e.key === "Tab",
+    command: "table.cellPrev",
+    onlyWhenAvailable: true,
+  },
   // Section break — Word uses Ctrl/Cmd+Shift+Enter for the same op.
   {
     match: (e) => cmd(e) && e.shift && !e.alt && (e.key === "Enter" || e.code === "Enter"),
