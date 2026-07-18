@@ -1,5 +1,15 @@
 # @sobree/block-tools
 
+## 0.1.71
+
+### Patch Changes
+
+- 53bb942: Version bump only — released together with @sobree/core to keep the
+  @sobree/\* package set on one patch version.
+- Updated dependencies [fd4f935]
+- Updated dependencies [99c11b5]
+  - @sobree/core@0.1.71
+
 ## 0.1.70
 
 ### Patch Changes

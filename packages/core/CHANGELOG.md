@@ -1,5 +1,39 @@
 # @sobree/core
 
+## 0.1.71
+
+### Patch Changes
+
+- fd4f935: Copy and cut now carry exactly what the selection covers. A selection ending
+  partway through a paragraph (spanning block boundaries) copied the WHOLE
+  endpoint blocks, so pasting reproduced text that was never selected — and a
+  cut of the same selection deleted whole blocks, taking unselected text with
+  it. The structured clipboard payload now slices the endpoint paragraphs to
+  the selected offsets and records WHICH ends were sliced; pasting splices at
+  the caret through the same machinery as rich HTML paste. A sliced endpoint
+  lost its paragraph mark and merges into the caret paragraph's halves; a
+  COMPLETE endpoint (a fully-selected heading ahead of a partial paragraph)
+  keeps its paragraph identity and stands as its own block, splitting the
+  caret paragraph to make place — mirroring Word's paragraph-mark rule. A
+  paste landing at the start of a block no longer leaves an empty paragraph
+  above the pasted content. Whole-block copies keep their existing
+  paste-as-blocks behaviour, and partial cuts delete only the selected range,
+  merging the endpoint paragraphs.
+- 99c11b5: Tab / Shift+Tab move between table cells. Core registers `table.cellNext` /
+  `table.cellPrev` on the command bus — the selection moves through the table's
+  rendered cells in reading order (skipping cells occluded by a vertical merge)
+  and the target cell's content is selected, as in Word. The keyboard plugin maps
+  Tab / Shift+Tab onto them, gated on availability: outside a table cell the key
+  keeps its browser default instead of being swallowed. At the table boundary the
+  key is consumed but nothing moves (Word would insert a row there; that
+  structural edit is out of scope). `KeyBinding` gains `onlyWhenAvailable` and
+  the command bus gains `isAvailable(name)`.
+
+  Also fixes a caret inside a NESTED table reading the inner table's cell stamp
+  against the outer table's block — which could resolve to (and write into) the
+  wrong outer cell. Nested-table carets now anchor to the outer cell containing
+  them.
+
 ## 0.1.70
 
 ### Patch Changes
