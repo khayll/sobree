@@ -46,11 +46,49 @@ export function pasteHtmlAtCaret(ctx: EditorContext, html: string): boolean {
   if (addedNumbering.length > 0) {
     ctx.commit({ numbering: [...(ctx.doc.numbering ?? []), ...addedNumbering] }, []);
   }
+  return pasteBlocksAtCaret(ctx, remapped);
+}
 
+/**
+ * Which endpoint blocks of a paste payload MERGE into the caret paragraph's
+ * halves rather than standing as their own blocks. The HTML path (no flags
+ * available) infers it from block shape via `isMergeable`; the structured
+ * clipboard KNOWS — a sliced (partial) endpoint lost its paragraph mark and
+ * merges, a complete one keeps its paragraph identity and splits the caret
+ * block to stand alone. Word's paragraph-mark rule, made explicit.
+ */
+export interface MergePolicy {
+  first: boolean;
+  last: boolean;
+}
+
+/** A paragraph CAN merge (structurally); policy decides whether it SHOULD. */
+function canMerge(block: Block): boolean {
+  return block.kind === "paragraph";
+}
+
+/**
+ * Insert ready-made AST `blocks` at the current selection with the paste
+ * semantics above (inline splice for a merging single paragraph;
+ * split-and-merge for block structure; cell carets paste into the cell).
+ * Shared by the HTML paste (after parsing) and the structured-clipboard
+ * FRAGMENT paste — one owner for "what pasting at a caret means". Unlike
+ * the HTML path, no numbering remap happens here: a structured payload's
+ * numIds come from this document and still resolve.
+ */
+export function pasteBlocksAtCaret(
+  ctx: EditorContext,
+  input: Block[],
+  merge?: MergePolicy,
+): boolean {
+  if (input.length === 0) return false;
+  ctx.ensureCurrent();
   const author = ctx.trackChanges.enabled ? ctx.trackChanges.author : undefined;
-  const blocks = ctx.trackChanges.enabled
-    ? remapped.map((b) => stampBlockRuns(b, author))
-    : remapped;
+  const blocks = ctx.trackChanges.enabled ? input.map((b) => stampBlockRuns(b, author)) : input;
+  const mergeFirst = canMerge(blocks[0]!) && (merge ? merge.first : isMergeable(blocks[0]!));
+  const mergeLast =
+    canMerge(blocks[blocks.length - 1]!) &&
+    (merge ? merge.last : isMergeable(blocks[blocks.length - 1]!));
 
   const caret = collapseToCaret(ctx);
   if (!caret) return false;
@@ -58,7 +96,7 @@ export function pasteHtmlAtCaret(ctx: EditorContext, html: string): boolean {
   // Caret inside a table cell — paste into the CELL's own content. The block
   // ops below address `doc.body`, so routing a cell caret through them pasted
   // the content after the whole TABLE instead of into the cell.
-  if (caret.cell) return pasteIntoCell(ctx, caret, blocks);
+  if (caret.cell) return pasteIntoCell(ctx, caret, blocks, mergeFirst, mergeLast);
 
   const targetIdx = ctx.registry.indexOf(caret.block.id);
   const target = ctx.doc.body[targetIdx];
@@ -71,9 +109,9 @@ export function pasteHtmlAtCaret(ctx: EditorContext, html: string): boolean {
   const targetRef = ctx.registry.refAt(targetIdx);
   const { before, after } = splitRunsAt(target.runs, caret.offset);
 
-  // Inline paste: one plain paragraph splices into the caret paragraph so it
-  // stays a single block.
-  if (blocks.length === 1 && isMergeable(blocks[0]!)) {
+  // Inline paste: one merging paragraph splices into the caret paragraph so
+  // it stays a single block.
+  if (blocks.length === 1 && (mergeFirst || mergeLast)) {
     const inserted = (blocks[0] as Paragraph).runs;
     const runs = mergeAdjacentTextRuns([...before, ...inserted, ...after]);
     const res = replaceBlock(ctx, targetRef, { ...target, runs });
@@ -81,23 +119,35 @@ export function pasteHtmlAtCaret(ctx: EditorContext, html: string): boolean {
     return true;
   }
 
-  // Block paste: the first / last plain paragraphs merge into the split halves;
-  // the middle blocks insert between.
+  // Block paste: merging first / last paragraphs join the split halves; the
+  // remaining blocks insert between as themselves.
   let list = blocks;
   let headRuns = before;
-  if (list.length > 0 && isMergeable(list[0]!)) {
+  let mergedHead = false;
+  if (list.length > 0 && mergeFirst) {
     headRuns = mergeAdjacentTextRuns([...before, ...(list[0] as Paragraph).runs]);
     list = list.slice(1);
+    mergedHead = true;
   }
   let tailRuns = after;
   let mergedTail = false;
-  if (list.length > 0 && isMergeable(list[list.length - 1]!)) {
+  if (list.length > 0 && mergeLast) {
     tailRuns = mergeAdjacentTextRuns([...(list[list.length - 1] as Paragraph).runs, ...after]);
     list = list.slice(0, -1);
     mergedTail = true;
   }
 
-  replaceBlock(ctx, targetRef, { ...target, runs: headRuns });
+  // Caret at the very START of the block, first pasted block standing alone:
+  // don't leave an empty paragraph above it. The first pasted block takes the
+  // target's slot instead (the target's own content is entirely in `after`,
+  // so nothing — including tracked `del` runs — is lost; it re-emerges in the
+  // tail below).
+  if (!mergedHead && before.length === 0 && list.length > 0) {
+    replaceBlock(ctx, targetRef, list[0]!);
+    list = list.slice(1);
+  } else {
+    replaceBlock(ctx, targetRef, { ...target, runs: headRuns });
+  }
   // `replaceBlock` bumped the block's version — refetch a fresh ref by (stable)
   // id, or the next insert's optimistic-lock check fails on the stale version.
   let afterRef = ctx.registry.refById(targetRef.id) ?? targetRef;
@@ -138,12 +188,18 @@ export function pasteHtmlAtCaret(ctx: EditorContext, html: string): boolean {
  * `paragraphTargetAt`), leaving the caller its plain-text fallback rather than
  * dropping the content somewhere else in the document.
  */
-function pasteIntoCell(ctx: EditorContext, caret: InlinePosition, blocks: Block[]): boolean {
+function pasteIntoCell(
+  ctx: EditorContext,
+  caret: InlinePosition,
+  blocks: Block[],
+  mergeFirst: boolean,
+  mergeLast: boolean,
+): boolean {
   const target = paragraphTargetAt(ctx.doc, ctx.registry, caret);
   if (!target) return false;
   const { before, after } = splitRunsAt(target.paragraph.runs, caret.offset);
 
-  if (blocks.length === 1 && isMergeable(blocks[0]!)) {
+  if (blocks.length === 1 && (mergeFirst || mergeLast)) {
     const inserted = (blocks[0] as Paragraph).runs;
     const runs = mergeAdjacentTextRuns([...before, ...inserted, ...after]);
     const body = target.withParagraph({ ...target.paragraph, runs });
@@ -152,23 +208,28 @@ function pasteIntoCell(ctx: EditorContext, caret: InlinePosition, blocks: Block[
     return true;
   }
 
-  // Block paste: first / last plain paragraphs merge into the split halves.
+  // Block paste: merging first / last paragraphs join the split halves.
   let list = blocks;
   let headRuns = before;
-  if (list.length > 0 && isMergeable(list[0]!)) {
+  let mergedHead = false;
+  if (list.length > 0 && mergeFirst) {
     headRuns = mergeAdjacentTextRuns([...before, ...(list[0] as Paragraph).runs]);
     list = list.slice(1);
+    mergedHead = true;
   }
   let tailRuns = after;
   let mergedTail = false;
-  if (list.length > 0 && isMergeable(list[list.length - 1]!)) {
+  if (list.length > 0 && mergeLast) {
     tailRuns = mergeAdjacentTextRuns([...(list[list.length - 1] as Paragraph).runs, ...after]);
     list = list.slice(0, -1);
     mergedTail = true;
   }
 
   const head: Paragraph = { ...target.paragraph, runs: headRuns };
-  const emitted: Block[] = [head, ...list];
+  // Same empty-head elision as the body path: caret at the block start with a
+  // standalone first pasted block leaves no empty paragraph above it.
+  const emitted: Block[] =
+    !mergedHead && before.length === 0 && list.length > 0 ? [...list] : [head, ...list];
   // The tail keeps the original paragraph's properties (the remainder keeps its
   // style) — emitted only when content followed the caret or a paragraph merged
   // into it, matching the body path.

@@ -53,8 +53,12 @@ function selectWholeBlock(host: HTMLElement, blockText: string): void {
 describe("clipboard — serialize/parse", () => {
   it("round-trips blocks through the structured payload", () => {
     const blocks = [paragraph([text("Hi", { bold: true })], { alignment: "center" })];
-    const parsed = parseBlocks(serializeBlocks(blocks));
-    expect(parsed).toEqual(blocks);
+    expect(parseBlocks(serializeBlocks(blocks))).toEqual({ blocks, fragment: null });
+    const ends = { first: true, last: false };
+    expect(parseBlocks(serializeBlocks(blocks, { fragment: ends }))).toEqual({
+      blocks,
+      fragment: ends,
+    });
   });
 
   it("rejects foreign / malformed clipboard data", () => {
@@ -143,9 +147,184 @@ describe("clipboard — copy a block, paste it below", () => {
     const clip = makeClipboard();
     fire(host, "copy", clip);
     const parsed = parseBlocks(clip._store.get(BLOCKS_MIME));
-    expect(parsed).toHaveLength(2);
-    expect((parsed![0] as Paragraph).runs[0]).toMatchObject({ text: "First line." });
-    expect((parsed![1] as Paragraph).runs[0]).toMatchObject({ text: "Duplicate me." });
+    expect(parsed?.fragment).toBeNull();
+    expect(parsed?.blocks).toHaveLength(2);
+    expect((parsed!.blocks[0] as Paragraph).runs[0]).toMatchObject({ text: "First line." });
+    expect((parsed!.blocks[1] as Paragraph).runs[0]).toMatchObject({ text: "Duplicate me." });
+    editor.destroy();
+  });
+
+  it("copies a PARTIAL multi-block selection as sliced fragments, not whole blocks", () => {
+    // Reported: select part of a paragraph (spanning into the next block),
+    // copy, paste — the WHOLE paragraphs appeared. The copy handler treated
+    // any multi-block range as whole-block coverage, ignoring the offsets.
+    const editor = editorWith();
+    const blocks = [...host.querySelectorAll<HTMLElement>("[data-block-id]")];
+    const tn0 = document.createTreeWalker(blocks[0]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const tn1 = document.createTreeWalker(blocks[1]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn0, 6); // "First |line."
+    range.setEnd(tn1, 9); // "Duplicate| me."
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const clip = makeClipboard();
+    const copyEv = fire(host, "copy", clip);
+
+    expect(copyEv.defaultPrevented).toBe(true);
+    const parsed = parseBlocks(clip._store.get(BLOCKS_MIME));
+    expect(parsed?.fragment).toEqual({ first: true, last: true });
+    const texts = parsed!.blocks.map((b) =>
+      (b as Paragraph).runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    expect(texts).toEqual(["line.", "Duplicate"]); // sliced, not whole
+    // Formatting survives the slice.
+    expect((parsed!.blocks[1] as Paragraph).runs[0]).toMatchObject({
+      properties: { bold: true },
+    });
+    expect(clip.getData("text/plain")).toBe("line.\nDuplicate");
+    editor.destroy();
+  });
+
+  it("pastes a fragment payload as EXACTLY the copied content (the reported bug)", () => {
+    const editor = editorWith();
+    const blocks = [...host.querySelectorAll<HTMLElement>("[data-block-id]")];
+    const tn0 = document.createTreeWalker(blocks[0]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const tn1 = document.createTreeWalker(blocks[1]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn0, 6);
+    range.setEnd(tn1, 9);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const clip = makeClipboard();
+    fire(host, "copy", clip);
+
+    // Caret mid-way through "Last line." — then paste.
+    const tn2 = document.createTreeWalker(blocks[2]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const caret = document.createRange();
+    caret.setStart(tn2, 5); // "Last |line."
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+
+    const pasteEv = fire(host, "paste", clip);
+    expect(pasteEv.defaultPrevented).toBe(true);
+
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    // The copied "line.<break>Duplicate" splices at the caret: the first
+    // fragment joins the caret paragraph's head, the second joins its tail.
+    // NOT two extra whole paragraphs.
+    expect(texts).toEqual(["First line.", "Duplicate me.", "Last line.", "Duplicateline."]);
+    editor.destroy();
+  });
+
+  it("a COMPLETE first block splits the target and stands alone (heading + fragment)", () => {
+    // Reported follow-up: copy a fully-selected heading + partial next
+    // paragraph, paste mid-paragraph — the heading must NOT merge inline into
+    // the caret paragraph; it keeps its paragraph identity, splitting the
+    // block to make place, and only the sliced fragment merges.
+    const editor = editorWith();
+    const blocks = [...host.querySelectorAll<HTMLElement>("[data-block-id]")];
+    const tn0 = document.createTreeWalker(blocks[0]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const tn1 = document.createTreeWalker(blocks[1]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn0, 0); // block 0 fully covered
+    range.setEnd(tn1, 9); // "Duplicate| me." — partial
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const clip = makeClipboard();
+    fire(host, "copy", clip);
+    expect(parseBlocks(clip._store.get(BLOCKS_MIME))?.fragment).toEqual({
+      first: false,
+      last: true,
+    });
+
+    // Paste mid-way through "Last line.".
+    const tn2 = document.createTreeWalker(blocks[2]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const caret = document.createRange();
+    caret.setStart(tn2, 5); // "Last |line."
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+    fire(host, "paste", clip);
+
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    // "Last line." splits at the caret; the complete block stands alone
+    // between the halves; the fragment merges into the tail half.
+    expect(texts).toEqual([
+      "First line.",
+      "Duplicate me.",
+      "Last ",
+      "First line.",
+      "Duplicateline.",
+    ]);
+    editor.destroy();
+  });
+
+  it("pasting over the STILL-ACTIVE selection reproduces exactly the copied content", () => {
+    // Reported follow-up: copy heading + partial paragraph, paste without
+    // moving the cursor — the fragment half vanished. Replace-with-self must
+    // reproduce the copied content: the complete block stands alone (no empty
+    // paragraph left above it) and the fragment merges with the remainder.
+    const editor = editorWith();
+    const blocks = [...host.querySelectorAll<HTMLElement>("[data-block-id]")];
+    const tn0 = document.createTreeWalker(blocks[0]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const tn1 = document.createTreeWalker(blocks[1]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn0, 0); // block 0 fully covered
+    range.setEnd(tn1, 9); // "Duplicate| me."
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const clip = makeClipboard();
+    fire(host, "copy", clip);
+
+    // Paste immediately — selection still active.
+    fire(host, "paste", clip);
+
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    // Replace-with-self: the document reads exactly as before, with no empty
+    // paragraph artifact and nothing lost.
+    expect(texts).toEqual(["First line.", "Duplicate me.", "Last line."]);
+    editor.destroy();
+  });
+
+  it("cut of a partial multi-block selection removes ONLY the selection", () => {
+    // Same root as the copy bug, but destructive: cut used to delete the
+    // WHOLE endpoint blocks, taking text outside the selection with it.
+    const editor = editorWith();
+    const blocks = [...host.querySelectorAll<HTMLElement>("[data-block-id]")];
+    const tn0 = document.createTreeWalker(blocks[0]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const tn1 = document.createTreeWalker(blocks[1]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn0, 6);
+    range.setEnd(tn1, 9);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const clip = makeClipboard();
+    const cutEv = fire(host, "cut", clip);
+
+    expect(cutEv.defaultPrevented).toBe(true);
+    expect(parseBlocks(clip._store.get(BLOCKS_MIME))?.fragment).toEqual({
+      first: true,
+      last: true,
+    });
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    // Unselected text survives; the endpoint paragraphs merge at the cut.
+    expect(texts).toEqual(["First  me.", "Last line."]);
     editor.destroy();
   });
 
@@ -156,7 +335,7 @@ describe("clipboard — copy a block, paste it below", () => {
     const cutEv = fire(host, "cut", clip);
 
     expect(cutEv.defaultPrevented).toBe(true);
-    expect(parseBlocks(clip._store.get(BLOCKS_MIME))).toHaveLength(1);
+    expect(parseBlocks(clip._store.get(BLOCKS_MIME))?.blocks).toHaveLength(1);
     const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
       p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
     );
