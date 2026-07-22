@@ -43,7 +43,7 @@ export function renderDocumentXml(
   // promises AST block indices). Each paragraph claims its anchors as a
   // leading run; frames keyed at a non-paragraph block fall back to the
   // first paragraph so nothing is silently dropped.
-  const anchorRuns = normalizeAnchorKeys(anchorRunsByParagraph(doc, ctx), doc.body);
+  const anchorRuns = normalizeAnchorKeys(anchorRunsByParagraph(doc, ctx, renderBlocks), doc.body);
 
   const bodyChildren: string[] = [];
   for (let i = 0; i < doc.body.length; i++) {

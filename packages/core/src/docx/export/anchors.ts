@@ -15,11 +15,23 @@
  * `group` content, custom-geometry shapes, and `headerFooterFrames`.
  */
 
-import type { AnchoredFrame, SobreeDocument } from "../../doc/types";
+import type { AnchoredFrame, Block, SobreeDocument } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { el, escapeXmlText } from "../shared/xml";
 import { type ExportContext, allocImageRel, nextDocPr } from "./context";
-import { renderBlocks } from "./document";
+
+/**
+ * Block serializer for textbox bodies, injected by the caller
+ * (`document.ts`) instead of imported — `anchors.ts` must not import
+ * `document.ts`, which imports it back (the same cycle-break `table.ts`
+ * uses for its cell renderer). The recursion is genuine (a textbox body
+ * holds blocks); the import cycle isn't.
+ */
+export type RenderAnchorBlocks = (
+  blocks: readonly Block[],
+  ctx: ExportContext,
+  doc: SobreeDocument,
+) => string[];
 
 /** Word 2010 drawing extensions (percent position / size forms). */
 const NS_WP14 = "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing";
@@ -35,10 +47,11 @@ const NS_WP14 = "http://schemas.microsoft.com/office/word/2010/wordprocessingDra
 export function anchorRunsByParagraph(
   doc: SobreeDocument,
   ctx: ExportContext,
+  renderBlocks: RenderAnchorBlocks,
 ): Map<number, string> {
   const out = new Map<number, string>();
   for (const frame of doc.anchoredFrames ?? []) {
-    const xml = renderAnchorRun(frame, ctx, doc);
+    const xml = renderAnchorRun(frame, ctx, doc, renderBlocks);
     if (!xml) continue;
     const idx = frame.anchor.paragraphIndex ?? 0;
     out.set(idx, (out.get(idx) ?? "") + xml);
@@ -59,9 +72,10 @@ function renderAnchorRun(
   frame: AnchoredFrame,
   ctx: ExportContext,
   doc: SobreeDocument,
+  renderBlocks: RenderAnchorBlocks,
 ): string | null {
   if (!isExportableAnchor(frame)) return null;
-  const graphicData = renderContent(frame, ctx, doc);
+  const graphicData = renderContent(frame, ctx, doc, renderBlocks);
   if (!graphicData) return null;
 
   // Distances / wrap are emitted only when the AST carries them — the
@@ -200,6 +214,7 @@ function renderContent(
   frame: AnchoredFrame,
   ctx: ExportContext,
   doc: SobreeDocument,
+  renderBlocks: RenderAnchorBlocks,
 ): string | null {
   const c = frame.content;
   if (c.kind === "picture") {
@@ -207,8 +222,10 @@ function renderContent(
     if (!rId) return null; // media bytes missing — drop rather than emit a dead rel
     return renderPictureData(frame, c.partPath, c.altText, rId, ctx);
   }
-  if (c.kind === "textbox") return renderShapeData(frame, ctx, doc, true);
-  if (c.kind === "shape" && c.geometry !== "custom") return renderShapeData(frame, ctx, doc, false);
+  if (c.kind === "textbox") return renderShapeData(frame, ctx, doc, true, renderBlocks);
+  if (c.kind === "shape" && c.geometry !== "custom") {
+    return renderShapeData(frame, ctx, doc, false, renderBlocks);
+  }
   return null;
 }
 
@@ -246,6 +263,7 @@ function renderShapeData(
   ctx: ExportContext,
   doc: SobreeDocument,
   isTextbox: boolean,
+  renderBlocks: RenderAnchorBlocks,
 ): string {
   const c = frame.content;
   // `custom` is unreachable here (renderContent declines it) — the
