@@ -76,14 +76,18 @@ lock paper sizes, margins, headers / footers, vAlign, title-page
 sections, tables, images, page numbering fields, numbering definitions,
 and multi-section documents.
 
+Footnotes and comments round-trip: export emits `word/footnotes.xml`,
+`word/comments.xml` and (for resolved / threaded comments)
+`word/commentsExtended.xml`, with reference marks and comment ranges
+reconstructed in the body. Custom footnote marks
+(`customMarkFollows`) and comment threading (`done`, reply-to)
+survive a save → open.
+
 Known exporter gaps (documented in the fixpoint test; each is a
 planned feature): `InlineFrame` blocks and anchored floating drawings
 are not yet serialized back to DrawingML — they render and edit fine in
 Sobree but are dropped on export; anchored / wrapped images export as
-inline pictures (the image survives, its wrap geometry doesn't);
-footnotes and comments are not yet emitted (`footnotes.xml` /
-`comments.xml`), so their reference marks and note bodies are dropped
-on save.
+inline pictures (the image survives, its wrap geometry doesn't).
 
 ## Headless usage
 

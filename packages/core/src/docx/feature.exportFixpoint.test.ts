@@ -66,30 +66,55 @@ function blockSignatures(blocks: readonly Block[]): string[] {
   return blocks.map((b) => (b.kind === "paragraph" ? `p:${text(b.runs)}` : b.kind));
 }
 
+/**
+ * Footnote bodies at the SAME bar as the document body — content &
+ * structure signatures, not deep equality. Formatting fidelity of what
+ * the exporter supports is covered by the focused `export/notes.test.ts`
+ * suite; deep equality here would additionally demand paragraph
+ * properties the exporter doesn't emit for ANY paragraph yet
+ * (`runDefaults`, `tabStops` — a generic `renderPPr` gap, tracked in
+ * devdocs/plan-ooxml-full-support.md).
+ */
+function noteSignatures(doc: SobreeDocument): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [id, blocks] of Object.entries(doc.footnotes ?? {})) {
+    out[id] = blockSignatures(blocks);
+  }
+  return out;
+}
+
+/** Comment threads: deep equality on the METADATA (author / initials /
+ *  date / done / replyToId), body at the signature bar (see above). */
+function commentSignatures(doc: SobreeDocument): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [id, c] of Object.entries(doc.comments ?? {})) {
+    out[id] = {
+      author: c.author ?? null,
+      initials: c.initials ?? null,
+      date: c.date ?? null,
+      done: c.done ?? false,
+      replyToId: c.replyToId ?? null,
+      body: blockSignatures(c.body),
+    };
+  }
+  return out;
+}
+
 /** Project the imported document onto what the CURRENT exporter is
  *  expected to preserve (the documented-gap transform). */
 function expectedAfterExport(doc: SobreeDocument): {
   bodySignatures: string[];
+  footnotes: unknown;
+  comments: unknown;
   numbering: unknown;
   sectionGeometry: unknown;
   listRefs: string[];
 } {
-  const body = doc.body
-    .filter((b) => b.kind !== "inline_frame")
-    .map((b) =>
-      b.kind === "paragraph"
-        ? // Documented gap: footnotes.xml / comments.xml are not emitted
-          // yet, so footnote/comment reference runs can't survive a
-          // save → open (the note bodies live in those parts too — a
-          // whole missing exporter feature, not a run-level slip).
-          {
-            ...b,
-            runs: b.runs.filter((r) => r.kind !== "footnoteRef" && r.kind !== "commentRef"),
-          }
-        : b,
-    );
+  const body = doc.body.filter((b) => b.kind !== "inline_frame");
   return {
     bodySignatures: blockSignatures(body),
+    footnotes: noteSignatures(doc),
+    comments: commentSignatures(doc),
     numbering: JSON.parse(JSON.stringify(doc.numbering)),
     sectionGeometry: doc.sections.map((s) => ({
       pageSize: s.pageSize,
@@ -114,6 +139,13 @@ describe("export fixpoint — open → save preserves the document", () => {
 
       const want = expectedAfterExport(d1);
       expect(blockSignatures(d2.body), "body content/structure").toEqual(want.bodySignatures);
+      expect(noteSignatures(d2), "footnote bodies (word/footnotes.xml round-trip)").toEqual(
+        want.footnotes,
+      );
+      expect(
+        commentSignatures(d2),
+        "comment threads (word/comments.xml + commentsExtended round-trip)",
+      ).toEqual(want.comments);
       expect(JSON.parse(JSON.stringify(d2.numbering)), "numbering definitions").toEqual(
         want.numbering,
       );

@@ -10,7 +10,7 @@ import type {
 import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
 import { el, xmlDocument } from "../shared/xml";
 import { type ExportContext, nextRevisionId } from "./context";
-import { inlinesToRuns } from "./runs";
+import { closeAllCommentRanges, inlinesToRuns } from "./runs";
 
 /**
  * Render the SobreeDocument body into `word/document.xml` (string form).
@@ -52,6 +52,11 @@ export function renderDocumentXml(
       bodyChildren.push(...renderBlock(block, ctx, doc));
     }
   }
+  // The body is a content stream too — close any comment range dangling
+  // past the last run (renderDocumentXml walks the body itself for sectPr
+  // splicing, so it can't lean on renderBlocks' stream-end close).
+  const dangling = closeAllCommentRanges(ctx);
+  if (dangling) bodyChildren.push(dangling);
   bodyChildren.push(finalSectPrXml);
   const body = el("w:body", null, bodyChildren);
   return xmlDocument(el("w:document", ROOT_DOCUMENT_ATTRS, body));
@@ -98,7 +103,14 @@ function computeTrailingSectPr(
   return map;
 }
 
-/** Also used for header/footer part bodies. */
+/**
+ * Render one content STREAM — the document body, a header/footer part
+ * body, a table cell, or a footnote/comment body. Comment ranges open and
+ * close within a stream (`ctx.openComments` threads run-level transitions
+ * across its paragraphs); any range still dangling after the last block
+ * gets its end marker appended here so no `commentRangeStart` leaves the
+ * stream unbalanced.
+ */
 export function renderBlocks(
   blocks: readonly Block[],
   ctx: ExportContext,
@@ -106,6 +118,8 @@ export function renderBlocks(
 ): string[] {
   const out: string[] = [];
   for (const block of blocks) out.push(...renderBlock(block, ctx, doc));
+  const dangling = closeAllCommentRanges(ctx);
+  if (dangling) out.push(dangling);
   return out;
 }
 
@@ -228,7 +242,15 @@ function renderPPr(
 }
 
 function renderTable(t: Table, ctx: ExportContext, doc: SobreeDocument): string {
+  // Isolate comment-range state across the table, mirroring the importer
+  // (which parses cell content with fresh `activeComments` sets): a
+  // body-level range open across the table must not see the cells' runs —
+  // their missing ids would read as a transition and emit a bogus end
+  // marker inside the first cell.
+  const outerOpen = ctx.openComments;
+  ctx.openComments = new Set();
   const rows = t.rows.map((r) => renderTableRow(r, ctx, doc)).join("");
+  ctx.openComments = outerOpen;
   const grid = el(
     "w:tblGrid",
     null,

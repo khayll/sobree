@@ -9,6 +9,9 @@ const REL_TYPES = {
   fontTable: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
   numbering: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
   font: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+  footnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
+  comments: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+  commentsExtended: "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
 } as const;
 
 type RelKind = keyof typeof REL_TYPES;
