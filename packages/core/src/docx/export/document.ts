@@ -9,6 +9,7 @@ import type {
 } from "../../doc/types";
 import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
 import { el, xmlDocument } from "../shared/xml";
+import { anchorRunsByParagraph } from "./anchors";
 import { type ExportContext, nextRevisionId } from "./context";
 import { closeAllCommentRanges, inlinesToRuns } from "./runs";
 
@@ -37,6 +38,13 @@ export function renderDocumentXml(
   const trailingSectPr = computeTrailingSectPr(doc.body, sectPrXmls);
   const finalSectPrXml = sectPrXmls[sectPrXmls.length - 1] ?? "";
 
+  // Anchored frames, keyed by their host paragraph's BODY index — the
+  // space `anchor.paragraphIndex` lives in (`paragraphIndexInContainer`
+  // promises AST block indices). Each paragraph claims its anchors as a
+  // leading run; frames keyed at a non-paragraph block fall back to the
+  // first paragraph so nothing is silently dropped.
+  const anchorRuns = normalizeAnchorKeys(anchorRunsByParagraph(doc, ctx), doc.body);
+
   const bodyChildren: string[] = [];
   for (let i = 0; i < doc.body.length; i++) {
     const block = doc.body[i];
@@ -47,7 +55,8 @@ export function renderDocumentXml(
     }
     if (block.kind === "paragraph") {
       const trailing = trailingSectPr.get(i);
-      bodyChildren.push(renderParagraph(block, ctx, doc, trailing));
+      const leading = anchorRuns.get(i);
+      bodyChildren.push(renderParagraph(block, ctx, doc, trailing, leading));
     } else {
       bodyChildren.push(...renderBlock(block, ctx, doc));
     }
@@ -147,10 +156,32 @@ function renderParagraph(
   ctx: ExportContext,
   doc: SobreeDocument,
   trailingSectPr?: string,
+  leadingRuns?: string,
 ): string {
   const pPr = renderPPr(p.properties, ctx, trailingSectPr);
   const runs = inlinesToRuns(p.runs, ctx, doc);
-  return el("w:p", null, `${pPr}${runs}`);
+  return el("w:p", null, `${pPr}${leadingRuns ?? ""}${runs}`);
+}
+
+/**
+ * Re-key anchor runs so every entry lands on a real PARAGRAPH body index.
+ * A key at a table / section_break index or past the end (possible for
+ * API-built frames whose `paragraphIndex` went stale) folds into the
+ * first paragraph — a degraded position beats dropping the frame.
+ */
+function normalizeAnchorKeys(
+  anchorRuns: Map<number, string>,
+  body: readonly Block[],
+): Map<number, string> {
+  if (anchorRuns.size === 0) return anchorRuns;
+  const first = body.findIndex((b) => b.kind === "paragraph");
+  if (first < 0) return new Map(); // no paragraphs at all
+  const out = new Map<number, string>();
+  for (const [key, xml] of anchorRuns) {
+    const target = body[key]?.kind === "paragraph" ? key : first;
+    out.set(target, (out.get(target) ?? "") + xml);
+  }
+  return out;
 }
 
 /** Serialise a CT_OnOff pPr flag, preserving the tri-state the importer
