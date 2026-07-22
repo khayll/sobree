@@ -83,11 +83,18 @@ reconstructed in the body. Custom footnote marks
 (`customMarkFollows`) and comment threading (`done`, reply-to)
 survive a save → open.
 
+Anchored floating drawings round-trip: pictures, text boxes and
+preset-geometry shapes serialize back to `<wp:anchor>` DrawingML with
+their positioning (EMU offset / alignment / percent forms), percent
+sizes, wrap mode, text distances and behind-text state intact.
+
 Known exporter gaps (documented in the fixpoint test; each is a
-planned feature): `InlineFrame` blocks and anchored floating drawings
-are not yet serialized back to DrawingML — they render and edit fine in
-Sobree but are dropped on export; anchored / wrapped images export as
-inline pictures (the image survives, its wrap geometry doesn't).
+planned feature): `InlineFrame` blocks, anchored GROUP frames and
+custom-geometry shapes are not yet serialized (DrawingML group /
+`custGeom` emission pending) — they render and edit fine in Sobree but
+are dropped on export; header/footer floating drawings are likewise
+not yet re-emitted; float-placed images inside paragraphs export as
+inline pictures (the image survives, its wrap side doesn't).
 
 ## Headless usage
 
