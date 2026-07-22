@@ -3,12 +3,16 @@ import { NS } from "../shared/namespaces";
 import { el, escapeXmlText } from "../shared/xml";
 
 /**
- * Emit a `<w:drawing>` XML fragment for an inline image. Consumes an
- * `rId` allocated elsewhere (via `ExportContext.allocImageRel`) and
- * writes the OOXML shape Word expects for a single inline picture.
+ * Emit a `<w:drawing>` XML fragment for a picture run. Consumes an
+ * `rId` allocated elsewhere (via `ExportContext.allocImageRel`).
  *
- * Anchored / floating drawings are out of scope for Phase 5 — all images
- * render inline.
+ * Inline placement emits `<wp:inline>`. Float placement (a wrapping
+ * anchored picture the importer converted to an in-flow CSS float)
+ * emits `<wp:anchor>` with a square wrap whose `wrapText` side inverts
+ * the float side — text flows opposite the float — plus the float's
+ * clearance margins as `dist*`. Re-importing runs the same
+ * `floatWrappingImages` conversion and lands back on the identical
+ * float run, so the wrap side survives a save → open.
  */
 export function renderDrawing(run: DrawingRun, rId: string, docPrId: number): string {
   const cx = run.widthEmu > 0 ? run.widthEmu : 914400; // default 1"
@@ -56,6 +60,39 @@ export function renderDrawing(run: DrawingRun, rId: string, docPrId: number): st
     name,
     descr: escapeXmlText(descr),
   });
+  if (run.placement === "floatLeft" || run.placement === "floatRight") {
+    const m = run.floatMarginsEmu;
+    // Text flows on the side OPPOSITE the float: floatLeft ⇒ text right.
+    // `floatSide` inverts this exact mapping on re-import.
+    const wrapText = run.placement === "floatLeft" ? "right" : "left";
+    const anchor = el(
+      "wp:anchor",
+      {
+        ...(m ? { distT: m.topEmu, distB: m.bottomEmu, distL: m.leftEmu, distR: m.rightEmu } : {}),
+        simplePos: 0,
+        relativeHeight: 0,
+        behindDoc: 0,
+        locked: 0,
+        layoutInCell: 1,
+        allowOverlap: 1,
+      },
+      [
+        el("wp:simplePos", { x: 0, y: 0 }),
+        el(
+          "wp:positionH",
+          { relativeFrom: "column" },
+          el("wp:align", null, run.placement === "floatLeft" ? "left" : "right"),
+        ),
+        el("wp:positionV", { relativeFrom: "paragraph" }, el("wp:posOffset", null, "0")),
+        extent,
+        el("wp:wrapSquare", { wrapText }),
+        docPr,
+        graphic,
+      ].join(""),
+    );
+    return el("w:r", null, el("w:drawing", { "xmlns:wp": NS.wp }, anchor));
+  }
+
   const inline = el(
     "wp:inline",
     {

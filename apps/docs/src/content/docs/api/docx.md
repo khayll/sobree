@@ -83,18 +83,21 @@ reconstructed in the body. Custom footnote marks
 (`customMarkFollows`) and comment threading (`done`, reply-to)
 survive a save → open.
 
-Anchored floating drawings round-trip: pictures, text boxes and
-preset-geometry shapes serialize back to `<wp:anchor>` DrawingML with
-their positioning (EMU offset / alignment / percent forms), percent
-sizes, wrap mode, text distances and behind-text state intact.
+Anchored floating drawings round-trip: pictures, text boxes, shapes
+(presets and custom geometry), and drawing GROUPS — including nested
+groups and their child coordinate systems — serialize back to
+`<wp:anchor>` DrawingML with their positioning (EMU offset / alignment
+/ percent forms), percent sizes, wrap mode, text distances and
+behind-text state intact. Header/footer floating drawings re-anchor in
+their parts; float-placed images keep their wrap side and clearance
+margins; inline drawing groups (`InlineFrame` blocks — pill headings,
+project entries, picture bands) re-emit as `<wp:inline>` groups or, for
+picture bands, as the anchored pictures they were synthesized from.
 
-Known exporter gaps (documented in the fixpoint test; each is a
-planned feature): `InlineFrame` blocks, anchored GROUP frames and
-custom-geometry shapes are not yet serialized (DrawingML group /
-`custGeom` emission pending) — they render and edit fine in Sobree but
-are dropped on export; header/footer floating drawings are likewise
-not yet re-emitted; float-placed images inside paragraphs export as
-inline pictures (the image survives, its wrap side doesn't).
+Known exporter gaps (documented in the fixpoint test): inline drawing
+groups holding neither a textbox nor a picture (pure decorative shape
+groups), and even-page header/footer parts (a pre-existing scope cut —
+proper support needs `w:evenAndOddHeaders` settings plumbing).
 
 ## Headless usage
 

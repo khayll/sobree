@@ -13,14 +13,13 @@
  * and this test gets stricter automatically.
  *
  * Current known gaps (audited 2026-07):
- *   - `inline_frame` blocks are not exported (DrawingML group
- *     serialization not implemented) — dropped from the body.
- *   - Anchored frames with GROUP content or CUSTOM-geometry shapes are
- *     not exported (group / custGeom serialization pending) — dropped.
- *   - `headerFooterFrames` are not exported — header/footer floating
- *     drawings dropped (and media referenced only by them).
- *   - Float drawing RUNS (placement floatLeft/floatRight) export as
- *     inline pictures (the wrap side degrades; the image survives).
+ *   - `inline_frame` blocks whose group holds NEITHER a textbox nor a
+ *     picture (pure decorative shape groups) are not exported — no
+ *     import path reclaims that wire shape yet.
+ *   - EVEN-page header/footer parts are not emitted (`emitHeadersAndFooters`
+ *     skips `type === "even"` refs — a pre-existing scope cut; proper
+ *     support needs `w:evenAndOddHeaders` settings plumbing). Their
+ *     bodies AND floating frames drop on save.
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -112,51 +111,56 @@ function commentSignatures(doc: SobreeDocument): Record<string, unknown> {
  * covered by the body-signature machinery, so neither is compared here.
  */
 function frameSignatures(doc: SobreeDocument): unknown[] {
-  // Host indices in FILTERED-body space — the same projection the body
-  // signatures use. `inline_frame` blocks are a documented exporter gap:
-  // they vanish from the re-imported body, shifting every later block
-  // index down by their count. Comparing raw indices would blame the
-  // anchor round-trip for the inline_frame gap; in filtered space both
-  // sides address the same physical paragraph. Inert once the
-  // inline_frame exporter lands (count 0 on both sides).
-  const inlineFramesBefore = (idx: number): number =>
-    doc.body.slice(0, idx).filter((b) => b.kind === "inline_frame").length;
-  return (doc.anchoredFrames ?? [])
-    .filter(
-      (f) =>
-        f.content.kind !== "group" &&
-        !(f.content.kind === "shape" && f.content.geometry === "custom"),
-    )
-    .map((f) => ({
-      kind: f.content.kind,
-      // A frame with no host paragraph (its drawing sat outside the body
-      // paragraph map, e.g. in a table cell) re-exports hosted at
-      // paragraph 0. For page/margin-relative positioning — the only kind
-      // the importer produces host-less — the host paragraph only decides
-      // which page's flow carries the anchor, so `undefined ≈ 0` is the
-      // same placement, not a loss.
-      anchor: {
-        ...f.anchor,
-        paragraphIndex:
-          f.anchor.paragraphIndex !== undefined
-            ? f.anchor.paragraphIndex - inlineFramesBefore(f.anchor.paragraphIndex)
-            : 0,
-      },
-      offsetXEmu: f.offsetXEmu,
-      offsetYEmu: f.offsetYEmu,
-      alignH: f.alignH ?? null,
-      alignV: f.alignV ?? null,
-      pctPosX: f.pctPosX ?? null,
-      pctPosY: f.pctPosY ?? null,
-      pctWidth: f.pctWidth ?? null,
-      pctHeight: f.pctHeight ?? null,
-      widthEmu: f.widthEmu,
-      heightEmu: f.heightEmu,
-      wrap: f.wrap ?? null,
-      wrapText: f.wrapText ?? null,
-      behindText: f.behindText ?? false,
-      textDistancesEmu: f.textDistancesEmu ?? null,
-    }));
+  return frameSignaturesOf(doc.anchoredFrames ?? []);
+}
+
+function frameSignaturesOf(
+  frames: readonly NonNullable<SobreeDocument["anchoredFrames"]>[number][],
+): unknown[] {
+  return frames.map((f) => ({
+    kind: f.content.kind,
+    // A frame with no host paragraph (its drawing sat outside the body
+    // paragraph map, e.g. in a table cell) re-exports hosted at
+    // paragraph 0. For page/margin-relative positioning — the only kind
+    // the importer produces host-less — the host paragraph only decides
+    // which page's flow carries the anchor, so `undefined ≈ 0` is the
+    // same placement, not a loss.
+    anchor: { ...f.anchor, paragraphIndex: f.anchor.paragraphIndex ?? 0 },
+    offsetXEmu: f.offsetXEmu,
+    offsetYEmu: f.offsetYEmu,
+    alignH: f.alignH ?? null,
+    alignV: f.alignV ?? null,
+    pctPosX: f.pctPosX ?? null,
+    pctPosY: f.pctPosY ?? null,
+    pctWidth: f.pctWidth ?? null,
+    pctHeight: f.pctHeight ?? null,
+    widthEmu: f.widthEmu,
+    heightEmu: f.heightEmu,
+    wrap: f.wrap ?? null,
+    wrapText: f.wrapText ?? null,
+    behindText: f.behindText ?? false,
+    textDistancesEmu: f.textDistancesEmu ?? null,
+  }));
+}
+
+/**
+ * Header/footer floating frames, per part, at the frame-signature bar.
+ * Parts reachable ONLY through even-page refs are excluded — the even
+ * scope cut above drops the whole part, frames included.
+ */
+function headerFrameSignatures(doc: SobreeDocument): Record<string, unknown[]> {
+  const emitted = new Set<string>();
+  for (const section of doc.sections) {
+    for (const ref of [...section.headerRefs, ...section.footerRefs]) {
+      if (ref.type !== "even") emitted.add(ref.partId);
+    }
+  }
+  const out: Record<string, unknown[]> = {};
+  for (const [partId, frames] of Object.entries(doc.headerFooterFrames ?? {})) {
+    if (frames.length === 0 || !emitted.has(partId)) continue;
+    out[partId] = frameSignaturesOf(frames);
+  }
+  return out;
 }
 
 function expectedAfterExport(doc: SobreeDocument): {
@@ -164,16 +168,20 @@ function expectedAfterExport(doc: SobreeDocument): {
   footnotes: unknown;
   comments: unknown;
   frames: unknown[];
+  headerFrames: Record<string, unknown[]>;
   numbering: unknown;
   sectionGeometry: unknown;
   listRefs: string[];
 } {
-  const body = doc.body.filter((b) => b.kind !== "inline_frame");
+  const body = doc.body.filter(
+    (b) => b.kind !== "inline_frame" || b.textboxes.length > 0 || b.pictures.length > 0,
+  );
   return {
     bodySignatures: blockSignatures(body),
     footnotes: noteSignatures(doc),
     comments: commentSignatures(doc),
     frames: frameSignatures(doc),
+    headerFrames: headerFrameSignatures(doc),
     numbering: JSON.parse(JSON.stringify(doc.numbering)),
     sectionGeometry: doc.sections.map((s) => ({
       pageSize: s.pageSize,
@@ -206,6 +214,10 @@ describe("export fixpoint — open → save preserves the document", () => {
         "comment threads (word/comments.xml + commentsExtended round-trip)",
       ).toEqual(want.comments);
       expect(frameSignatures(d2), "anchored frames (wp:anchor round-trip)").toEqual(want.frames);
+      expect(
+        headerFrameSignatures(d2),
+        "header/footer floating frames (per-part wp:anchor round-trip)",
+      ).toEqual(want.headerFrames);
       expect(JSON.parse(JSON.stringify(d2.numbering)), "numbering definitions").toEqual(
         want.numbering,
       );

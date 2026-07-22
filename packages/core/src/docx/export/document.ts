@@ -11,6 +11,7 @@ import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
 import { el, xmlDocument } from "../shared/xml";
 import { anchorRunsByParagraph } from "./anchors";
 import { type ExportContext, nextRevisionId } from "./context";
+import { renderInlineFrameRuns } from "./inlineFrames";
 import { closeAllCommentRanges, inlinesToRuns } from "./runs";
 
 /**
@@ -124,9 +125,21 @@ export function renderBlocks(
   blocks: readonly Block[],
   ctx: ExportContext,
   doc: SobreeDocument,
+  /** Anchor runs to inject as leading runs, keyed by index within
+   *  `blocks` — header/footer parts thread their floating frames here.
+   *  The body walk does its own injection (it also splices sectPrs). */
+  anchorRuns?: Map<number, string>,
 ): string[] {
   const out: string[] = [];
-  for (const block of blocks) out.push(...renderBlock(block, ctx, doc));
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (!block) continue;
+    if (block.kind === "paragraph") {
+      out.push(renderParagraph(block, ctx, doc, undefined, anchorRuns?.get(i)));
+    } else {
+      out.push(...renderBlock(block, ctx, doc));
+    }
+  }
   const dangling = closeAllCommentRanges(ctx);
   if (dangling) out.push(dangling);
   return out;
@@ -138,6 +151,19 @@ function renderBlock(block: Block, ctx: ExportContext, doc: SobreeDocument): str
       return [renderParagraph(block, ctx, doc)];
     case "table":
       return [renderTable(block, ctx, doc)];
+    case "inline_frame": {
+      // The frame re-emits inside a host paragraph carrying the block's
+      // captured pPr (spacing/alignment) plus its break directives — the
+      // exact shape `parseInlineFrames` / the band pass read them from.
+      const runs = renderInlineFrameRuns(block, ctx, doc, (b, c, d) => renderBlocks(b, c, d));
+      if (runs === null) return []; // shape-only frames: documented gap
+      const props: ParagraphProperties = {
+        ...(block.hostProps ?? {}),
+        ...(block.pageBreakBefore ? { pageBreakBefore: true } : {}),
+        ...(block.keepNext ? { keepNext: true } : {}),
+      };
+      return [el("w:p", null, `${renderPPr(props, ctx)}${runs}`)];
+    }
     case "section_break":
       return [];
     default:
@@ -169,7 +195,7 @@ function renderParagraph(
  * API-built frames whose `paragraphIndex` went stale) folds into the
  * first paragraph — a degraded position beats dropping the frame.
  */
-function normalizeAnchorKeys(
+export function normalizeAnchorKeys(
   anchorRuns: Map<number, string>,
   body: readonly Block[],
 ): Map<number, string> {
