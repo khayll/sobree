@@ -1,5 +1,51 @@
 # @sobree/core
 
+## 0.1.72
+
+### Patch Changes
+
+- d1620d5: Export serializes anchored floating drawings back to `<wp:anchor>`
+  DrawingML: anchored pictures, text boxes (body, fill, border, padding,
+  rounded/ellipse geometry) and preset-geometry shapes previously rendered
+  and edited fine but were dropped on save. All three OOXML positioning
+  forms round-trip (EMU offsets, alignment keywords, wp14 percent
+  positions), as do percent sizes, wrap modes, text distances, z-order and
+  behind-text. Also fixes anchored frames after a section break addressing
+  the wrong paragraph (an index-space mismatch between the importer's
+  paragraph map and its consumers) — a wrapping image anchored after a
+  break now floats in its real host paragraph. Group frames,
+  custom-geometry shapes and header/footer floating drawings remain
+  documented exporter gaps.
+- b944ee5: Drawing export is now complete for every frame kind the editor models:
+  drawing groups (`wpg:wgp`, nested groups, child coordinate systems),
+  custom-geometry shapes (`a:custGeom` re-built from the imported outline),
+  header/footer floating drawings (re-anchored in their parts), float-placed
+  images (wrap side and clearance margins survive instead of degrading to
+  inline), and inline drawing groups — pill headings and project entries
+  re-emit as `<wp:inline>` groups, picture bands as the anchored pictures
+  they were synthesized from. The export fixpoint suite now enforces all of
+  these for every corpus document. Remaining documented gaps: shape-only
+  inline groups and even-page header/footer parts.
+- 926b883: Export now emits `word/footnotes.xml`, `word/comments.xml` and
+  `word/commentsExtended.xml`. Footnotes (including custom reference marks)
+  and comment threads (author metadata, resolved state, replies) previously
+  imported and rendered but were dropped on save — silent data loss on any
+  open → edit → save cycle. Reference marks and comment ranges are
+  reconstructed in the body (`w:footnoteReference`, `w:commentRangeStart/End`,
+  `w:commentReference`), ranges spanning paragraphs stay balanced, and
+  body-level ranges don't leak into tables. The export fixpoint suite now
+  enforces footnote-body and comment-thread equality for every corpus
+  document.
+- 42d094a: Content controls (Structured Document Tags) survive a save. Body-level
+  `<w:sdt>` wrappers — repeating sections, dropdowns, placeholders, tagged
+  template fields — previously flattened to their content on import, losing
+  the control's identity on export. Each flattened block now records its
+  wrapper (`properties.sdt`, with the `<w:sdtPr>` preserved verbatim), and
+  the exporter re-groups consecutive members into the original control.
+  Nested controls keep the outermost identity; editing inside a control
+  splits it rather than corrupting it. Cell-level and run-level controls
+  still flatten (documented gap).
+
 ## 0.1.71
 
 ### Patch Changes
