@@ -4,7 +4,34 @@ import type { BorderSpec, Shading } from "../formatting.types";
 import type { RevisionMark } from "./revisions";
 import type { RunProperties } from "./runs";
 
+/**
+ * Content-control (Structured Document Tag) membership. The importer
+ * FLATTENS `<w:sdt>` wrappers into their content blocks — the body stays
+ * flat and block identity stays single-owned — but each flattened block
+ * records which wrapper it came from so the exporter can re-group
+ * consecutive members and re-emit the control verbatim.
+ *
+ *   - `id` distinguishes adjacent controls with identical properties;
+ *     deterministic per imported container (document order).
+ *   - `prXml` is the wrapper's `<w:sdtPr>` serialized verbatim —
+ *     placeholders, dropdown lists, tags, aliases all ride along without
+ *     Sobree modelling them. Re-emitted as-is on export.
+ *
+ * Blocks created by editing inside a control DON'T inherit membership —
+ * the exporter then splits the control around them, which degrades the
+ * control's span but never corrupts it.
+ */
+export interface SdtWrap {
+  id: number;
+  prXml: string;
+}
+
 export interface ParagraphProperties {
+  /** Content-control membership — see {@link SdtWrap}. Carried in
+   *  properties (not pPr semantics) so it rides every channel that
+   *  transports block properties: the Y.Doc codec, the structured
+   *  clipboard, and split/merge property inheritance. */
+  sdt?: SdtWrap;
   /** Reference to a `NamedStyle.id` of type "paragraph". */
   styleId?: string;
   alignment?: ParagraphAlignment;

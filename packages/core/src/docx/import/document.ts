@@ -1,4 +1,4 @@
-import type { Block } from "../../doc/types";
+import type { Block, SdtWrap } from "../../doc/types";
 import { wFirst } from "../shared/xml";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 import { convertTable } from "./tables";
@@ -138,7 +138,8 @@ export function convertBlocksFromContainer(
   // everything inside — observed on healthcare-with-photo.docx where
   // the entire "Peter Burkimsher" name + email + photo banner table
   // was wrapped in an SDT and lost.
-  const directChildren = expandSdtWrappers(Array.from(container.children));
+  const sdtByElement = new Map<Element, SdtWrap>();
+  const directChildren = expandSdtWrappers(Array.from(container.children), sdtByElement);
 
   const replaceParagraphs = ctx.replaceParagraphs ?? opts?.replaceParagraphs;
 
@@ -155,7 +156,10 @@ export function convertBlocksFromContainer(
         // original text/runs don't double-render.
         blocks.push(replacement);
       } else {
-        blocks.push(convertParagraph(child, ctx, activeComments));
+        const p = convertParagraph(child, ctx, activeComments);
+        const wrap = sdtByElement.get(child);
+        if (wrap) p.properties.sdt = wrap;
+        blocks.push(p);
       }
       const inlineSectPr = inlineSectPrOf(child);
       if (inlineSectPr) {
@@ -167,7 +171,10 @@ export function convertBlocksFromContainer(
         blocks.push({ kind: "section_break", toSectionIndex: pendingSectionIndex });
       }
     } else if (name === "tbl") {
-      blocks.push(convertTable(child, ctx));
+      const t = convertTable(child, ctx);
+      const tableWrap = sdtByElement.get(child);
+      if (tableWrap) t.properties.sdt = tableWrap;
+      blocks.push(t);
     } else if (name === "sectPr") {
       // Body-level sectPr — the document-final section.
       sectPrEls.push(child);
@@ -194,19 +201,41 @@ export function convertBlocksFromContainer(
  * Only `<w:sdtContent>` matters for rendering; the metadata children
  * drive form-control behaviour that Sobree doesn't yet surface.
  */
-function expandSdtWrappers(children: readonly Element[]): Element[] {
+function expandSdtWrappers(
+  children: readonly Element[],
+  /** OUT: promoted element → the OUTERMOST wrapper it came from, so the
+   *  converted block can record its content-control membership and the
+   *  exporter can re-group and re-emit the control verbatim. Nested SDTs
+   *  attribute to the outermost wrapper (the inner identity flattens —
+   *  Quick Parts galleries nest, and one owner per block keeps the
+   *  re-grouping unambiguous). */
+  sdtByElement?: Map<Element, SdtWrap>,
+  /** Deterministic per-container id state (document order). */
+  counter: { n: number } = { n: 0 },
+  /** The wrapper the current recursion level is inside, if any. */
+  enclosing?: SdtWrap,
+): Element[] {
   const out: Element[] = [];
   for (const child of children) {
     if (child.namespaceURI !== null && child.localName === "sdt") {
       const content = wFirst(child, "sdtContent");
       if (content) {
+        let wrap = enclosing;
+        if (!wrap && sdtByElement) {
+          const sdtPr = wFirst(child, "sdtPr");
+          wrap = {
+            id: counter.n++,
+            prXml: sdtPr ? new XMLSerializer().serializeToString(sdtPr) : "",
+          };
+        }
         // Recurse so nested SDTs unwrap too.
-        out.push(...expandSdtWrappers(Array.from(content.children)));
+        out.push(...expandSdtWrappers(Array.from(content.children), sdtByElement, counter, wrap));
       }
       // SDT with no `<w:sdtContent>` (rare — placeholder-only) drops
       // silently, matching the original "unknown element" behaviour.
     } else {
       out.push(child);
+      if (enclosing && sdtByElement) sdtByElement.set(child, enclosing);
     }
   }
   return out;
