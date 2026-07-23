@@ -14,7 +14,16 @@ export interface ExportContext {
   /** Rels to append to `word/_rels/document.xml.rels`. */
   relationships: Array<{
     id: string;
-    type: "header" | "footer" | "image" | "hyperlink" | "fontTable" | "numbering";
+    type:
+      | "header"
+      | "footer"
+      | "image"
+      | "hyperlink"
+      | "fontTable"
+      | "numbering"
+      | "footnotes"
+      | "comments"
+      | "commentsExtended";
     target: string;
     /** External targets (URLs) need `TargetMode="External"`. */
     external?: boolean;
@@ -39,6 +48,16 @@ export interface ExportContext {
    * all revision kinds to keep the IDs simple and contiguous.
    */
   nextRevisionId: number;
+  /**
+   * Comment ids whose `<w:commentRangeStart>` has been emitted but whose
+   * end hasn't — threaded ACROSS paragraphs by the body walk, mirroring
+   * the importer's shared `activeComments` set, so a range spanning
+   * paragraphs opens once and closes once. Tables stash/restore it
+   * (import parses cells with fresh sets, so cell runs never carry
+   * body-level ids — a transition diff inside a cell would emit a bogus
+   * end marker).
+   */
+  openComments: Set<number>;
 }
 
 export function makeExportContext(startRid: number): ExportContext {
@@ -52,6 +71,7 @@ export function makeExportContext(startRid: number): ExportContext {
     hyperlinkRelByHref: new Map(),
     nextDocPrId: 1,
     nextRevisionId: 1,
+    openComments: new Set(),
   };
 }
 

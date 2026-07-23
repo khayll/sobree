@@ -36,6 +36,16 @@ export function inlinesToRuns(
   let i = 0;
   while (i < inlines.length) {
     const run = inlines[i]!;
+    // Comment range reconstruction — the inverse of the importer's
+    // `activeComments` tagging. `RunProperties.commentIds` marks WHICH
+    // runs a comment covers; the wire format wants explicit
+    // `<w:commentRangeStart/End>` markers between runs. Emit a start
+    // where an id first appears and an end where it stops, threading
+    // `ctx.openComments` across paragraphs for multi-paragraph ranges.
+    // The end lands exactly before the run that dropped the id — for an
+    // imported doc that's the `CommentRefRun` anchor, reproducing
+    // Word's `…rangeEnd → commentReference` order.
+    parts.push(commentRangeTransitions(ctx, commentIdsOf(run)));
     const rev = revisionOf(run);
     if (!rev) {
       parts.push(emitInline(run, ctx, doc));
@@ -65,6 +75,53 @@ export function inlinesToRuns(
 function revisionOf(run: InlineRun): RevisionMark | undefined {
   if (run.kind !== "text") return undefined;
   return run.properties.revision;
+}
+
+/** The comment ids covering a run (empty set when untagged). */
+function commentIdsOf(run: InlineRun): ReadonlySet<number> {
+  const props = (run as { properties?: RunProperties }).properties;
+  return new Set(props?.commentIds ?? []);
+}
+
+/**
+ * Emit the `<w:commentRangeEnd>` / `<w:commentRangeStart>` markers the
+ * transition from `ctx.openComments` to `now` requires, updating the set.
+ * Ends come first (they close before the run that dropped the id), starts
+ * second. Ascending id order keeps the output deterministic.
+ */
+function commentRangeTransitions(ctx: ExportContext, now: ReadonlySet<number>): string {
+  const parts: string[] = [];
+  for (const id of [...ctx.openComments].sort((a, b) => a - b)) {
+    if (!now.has(id)) {
+      parts.push(el("w:commentRangeEnd", { "w:id": id }));
+      ctx.openComments.delete(id);
+    }
+  }
+  for (const id of [...now].sort((a, b) => a - b)) {
+    if (!ctx.openComments.has(id)) {
+      parts.push(el("w:commentRangeStart", { "w:id": id }));
+      ctx.openComments.add(id);
+    }
+  }
+  return parts.join("");
+}
+
+/**
+ * Close every comment range still open at the end of a content STREAM
+ * (document body, table cell, header/footer or note body — each is one
+ * `renderBlocks` call). Within a stream the run-level transitions place
+ * every end marker; a range dangling past the last run gets its
+ * `<w:commentRangeEnd>` appended as a block-level sibling (valid per
+ * ECMA-376 — `CT_MarkupRange` lives in `EG_ContentBlockContent` too), so
+ * no `commentRangeStart` is ever left unbalanced in the package.
+ */
+export function closeAllCommentRanges(ctx: ExportContext): string {
+  const parts: string[] = [];
+  for (const id of [...ctx.openComments].sort((a, b) => a - b)) {
+    parts.push(el("w:commentRangeEnd", { "w:id": id }));
+  }
+  ctx.openComments.clear();
+  return parts.join("");
 }
 
 /**
@@ -102,6 +159,18 @@ function emitInline(
       return emitHyperlink(run, ctx, doc);
     case "drawing":
       return emitDrawing(run, ctx, doc);
+    case "footnoteRef": {
+      // `customMarkFollows` suppresses Word's auto-number; the mark text
+      // rides in the same run right after the reference — the exact shape
+      // the importer parses back into `customMark`.
+      const ref = run.customMark
+        ? el("w:footnoteReference", { "w:customMarkFollows": 1, "w:id": run.id }) +
+          el("w:t", { "xml:space": "preserve" }, escapeXmlText(run.customMark))
+        : el("w:footnoteReference", { "w:id": run.id });
+      return emitRun([ref], run.properties, ctx);
+    }
+    case "commentRef":
+      return emitRun([el("w:commentReference", { "w:id": run.id })], run.properties, ctx);
     default:
       return "";
   }
