@@ -12,7 +12,7 @@ import type {
   TableCellMargins,
 } from "../formatting.types";
 import type { TableLook, TableStyleDefinition } from "../tableStyle.types";
-import type { ParagraphAlignment, ParagraphProperties } from "./paragraph";
+import type { ParagraphAlignment, ParagraphProperties, SdtWrap } from "./paragraph";
 import type { InlineRun } from "./runs";
 
 export type Block = Paragraph | Table | SectionBreak | InlineFrame;
@@ -42,6 +42,8 @@ export interface Table {
 }
 
 export interface TableProperties {
+  /** Content-control membership — see {@link SdtWrap} in paragraph.ts. */
+  sdt?: SdtWrap;
   /** Total table width in twips, or "auto" for content-driven. */
   widthTwips?: number;
   /** `<w:tblLayout w:type="fixed"/>` — the author locked the layout to

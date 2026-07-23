@@ -163,12 +163,38 @@ function headerFrameSignatures(doc: SobreeDocument): Record<string, unknown[]> {
   return out;
 }
 
+/**
+ * Content-control groups: consecutive body blocks sharing one SdtWrap,
+ * as (prXml, member count) in document order. Ids are import-order
+ * artifacts, so only the grouping and the verbatim properties compare.
+ */
+function sdtGroupSignatures(doc: SobreeDocument): Array<{ prXml: string; members: number }> {
+  const out: Array<{ prXml: string; members: number }> = [];
+  let openId: number | undefined;
+  for (const block of doc.body) {
+    const sdt =
+      block.kind === "paragraph" || block.kind === "table" ? block.properties.sdt : undefined;
+    if (!sdt) {
+      openId = undefined;
+      continue;
+    }
+    if (openId === sdt.id && out.length > 0) {
+      out[out.length - 1]!.members++;
+    } else {
+      out.push({ prXml: sdt.prXml, members: 1 });
+      openId = sdt.id;
+    }
+  }
+  return out;
+}
+
 function expectedAfterExport(doc: SobreeDocument): {
   bodySignatures: string[];
   footnotes: unknown;
   comments: unknown;
   frames: unknown[];
   headerFrames: Record<string, unknown[]>;
+  sdtGroups: unknown[];
   numbering: unknown;
   sectionGeometry: unknown;
   listRefs: string[];
@@ -182,6 +208,7 @@ function expectedAfterExport(doc: SobreeDocument): {
     comments: commentSignatures(doc),
     frames: frameSignatures(doc),
     headerFrames: headerFrameSignatures(doc),
+    sdtGroups: sdtGroupSignatures(doc),
     numbering: JSON.parse(JSON.stringify(doc.numbering)),
     sectionGeometry: doc.sections.map((s) => ({
       pageSize: s.pageSize,
@@ -218,6 +245,9 @@ describe("export fixpoint — open → save preserves the document", () => {
         headerFrameSignatures(d2),
         "header/footer floating frames (per-part wp:anchor round-trip)",
       ).toEqual(want.headerFrames);
+      expect(sdtGroupSignatures(d2), "content-control groups (w:sdt round-trip)").toEqual(
+        want.sdtGroups,
+      );
       expect(JSON.parse(JSON.stringify(d2.numbering)), "numbering definitions").toEqual(
         want.numbering,
       );

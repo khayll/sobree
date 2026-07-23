@@ -94,10 +94,18 @@ margins; inline drawing groups (`InlineFrame` blocks — pill headings,
 project entries, picture bands) re-emit as `<wp:inline>` groups or, for
 picture bands, as the anchored pictures they were synthesized from.
 
+Content controls (Structured Document Tags) pass through: block-level
+`<w:sdt>` wrappers — repeating sections, dropdowns, placeholders,
+tagged template fields — round-trip with their `<w:sdtPr>` preserved
+verbatim, re-grouped around their content on save. Editing inside a
+control splits it rather than corrupting it.
+
 Known exporter gaps (documented in the fixpoint test): inline drawing
 groups holding neither a textbox nor a picture (pure decorative shape
-groups), and even-page header/footer parts (a pre-existing scope cut —
-proper support needs `w:evenAndOddHeaders` settings plumbing).
+groups); even-page header/footer parts (a pre-existing scope cut —
+proper support needs `w:evenAndOddHeaders` settings plumbing); and
+cell-level / run-level content controls, which still flatten to their
+content.
 
 ## Headless usage
 

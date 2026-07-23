@@ -2,6 +2,7 @@ import type {
   Block,
   Paragraph,
   ParagraphProperties,
+  SdtWrap,
   SobreeDocument,
   Table,
   TableCell,
@@ -46,7 +47,7 @@ export function renderDocumentXml(
   // first paragraph so nothing is silently dropped.
   const anchorRuns = normalizeAnchorKeys(anchorRunsByParagraph(doc, ctx, renderBlocks), doc.body);
 
-  const bodyChildren: string[] = [];
+  const rendered: { xml: string; sdt?: SdtWrap }[] = [];
   for (let i = 0; i < doc.body.length; i++) {
     const block = doc.body[i];
     if (!block) continue;
@@ -57,11 +58,18 @@ export function renderDocumentXml(
     if (block.kind === "paragraph") {
       const trailing = trailingSectPr.get(i);
       const leading = anchorRuns.get(i);
-      bodyChildren.push(renderParagraph(block, ctx, doc, trailing, leading));
+      rendered.push({
+        xml: renderParagraph(block, ctx, doc, trailing, leading),
+        ...(block.properties.sdt ? { sdt: block.properties.sdt } : {}),
+      });
     } else {
-      bodyChildren.push(...renderBlock(block, ctx, doc));
+      const sdt = block.kind === "table" ? block.properties.sdt : undefined;
+      for (const xml of renderBlock(block, ctx, doc)) {
+        rendered.push({ xml, ...(sdt ? { sdt } : {}) });
+      }
     }
   }
+  const bodyChildren: string[] = foldSdtGroups(rendered);
   // The body is a content stream too — close any comment range dangling
   // past the last run (renderDocumentXml walks the body itself for sectPr
   // splicing, so it can't lean on renderBlocks' stream-end close).
@@ -130,18 +138,58 @@ export function renderBlocks(
    *  The body walk does its own injection (it also splices sectPrs). */
   anchorRuns?: Map<number, string>,
 ): string[] {
-  const out: string[] = [];
+  const rendered: { xml: string; sdt?: SdtWrap }[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (!block) continue;
     if (block.kind === "paragraph") {
-      out.push(renderParagraph(block, ctx, doc, undefined, anchorRuns?.get(i)));
+      rendered.push({
+        xml: renderParagraph(block, ctx, doc, undefined, anchorRuns?.get(i)),
+        ...(block.properties.sdt ? { sdt: block.properties.sdt } : {}),
+      });
     } else {
-      out.push(...renderBlock(block, ctx, doc));
+      const sdt = block.kind === "table" ? block.properties.sdt : undefined;
+      for (const xml of renderBlock(block, ctx, doc)) {
+        rendered.push({ xml, ...(sdt ? { sdt } : {}) });
+      }
     }
   }
+  const out = foldSdtGroups(rendered);
   const dangling = closeAllCommentRanges(ctx);
   if (dangling) out.push(dangling);
+  return out;
+}
+
+/**
+ * Fold rendered block XMLs back into their `<w:sdt>` wrappers: a
+ * consecutive run of blocks sharing one `SdtWrap` (same id + prXml)
+ * re-emits as a single control, its recorded `<w:sdtPr>` verbatim.
+ * Blocks without membership pass through bare. Blocks edited into the
+ * middle of a control (no membership) split it — a degraded span, never
+ * a corrupted control.
+ */
+function foldSdtGroups(items: readonly { xml: string; sdt?: SdtWrap }[]): string[] {
+  const out: string[] = [];
+  let open: SdtWrap | undefined;
+  let buffer: string[] = [];
+  const flush = (): void => {
+    if (!open) return;
+    out.push(el("w:sdt", null, `${open.prXml}${el("w:sdtContent", null, buffer.join(""))}`));
+    open = undefined;
+    buffer = [];
+  };
+  for (const item of items) {
+    const wrap = item.sdt;
+    if (!wrap) {
+      flush();
+      out.push(item.xml);
+      continue;
+    }
+    if (open && (open.id !== wrap.id || open.prXml !== wrap.prXml)) flush();
+    open = wrap;
+    buffer.push(item.xml);
+  }
+  flush();
   return out;
 }
 
