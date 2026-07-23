@@ -7,8 +7,9 @@ import type {
 } from "../../doc/types";
 import { NS } from "../shared/namespaces";
 import { el, xmlDocument } from "../shared/xml";
+import { anchorRunsForFrames } from "./anchors";
 import type { ExportContext } from "./context";
-import { renderBlocks } from "./document";
+import { normalizeAnchorKeys, renderBlocks } from "./document";
 
 const HEADER_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
 const FOOTER_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml";
@@ -45,7 +46,7 @@ export function emitHeadersAndFooters(doc: SobreeDocument, ctx: ExportContext): 
       let id = partIdToRid.get(ref.partId);
       if (!id) {
         const path = `word/${ref.partId}`;
-        ctx.parts[path] = renderHeaderFooterXml(kind, body, ctx, doc);
+        ctx.parts[path] = renderHeaderFooterXml(kind, body, ctx, doc, ref.partId);
         ctx.contentTypeOverrides.push({
           partName: `/${path}`,
           contentType: kind === "header" ? HEADER_CT : FOOTER_CT,
@@ -74,9 +75,20 @@ function renderHeaderFooterXml(
   body: readonly Block[],
   ctx: ExportContext,
   doc: SobreeDocument,
+  partId: string,
 ): string {
   const rootTag = kind === "header" ? "w:hdr" : "w:ftr";
-  const children = renderBlocks(body, ctx, doc);
+  // The part's floating frames re-anchor as leading runs of their host
+  // paragraphs (part-body index space, as the header importer records).
+  // Image rels ride `document.xml.rels`, matching the existing header
+  // image convention — the importer merges part rels with a document-rels
+  // fallback, so the round-trip resolves.
+  const frames = doc.headerFooterFrames?.[partId] ?? [];
+  const anchorRuns = normalizeAnchorKeys(
+    anchorRunsForFrames(frames, doc, ctx, (b, c, d) => renderBlocks(b, c, d)),
+    body,
+  );
+  const children = renderBlocks(body, ctx, doc, anchorRuns);
   // Word refuses to open hdr/ftr parts without at least one paragraph.
   if (children.length === 0) children.push(el("w:p"));
   return xmlDocument(el(rootTag, { "xmlns:w": NS.w, "xmlns:r": NS.r }, children));

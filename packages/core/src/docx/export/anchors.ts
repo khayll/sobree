@@ -5,14 +5,14 @@
  * (`anchor.paragraphIndex`), which is where Word keeps anchors and
  * exactly where the importer's paragraph walk-up will find it again.
  *
- * Serialized in this slice: `picture`, `textbox` and PRESET-geometry
- * `shape` content, all three positioning forms (EMU offset / align
- * keyword / wp14 percent), percent sizes, wrap modes (tight/through get
- * a synthesized full-extent polygon — semantically their rectangular
- * degenerate, and the tag round-trips), text distances and behindDoc.
- *
- * Still on the audited gap list (see `feature.exportFixpoint.test.ts`):
- * `group` content, custom-geometry shapes, and `headerFooterFrames`.
+ * Serialized: `picture`, `textbox`, `shape` (presets AND `a:custGeom`
+ * from the stored SVG path) and `group` content (`wpg:wgp` with the
+ * child coordinate system, children at their local offsets, nested
+ * groups as `wpg:grpSp`); all three positioning forms (EMU offset /
+ * align keyword / wp14 percent), percent sizes, wrap modes
+ * (tight/through get a synthesized full-extent polygon — semantically
+ * their rectangular degenerate, and the tag round-trips), text
+ * distances and behindDoc.
  */
 
 import type { AnchoredFrame, Block, SobreeDocument } from "../../doc/types";
@@ -49,8 +49,20 @@ export function anchorRunsByParagraph(
   ctx: ExportContext,
   renderBlocks: RenderAnchorBlocks,
 ): Map<number, string> {
+  return anchorRunsForFrames(doc.anchoredFrames ?? [], doc, ctx, renderBlocks);
+}
+
+/** Same grouping for an EXPLICIT frame list — header/footer parts pass
+ *  their `doc.headerFooterFrames[partId]` set, keyed by PART-body
+ *  paragraph indices (the space the header importer records). */
+export function anchorRunsForFrames(
+  frames: readonly AnchoredFrame[],
+  doc: SobreeDocument,
+  ctx: ExportContext,
+  renderBlocks: RenderAnchorBlocks,
+): Map<number, string> {
   const out = new Map<number, string>();
-  for (const frame of doc.anchoredFrames ?? []) {
+  for (const frame of frames) {
     const xml = renderAnchorRun(frame, ctx, doc, renderBlocks);
     if (!xml) continue;
     const idx = frame.anchor.paragraphIndex ?? 0;
@@ -59,13 +71,9 @@ export function anchorRunsByParagraph(
   return out;
 }
 
-/** `true` when this slice can serialize the frame's content. */
-export function isExportableAnchor(frame: AnchoredFrame): boolean {
-  const c = frame.content;
-  if (c.kind === "picture") return true;
-  if (c.kind === "textbox") return true;
-  if (c.kind === "shape") return c.geometry !== "custom";
-  return false;
+/** Every content kind serializes; kept for callers that gate on it. */
+export function isExportableAnchor(_frame: AnchoredFrame): boolean {
+  return true;
 }
 
 function renderAnchorRun(
@@ -223,17 +231,96 @@ function renderContent(
     return renderPictureData(frame, c.partPath, c.altText, rId, ctx);
   }
   if (c.kind === "textbox") return renderShapeData(frame, ctx, doc, true, renderBlocks);
-  if (c.kind === "shape" && c.geometry !== "custom") {
-    return renderShapeData(frame, ctx, doc, false, renderBlocks);
+  if (c.kind === "shape") return renderShapeData(frame, ctx, doc, false, renderBlocks);
+  if (c.kind === "group") return renderGroupData(frame, ctx, doc, renderBlocks);
+  return null;
+}
+
+/**
+ * `<wpg:wgp>` group payload. The group's own `<a:xfrm>` carries the
+ * rendered extent (`a:ext`) plus the CHILD coordinate system (`a:chExt`
+ * origin `a:chOff`) that children's local offsets live in — exactly what
+ * `parseGroup` reads back. Children render at their LOCAL boxes; a
+ * nested group becomes `<wpg:grpSp>` with its own xfrm + coordinate
+ * system, mirroring `synthFrameFromNestedGroup`.
+ */
+function renderGroupData(
+  frame: AnchoredFrame,
+  ctx: ExportContext,
+  doc: SobreeDocument,
+  renderBlocks: RenderAnchorBlocks,
+): string | null {
+  const c = frame.content;
+  if (c.kind !== "group") return null;
+  const inner = renderGroupShape("wpg:wgp", frameBox(frame), c, ctx, doc, renderBlocks);
+  return el("a:graphicData", { uri: NS.wpg }, inner);
+}
+
+type GroupContent = Extract<AnchoredFrame["content"], { kind: "group" }>;
+
+function renderGroupShape(
+  tag: "wpg:wgp" | "wpg:grpSp",
+  box: Box,
+  group: GroupContent,
+  ctx: ExportContext,
+  doc: SobreeDocument,
+  renderBlocks: RenderAnchorBlocks,
+): string {
+  const xfrmXml = el(
+    "a:xfrm",
+    null,
+    [
+      el("a:off", { x: box.x, y: box.y }),
+      el("a:ext", { cx: box.cx, cy: box.cy }),
+      el("a:chOff", { x: group.childCoordOffsetX ?? 0, y: group.childCoordOffsetY ?? 0 }),
+      el("a:chExt", { cx: group.childCoordSystemCx, cy: group.childCoordSystemCy }),
+    ].join(""),
+  );
+  const children = group.children
+    .map((child) => renderGroupChild(child, ctx, doc, renderBlocks))
+    .filter(Boolean)
+    .join("");
+  const parts = [
+    el(tag === "wpg:wgp" ? "wpg:cNvGrpSpPr" : "wpg:cNvGrpSpPr"),
+    el("wpg:grpSpPr", null, xfrmXml),
+    children,
+  ].join("");
+  return tag === "wpg:wgp"
+    ? el("wpg:wgp", { "xmlns:wpg": NS.wpg }, parts)
+    : el("wpg:grpSp", null, parts);
+}
+
+/** One group child at its LOCAL box. `null` drops only a picture whose
+ *  media bytes are missing (a dead rel would corrupt the package). */
+function renderGroupChild(
+  child: AnchoredFrame,
+  ctx: ExportContext,
+  doc: SobreeDocument,
+  renderBlocks: RenderAnchorBlocks,
+): string | null {
+  const c = child.content;
+  const box = localBox(child);
+  if (c.kind === "picture") {
+    const rId = allocImageRel(ctx, c.partPath, doc);
+    if (!rId) return null;
+    return renderPicElement(c.partPath, c.altText, rId, box, ctx);
+  }
+  if (c.kind === "textbox" || c.kind === "shape") {
+    return renderWspElement(child, box, ctx, doc, renderBlocks);
+  }
+  if (c.kind === "group") {
+    return renderGroupShape("wpg:grpSp", box, c, ctx, doc, renderBlocks);
   }
   return null;
 }
 
-function renderPictureData(
-  frame: AnchoredFrame,
+/** Bare `<pic:pic>` at `box` — shared by anchored pictures, group
+ *  children and inline-frame pictures. */
+export function renderPicElement(
   partPath: string,
   altText: string | undefined,
   rId: string,
+  box: Box,
   ctx: ExportContext,
 ): string {
   const id = nextDocPr(ctx);
@@ -250,34 +337,65 @@ function renderPictureData(
   const spPr = el(
     "pic:spPr",
     null,
-    `${xfrm(frame)}${el("a:prstGeom", { prst: "rect" }, el("a:avLst"))}`,
+    `${xfrm(box)}${el("a:prstGeom", { prst: "rect" }, el("a:avLst"))}`,
   );
-  const pic = el("pic:pic", { "xmlns:pic": NS.pic }, `${nvPicPr}${blipFill}${spPr}`);
+  return el("pic:pic", { "xmlns:pic": NS.pic }, `${nvPicPr}${blipFill}${spPr}`);
+}
+
+function renderPictureData(
+  frame: AnchoredFrame,
+  partPath: string,
+  altText: string | undefined,
+  rId: string,
+  ctx: ExportContext,
+): string {
+  const pic = renderPicElement(partPath, altText, rId, frameBox(frame), ctx);
   return el("a:graphicData", { uri: NS.pic }, pic);
 }
 
-/** `<wps:wsp>` for both textboxes and geometric shapes — the shape kind
- *  decides the prstGeom, the textbox adds `wps:txbx` + `wps:bodyPr`. */
 function renderShapeData(
   frame: AnchoredFrame,
   ctx: ExportContext,
   doc: SobreeDocument,
-  isTextbox: boolean,
+  _isTextbox: boolean,
+  renderBlocks: RenderAnchorBlocks,
+): string {
+  const wsp = renderWspElement(frame, frameBox(frame), ctx, doc, renderBlocks);
+  return el("a:graphicData", { uri: NS.wps }, wsp);
+}
+
+/**
+ * `<wps:wsp>` for both textboxes and geometric shapes at `box` — the
+ * shape kind decides the geometry (`a:prstGeom` for presets,
+ * `a:custGeom` re-built from the stored SVG path for custom outlines),
+ * the textbox adds `wps:txbx` + `wps:bodyPr`.
+ */
+function renderWspElement(
+  frame: AnchoredFrame,
+  box: Box,
+  ctx: ExportContext,
+  doc: SobreeDocument,
   renderBlocks: RenderAnchorBlocks,
 ): string {
   const c = frame.content;
-  // `custom` is unreachable here (renderContent declines it) — the
-  // narrowing is for the type system, not a real fallback.
-  const geometry =
-    c.kind === "textbox"
-      ? (c.geometry ?? "rect")
-      : c.kind === "shape" && c.geometry !== "custom"
-        ? c.geometry
-        : "rect";
+  const isTextbox = c.kind === "textbox";
   const fill = c.kind === "textbox" || c.kind === "shape" ? c.fill : undefined;
   const border = c.kind === "textbox" || c.kind === "shape" ? c.border : undefined;
 
-  const spPrChildren = [xfrm(frame), prstGeom(geometry), solidFill(fill), outline(border)]
+  let geometryXml: string;
+  if (c.kind === "shape" && c.geometry === "custom" && c.path) {
+    geometryXml = custGeom(c.path);
+  } else {
+    const preset =
+      c.kind === "textbox"
+        ? (c.geometry ?? "rect")
+        : c.kind === "shape" && c.geometry !== "custom"
+          ? c.geometry
+          : "rect";
+    geometryXml = prstGeom(preset);
+  }
+
+  const spPrChildren = [xfrm(box), geometryXml, solidFill(fill), outline(border)]
     .filter(Boolean)
     .join("");
 
@@ -309,16 +427,77 @@ function renderShapeData(
     parts.push(el("wps:bodyPr"));
   }
 
-  const wsp = el("wps:wsp", { "xmlns:wps": NS.wps }, parts.join(""));
-  return el("a:graphicData", { uri: NS.wps }, wsp);
+  return el("wps:wsp", { "xmlns:wps": NS.wps }, parts.join(""));
 }
 
-function xfrm(frame: AnchoredFrame): string {
+/**
+ * `<a:custGeom>` re-built from the stored SVG path — the inverse of
+ * `customGeometry.ts`, whose output grammar is exactly `M x y`, `L x y`,
+ * `C x1 y1 x2 y2 x y`, `Q x1 y1 x y` and `Z`, space-separated absolute
+ * integer commands. Anything else (never produced by our importer) is
+ * skipped, mirroring the importer's own skip-unknown-segment policy.
+ */
+export function custGeom(path: { widthEmu: number; heightEmu: number; d: string }): string {
+  const tokens = path.d.trim().split(/\s+/);
+  const commands: string[] = [];
+  const pt = (x: string | undefined, y: string | undefined): string | null => {
+    if (x === undefined || y === undefined) return null;
+    return el("a:pt", { x, y });
+  };
+  let i = 0;
+  while (i < tokens.length) {
+    const op = tokens[i];
+    if (op === "M" || op === "L") {
+      const p1 = pt(tokens[i + 1], tokens[i + 2]);
+      if (p1) commands.push(el(op === "M" ? "a:moveTo" : "a:lnTo", null, p1));
+      i += 3;
+    } else if (op === "C") {
+      const ps = [
+        pt(tokens[i + 1], tokens[i + 2]),
+        pt(tokens[i + 3], tokens[i + 4]),
+        pt(tokens[i + 5], tokens[i + 6]),
+      ];
+      if (ps.every(Boolean)) commands.push(el("a:cubicBezTo", null, ps.join("")));
+      i += 7;
+    } else if (op === "Q") {
+      const ps = [pt(tokens[i + 1], tokens[i + 2]), pt(tokens[i + 3], tokens[i + 4])];
+      if (ps.every(Boolean)) commands.push(el("a:quadBezTo", null, ps.join("")));
+      i += 5;
+    } else if (op === "Z") {
+      commands.push(el("a:close"));
+      i += 1;
+    } else {
+      i += 1; // unknown token — skip, keep the rest of the shape
+    }
+  }
+  const pathEl = el("a:path", { w: path.widthEmu, h: path.heightEmu }, commands.join(""));
+  return el("a:custGeom", null, `${el("a:avLst")}${el("a:pathLst", null, pathEl)}`);
+}
+
+/** `<a:xfrm>` for a shape/picture at `box` — group children pass their
+ *  LOCAL offsets, top-level frames sit at (0,0) in their own extent. */
+function xfrm(box: Box): string {
   return el(
     "a:xfrm",
     null,
-    `${el("a:off", { x: 0, y: 0 })}${el("a:ext", { cx: frame.widthEmu, cy: frame.heightEmu })}`,
+    `${el("a:off", { x: box.x, y: box.y })}${el("a:ext", { cx: box.cx, cy: box.cy })}`,
   );
+}
+
+/** Placement box in the current coordinate space (EMU). */
+export interface Box {
+  x: number;
+  y: number;
+  cx: number;
+  cy: number;
+}
+
+function frameBox(frame: AnchoredFrame): Box {
+  return { x: 0, y: 0, cx: frame.widthEmu, cy: frame.heightEmu };
+}
+
+function localBox(frame: AnchoredFrame): Box {
+  return { x: frame.offsetXEmu, y: frame.offsetYEmu, cx: frame.widthEmu, cy: frame.heightEmu };
 }
 
 /** Preset geometry — the inverse of `readGeometry`'s coercions. */

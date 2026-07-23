@@ -220,10 +220,11 @@ describe("anchored frame export round-trip", () => {
     });
   });
 
-  it("skips GROUP frames without corrupting the package (documented gap)", async () => {
+  it("an empty GROUP frame round-trips alongside its siblings", async () => {
     const doc = baseDoc();
     doc.anchoredFrames = [
       frame({
+        behindText: true,
         content: { kind: "group", children: [], childCoordSystemCx: 100, childCoordSystemCy: 100 },
       }),
       frame({ id: "f1", behindText: true }),
@@ -231,9 +232,8 @@ describe("anchored frame export round-trip", () => {
 
     const back = await roundTrip(doc);
 
-    // The group is dropped (gap), the sibling picture survives.
-    expect(back.anchoredFrames).toHaveLength(1);
-    expect(back.anchoredFrames![0]!.content.kind).toBe("picture");
+    expect(back.anchoredFrames).toHaveLength(2);
+    expect(back.anchoredFrames!.map((f) => f.content.kind).sort()).toEqual(["group", "picture"]);
     expect((back.body[0] as Paragraph).runs.some((r) => r.kind === "text")).toBe(true);
   });
 });
