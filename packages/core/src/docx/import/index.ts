@@ -512,6 +512,22 @@ function paragraphIndexInContainer(container: Element): Map<Element, number> {
     if (child.namespaceURI === W_NS && child.localName === "p") {
       map.set(child, index);
       index++;
+      // A paragraph carrying an inline `<w:sectPr>` is followed by a
+      // synthesized `section_break` BLOCK in the AST body
+      // (`convertBlocksFromContainer` pushes one) — the block index this
+      // map promises must advance past it, or every anchor after a
+      // section break addresses one block too early. That off-by-N made
+      // `floatWrappingImages`' `body[paragraphIndex]` land on the wrong
+      // block (observed: ieee-trans-journal-letter's author photo never
+      // floated because its index hit the section_break, not its host
+      // paragraph) and the anchor overlay pin drift after every break.
+      const pPr = Array.from(child.children).find(
+        (c) => c.namespaceURI === W_NS && c.localName === "pPr",
+      );
+      const sectPr = pPr
+        ? Array.from(pPr.children).find((c) => c.namespaceURI === W_NS && c.localName === "sectPr")
+        : undefined;
+      if (sectPr) index++;
     } else if (child.namespaceURI === W_NS && child.localName === "tbl") {
       index++;
     }

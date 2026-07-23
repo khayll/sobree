@@ -12,13 +12,15 @@
  * feature; when an exporter gains support for one, delete its transform
  * and this test gets stricter automatically.
  *
- * Current known gaps (audited 2026-06):
+ * Current known gaps (audited 2026-07):
  *   - `inline_frame` blocks are not exported (DrawingML group
  *     serialization not implemented) — dropped from the body.
- *   - `anchoredFrames` / `headerFooterFrames` are not exported —
- *     floating drawings dropped (and media referenced only by them).
- *   - Anchored / float drawing RUNS export as inline pictures
- *     (placement + wrap geometry degrade; the image itself survives).
+ *   - Anchored frames with GROUP content or CUSTOM-geometry shapes are
+ *     not exported (group / custGeom serialization pending) — dropped.
+ *   - `headerFooterFrames` are not exported — header/footer floating
+ *     drawings dropped (and media referenced only by them).
+ *   - Float drawing RUNS (placement floatLeft/floatRight) export as
+ *     inline pictures (the wrap side degrades; the image survives).
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -102,10 +104,66 @@ function commentSignatures(doc: SobreeDocument): Record<string, unknown> {
 
 /** Project the imported document onto what the CURRENT exporter is
  *  expected to preserve (the documented-gap transform). */
+/**
+ * Anchored-frame signatures at the structure/geometry bar: everything the
+ * exporter serializes must survive — content kind, anchor origin, offsets
+ * and positioning forms, size (incl. percent forms), wrap and z-state.
+ * Frame ids are import-order artifacts and body/textbox content is
+ * covered by the body-signature machinery, so neither is compared here.
+ */
+function frameSignatures(doc: SobreeDocument): unknown[] {
+  // Host indices in FILTERED-body space — the same projection the body
+  // signatures use. `inline_frame` blocks are a documented exporter gap:
+  // they vanish from the re-imported body, shifting every later block
+  // index down by their count. Comparing raw indices would blame the
+  // anchor round-trip for the inline_frame gap; in filtered space both
+  // sides address the same physical paragraph. Inert once the
+  // inline_frame exporter lands (count 0 on both sides).
+  const inlineFramesBefore = (idx: number): number =>
+    doc.body.slice(0, idx).filter((b) => b.kind === "inline_frame").length;
+  return (doc.anchoredFrames ?? [])
+    .filter(
+      (f) =>
+        f.content.kind !== "group" &&
+        !(f.content.kind === "shape" && f.content.geometry === "custom"),
+    )
+    .map((f) => ({
+      kind: f.content.kind,
+      // A frame with no host paragraph (its drawing sat outside the body
+      // paragraph map, e.g. in a table cell) re-exports hosted at
+      // paragraph 0. For page/margin-relative positioning — the only kind
+      // the importer produces host-less — the host paragraph only decides
+      // which page's flow carries the anchor, so `undefined ≈ 0` is the
+      // same placement, not a loss.
+      anchor: {
+        ...f.anchor,
+        paragraphIndex:
+          f.anchor.paragraphIndex !== undefined
+            ? f.anchor.paragraphIndex - inlineFramesBefore(f.anchor.paragraphIndex)
+            : 0,
+      },
+      offsetXEmu: f.offsetXEmu,
+      offsetYEmu: f.offsetYEmu,
+      alignH: f.alignH ?? null,
+      alignV: f.alignV ?? null,
+      pctPosX: f.pctPosX ?? null,
+      pctPosY: f.pctPosY ?? null,
+      pctWidth: f.pctWidth ?? null,
+      pctHeight: f.pctHeight ?? null,
+      widthEmu: f.widthEmu,
+      heightEmu: f.heightEmu,
+      wrap: f.wrap ?? null,
+      wrapText: f.wrapText ?? null,
+      behindText: f.behindText ?? false,
+      textDistancesEmu: f.textDistancesEmu ?? null,
+    }));
+}
+
 function expectedAfterExport(doc: SobreeDocument): {
   bodySignatures: string[];
   footnotes: unknown;
   comments: unknown;
+  frames: unknown[];
   numbering: unknown;
   sectionGeometry: unknown;
   listRefs: string[];
@@ -115,6 +173,7 @@ function expectedAfterExport(doc: SobreeDocument): {
     bodySignatures: blockSignatures(body),
     footnotes: noteSignatures(doc),
     comments: commentSignatures(doc),
+    frames: frameSignatures(doc),
     numbering: JSON.parse(JSON.stringify(doc.numbering)),
     sectionGeometry: doc.sections.map((s) => ({
       pageSize: s.pageSize,
@@ -146,6 +205,7 @@ describe("export fixpoint — open → save preserves the document", () => {
         commentSignatures(d2),
         "comment threads (word/comments.xml + commentsExtended round-trip)",
       ).toEqual(want.comments);
+      expect(frameSignatures(d2), "anchored frames (wp:anchor round-trip)").toEqual(want.frames);
       expect(JSON.parse(JSON.stringify(d2.numbering)), "numbering definitions").toEqual(
         want.numbering,
       );
