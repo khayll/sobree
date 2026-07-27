@@ -22,6 +22,7 @@ const NS_W15 = "http://schemas.microsoft.com/office/word/2012/wordml";
 const NS_W14 = "http://schemas.microsoft.com/office/word/2010/wordml";
 
 const FOOTNOTES_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml";
+const ENDNOTES_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml";
 const COMMENTS_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml";
 const COMMENTS_EXTENDED_CT = "application/vnd.ms-word.commentsExtended+xml";
 
@@ -65,6 +66,47 @@ export function emitFootnotesPart(doc: SobreeDocument, ctx: ExportContext): void
     id: `rId${ctx.nextRid++}`,
     type: "footnotes",
     target: "footnotes.xml",
+  });
+}
+
+/**
+ * Stage `word/endnotes.xml` — the endnote twin of the footnotes part.
+ * Word's stock notes here are `separator` (id −1) and
+ * `continuationSeparator` (id 0), same as footnotes; the importer skips
+ * both and ids < 1.
+ */
+export function emitEndnotesPart(doc: SobreeDocument, ctx: ExportContext): void {
+  const entries = Object.entries(doc.endnotes ?? {});
+  if (entries.length === 0) return;
+
+  const stock = [
+    el(
+      "w:endnote",
+      { "w:type": "separator", "w:id": -1 },
+      el("w:p", null, el("w:r", null, el("w:separator"))),
+    ),
+    el(
+      "w:endnote",
+      { "w:type": "continuationSeparator", "w:id": 0 },
+      el("w:p", null, el("w:r", null, el("w:continuationSeparator"))),
+    ),
+  ];
+  const notes = entries
+    .map(([id, blocks]) => ({ id: Number(id), blocks }))
+    .sort((a, b) => a.id - b.id)
+    .map(({ id, blocks }) => el("w:endnote", { "w:id": id }, renderBlocks(blocks, ctx, doc)));
+
+  ctx.parts["word/endnotes.xml"] = xmlDocument(
+    el("w:endnotes", { "xmlns:w": NS.w, "xmlns:r": NS.r }, [...stock, ...notes]),
+  );
+  ctx.contentTypeOverrides.push({
+    partName: "/word/endnotes.xml",
+    contentType: ENDNOTES_CT,
+  });
+  ctx.relationships.push({
+    id: `rId${ctx.nextRid++}`,
+    type: "endnotes",
+    target: "endnotes.xml",
   });
 }
 

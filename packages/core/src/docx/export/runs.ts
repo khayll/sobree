@@ -171,6 +171,13 @@ function emitInline(
     }
     case "commentRef":
       return emitRun([el("w:commentReference", { "w:id": run.id })], run.properties, ctx);
+    case "endnoteRef": {
+      const ref = run.customMark
+        ? el("w:endnoteReference", { "w:customMarkFollows": 1, "w:id": run.id }) +
+          el("w:t", { "xml:space": "preserve" }, escapeXmlText(run.customMark))
+        : el("w:endnoteReference", { "w:id": run.id });
+      return emitRun([ref], run.properties, ctx);
+    }
     case "bookmarkStart":
       // Paragraph-level marker, NOT wrapped in <w:r> — EG_PContent
       // allows it as a sibling of runs, which is where Word writes it.

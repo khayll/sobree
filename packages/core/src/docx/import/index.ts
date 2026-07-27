@@ -24,7 +24,7 @@ import { parseCommentsXml } from "./comments";
 import { convertBlocksFromContainer, convertDocumentXml } from "./document";
 import { floatWrappingImages } from "./floatFrames";
 import { flowDisplacingTextboxes } from "./flowFrames";
-import { parseFootnotesXml } from "./footnotes";
+import { parseEndnotesXml, parseFootnotesXml } from "./footnotes";
 import { readSection } from "./headers";
 import { groupAnchoredPictureBands } from "./imageBands";
 import { parseNumberingXml } from "./numbering";
@@ -271,6 +271,7 @@ export async function importDocx(
   // the docx genuinely omits styles.xml or the parse fails.
   const importedStyles = parseStylesXml(unzipped.text["word/styles.xml"], settings);
   const footnotes = parseFootnotesXml(unzipped.text["word/footnotes.xml"], { rels });
+  const endnotes = parseEndnotesXml(unzipped.text["word/endnotes.xml"], { rels });
   const comments = parseCommentsXml(
     unzipped.text["word/comments.xml"],
     { rels },
@@ -288,6 +289,7 @@ export async function importDocx(
     rawParts,
     fonts,
     ...(Object.keys(footnotes).length > 0 ? { footnotes } : {}),
+    ...(Object.keys(endnotes).length > 0 ? { endnotes } : {}),
     ...(Object.keys(comments).length > 0 ? { comments } : {}),
     // Surface document-wide layout settings (defaultTabStop, column-balance
     // policy) so the renderer can apply them instead of CSS fallbacks.

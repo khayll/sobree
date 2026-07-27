@@ -15,7 +15,8 @@ export type InlineRun =
   | FootnoteRefRun
   | CommentRefRun
   | BookmarkStartRun
-  | BookmarkEndRun;
+  | BookmarkEndRun
+  | EndnoteRefRun;
 
 export interface TextRun {
   kind: "text";
@@ -80,6 +81,19 @@ export interface FootnoteRefRun {
    * auto-number, both at the reference and before the footnote body.
    * Undefined for ordinary auto-numbered footnotes.
    */
+  customMark?: string;
+  properties?: RunProperties;
+}
+
+/**
+ * Inline reference to an endnote (`<w:endnoteReference w:id="N"/>`).
+ * Mirror of {@link FootnoteRefRun}; the body lives in
+ * `SobreeDocument.endnotes[id]` and renders in the document-end aside.
+ */
+export interface EndnoteRefRun {
+  kind: "endnoteRef";
+  id: number;
+  /** Custom reference mark (`customMarkFollows`) — see FootnoteRefRun. */
   customMark?: string;
   properties?: RunProperties;
 }

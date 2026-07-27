@@ -89,6 +89,8 @@ function renderRun(
       return renderHyperlink(run, rawParts, styles, paragraphRunDefaults);
     case "footnoteRef":
       return renderFootnoteRef(run);
+    case "endnoteRef":
+      return renderEndnoteRef(run);
     case "commentRef":
       return renderCommentRef(run);
     default:
@@ -109,6 +111,18 @@ function renderFootnoteRef(run: import("../../../doc/types").FootnoteRefRun): HT
   link.setAttribute("id", `sobree-footnote-ref-${run.id}`);
   // A custom mark (`<w:footnoteReference w:customMarkFollows>`) replaces the
   // auto-number — e.g. an author "*" footnote.
+  link.textContent = run.customMark ?? String(run.id);
+  sup.appendChild(link);
+  return sup;
+}
+
+/** Endnote twin of `renderFootnoteRef` — links into the endnotes aside. */
+function renderEndnoteRef(run: import("../../../doc/types").EndnoteRefRun): HTMLElement {
+  const sup = document.createElement("sup");
+  sup.className = "sobree-endnote-ref";
+  const link = document.createElement("a");
+  link.setAttribute("href", `#sobree-endnote-${run.id}`);
+  link.setAttribute("id", `sobree-endnote-ref-${run.id}`);
   link.textContent = run.customMark ?? String(run.id);
   sup.appendChild(link);
   return sup;

@@ -64,6 +64,9 @@ export function renderSobreeDocument(
   if (doc.footnotes && Object.keys(doc.footnotes).length > 0) {
     renderFootnotesAside(doc, host);
   }
+  if (doc.endnotes && Object.keys(doc.endnotes).length > 0) {
+    renderEndnotesAside(doc, host);
+  }
 }
 
 /**
@@ -127,6 +130,33 @@ function applyPageBackground(host: HTMLElement, color: string | undefined): void
   const target = scope ?? host;
   if (color) target.style.setProperty("--page-background", color);
   else target.style.removeProperty("--page-background");
+}
+
+/**
+ * Endnote bodies — Word collects these at the DOCUMENT end, which is the
+ * same placement this renderer already gives footnotes, so the aside is a
+ * near-twin (own class + anchor ids so both can coexist).
+ */
+function renderEndnotesAside(doc: SobreeDocument, host: HTMLElement): void {
+  const aside = document.createElement("aside");
+  aside.className = "sobree-endnotes";
+  aside.setAttribute("role", "doc-endnotes");
+  const list = document.createElement("ol");
+  list.className = "sobree-endnotes__list";
+  const ids = Object.keys(doc.endnotes!)
+    .map((s) => Number(s))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  for (const id of ids) {
+    const li = document.createElement("li");
+    li.id = `sobree-endnote-${id}`;
+    li.value = id;
+    li.className = "sobree-endnotes__item";
+    renderBlocks(doc.endnotes![id]!, li, doc.numbering, doc.styles, doc.rawParts);
+    list.appendChild(li);
+  }
+  aside.appendChild(list);
+  host.appendChild(aside);
 }
 
 function renderFootnotesAside(doc: SobreeDocument, host: HTMLElement): void {

@@ -22,6 +22,7 @@ export interface ExportContext {
       | "fontTable"
       | "numbering"
       | "footnotes"
+      | "endnotes"
       | "comments"
       | "commentsExtended";
     target: string;

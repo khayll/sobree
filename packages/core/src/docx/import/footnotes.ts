@@ -26,6 +26,22 @@ export function parseFootnotesXml(
   xml: string | undefined,
   ctx: ConvertContext,
 ): Record<number, Block[]> {
+  return parseNotesXml(xml, ctx, "footnote");
+}
+
+/** `word/endnotes.xml` — same wire shape with `<w:endnote>` elements. */
+export function parseEndnotesXml(
+  xml: string | undefined,
+  ctx: ConvertContext,
+): Record<number, Block[]> {
+  return parseNotesXml(xml, ctx, "endnote");
+}
+
+function parseNotesXml(
+  xml: string | undefined,
+  ctx: ConvertContext,
+  elementName: "footnote" | "endnote",
+): Record<number, Block[]> {
   if (!xml) return {};
   let doc: Document;
   try {
@@ -34,7 +50,7 @@ export function parseFootnotesXml(
     return {};
   }
   const out: Record<number, Block[]> = {};
-  for (const footnote of wAll(doc, "footnote")) {
+  for (const footnote of wAll(doc, elementName)) {
     const typeAttr = footnote.getAttributeNS(NS.w, "type") ?? footnote.getAttribute("w:type");
     if (typeAttr === "separator" || typeAttr === "continuationSeparator") continue;
     const idAttr = footnote.getAttributeNS(NS.w, "id") ?? footnote.getAttribute("w:id");
