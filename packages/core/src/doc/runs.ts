@@ -25,6 +25,17 @@ export function runLength(run: InlineRun): number {
   }
 }
 
+/**
+ * Zero-length marker runs (bookmark start/end) — present in the runs
+ * array for round-trip fidelity but contributing no content: no offset
+ * width, no rendered output. Emptiness predicates and "first content
+ * run" scans must skip them, or a paragraph whose only run is a marker
+ * stops counting as empty (and e.g. loses its ¶-mark font).
+ */
+export function isMarkerRun(run: InlineRun): boolean {
+  return run.kind === "bookmarkStart" || run.kind === "bookmarkEnd";
+}
+
 export function runsLength(runs: readonly InlineRun[]): number {
   let n = 0;
   for (const r of runs) n += runLength(r);

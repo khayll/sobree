@@ -51,6 +51,10 @@ export interface ImportedRun {
   footnoteCustomMark?: string;
   /** Set when the run wraps a `<w:commentReference w:id="N"/>`. */
   commentRefId?: number;
+  /** Set for a `<w:bookmarkStart w:id w:name/>` marker. */
+  bookmarkStart?: { id: number; name: string };
+  /** Set for a `<w:bookmarkEnd w:id/>` marker. */
+  bookmarkEnd?: { id: number };
   /** Set when the run is inside a `<w:ins>` / `<w:del>` wrapper. */
   revision?: { type: "ins" | "del"; author?: string; date?: string };
   /** Set when the run is between a `<w:commentRangeStart w:id="N"/>`

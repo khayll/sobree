@@ -21,6 +21,7 @@
  * wrap-around image still floats as before.
  */
 
+import { isMarkerRun } from "../../doc/runs";
 import type {
   AnchoredContent,
   AnchoredFrame,
@@ -130,5 +131,5 @@ function buildBand(group: readonly AnchoredFrame[], host: Paragraph): InlineFram
 }
 
 function isEmptyParagraph(p: Paragraph): boolean {
-  return p.runs.every((r) => r.kind === "text" && r.text.trim() === "");
+  return p.runs.every((r) => isMarkerRun(r) || (r.kind === "text" && r.text.trim() === ""));
 }

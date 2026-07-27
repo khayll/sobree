@@ -16,6 +16,7 @@
  * renderer as `renderBody`.
  */
 
+import { isMarkerRun } from "../../../doc/runs";
 import type {
   Block,
   DrawingRun,
@@ -269,7 +270,7 @@ function dropTrailingEmptyParagraphs(blocks: Block[]): Block[] {
 }
 
 function isBlankParagraph(p: Paragraph): boolean {
-  return p.runs.every((r) => r.kind === "text" && r.text.trim() === "");
+  return p.runs.every((r) => isMarkerRun(r) || (r.kind === "text" && r.text.trim() === ""));
 }
 
 /** Prepend inline images to the first paragraph in `blocks` (cloned, so
