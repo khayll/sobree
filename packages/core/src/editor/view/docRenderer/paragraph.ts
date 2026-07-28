@@ -5,6 +5,7 @@
  * and tab-stop layouts (delegated to tabLayout.ts).
  */
 
+import { isMarkerRun } from "../../../doc/runs";
 import type { NamedStyle, Paragraph } from "../../../doc/types";
 import { headingLevelOf } from "../../../doc/walk";
 import { appendInlineRuns } from "./inline";
@@ -27,7 +28,8 @@ export function renderParagraph(
   // its first bullet on google-modern.docx. The original heading
   // semantics never matter for an empty paragraph — there's no
   // outline entry to lose.
-  const isEmpty = p.runs.length === 0 || p.runs.every((r) => (r.kind === "text" ? !r.text : false));
+  const isEmpty =
+    p.runs.length === 0 || p.runs.every((r) => (r.kind === "text" ? !r.text : isMarkerRun(r)));
   const tag = level && !isEmpty ? `h${level}` : "p";
   const el = document.createElement(tag);
   const { runDefaults: paraRunDefaults, effective } = applyParagraphProps(

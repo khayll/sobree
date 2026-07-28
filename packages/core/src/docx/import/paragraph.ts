@@ -222,6 +222,14 @@ function pushInline(run: ImportedRun, ctx: ConvertContext, out: InlineRun[]): vo
     out.push({ kind: "commentRef", id: run.commentRefId });
     return;
   }
+  if (run.bookmarkStart) {
+    out.push({ kind: "bookmarkStart", id: run.bookmarkStart.id, name: run.bookmarkStart.name });
+    return;
+  }
+  if (run.bookmarkEnd) {
+    out.push({ kind: "bookmarkEnd", id: run.bookmarkEnd.id });
+    return;
+  }
   if (run.isHardBreak) {
     out.push({ kind: "break", type: run.breakType ?? "line" });
     return;

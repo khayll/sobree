@@ -13,7 +13,9 @@ export type InlineRun =
   | DrawingRun
   | HyperlinkRun
   | FootnoteRefRun
-  | CommentRefRun;
+  | CommentRefRun
+  | BookmarkStartRun
+  | BookmarkEndRun;
 
 export interface TextRun {
   kind: "text";
@@ -80,6 +82,26 @@ export interface FootnoteRefRun {
    */
   customMark?: string;
   properties?: RunProperties;
+}
+
+/**
+ * Zero-length bookmark markers — `<w:bookmarkStart w:id w:name/>` /
+ * `<w:bookmarkEnd w:id/>`. Word's own model IS markers (most bookmarks
+ * are empty points: TOC heading targets, `_GoBack`), so the AST carries
+ * them verbatim rather than range-tagging runs. They occupy no offset
+ * (`runLength` counts them 0), render nothing, and exist so REF /
+ * PAGEREF / TOC targets survive a round-trip — and can later be
+ * resolved to rendered positions.
+ */
+export interface BookmarkStartRun {
+  kind: "bookmarkStart";
+  id: number;
+  name: string;
+}
+
+export interface BookmarkEndRun {
+  kind: "bookmarkEnd";
+  id: number;
 }
 
 export interface DrawingRun {

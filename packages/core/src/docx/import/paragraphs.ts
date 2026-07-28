@@ -101,6 +101,27 @@ function collectParagraphChildren(
         ...readRevisionAttrs(child),
       };
       collectParagraphChildren(child, out, nextRevision, activeComments);
+    } else if (child.localName === "bookmarkStart") {
+      // Zero-length marker — carried as its own run so REF/PAGEREF/TOC
+      // targets survive the round-trip at their exact offsets.
+      const idAttr = child.getAttributeNS(NS.w, "id") ?? child.getAttribute("w:id");
+      const name = child.getAttributeNS(NS.w, "name") ?? child.getAttribute("w:name");
+      const id = Number(idAttr);
+      if (Number.isFinite(id) && name !== null) {
+        out.push({
+          kind: "run",
+          run: tag({ text: "", format: {}, isHardBreak: false, bookmarkStart: { id, name } }),
+        });
+      }
+    } else if (child.localName === "bookmarkEnd") {
+      const idAttr = child.getAttributeNS(NS.w, "id") ?? child.getAttribute("w:id");
+      const id = Number(idAttr);
+      if (Number.isFinite(id)) {
+        out.push({
+          kind: "run",
+          run: tag({ text: "", format: {}, isHardBreak: false, bookmarkEnd: { id } }),
+        });
+      }
     } else if (child.localName === "commentRangeStart") {
       const id = readCommentId(child);
       if (id !== null) activeComments.add(id);

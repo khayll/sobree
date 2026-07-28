@@ -171,6 +171,12 @@ function emitInline(
     }
     case "commentRef":
       return emitRun([el("w:commentReference", { "w:id": run.id })], run.properties, ctx);
+    case "bookmarkStart":
+      // Paragraph-level marker, NOT wrapped in <w:r> — EG_PContent
+      // allows it as a sibling of runs, which is where Word writes it.
+      return el("w:bookmarkStart", { "w:id": run.id, "w:name": run.name });
+    case "bookmarkEnd":
+      return el("w:bookmarkEnd", { "w:id": run.id });
     default:
       return "";
   }
