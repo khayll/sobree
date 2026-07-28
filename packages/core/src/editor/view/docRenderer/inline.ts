@@ -1,3 +1,4 @@
+import { bookmarkDomId, domHrefFor } from "../../../doc/bookmarks";
 import { mergeRunStyleLayer, resolveRunStyle } from "../../../doc/styles";
 import type {
   HyperlinkRun,
@@ -91,6 +92,22 @@ function renderRun(
       return renderFootnoteRef(run);
     case "endnoteRef":
       return renderEndnoteRef(run);
+    case "bookmarkStart": {
+      // Zero-width anchor: gives internal hyperlinks a jump target and
+      // the paginator a DOM position to resolve PAGEREF fields against.
+      const span = document.createElement("span");
+      span.className = "sobree-bookmark";
+      span.id = bookmarkDomId(run.name);
+      span.dataset.bookmarkStart = String(run.id);
+      span.dataset.name = run.name;
+      return span;
+    }
+    case "bookmarkEnd": {
+      const span = document.createElement("span");
+      span.className = "sobree-bookmark";
+      span.dataset.bookmarkEnd = String(run.id);
+      return span;
+    }
     case "commentRef":
       return renderCommentRef(run);
     default:
@@ -256,7 +273,7 @@ function renderHyperlink(
   paragraphRunDefaults: RunProperties = {},
 ): Node {
   const a = document.createElement("a");
-  a.setAttribute("href", link.href);
+  a.setAttribute("href", domHrefFor(link.href));
   appendInlineRuns(a, link.children, rawParts, styles, paragraphRunDefaults);
   return a;
 }

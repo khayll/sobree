@@ -12,3 +12,14 @@
 export function fieldType(instruction: string): string {
   return instruction.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
 }
+
+/**
+ * The bookmark name a `PAGEREF` (or `REF`) instruction targets — the
+ * first token after the type that isn't a `\*`-style switch. Word
+ * writes `PAGEREF _Toc123 \h \* MERGEFORMAT`; the switches must not be
+ * mistaken for the target.
+ */
+export function fieldTarget(instruction: string): string | undefined {
+  const tokens = instruction.trim().split(/\s+/).slice(1);
+  return tokens.find((t) => !t.startsWith("\\"));
+}

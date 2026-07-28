@@ -25,6 +25,7 @@ import {
   paginationUnchanged,
 } from "./paginationSnapshot";
 import { Paper } from "./paper";
+import { resolvePageRefFields } from "./paperZone";
 import { type RepaginationHost, repaginate as runRepagination } from "./repagination";
 
 /**
@@ -574,6 +575,12 @@ export class PaperStack {
     // setSections) call that triggers renderAllZones also refreshes
     // anchor placement.
     this.paintAnchorLayers();
+    // Body PAGEREF fields resolve here too: page assignment is final at
+    // this point, and this hook runs on every repagination and zone
+    // repaint. A substitution that changes text width is corrected by
+    // the next repagination pass (same convergence contract as the
+    // repaginate fixpoint).
+    resolvePageRefFields(this.papers.map((p) => p.content));
   }
 
   /**
