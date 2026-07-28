@@ -76,12 +76,12 @@ lock paper sizes, margins, headers / footers, vAlign, title-page
 sections, tables, images, page numbering fields, numbering definitions,
 and multi-section documents.
 
-Footnotes and comments round-trip: export emits `word/footnotes.xml`,
-`word/comments.xml` and (for resolved / threaded comments)
-`word/commentsExtended.xml`, with reference marks and comment ranges
-reconstructed in the body. Custom footnote marks
-(`customMarkFollows`) and comment threading (`done`, reply-to)
-survive a save → open.
+Footnotes, endnotes and comments round-trip: export emits
+`word/footnotes.xml`, `word/endnotes.xml`, `word/comments.xml` and (for
+resolved / threaded comments) `word/commentsExtended.xml`, with
+reference marks and comment ranges reconstructed in the body. Custom
+note marks (`customMarkFollows`) and comment threading (`done`,
+reply-to) survive a save → open.
 
 Anchored floating drawings round-trip: pictures, text boxes, shapes
 (presets and custom geometry), and drawing GROUPS — including nested

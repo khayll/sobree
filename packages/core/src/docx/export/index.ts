@@ -6,7 +6,7 @@ import { renderContentTypesXml, renderDocumentRelsXml, renderRootRelsXml } from 
 import { makeExportContext } from "./context";
 import { renderDocumentXml } from "./document";
 import { emitHeadersAndFooters } from "./headers";
-import { emitCommentsParts, emitFootnotesPart } from "./notes";
+import { emitCommentsParts, emitEndnotesPart, emitFootnotesPart } from "./notes";
 import { renderNumberingXml } from "./numbering";
 import { renderStylesXml } from "./styles";
 import { type DocxParts, packageDocx } from "./zip";
@@ -60,6 +60,7 @@ export function exportDocx(doc: SobreeDocument): DocxExportResult {
   // the body by the run serializer above; without these parts the ids
   // would dangle and Word refuses to open the package.
   emitFootnotesPart(doc, ctx);
+  emitEndnotesPart(doc, ctx);
   emitCommentsParts(doc, ctx);
 
   // Font table — staged before the safety-net loop so embedded font

@@ -68,6 +68,7 @@ type InlineRun =
   | DrawingRun     // image (placement: "inline" | "anchor" | "floatLeft" | "floatRight")
   | HyperlinkRun   // link wrapping child runs
   | FootnoteRefRun // footnote reference mark
+  | EndnoteRefRun  // endnote reference mark (body renders at doc end)
   | CommentRefRun; // comment-range marker
 ```
 

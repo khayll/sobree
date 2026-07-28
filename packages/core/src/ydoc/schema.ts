@@ -193,6 +193,7 @@ export const Y_META_FIELDS = {
   // survive reload / collab projection (footnotes/comments would otherwise
   // vanish on refresh, defaultTabStop would revert).
   footnotes: "footnotes",
+  endnotes: "endnotes",
   comments: "comments",
   settings: "settings",
   styles: "styles",

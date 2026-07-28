@@ -10,6 +10,7 @@ const REL_TYPES = {
   numbering: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
   font: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
   footnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
+  endnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
   comments: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
   commentsExtended: "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
 } as const;

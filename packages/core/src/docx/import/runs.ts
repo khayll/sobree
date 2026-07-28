@@ -51,6 +51,10 @@ export interface ImportedRun {
   footnoteCustomMark?: string;
   /** Set when the run wraps a `<w:commentReference w:id="N"/>`. */
   commentRefId?: number;
+  /** Set when the run wraps a `<w:endnoteReference w:id="N"/>`. */
+  endnoteRefId?: number;
+  /** Custom mark for an endnote reference (`customMarkFollows`). */
+  endnoteCustomMark?: string;
   /** Set for a `<w:bookmarkStart w:id w:name/>` marker. */
   bookmarkStart?: { id: number; name: string };
   /** Set for a `<w:bookmarkEnd w:id/>` marker. */
@@ -228,6 +232,27 @@ export function readRun(r: Element): ImportedRun {
         isHardBreak: false,
         footnoteRefId: id,
         ...(customMark ? { footnoteCustomMark: customMark } : {}),
+      };
+    }
+  }
+
+  // Endnote reference — the endnote twin of the block above; body text
+  // lives in `word/endnotes.xml` → `SobreeDocument.endnotes[N]`.
+  const endnoteRef = wFirst(r, "endnoteReference");
+  if (endnoteRef) {
+    const idAttr = endnoteRef.getAttributeNS(NS.w, "id") ?? endnoteRef.getAttribute("w:id");
+    const id = Number(idAttr);
+    if (Number.isFinite(id) && id >= 1) {
+      const custom =
+        endnoteRef.getAttributeNS(NS.w, "customMarkFollows") ??
+        endnoteRef.getAttribute("w:customMarkFollows");
+      const customMark = custom === "1" || custom === "true" ? readRunText(r) : "";
+      return {
+        text: "",
+        format: {},
+        isHardBreak: false,
+        endnoteRefId: id,
+        ...(customMark ? { endnoteCustomMark: customMark } : {}),
       };
     }
   }

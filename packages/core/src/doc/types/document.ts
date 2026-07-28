@@ -51,6 +51,13 @@ export interface SobreeDocument {
    */
   footnotes?: Record<number, Block[]>;
   /**
+   * Endnote bodies keyed by id — `word/endnotes.xml`. Body inline runs
+   * use `EndnoteRefRun` with the matching `id`. Unlike footnotes
+   * (page-bottom in Word), endnotes collect at the DOCUMENT end — which
+   * is exactly where this renderer already places both.
+   */
+  endnotes?: Record<number, Block[]>;
+  /**
    * Comments keyed by id. Body inline runs whose properties carry a
    * matching `commentIds` mark the range each comment annotates.
    * Empty for docs without comments (the common case).

@@ -74,6 +74,11 @@ function noteSignatures(doc: SobreeDocument): unknown {
   return JSON.parse(JSON.stringify(doc.footnotes ?? {}));
 }
 
+/** Endnote bodies, deep equality — same bar as footnotes. */
+function endnoteSignatures(doc: SobreeDocument): unknown {
+  return JSON.parse(JSON.stringify(doc.endnotes ?? {}));
+}
+
 /** Comment threads at deep equality (metadata AND bodies — see above). */
 function commentSignatures(doc: SobreeDocument): unknown {
   return JSON.parse(JSON.stringify(doc.comments ?? {}));
@@ -169,6 +174,7 @@ function sdtGroupSignatures(doc: SobreeDocument): Array<{ prXml: string; members
 function expectedAfterExport(doc: SobreeDocument): {
   bodySignatures: string[];
   footnotes: unknown;
+  endnotes: unknown;
   comments: unknown;
   frames: unknown[];
   headerFrames: Record<string, unknown[]>;
@@ -183,6 +189,7 @@ function expectedAfterExport(doc: SobreeDocument): {
   return {
     bodySignatures: blockSignatures(body),
     footnotes: noteSignatures(doc),
+    endnotes: endnoteSignatures(doc),
     comments: commentSignatures(doc),
     frames: frameSignatures(doc),
     headerFrames: headerFrameSignatures(doc),
@@ -213,6 +220,9 @@ describe("export fixpoint — open → save preserves the document", () => {
       expect(blockSignatures(d2.body), "body content/structure").toEqual(want.bodySignatures);
       expect(noteSignatures(d2), "footnote bodies (word/footnotes.xml round-trip)").toEqual(
         want.footnotes,
+      );
+      expect(endnoteSignatures(d2), "endnote bodies (word/endnotes.xml round-trip)").toEqual(
+        want.endnotes,
       );
       expect(
         commentSignatures(d2),
