@@ -35,6 +35,13 @@ export interface ParagraphProperties {
   /** Reference to a `NamedStyle.id` of type "paragraph". */
   styleId?: string;
   alignment?: ParagraphAlignment;
+  /**
+   * `<w:bidi/>` — right-to-left paragraph direction. `alignment` stays
+   * LOGICAL (wire `jc`: left ≡ start); the RENDERER maps it to physical
+   * under bidi (left↔right swap + `dir="rtl"`), and the DOM serializer
+   * applies the inverse. Stored only when true.
+   */
+  bidi?: boolean;
   /** Numbered/bulleted list reference. */
   numbering?: { numId: number; level: number };
   spacing?: ParagraphSpacing;

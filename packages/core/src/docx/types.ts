@@ -39,6 +39,8 @@ export interface ParagraphFormat {
   /** `<w:contextualSpacing/>` toggle — omit before/after spacing between
    *  same-style neighbours (ECMA-376 §17.3.1.9). */
   contextualSpacing?: boolean;
+  /** `<w:bidi/>` — right-to-left paragraph (stored only when true). */
+  bidi?: boolean;
   /** `<w:keepNext/>` — keep on the same page as the following paragraph.
    *  Tri-state: explicit `w:val="0"` records `false` so direct formatting
    *  can override a style's flag. */

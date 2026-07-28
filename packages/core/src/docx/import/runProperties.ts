@@ -102,6 +102,21 @@ export function readRunProperties(rPr: Element): RunProperties | undefined {
     if (Number.isFinite(pt) && pt > 0) out.fontSizePt = pt;
   }
 
+  // <w:szCs> — complex-script size, kept only when it DIFFERS from
+  // `sz` (the exporter mirrors fontSizePt into szCs otherwise, so equal
+  // values round-trip without a model field).
+  const szCs = wVal(wFirst(rPr, "szCs"));
+  if (szCs) {
+    const csPt = halfPtToPt(Number(szCs));
+    if (Number.isFinite(csPt) && csPt > 0 && csPt !== out.fontSizePt) out.fontSizeCsPt = csPt;
+  }
+
+  // <w:rtl/> — complex-script right-to-left run. Only an explicit ON is
+  // stored: RTL-enabled Word stamps `w:rtl w:val="0"` on every run of
+  // plain LTR documents (835 of them in one corpus CV), and carrying
+  // those as `false` would bloat every such doc for zero meaning.
+  if (wToggleOn(wFirst(rPr, "rtl")) === true) out.rtl = true;
+
   // <w:vertAlign w:val="superscript"/>
   const vAlign = wVal(wFirst(rPr, "vertAlign"));
   if (vAlign === "subscript" || vAlign === "superscript") out.verticalAlign = vAlign;

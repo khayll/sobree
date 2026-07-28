@@ -286,6 +286,10 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
   const contextualSpacing = wToggleOn(wFirst(pPr, "contextualSpacing"));
   if (contextualSpacing !== undefined) format.contextualSpacing = contextualSpacing;
 
+  // <w:bidi/> — right-to-left paragraph. Explicit-off (`w:val="0"`)
+  // normalizes to absent, same reasoning as the run-level `w:rtl` read.
+  if (wToggleOn(wFirst(pPr, "bidi")) === true) format.bidi = true;
+
   // <w:keepNext/> / <w:keepLines/> / <w:pageBreakBefore/> on the direct
   // pPr — same properties the style reader pulls off `<w:style>` pPr
   // (two homes, one meaning). The paginator consumes them via the

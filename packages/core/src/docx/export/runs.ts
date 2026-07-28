@@ -317,11 +317,18 @@ function rprChildElements(props: RunProperties): string[] {
   if (props.fontSizePt) {
     const hp = ptToHalfPt(props.fontSizePt);
     parts.push(el("w:sz", { "w:val": hp }));
-    parts.push(el("w:szCs", { "w:val": hp }));
+    // szCs mirrors sz unless the run carries a distinct complex-script
+    // size (the only case the importer stores `fontSizeCsPt`).
+    parts.push(el("w:szCs", { "w:val": ptToHalfPt(props.fontSizeCsPt ?? props.fontSizePt) }));
+  } else if (props.fontSizeCsPt) {
+    parts.push(el("w:szCs", { "w:val": ptToHalfPt(props.fontSizeCsPt) }));
   }
   if (props.verticalAlign) {
     parts.push(el("w:vertAlign", { "w:val": props.verticalAlign }));
   }
+  // <w:rtl/> LAST in EG_RPrBase order among what we emit — Word writes
+  // it at the tail of the rPr.
+  if (props.rtl) parts.push(el("w:rtl"));
   if (props.caps) parts.push(el("w:caps"));
   if (props.smallCaps) parts.push(el("w:smallCaps"));
   if (props.hidden) parts.push(el("w:vanish"));

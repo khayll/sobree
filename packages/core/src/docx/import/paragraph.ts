@@ -158,6 +158,7 @@ function mapParagraphFormat(f: ParagraphFormat): ParagraphProperties {
   if (f.spacingBeforeTwips !== undefined) spacing.beforeTwips = f.spacingBeforeTwips;
   if (Object.keys(spacing).length > 0) out.spacing = spacing;
   if (f.contextualSpacing !== undefined) out.contextualSpacing = f.contextualSpacing;
+  if (f.bidi) out.bidi = true;
   // Pagination flags keep their explicit value (including `false`) — a
   // direct `<w:keepNext w:val="0"/>` must reach the AST so it overrides
   // the flag inherited from the style cascade at render time.

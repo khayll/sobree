@@ -148,8 +148,20 @@ export function applyParagraphProps(
   if (props.styleId && !/^Heading[1-6]$/.test(props.styleId)) {
     el.setAttribute("data-style-id", props.styleId);
   }
+  // Bidi: `alignment` is LOGICAL (wire `jc`: left ≡ start), so under
+  // `<w:bidi/>` the physical mapping swaps left↔right; `dir="rtl"` gives
+  // the browser the paragraph direction (absent alignment then falls to
+  // `text-align: start` = physical right, Word's RTL default). The DOM
+  // serializer applies the exact inverse — keep the two in sync.
+  if (effective.bidi) el.dir = "rtl";
   if (effective.alignment) {
-    el.style.textAlign = effective.alignment === "both" ? "justify" : effective.alignment;
+    const physical =
+      effective.bidi && (effective.alignment === "left" || effective.alignment === "right")
+        ? effective.alignment === "left"
+          ? "right"
+          : "left"
+        : effective.alignment;
+    el.style.textAlign = physical === "both" ? "justify" : physical;
   }
   if (effective.spacing?.line && effective.spacing.lineRule === "auto") {
     // OOXML's `auto` lineRule means "1 = single line spacing as Word
