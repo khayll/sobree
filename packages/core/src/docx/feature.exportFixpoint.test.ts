@@ -67,38 +67,16 @@ function blockSignatures(blocks: readonly Block[]): string[] {
   return blocks.map((b) => (b.kind === "paragraph" ? `p:${text(b.runs)}` : b.kind));
 }
 
-/**
- * Footnote bodies at the SAME bar as the document body — content &
- * structure signatures, not deep equality. Formatting fidelity of what
- * the exporter supports is covered by the focused `export/notes.test.ts`
- * suite; deep equality here would additionally demand paragraph
- * properties the exporter doesn't emit for ANY paragraph yet
- * (`runDefaults`, `tabStops` — a generic `renderPPr` gap, tracked in
- * devdocs/plan-ooxml-full-support.md).
- */
-function noteSignatures(doc: SobreeDocument): Record<string, string[]> {
-  const out: Record<string, string[]> = {};
-  for (const [id, blocks] of Object.entries(doc.footnotes ?? {})) {
-    out[id] = blockSignatures(blocks);
-  }
-  return out;
+/** Footnote bodies at DEEP equality — the `renderPPr` gaps that forced
+ *  a signature-only bar (`runDefaults` / `tabStops`, plan item 2e) are
+ *  closed, so the whole block structure must survive. */
+function noteSignatures(doc: SobreeDocument): unknown {
+  return JSON.parse(JSON.stringify(doc.footnotes ?? {}));
 }
 
-/** Comment threads: deep equality on the METADATA (author / initials /
- *  date / done / replyToId), body at the signature bar (see above). */
-function commentSignatures(doc: SobreeDocument): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [id, c] of Object.entries(doc.comments ?? {})) {
-    out[id] = {
-      author: c.author ?? null,
-      initials: c.initials ?? null,
-      date: c.date ?? null,
-      done: c.done ?? false,
-      replyToId: c.replyToId ?? null,
-      body: blockSignatures(c.body),
-    };
-  }
-  return out;
+/** Comment threads at deep equality (metadata AND bodies — see above). */
+function commentSignatures(doc: SobreeDocument): unknown {
+  return JSON.parse(JSON.stringify(doc.comments ?? {}));
 }
 
 /** Project the imported document onto what the CURRENT exporter is

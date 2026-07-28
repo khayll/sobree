@@ -9,6 +9,7 @@ import type {
   TableRow,
 } from "../../doc/types";
 import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
+import { ptToHalfPt } from "../shared/units";
 import { el, xmlDocument } from "../shared/xml";
 import { anchorRunsByParagraph } from "./anchors";
 import { type ExportContext, nextRevisionId } from "./context";
@@ -286,6 +287,25 @@ function renderPPr(
   if (props.alignment && props.alignment !== "left") {
     parts.push(el("w:jc", { "w:val": props.alignment }));
   }
+  if (props.tabStops && props.tabStops.length > 0) {
+    // `<w:tabs>` — custom stop list; the importer's `readTabStops` reads
+    // exactly these three attributes back.
+    parts.push(
+      el(
+        "w:tabs",
+        null,
+        props.tabStops
+          .map((t) =>
+            el("w:tab", {
+              "w:val": t.alignment,
+              ...(t.leader ? { "w:leader": t.leader } : {}),
+              "w:pos": t.positionTwips,
+            }),
+          )
+          .join(""),
+      ),
+    );
+  }
   if (props.spacing) {
     const attrs: Record<string, string | number> = {};
     if (props.spacing.beforeTwips !== undefined) attrs["w:before"] = props.spacing.beforeTwips;
@@ -342,6 +362,28 @@ function renderPPr(
   // Trailing sectPr — last in pPr child order per CT_PPr. Means "this
   // paragraph is the last one of its section; here are the section's
   // properties." Section-end semantics in OOXML.
+  // Paragraph-mark run defaults (`<w:pPr><w:rPr>`) — the font an empty
+  // paragraph renders at, and what the importer reads back into
+  // `runDefaults`. Last of the formatting children, before any sectPr,
+  // per CT_PPr ordering.
+  if (props.runDefaults) {
+    const rd: string[] = [];
+    if (props.runDefaults.fontFamily) {
+      rd.push(
+        el("w:rFonts", {
+          "w:ascii": props.runDefaults.fontFamily,
+          "w:hAnsi": props.runDefaults.fontFamily,
+          "w:cs": props.runDefaults.fontFamily,
+        }),
+      );
+    }
+    if (props.runDefaults.fontSizePt !== undefined) {
+      const hp = ptToHalfPt(props.runDefaults.fontSizePt);
+      rd.push(el("w:sz", { "w:val": hp }));
+      rd.push(el("w:szCs", { "w:val": hp }));
+    }
+    if (rd.length > 0) parts.push(el("w:rPr", null, rd));
+  }
   if (trailingSectPr) parts.push(trailingSectPr);
   return parts.length > 0 ? el("w:pPr", null, parts) : "";
 }
