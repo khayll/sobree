@@ -1,5 +1,35 @@
 # @sobree/core
 
+## 0.1.73
+
+### Patch Changes
+
+- ecb135e: Bookmarks survive a save. `w:bookmarkStart`/`w:bookmarkEnd` markers —
+  TOC heading targets, cross-reference anchors, `_GoBack` — previously
+  dropped on import, breaking every REF/PAGEREF/TOC field in Word on the
+  next open. They now round-trip as zero-length marker runs at their exact
+  offsets: no rendered output, no cursor-position impact, carried through
+  collaboration. This is the foundation for native cross-reference and
+  table-of-contents support.
+- 564adf7: Endnotes now round-trip: `word/endnotes.xml` imports into the document
+  model, reference marks render as clickable superscripts linking to an
+  endnotes list at the document end, and saving emits the part back with
+  custom reference marks (`customMarkFollows`) preserved.
+- 7319674: Paragraph tab stops (`<w:tabs>`) and paragraph-mark run defaults (the
+  `<w:pPr><w:rPr>` font/size an empty paragraph renders at) now survive a
+  save. Both imported and rendered but were dropped by the exporter for
+  every paragraph — label/value layouts lost their custom stops and empty
+  paragraphs their mark font on an open → save cycle. The export fixpoint's
+  footnote and comment body comparison is back at full deep equality, which
+  these two gaps had forced down to structure-only.
+- 1b99adf: Internal hyperlinks and live PAGEREF page numbers. `<w:hyperlink
+w:anchor>` now imports as a fragment href, exports back as `w:anchor`,
+  and renders as a working in-document link; bookmark markers render as
+  addressable zero-width spans. PAGEREF fields nested inside hyperlinks
+  (the shape every Word TOC entry uses) survive import as fields, and
+  after pagination their page numbers update live to match the actual
+  layout — TOC page numbers stay correct as the document is edited.
+
 ## 0.1.72
 
 ### Patch Changes
