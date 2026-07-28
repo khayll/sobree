@@ -1,7 +1,7 @@
 import { NS } from "../shared/namespaces";
 import { readShading } from "../shared/shading";
 import { ooxmlLineHeightToCss } from "../shared/units";
-import { wChildren, wFirst, wToggleOn, wVal } from "../shared/xml";
+import { wFirst, wToggleOn, wVal } from "../shared/xml";
 import type { ParagraphFormat } from "../types";
 import { readParagraphBorders } from "./borders";
 import { ComplexFieldCollector } from "./fields";
@@ -84,8 +84,32 @@ function collectParagraphChildren(
       for (const seg of readRunSegments(child)) out.push({ kind: "run", run: tag(seg) });
     } else if (child.localName === "hyperlink") {
       const relId = child.getAttributeNS(NS.r, "id") ?? child.getAttribute("r:id") ?? undefined;
-      const runs = wChildren(child, "r").flatMap((r) => readRunSegments(r).map(tag));
-      out.push({ kind: "hyperlink", ...(relId ? { relId } : {}), runs });
+      const anchor =
+        child.getAttributeNS(NS.w, "anchor") ?? child.getAttribute("w:anchor") ?? undefined;
+      // A TOC entry is a hyperlink whose children embed a PAGEREF
+      // complex field (the page number). Route the children through
+      // their own field collector so that field survives as a field —
+      // the flat readRunSegments walk turned it into loose text.
+      const runs: ImportedRun[] = [];
+      const nested = new ComplexFieldCollector((item) => {
+        if (item.kind === "run") runs.push(item.run);
+        else runs.push(...item.runs);
+      }, tag);
+      for (const el of Array.from(child.children)) {
+        if (el.namespaceURI !== NS.w) continue;
+        if (el.localName === "r") {
+          if (nested.handleRun(el)) continue;
+          runs.push(...readRunSegments(el).map(tag));
+        } else if (el.localName === "fldSimple") {
+          runs.push(tag(fldSimpleRun(el)));
+        }
+      }
+      out.push({
+        kind: "hyperlink",
+        ...(relId ? { relId } : {}),
+        ...(anchor ? { anchor } : {}),
+        runs,
+      });
     } else if (child.localName === "sdt") {
       // Run-level content control (`<w:sdt>` INSIDE a paragraph — e.g.
       // a cover-page "E-mail Address" binding). The block-level SDT
@@ -129,26 +153,30 @@ function collectParagraphChildren(
       const id = readCommentId(child);
       if (id !== null) activeComments.delete(id);
     } else if (child.localName === "fldSimple") {
-      // Simple field — `<w:fldSimple w:instr="PAGE"><w:r><w:t>1</w:t></w:r></w:fldSimple>`
-      // Emit one `ImportedRun` with `field` set so the paragraph
-      // converter produces a `FieldRun`. Used by headers/footers to
-      // carry page-number tokens through round-trip.
-      const instr = child.getAttributeNS(NS.w, "instr") ?? child.getAttribute("w:instr") ?? "";
-      const innerR = wFirst(child, "r");
-      const cachedText = innerR ? (wFirst(innerR, "t")?.textContent ?? "") : "";
-      const run: ImportedRun = {
-        text: "",
-        format: {},
-        isHardBreak: false,
-        field:
-          cachedText !== "" ? { instruction: instr, cached: cachedText } : { instruction: instr },
-      };
-      out.push({ kind: "run", run: tag(run) });
+      out.push({ kind: "run", run: tag(fldSimpleRun(child)) });
     }
     // pPr / commentReference (the balloon-icon run) handled by the
     // caller or silently dropped — the highlighted range carries the
     // visual signal, so the reference glyph is redundant.
   }
+}
+
+/**
+ * Simple field — `<w:fldSimple w:instr="PAGE"><w:r><w:t>1</w:t></w:r></w:fldSimple>`.
+ * One `ImportedRun` with `field` set so the paragraph converter produces
+ * a `FieldRun`. Appears both as a paragraph child (header/footer page
+ * tokens) and inside `<w:hyperlink>` (our own exported TOC entries).
+ */
+function fldSimpleRun(child: Element): ImportedRun {
+  const instr = child.getAttributeNS(NS.w, "instr") ?? child.getAttribute("w:instr") ?? "";
+  const innerR = wFirst(child, "r");
+  const cachedText = innerR ? (wFirst(innerR, "t")?.textContent ?? "") : "";
+  return {
+    text: "",
+    format: {},
+    isHardBreak: false,
+    field: cachedText !== "" ? { instruction: instr, cached: cachedText } : { instruction: instr },
+  };
 }
 
 function readCommentId(el: Element): number | null {

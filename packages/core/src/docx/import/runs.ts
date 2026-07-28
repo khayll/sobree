@@ -88,7 +88,7 @@ export type ImportedItem =
   /** `href` is set for HYPERLINK *fields* (the target lives in the field
    *  instruction); `relId` for `<w:hyperlink r:id>` elements (resolved
    *  against the rels table downstream). */
-  | { kind: "hyperlink"; relId?: string; href?: string; runs: ImportedRun[] };
+  | { kind: "hyperlink"; relId?: string; href?: string; anchor?: string; runs: ImportedRun[] };
 
 /**
  * Read a `<w:r>` into a SEQUENCE of imported runs. A run's content is an

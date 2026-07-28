@@ -1,4 +1,4 @@
-import { fieldType } from "../doc/fields";
+import { fieldTarget, fieldType } from "../doc/fields";
 import type { AnchoredFrame, Block, NamedStyle, NumberingDefinition } from "../doc/types";
 import { type AnchorLayerContext, renderAnchorLayer } from "../editor/view/docRenderer/anchorLayer";
 import { renderBlocks } from "../editor/view/docRenderer/block";
@@ -101,5 +101,34 @@ function substituteFieldNodes(zone: HTMLElement, pageNumber: number, totalPages:
     else if (type === "NUMPAGES") field.textContent = String(totalPages);
     // Unknown instructions keep whatever the AST cached (Word writes a
     // cached value for non-resolvable fields, e.g. SECTION). No-op.
+  }
+}
+
+/**
+ * Resolve body `PAGEREF` fields against rendered bookmark positions —
+ * the cross-page sibling of `substituteFieldNodes` (which handles the
+ * per-page PAGE / NUMPAGES pair). `containers` are the per-page content
+ * hosts IN PAGE ORDER; a bookmark's page is the 1-based index of the
+ * first container holding its start marker. A field whose target isn't
+ * rendered keeps its cached text, matching Word's dangling-PAGEREF
+ * behaviour. Idempotent, so re-running on zone repaints is free.
+ */
+export function resolvePageRefFields(containers: readonly HTMLElement[]): void {
+  const pageOf = new Map<string, number>();
+  containers.forEach((c, i) => {
+    for (const marker of Array.from(c.querySelectorAll<HTMLElement>("[data-bookmark-start]"))) {
+      const name = marker.dataset.name;
+      if (name && !pageOf.has(name)) pageOf.set(name, i + 1);
+    }
+  });
+  if (pageOf.size === 0) return;
+  for (const c of containers) {
+    for (const field of Array.from(c.querySelectorAll<HTMLElement>("[data-field]"))) {
+      const instr = field.dataset.field ?? "";
+      if (fieldType(instr) !== "PAGEREF") continue;
+      const target = fieldTarget(instr);
+      const page = target !== undefined ? pageOf.get(target) : undefined;
+      if (page !== undefined) field.textContent = String(page);
+    }
   }
 }

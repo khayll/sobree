@@ -192,7 +192,13 @@ function itemsToInlines(items: ImportedItem[], ctx: ConvertContext): InlineRun[]
     } else {
       const inner: InlineRun[] = [];
       for (const run of item.runs) pushInline(run, ctx, inner);
-      const href = item.href ?? (item.relId ? ctx.rels.get(item.relId) : undefined);
+      const href =
+        item.href ??
+        (item.anchor !== undefined
+          ? `#${item.anchor}`
+          : item.relId
+            ? ctx.rels.get(item.relId)
+            : undefined);
       const link: HyperlinkRun = {
         kind: "hyperlink",
         href: href ?? "#",

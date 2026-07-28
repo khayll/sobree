@@ -192,6 +192,11 @@ function emitInline(
 function emitHyperlink(link: HyperlinkRun, ctx: ExportContext, doc: SobreeDocument): string {
   const innerRuns = inlinesToRuns(link.children, ctx, doc);
   if (!link.href) return innerRuns;
+  // Internal anchor (`#bookmarkName`) — the wire form is a `w:anchor`
+  // attribute, never a relationship (Word rejects rels for fragments).
+  if (link.href.startsWith("#")) {
+    return el("w:hyperlink", { "w:anchor": link.href.slice(1), "w:history": 1 }, innerRuns);
+  }
   const rId = allocHyperlinkRel(ctx, link.href);
   return el("w:hyperlink", { "r:id": rId, "w:history": 1 }, innerRuns);
 }

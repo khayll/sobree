@@ -1,3 +1,4 @@
+import { modelHrefFrom } from "../../../doc/bookmarks";
 import type { HyperlinkRun, InlineRun, RunProperties } from "../../../doc/types";
 
 /**
@@ -32,6 +33,28 @@ function walk(node: Node, inherited: RunProperties, out: InlineRun[]): void {
     return;
   }
 
+  // First-class read-back for renderer-emitted data spans — BEFORE the
+  // tag switch, since they are all `<span>`s. Without these, a field's
+  // cached text degrades to a plain run and bookmark markers vanish on
+  // the DOM read-back path (the gap noted when markers landed).
+  if (node.dataset.field !== undefined) {
+    const field: InlineRun = { kind: "field", instruction: node.dataset.field };
+    const cached = node.textContent ?? "";
+    out.push(cached !== "" ? { ...field, cached } : field);
+    return;
+  }
+  if (node.dataset.bookmarkStart !== undefined) {
+    const id = Number(node.dataset.bookmarkStart);
+    const name = node.dataset.name ?? "";
+    if (Number.isFinite(id) && name !== "") out.push({ kind: "bookmarkStart", id, name });
+    return;
+  }
+  if (node.dataset.bookmarkEnd !== undefined) {
+    const id = Number(node.dataset.bookmarkEnd);
+    if (Number.isFinite(id)) out.push({ kind: "bookmarkEnd", id });
+    return;
+  }
+
   const tag = node.tagName.toLowerCase();
 
   switch (tag) {
@@ -54,7 +77,7 @@ function walk(node: Node, inherited: RunProperties, out: InlineRun[]): void {
       return;
     }
     case "a": {
-      const href = node.getAttribute("href") ?? "";
+      const href = modelHrefFrom(node.getAttribute("href") ?? "");
       const children: InlineRun[] = [];
       const linkProps = withStyle(node, inherited, {});
       for (const child of Array.from(node.childNodes)) walk(child, linkProps, children);
