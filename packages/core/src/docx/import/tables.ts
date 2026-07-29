@@ -2,6 +2,7 @@ import type { Block, Table, TableCell, TableLook, TableRow } from "../../doc/typ
 import { readShading } from "../shared/shading";
 import { readCellBorders, readCellMargins, readTableBorders } from "../shared/tableBorders";
 import { wChildren, wFirst, wVal } from "../shared/xml";
+import { BlockMarkerBuffer } from "./blockMarkers";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 
 /**
@@ -163,8 +164,12 @@ function readCell(tc: Element, ctx: ConvertContext): TableCell {
   }
 
   // Cell content: every direct child `<w:p>` or `<w:tbl>` becomes a Block.
+  // Cell-level bookmark markers (`_GoBack` lands here) normalize into the
+  // nearest paragraph via the same buffer the body walk uses.
+  const markers = new BlockMarkerBuffer();
   for (const child of Array.from(tc.children)) {
     if (child.namespaceURI === null) continue;
+    if (markers.handle(child, cell.content)) continue;
     if (child.localName === "p") {
       // A host paragraph whose drawing became an InlineFrame is replaced
       // wholesale — same contract as the body walker (the drawing has
@@ -172,11 +177,14 @@ function readCell(tc: Element, ctx: ConvertContext): TableCell {
       // paragraph would render an empty husk and drop the frame).
       const replacement = ctx.replaceParagraphs?.get(child);
       cell.content.push(replacement ?? convertParagraph(child, ctx));
+      markers.afterBlockPushed(cell.content);
     } else if (child.localName === "tbl") {
       cell.content.push(convertTable(child, ctx));
+      markers.afterBlockPushed(cell.content);
     }
     // pPr/tcPr/etc. are handled above; other elements are dropped.
   }
+  markers.finish(cell.content);
 
   // Word requires at least one paragraph per cell. If Phase N2 flattened
   // something weird and left us empty, supply a blank paragraph so the

@@ -1,5 +1,6 @@
 import type { Block, SdtWrap } from "../../doc/types";
 import { wFirst } from "../shared/xml";
+import { BlockMarkerBuffer } from "./blockMarkers";
 import { type ConvertContext, convertParagraph } from "./paragraph";
 import { convertTable } from "./tables";
 
@@ -143,8 +144,13 @@ export function convertBlocksFromContainer(
 
   const replaceParagraphs = ctx.replaceParagraphs ?? opts?.replaceParagraphs;
 
+  // Block-level bookmark markers buffer until a paragraph can host them
+  // (see blockMarkers.ts for the normalization rules).
+  const markers = new BlockMarkerBuffer();
+
   for (const child of directChildren) {
     if (child.namespaceURI === null) continue;
+    if (markers.handle(child, blocks)) continue;
     const name = child.localName;
     if (name === "p") {
       const replacement = replaceParagraphs?.get(child);
@@ -161,6 +167,7 @@ export function convertBlocksFromContainer(
         if (wrap) p.properties.sdt = wrap;
         blocks.push(p);
       }
+      markers.afterBlockPushed(blocks);
       const inlineSectPr = inlineSectPrOf(child);
       if (inlineSectPr) {
         // The just-pushed paragraph is the last one of its section.
@@ -175,6 +182,7 @@ export function convertBlocksFromContainer(
       const tableWrap = sdtByElement.get(child);
       if (tableWrap) t.properties.sdt = tableWrap;
       blocks.push(t);
+      markers.afterBlockPushed(blocks);
     } else if (name === "sectPr") {
       // Body-level sectPr — the document-final section.
       sectPrEls.push(child);
@@ -182,6 +190,7 @@ export function convertBlocksFromContainer(
       // Unknown / unhandled elements dropped silently.
     }
   }
+  markers.finish(blocks);
   return { body: blocks, warnings, sectPrEls };
 }
 
