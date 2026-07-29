@@ -78,7 +78,9 @@ and multi-section documents.
 
 Internal hyperlinks (`w:anchor`) and bookmarks round-trip, and
 `PAGEREF` fields — including the ones inside Word TOC entries — show
-live page numbers that follow the editor's own pagination.
+live page numbers that follow the editor's own pagination. The TOC
+field itself keeps its identity through a save, so Word's "Update
+Table of Contents" still works on the exported document.
 
 Footnotes, endnotes and comments round-trip: export emits
 `word/footnotes.xml`, `word/endnotes.xml`, `word/comments.xml` and (for

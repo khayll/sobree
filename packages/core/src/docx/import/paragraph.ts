@@ -48,8 +48,9 @@ export function convertParagraph(
   p: Element,
   ctx: ConvertContext,
   activeComments?: Set<number>,
+  fieldSignals?: import("./paragraphs").FieldSignals,
 ): Paragraph {
-  const { items, format } = readParagraph(p, activeComments);
+  const { items, format } = readParagraph(p, activeComments, fieldSignals);
   const properties = mapParagraphFormat(format);
   const inlineRuns = itemsToInlines(items, ctx);
   const honorLastRenderedPageBreaks = ctx.honorLastRenderedPageBreaks === true;

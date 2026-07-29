@@ -10,7 +10,7 @@ import type {
 } from "../../doc/types";
 import { ROOT_DOCUMENT_ATTRS } from "../shared/namespaces";
 import { ptToHalfPt } from "../shared/units";
-import { el, xmlDocument } from "../shared/xml";
+import { el, escapeXmlText, xmlDocument } from "../shared/xml";
 import { anchorRunsByParagraph } from "./anchors";
 import { type ExportContext, nextRevisionId } from "./context";
 import { renderInlineFrameRuns } from "./inlineFrames";
@@ -48,7 +48,7 @@ export function renderDocumentXml(
   // first paragraph so nothing is silently dropped.
   const anchorRuns = normalizeAnchorKeys(anchorRunsByParagraph(doc, ctx, renderBlocks), doc.body);
 
-  const rendered: { xml: string; sdt?: SdtWrap }[] = [];
+  const rendered: { xml: string; sdt?: SdtWrap; fw?: FieldWrapRef }[] = [];
   for (let i = 0; i < doc.body.length; i++) {
     const block = doc.body[i];
     if (!block) continue;
@@ -62,6 +62,7 @@ export function renderDocumentXml(
       rendered.push({
         xml: renderParagraph(block, ctx, doc, trailing, leading),
         ...(block.properties.sdt ? { sdt: block.properties.sdt } : {}),
+        ...(block.properties.fieldWrap ? { fw: block.properties.fieldWrap } : {}),
       });
     } else {
       const sdt = block.kind === "table" ? block.properties.sdt : undefined;
@@ -70,6 +71,7 @@ export function renderDocumentXml(
       }
     }
   }
+  injectFieldChars(rendered);
   const bodyChildren: string[] = foldSdtGroups(rendered);
   // The body is a content stream too — close any comment range dangling
   // past the last run (renderDocumentXml walks the body itself for sectPr
@@ -139,7 +141,7 @@ export function renderBlocks(
    *  The body walk does its own injection (it also splices sectPrs). */
   anchorRuns?: Map<number, string>,
 ): string[] {
-  const rendered: { xml: string; sdt?: SdtWrap }[] = [];
+  const rendered: { xml: string; sdt?: SdtWrap; fw?: FieldWrapRef }[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (!block) continue;
@@ -147,6 +149,7 @@ export function renderBlocks(
       rendered.push({
         xml: renderParagraph(block, ctx, doc, undefined, anchorRuns?.get(i)),
         ...(block.properties.sdt ? { sdt: block.properties.sdt } : {}),
+        ...(block.properties.fieldWrap ? { fw: block.properties.fieldWrap } : {}),
       });
     } else {
       const sdt = block.kind === "table" ? block.properties.sdt : undefined;
@@ -155,10 +158,65 @@ export function renderBlocks(
       }
     }
   }
+  injectFieldChars(rendered);
   const out = foldSdtGroups(rendered);
   const dangling = closeAllCommentRanges(ctx);
   if (dangling) out.push(dangling);
   return out;
+}
+
+type FieldWrapRef = { id: number; instruction: string };
+
+/**
+ * Re-emit multi-paragraph complex fields (`ParagraphProperties.fieldWrap`
+ * — TOC) around their member paragraphs: fldChar begin + the stored
+ * instruction + separate at the FRONT of the first member's content,
+ * and the fldChar end at the TAIL of the last member. Word then treats
+ * the span as a live field again ("Update Table of Contents").
+ *
+ * String surgery on the serialized paragraphs is deliberate, same
+ * trade-off as the comments paraId stamp: threading a "prepend these
+ * runs / append these runs" option through renderParagraph for this one
+ * wire detail would put a field concern into every caller's signature.
+ * Members with gaps (a non-member block edited into the span) stay
+ * INSIDE the field — begin/end land at the outermost members, which is
+ * the wire shape Word itself produces for fields spanning mixed content.
+ */
+function injectFieldChars(items: { xml: string; fw?: FieldWrapRef }[]): void {
+  const spans = new Map<number, { first: number; last: number; instruction: string }>();
+  items.forEach((it, i) => {
+    if (!it.fw) return;
+    const span = spans.get(it.fw.id);
+    if (span) span.last = i;
+    else spans.set(it.fw.id, { first: i, last: i, instruction: it.fw.instruction });
+  });
+  for (const span of spans.values()) {
+    const open =
+      el("w:r", null, el("w:fldChar", { "w:fldCharType": "begin" })) +
+      el(
+        "w:r",
+        null,
+        el("w:instrText", { "xml:space": "preserve" }, escapeXmlText(` ${span.instruction} `)),
+      ) +
+      el("w:r", null, el("w:fldChar", { "w:fldCharType": "separate" }));
+    const close = el("w:r", null, el("w:fldChar", { "w:fldCharType": "end" }));
+    const first = items[span.first];
+    if (first) first.xml = insertAfterPPr(expandSelfClosedP(first.xml), open);
+    const last = items[span.last];
+    if (last) last.xml = expandSelfClosedP(last.xml).replace(/<\/w:p>$/, `${close}</w:p>`);
+  }
+}
+
+/** `<w:p/>` / `<w:p attrs/>` → `<w:p …></w:p>` so runs can be spliced in. */
+function expandSelfClosedP(xml: string): string {
+  return /^<w:p[^>]*\/>$/.test(xml) ? `${xml.slice(0, -2)}></w:p>` : xml;
+}
+
+/** Insert `inner` right after the opening `<w:p>` tag and its `<w:pPr>` block, if any. */
+function insertAfterPPr(xml: string, inner: string): string {
+  const m = xml.match(/^<w:p[^>]*>(?:<w:pPr\/>|<w:pPr>[\s\S]*?<\/w:pPr>)?/);
+  if (!m) return xml;
+  return xml.slice(0, m[0].length) + inner + xml.slice(m[0].length);
 }
 
 /**
