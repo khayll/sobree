@@ -1,7 +1,9 @@
+import { fieldType } from "../../doc/fields";
 import type { Block, SdtWrap } from "../../doc/types";
 import { wFirst } from "../shared/xml";
 import { BlockMarkerBuffer } from "./blockMarkers";
 import { type ConvertContext, convertParagraph } from "./paragraph";
+import type { FieldSignals } from "./paragraphs";
 import { convertTable } from "./tables";
 
 // Re-export so existing callers (and the import barrel) keep their
@@ -148,6 +150,17 @@ export function convertBlocksFromContainer(
   // (see blockMarkers.ts for the normalization rules).
   const markers = new BlockMarkerBuffer();
 
+  // Multi-paragraph complex fields (TOC): a field left open at one
+  // paragraph's end spans forward until a paragraph reports an
+  // unmatched `end` fldChar. Every spanned paragraph (opening and
+  // closing ones included) gets the same `fieldWrap` membership; the
+  // exporter re-emits the field chars from first/last membership.
+  // Restricted to TOC — the one field Word routinely writes across
+  // paragraphs — so a malformed unterminated PAGE field can't wrap the
+  // rest of the document.
+  let openField: { id: number; instruction: string } | null = null;
+  let fieldCounter = 0;
+
   for (const child of directChildren) {
     if (child.namespaceURI === null) continue;
     if (markers.handle(child, blocks)) continue;
@@ -162,9 +175,18 @@ export function convertBlocksFromContainer(
         // original text/runs don't double-render.
         blocks.push(replacement);
       } else {
-        const p = convertParagraph(child, ctx, activeComments);
+        const signals: FieldSignals = { unmatchedEnds: 0 };
+        const p = convertParagraph(child, ctx, activeComments, signals);
         const wrap = sdtByElement.get(child);
         if (wrap) p.properties.sdt = wrap;
+        if (openField) {
+          p.properties.fieldWrap = openField;
+          if (signals.unmatchedEnds > 0) openField = null;
+        }
+        if (!openField && signals.opened && fieldType(signals.opened) === "TOC") {
+          openField = { id: fieldCounter++, instruction: signals.opened };
+          p.properties.fieldWrap = openField;
+        }
         blocks.push(p);
       }
       markers.afterBlockPushed(blocks);

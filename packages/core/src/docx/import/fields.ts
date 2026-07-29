@@ -29,6 +29,9 @@ export class ComplexFieldCollector {
   private instr = "";
   private cached = "";
   private resultRuns: ImportedRun[] = [];
+  /** `end` fldChars seen with NO field open — the closing half of a
+   *  field that OPENED in an earlier paragraph (TOC's last paragraph). */
+  unmatchedEnds = 0;
 
   constructor(
     private readonly emit: (item: ImportedItem) => void,
@@ -96,6 +99,7 @@ export class ComplexFieldCollector {
         } else if (type === "separate") {
           this.state = "result";
         } else if (type === "end") {
+          if (this.state === "before") this.unmatchedEnds += 1;
           this.flush();
         }
       } else if (el.localName === "instrText") {
@@ -107,6 +111,35 @@ export class ComplexFieldCollector {
       }
     }
     flushText();
+  }
+
+  /**
+   * The instruction of a field still open when the paragraph ends —
+   * the opening half of a MULTI-PARAGRAPH field (`TOC`). Word writes
+   * begin + instrText + separate in the first spanned paragraph and the
+   * `end` fldChar paragraphs later, so per-paragraph collection can
+   * never pair them; the body walk stamps the span from this signal.
+   */
+  openInstruction(): string | null {
+    return this.state === "before" ? null : this.instr.trim() || null;
+  }
+
+  /**
+   * Paragraph-end flush for an open field's RESULT zone: emit the
+   * already-read result runs as ORDINARY runs so the first paragraph's
+   * cached content (a non-hyperlinked TOC entry, for instance) is not
+   * silently dropped with the collector. The field identity itself is
+   * carried by `openInstruction()` — read it BEFORE calling this, the
+   * reset clears it.
+   */
+  flushOpenAsRuns(): void {
+    if (this.state === "result") {
+      for (const run of this.resultRuns) this.emit({ kind: "run", run });
+    }
+    this.state = "before";
+    this.instr = "";
+    this.cached = "";
+    this.resultRuns = [];
   }
 
   /**
