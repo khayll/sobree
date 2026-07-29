@@ -23,6 +23,10 @@ export interface ExportContext {
       | "numbering"
       | "footnotes"
       | "endnotes"
+      | "settings"
+      | "webSettings"
+      | "theme"
+      | "customXml"
       | "comments"
       | "commentsExtended";
     target: string;

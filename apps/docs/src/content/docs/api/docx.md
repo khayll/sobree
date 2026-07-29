@@ -76,6 +76,10 @@ lock paper sizes, margins, headers / footers, vAlign, title-page
 sections, tables, images, page numbering fields, numbering definitions,
 and multi-section documents.
 
+Supporting package parts pass through a save byte-identical: Word
+settings, the theme part, document metadata (`docProps`), customXml
+data bindings, and even-page headers/footers all survive export.
+
 Right-to-left text is supported: `w:bidi` paragraphs render with the
 correct direction and alignment semantics, `w:rtl` runs and
 complex-script sizes (`w:szCs`) round-trip.

@@ -11,6 +11,10 @@ const REL_TYPES = {
   font: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
   footnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
   endnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
+  settings: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+  webSettings: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
+  theme: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+  customXml: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
   comments: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
   commentsExtended: "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
 } as const;
@@ -68,13 +72,19 @@ export function renderContentTypesXml(
  * `_rels/.rels` — the package-level relationships, pointing at the main
  * document part.
  */
-export function renderRootRelsXml(): string {
+export function renderRootRelsXml(
+  /** Extra package-level relationships (docProps parts). */
+  extra: readonly { type: string; target: string }[] = [],
+): string {
   const children = [
     el("Relationship", {
       Id: "rId1",
       Type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
       Target: "word/document.xml",
     }),
+    ...extra.map((r, i) =>
+      el("Relationship", { Id: `rId${i + 2}`, Type: r.type, Target: r.target }),
+    ),
   ];
   return xmlDocument(el("Relationships", { xmlns: NS.rel }, children));
 }

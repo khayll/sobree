@@ -40,7 +40,6 @@ export function emitHeadersAndFooters(doc: SobreeDocument, ctx: ExportContext): 
     const footerRefXml: string[] = [];
 
     const emit = (ref: HeaderFooterRef, kind: "header" | "footer"): void => {
-      if (ref.type === "even") return; // Scope cut.
       const body = doc.headerFooterBodies[ref.partId] ?? [];
       if (body.length === 0) return;
       let id = partIdToRid.get(ref.partId);
