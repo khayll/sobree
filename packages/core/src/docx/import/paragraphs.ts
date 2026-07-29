@@ -33,12 +33,28 @@ export interface ImportedParagraph {
 export function readParagraph(
   p: Element,
   activeComments: Set<number> = new Set(),
+  fieldSignals?: FieldSignals,
 ): ImportedParagraph {
   const items: ImportedItem[] = [];
-  collectParagraphChildren(p, items, undefined, activeComments);
+  collectParagraphChildren(p, items, undefined, activeComments, fieldSignals);
   const pPr = wFirst(p, "pPr");
   const format = pPr ? readParagraphFormat(pPr) : {};
   return { items, format };
+}
+
+/**
+ * Cross-paragraph field plumbing (OUT-params of one paragraph's walk).
+ * A `TOC` field opens in its first paragraph (begin + instrText +
+ * separate) and closes paragraphs later (`end` fldChar), so the
+ * per-paragraph collector can never pair them — the BODY walk reads
+ * these signals to stamp `ParagraphProperties.fieldWrap` membership
+ * over the span.
+ */
+export interface FieldSignals {
+  /** Instruction of a field left open when the paragraph ended. */
+  opened?: string;
+  /** Count of `end` fldChars with no matching open in this paragraph. */
+  unmatchedEnds: number;
 }
 
 /**
@@ -66,6 +82,7 @@ function collectParagraphChildren(
   out: ImportedItem[],
   revision: ImportedRun["revision"],
   activeComments: Set<number>,
+  fieldSignals?: FieldSignals,
 ): void {
   const tag = (run: ImportedRun): ImportedRun => {
     if (revision) run.revision = revision;
@@ -117,14 +134,14 @@ function collectParagraphChildren(
       // sdtContent, every run inside the control silently vanishes.
       const sdtContent = wFirst(child, "sdtContent");
       if (sdtContent) {
-        collectParagraphChildren(sdtContent, out, revision, activeComments);
+        collectParagraphChildren(sdtContent, out, revision, activeComments, fieldSignals);
       }
     } else if (child.localName === "ins" || child.localName === "del") {
       const nextRevision: ImportedRun["revision"] = {
         type: child.localName === "ins" ? "ins" : "del",
         ...readRevisionAttrs(child),
       };
-      collectParagraphChildren(child, out, nextRevision, activeComments);
+      collectParagraphChildren(child, out, nextRevision, activeComments, fieldSignals);
     } else if (child.localName === "bookmarkStart") {
       // Zero-length marker — carried as its own run so REF/PAGEREF/TOC
       // targets survive the round-trip at their exact offsets.
@@ -159,6 +176,16 @@ function collectParagraphChildren(
     // caller or silently dropped — the highlighted range carries the
     // visual signal, so the reference glyph is redundant.
   }
+
+  // Cross-paragraph field bookkeeping: expose what this walk left open
+  // or closed (read the instruction BEFORE the flush resets it), and
+  // keep the open field's already-read result content as real runs.
+  if (fieldSignals) {
+    const opened = fields.openInstruction();
+    if (opened) fieldSignals.opened = opened;
+    fieldSignals.unmatchedEnds += fields.unmatchedEnds;
+  }
+  fields.flushOpenAsRuns();
 }
 
 /**

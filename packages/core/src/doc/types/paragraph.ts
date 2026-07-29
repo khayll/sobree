@@ -32,6 +32,17 @@ export interface ParagraphProperties {
    *  transports block properties: the Y.Doc codec, the structured
    *  clipboard, and split/merge property inheritance. */
   sdt?: SdtWrap;
+  /**
+   * Multi-paragraph complex-field membership (`TOC` today). The field
+   * OPENS in the first member paragraph (fldChar begin + instrText +
+   * separate before its entries) and CLOSES in the last (fldChar end);
+   * every spanned paragraph carries the same `id`. Carried in
+   * properties — like `sdt` — so it rides every channel that transports
+   * block properties. The exporter re-emits the field chars from
+   * first/last membership, which is what lets Word "Update Table of
+   * Contents" again after a Sobree save.
+   */
+  fieldWrap?: { id: number; instruction: string };
   /** Reference to a `NamedStyle.id` of type "paragraph". */
   styleId?: string;
   alignment?: ParagraphAlignment;
