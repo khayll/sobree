@@ -1,5 +1,28 @@
 # @sobree/core
 
+## 0.1.74
+
+### Patch Changes
+
+- 06292e4: Block-level bookmark markers survive import. `w:bookmarkStart`/`End`
+  written as direct children of the body or a table cell (Word's shape
+  for TOC targets that open before the first paragraph, and `_GoBack`)
+  were silently dropped; they now normalize into the nearest paragraph,
+  so PAGEREF/TOC entries pointing at them resolve instead of dangling.
+- e4dd4b4: Right-to-left support: `w:bidi` paragraphs render with `dir="rtl"` and
+  Word's logical alignment semantics (start/end follow the paragraph
+  direction), `w:rtl` runs keep their direction in mixed LTR/RTL text,
+  and complex-script sizes (`w:szCs`) round-trip when they differ from
+  the Latin size. Explicit-off toggles from RTL-enabled Word installs
+  normalize away instead of bloating LTR documents.
+- f30fa5a: Word can update the table of contents again after a save. The
+  multi-paragraph `TOC` complex field was flattened to its cached entry
+  paragraphs on import; the field identity (begin + instruction +
+  separate … end) now survives as paragraph membership and is re-emitted
+  on export, so the saved document keeps a live, refreshable TOC. A
+  first-paragraph entry of a non-hyperlinked TOC — previously swallowed
+  with the unterminated field — also survives now.
+
 ## 0.1.73
 
 ### Patch Changes
