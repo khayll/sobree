@@ -210,10 +210,15 @@ function renderTextRun(
   // editor root carries `sobree-show-hidden` (toggled via the
   // `showHiddenText` option / `setShowHiddenText`). Keeping it class-driven
   // means the toggle is a single class flip, no re-render.
-  if (style || p.hidden) {
+  if (style || p.hidden || p.rtl) {
     const span = document.createElement("span");
     if (style) span.setAttribute("style", style);
     if (p.hidden) span.className = "sobree-hidden";
+    // `<w:rtl/>` — explicit direction on the run span keeps mixed
+    // LTR/RTL neighbours ordered the way Word resolved them, instead of
+    // leaving it to the UBA's first-strong guess. The DOM serializer
+    // reads `dir` back into `rtl`.
+    if (p.rtl) span.dir = "rtl";
     span.appendChild(node);
     node = span;
   }

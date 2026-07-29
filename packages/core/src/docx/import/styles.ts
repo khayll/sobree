@@ -430,6 +430,10 @@ function readParagraphProperties(pPr: Element): ParagraphProperties | undefined 
   const contextualSpacing = wToggleOn(wFirst(pPr, "contextualSpacing"));
   if (contextualSpacing !== undefined) out.contextualSpacing = contextualSpacing;
 
+  // <w:bidi/> — an RTL paragraph style (e.g. a Normal style in an
+  // Arabic template) flows to paragraphs through the cascade.
+  if (wToggleOn(wFirst(pPr, "bidi")) === true) out.bidi = true;
+
   // <w:pBdr> — divider rules. Word puts the top/bottom rule of a
   // letterhead/résumé header on a STYLE (e.g. a "Name" style's top rule),
   // so read it here too, not just on direct paragraphs.

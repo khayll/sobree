@@ -115,7 +115,9 @@ function walk(node: Node, inherited: RunProperties, out: InlineRun[]): void {
       descend(node, withStyle(node, inherited, { fontFamily: "Consolas" }), out);
       return;
     case "span": {
-      const merged = mergeStyleAttribute(inherited, node.getAttribute("style"));
+      let merged = mergeStyleAttribute(inherited, node.getAttribute("style"));
+      // Inverse of the renderer's rtl span: `dir="rtl"` → RunProperties.rtl.
+      if (node.getAttribute("dir") === "rtl") merged = { ...merged, rtl: true };
       descend(node, merged, out);
       return;
     }

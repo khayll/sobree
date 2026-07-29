@@ -191,9 +191,15 @@ function paragraphFromElement(el: HTMLElement, forcedStyleId?: string): Paragrap
     if (m) properties.styleId = `Heading${m[1]}`;
   }
 
+  // Inverse of the renderer's bidi mapping: `dir="rtl"` → bidi, and the
+  // PHYSICAL text-align swaps back to the LOGICAL alignment the model
+  // stores (renderer: logical left ≡ start → physical right under bidi).
+  const bidi = el.dir === "rtl";
+  if (bidi) properties.bidi = true;
   const align = el.style.textAlign;
   if (align === "left" || align === "right" || align === "center") {
-    properties.alignment = align;
+    properties.alignment =
+      bidi && align !== "center" ? (align === "left" ? "right" : "left") : align;
   } else if (align === "justify") {
     properties.alignment = "both";
   }

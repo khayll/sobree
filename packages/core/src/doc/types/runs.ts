@@ -192,6 +192,15 @@ export interface HyperlinkRun {
 export interface RunProperties {
   /** Reference to a `NamedStyle.id` of type "character". */
   styleId?: string;
+  /** `<w:rtl/>` — complex-script right-to-left run. Stored only when true. */
+  rtl?: boolean;
+  /**
+   * `<w:szCs>` complex-script size in pt — stored ONLY when it differs
+   * from `fontSizePt` (the exporter mirrors `fontSizePt` otherwise).
+   * Round-trip only for now; the renderer sizes rtl runs from
+   * `fontSizePt` (csPt rendering + bCs/iCs are the noted follow-up).
+   */
+  fontSizeCsPt?: number;
   bold?: boolean;
   italic?: boolean;
   /** Underline style — most callers want `"single"`. */

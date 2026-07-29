@@ -284,6 +284,9 @@ function renderPPr(
       ),
     );
   }
+  // <w:bidi/> BEFORE <w:jc> (CT_PPrBase declaration order). `alignment`
+  // is logical, matching the wire — no swap on either side.
+  if (props.bidi) parts.push(el("w:bidi"));
   if (props.alignment && props.alignment !== "left") {
     parts.push(el("w:jc", { "w:val": props.alignment }));
   }

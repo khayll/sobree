@@ -76,6 +76,10 @@ lock paper sizes, margins, headers / footers, vAlign, title-page
 sections, tables, images, page numbering fields, numbering definitions,
 and multi-section documents.
 
+Right-to-left text is supported: `w:bidi` paragraphs render with the
+correct direction and alignment semantics, `w:rtl` runs and
+complex-script sizes (`w:szCs`) round-trip.
+
 Internal hyperlinks (`w:anchor`) and bookmarks round-trip, and
 `PAGEREF` fields — including the ones inside Word TOC entries — show
 live page numbers that follow the editor's own pagination.
