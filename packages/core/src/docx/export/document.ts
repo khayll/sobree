@@ -429,12 +429,16 @@ function renderPPr(
   // per CT_PPr ordering.
   if (props.runDefaults) {
     const rd: string[] = [];
-    if (props.runDefaults.fontFamily) {
+    if (props.runDefaults.fontFamily || props.runDefaults.fontThemeSlot) {
       rd.push(
         el("w:rFonts", {
-          "w:ascii": props.runDefaults.fontFamily,
-          "w:hAnsi": props.runDefaults.fontFamily,
-          "w:cs": props.runDefaults.fontFamily,
+          ...(props.runDefaults.fontFamily
+            ? {
+                "w:ascii": props.runDefaults.fontFamily,
+                "w:hAnsi": props.runDefaults.fontFamily,
+                "w:cs": props.runDefaults.fontFamily,
+              }
+            : {}),
           ...(props.runDefaults.fontThemeSlot
             ? {
                 "w:asciiTheme": `${props.runDefaults.fontThemeSlot}HAnsi`,

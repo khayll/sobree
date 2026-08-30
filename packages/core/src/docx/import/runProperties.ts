@@ -93,16 +93,25 @@ export function readRunProperties(rPr: Element): RunProperties | undefined {
       rFonts.getAttributeNS(NS.w, "hAnsi") ??
       rFonts.getAttribute("w:hAnsi");
     if (font) out.fontFamily = font;
-    // Theme slot (`w:asciiTheme="majorHAnsi"` / `minorHAnsi`, hAnsi
-    // twin) — recorded as SYNTAX here; the import post-pass resolves it
-    // against the document's fontScheme, and per §17.3.2.26 the theme
-    // reference supersedes any literal `w:ascii` next to it.
+    // Theme slot — recorded as SYNTAX here; the import post-pass
+    // resolves it against the fontScheme's LATIN faces, and per
+    // §17.3.2.26 the theme reference supersedes any literal `w:ascii`
+    // next to it. ONLY the Latin-slot values (majorAscii/majorHAnsi and
+    // minor twins) are recorded: ST_Theme also allows
+    // majorEastAsia/majorBidi (CJK Word styles bind the ASCII range to
+    // the East-Asian face), and classifying those as Latin major would
+    // overwrite the correct EA literal with the Latin face AND rewrite
+    // the reference to `*HAnsi` on save — corruption, not degradation.
+    // EastAsia/Bidi references keep their literal and drop the linkage,
+    // matching the eastAsia/cs follow-up note above.
     const themeAttr =
       rFonts.getAttributeNS(NS.w, "asciiTheme") ??
       rFonts.getAttribute("w:asciiTheme") ??
       rFonts.getAttributeNS(NS.w, "hAnsiTheme") ??
       rFonts.getAttribute("w:hAnsiTheme");
-    if (themeAttr) out.fontThemeSlot = themeAttr.startsWith("major") ? "major" : "minor";
+    if (themeAttr && /^(major|minor)(Ascii|HAnsi)$/.test(themeAttr)) {
+      out.fontThemeSlot = themeAttr.startsWith("major") ? "major" : "minor";
+    }
   }
 
   // <w:sz w:val="22"/> — value is in HALF-POINTS, so 22 = 11pt.

@@ -177,10 +177,14 @@ function mapParagraphFormat(f: ParagraphFormat): ParagraphProperties {
   // Mark-format → ParagraphProperties.runDefaults. Renderer cascades
   // these onto the paragraph element, so empty paragraphs render at
   // the paragraph mark's font (not the browser default).
-  if (f.markFormat && (f.markFormat.fontFamily || f.markFormat.fontSizePt !== undefined)) {
+  if (
+    f.markFormat &&
+    (f.markFormat.fontFamily || f.markFormat.fontSizePt !== undefined || f.markFormat.fontThemeSlot)
+  ) {
     const runDefaults: RunProperties = { ...(out.runDefaults ?? {}) };
     if (f.markFormat.fontFamily) runDefaults.fontFamily = f.markFormat.fontFamily;
     if (f.markFormat.fontSizePt !== undefined) runDefaults.fontSizePt = f.markFormat.fontSizePt;
+    if (f.markFormat.fontThemeSlot) runDefaults.fontThemeSlot = f.markFormat.fontThemeSlot;
     out.runDefaults = runDefaults;
   }
   return out;

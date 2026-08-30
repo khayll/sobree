@@ -77,7 +77,7 @@ export function parseStylesXml(
   },
   /** Theme font scheme — the real source of the heading/body baseline
    *  faces the hardcoded literals below stand in for. */
-  themeFonts?: { major?: string; minor?: string },
+  themeFonts?: import("../../doc/types/document").ThemeFonts,
 ): NamedStyle[] | null {
   if (!xml) return null;
   let doc: Document;
@@ -207,7 +207,7 @@ function ensureWordBaseline(
   styles: NamedStyle[],
   doc: Document,
   applyAutoSpacing: boolean,
-  themeFonts?: { major?: string; minor?: string },
+  themeFonts?: import("../../doc/types/document").ThemeFonts,
 ): void {
   // Find the explicit default-paragraph-style id from styles.xml
   // attribute markers.

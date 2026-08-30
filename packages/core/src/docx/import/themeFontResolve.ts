@@ -15,38 +15,39 @@
  */
 
 import type { AnchoredFrame, Block, RunProperties, SobreeDocument } from "../../doc/types";
-import { walk, walkBlock } from "../../doc/walk";
+import { walkBlock } from "../../doc/walk";
 
 export function resolveThemeFontSlots(doc: SobreeDocument): void {
   const fonts = doc.themeFonts;
   if (!fonts || (fonts.major === undefined && fonts.minor === undefined)) return;
 
   const apply = (props: RunProperties | undefined): void => {
-    if (!props?.fontThemeSlot) return;
-    const face = fonts[props.fontThemeSlot];
-    if (face) props.fontFamily = face;
-  };
-  const applyBlocks = (blocks: readonly Block[] | undefined): void => {
-    for (const b of blocks ?? []) {
-      walkBlock(b, {
-        paragraph: (p) => {
-          apply(p.properties.runDefaults);
-        },
-        run: (r) => {
-          apply((r as { properties?: RunProperties }).properties);
-        },
-      });
+    if (!props) return;
+    if (props.fontThemeSlot) {
+      const face = fonts[props.fontThemeSlot];
+      if (face) props.fontFamily = face;
     }
+    // The tracked format-change snapshot is a RunProperties too.
+    apply(props.revisionFormat?.before);
   };
-
-  walk(doc, {
-    paragraph: (p) => {
+  const visitor = {
+    block: (b: Block) => {
+      // walkBlock descends paragraph/table only; inline_frame textbox
+      // bodies (body OR header/footer parts) are visited here.
+      if (b.kind === "inline_frame") for (const tb of b.textboxes) applyBlocks(tb.body);
+    },
+    paragraph: (p: { properties: { runDefaults?: RunProperties } }) => {
       apply(p.properties.runDefaults);
     },
-    run: (r) => {
+    run: (r: unknown) => {
       apply((r as { properties?: RunProperties }).properties);
     },
-  });
+  };
+  const applyBlocks = (blocks: readonly Block[] | undefined): void => {
+    for (const b of blocks ?? []) walkBlock(b, visitor);
+  };
+
+  applyBlocks(doc.body);
   for (const body of Object.values(doc.headerFooterBodies ?? {})) applyBlocks(body);
   for (const body of Object.values(doc.footnotes ?? {})) applyBlocks(body);
   for (const body of Object.values(doc.endnotes ?? {})) applyBlocks(body);

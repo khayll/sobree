@@ -7,6 +7,13 @@ import type { NumberingDefinition } from "./numbering";
 import type { SectionProperties } from "./sections";
 import type { NamedStyle } from "./styles";
 
+/** Theme font scheme (`<a:fontScheme>`): major = heading face, minor =
+ *  body face — the LATIN slots only (eastAsia/cs are a follow-up). */
+export interface ThemeFonts {
+  major?: string;
+  minor?: string;
+}
+
 export interface SobreeDocument {
   /** Top-level body content, in document order. */
   body: Block[];
@@ -62,7 +69,7 @@ export interface SobreeDocument {
    * the major (heading) and minor (body) Latin typefaces. What
    * `fontThemeSlot` references resolve against.
    */
-  themeFonts?: { major?: string; minor?: string };
+  themeFonts?: ThemeFonts;
   /**
    * Comments keyed by id. Body inline runs whose properties carry a
    * matching `commentIds` mark the range each comment annotates.

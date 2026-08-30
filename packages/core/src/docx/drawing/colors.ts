@@ -48,20 +48,16 @@ export function parseThemeXml(xml: string | undefined): ThemePalette | undefined
 }
 
 /**
- * Parse the theme's `<a:fmtScheme><a:lnStyleLst>` outline widths (EMU), in
- * order. A shape's `<a:lnRef idx="N">` references the Nth (1-based) entry
- * for its outline WIDTH, while the lnRef's own colour child gives the
- * stroke colour. Empty when the theme omits the list.
- */
-/**
  * `<a:fontScheme>` — the theme's major (heading) and minor (body) Latin
  * typefaces. What `w:asciiTheme="majorHAnsi"` etc. resolve against, and
  * the source of truth the styles baseline previously hardcoded as
  * "Calibri Light" / "Calibri" (the Office-default theme's faces).
  */
+export type { ThemeFonts } from "../../doc/types/document";
+
 export function parseThemeFontScheme(
   xml: string | undefined,
-): { major?: string; minor?: string } | undefined {
+): import("../../doc/types/document").ThemeFonts | undefined {
   if (!xml) return undefined;
   let doc: Document;
   try {
@@ -71,7 +67,7 @@ export function parseThemeFontScheme(
   }
   const read = (slot: "majorFont" | "minorFont"): string | undefined => {
     const el = doc.getElementsByTagNameNS(NS.a, slot)[0];
-    const latin = el ? Array.from(el.children).find((c) => c.localName === "latin") : undefined;
+    const latin = el ? firstA(el, "latin") : undefined;
     const face = latin?.getAttribute("typeface")?.trim();
     return face ? face : undefined;
   };
@@ -81,6 +77,12 @@ export function parseThemeFontScheme(
   return { ...(major ? { major } : {}), ...(minor ? { minor } : {}) };
 }
 
+/**
+ * Parse the theme's `<a:fmtScheme><a:lnStyleLst>` outline widths (EMU), in
+ * order. A shape's `<a:lnRef idx="N">` references the Nth (1-based) entry
+ * for its outline WIDTH, while the lnRef's own colour child gives the
+ * stroke colour. Empty when the theme omits the list.
+ */
 export function parseThemeLineWidthsEmu(xml: string | undefined): number[] {
   if (!xml) return [];
   let doc: Document;

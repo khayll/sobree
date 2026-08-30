@@ -125,6 +125,30 @@ describe("theme font scheme", () => {
     expect(run.properties.fontFamily).toBeUndefined();
   });
 
+  it("EastAsia theme references are left untouched (no Latin-slot corruption)", async () => {
+    // ja-JP Word binds the ASCII range to the East-Asian face via
+    // asciiTheme="majorEastAsia". Classifying that as Latin "major"
+    // would overwrite the correct MS-Gothic literal with the Latin face
+    // AND rewrite the reference to majorHAnsi on save — corruption. The
+    // reader records Latin slots only; EA/Bidi refs keep their literal.
+    const { document: doc } = await importDocx(
+      buildDocx({
+        bodyXml: `<w:p><w:r>
+          <w:rPr><w:rFonts w:ascii="MS Gothic" w:asciiTheme="majorEastAsia"/></w:rPr>
+          <w:t>CJK heading</w:t>
+        </w:r></w:p>`,
+      }),
+    );
+    const run = (doc.body[0] as Paragraph).runs[0] as TextRun;
+    expect(run.properties.fontFamily).toBe("MS Gothic");
+    expect(run.properties.fontThemeSlot).toBeUndefined();
+    const xml = new TextDecoder().decode(
+      unzipSync(exportDocx(doc).bytes)["word/document.xml"],
+    );
+    expect(xml).toContain('w:ascii="MS Gothic"');
+    expect(xml.includes("majorHAnsi")).toBe(false);
+  });
+
   it("export re-emits the theme linkage and the round trip is a fixpoint", async () => {
     const { document: doc } = await importDocx(
       buildDocx({
