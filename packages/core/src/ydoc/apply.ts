@@ -217,6 +217,7 @@ function diffMeta(meta: Y.Map<string>, doc: SobreeDocument): void {
   if (meta.has(Y_META_FIELDS.headerFooterFrames)) meta.delete(Y_META_FIELDS.headerFooterFrames);
   setIfChanged(meta, Y_META_FIELDS.footnotes, JSON.stringify(doc.footnotes ?? {}));
   setIfChanged(meta, Y_META_FIELDS.endnotes, JSON.stringify(doc.endnotes ?? {}));
+  setIfChanged(meta, Y_META_FIELDS.themeFonts, JSON.stringify(doc.themeFonts ?? {}));
   setIfChanged(meta, Y_META_FIELDS.comments, JSON.stringify(doc.comments ?? {}));
   setIfChanged(meta, Y_META_FIELDS.settings, JSON.stringify(doc.settings ?? {}));
   setIfChanged(meta, Y_META_FIELDS.styles, JSON.stringify(doc.styles));

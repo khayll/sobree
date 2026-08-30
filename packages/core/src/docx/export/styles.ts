@@ -65,6 +65,12 @@ function runPropertiesToXml(props: RunProperties): string {
         "w:ascii": props.fontFamily,
         "w:hAnsi": props.fontFamily,
         "w:cs": props.fontFamily,
+        ...(props.fontThemeSlot
+          ? {
+              "w:asciiTheme": `${props.fontThemeSlot}HAnsi`,
+              "w:hAnsiTheme": `${props.fontThemeSlot}HAnsi`,
+            }
+          : {}),
       }),
     );
   }

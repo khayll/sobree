@@ -58,6 +58,12 @@ export interface SobreeDocument {
    */
   endnotes?: Record<number, Block[]>;
   /**
+   * Theme font scheme from `word/theme/theme1.xml` (`<a:fontScheme>`):
+   * the major (heading) and minor (body) Latin typefaces. What
+   * `fontThemeSlot` references resolve against.
+   */
+  themeFonts?: { major?: string; minor?: string };
+  /**
    * Comments keyed by id. Body inline runs whose properties carry a
    * matching `commentIds` mark the range each comment annotates.
    * Empty for docs without comments (the common case).

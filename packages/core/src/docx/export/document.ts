@@ -435,6 +435,12 @@ function renderPPr(
           "w:ascii": props.runDefaults.fontFamily,
           "w:hAnsi": props.runDefaults.fontFamily,
           "w:cs": props.runDefaults.fontFamily,
+          ...(props.runDefaults.fontThemeSlot
+            ? {
+                "w:asciiTheme": `${props.runDefaults.fontThemeSlot}HAnsi`,
+                "w:hAnsiTheme": `${props.runDefaults.fontThemeSlot}HAnsi`,
+              }
+            : {}),
         }),
       );
     }

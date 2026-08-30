@@ -311,6 +311,15 @@ function rprChildElements(props: RunProperties): string[] {
         "w:ascii": props.fontFamily,
         "w:hAnsi": props.fontFamily,
         "w:cs": props.fontFamily,
+        // Theme linkage preserved from import — Word retheming still
+        // works; the literals above are the resolved values (which the
+        // theme attrs supersede in any theme-aware consumer).
+        ...(props.fontThemeSlot
+          ? {
+              "w:asciiTheme": `${props.fontThemeSlot}HAnsi`,
+              "w:hAnsiTheme": `${props.fontThemeSlot}HAnsi`,
+            }
+          : {}),
       }),
     );
   }

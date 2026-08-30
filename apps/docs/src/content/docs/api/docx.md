@@ -76,6 +76,10 @@ lock paper sizes, margins, headers / footers, vAlign, title-page
 sections, tables, images, page numbering fields, numbering definitions,
 and multi-section documents.
 
+Theme fonts resolve against the document's font scheme: headings and
+body text follow `theme1.xml`'s major/minor faces rather than a
+hardcoded default, and the theme linkage survives a save.
+
 Supporting package parts pass through a save byte-identical: Word
 settings, the theme part, document metadata (`docProps`), customXml
 data bindings, and even-page headers/footers all survive export.

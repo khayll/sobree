@@ -93,6 +93,16 @@ export function readRunProperties(rPr: Element): RunProperties | undefined {
       rFonts.getAttributeNS(NS.w, "hAnsi") ??
       rFonts.getAttribute("w:hAnsi");
     if (font) out.fontFamily = font;
+    // Theme slot (`w:asciiTheme="majorHAnsi"` / `minorHAnsi`, hAnsi
+    // twin) — recorded as SYNTAX here; the import post-pass resolves it
+    // against the document's fontScheme, and per §17.3.2.26 the theme
+    // reference supersedes any literal `w:ascii` next to it.
+    const themeAttr =
+      rFonts.getAttributeNS(NS.w, "asciiTheme") ??
+      rFonts.getAttribute("w:asciiTheme") ??
+      rFonts.getAttributeNS(NS.w, "hAnsiTheme") ??
+      rFonts.getAttribute("w:hAnsiTheme");
+    if (themeAttr) out.fontThemeSlot = themeAttr.startsWith("major") ? "major" : "minor";
   }
 
   // <w:sz w:val="22"/> — value is in HALF-POINTS, so 22 = 11pt.

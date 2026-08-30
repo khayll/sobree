@@ -26,6 +26,7 @@ export {
   computeThemeBlipLuminance,
   parseThemeFillStyles,
   parseThemeLineWidthsEmu,
+  parseThemeFontScheme,
   parseThemeXml,
   readDrawingColor,
   resolveThemeFillEntry,
