@@ -16,10 +16,6 @@
  *   - `inline_frame` blocks whose group holds NEITHER a textbox nor a
  *     picture (pure decorative shape groups) are not exported — no
  *     import path reclaims that wire shape yet.
- *   - EVEN-page header/footer parts are not emitted (`emitHeadersAndFooters`
- *     skips `type === "even"` refs — a pre-existing scope cut; proper
- *     support needs `w:evenAndOddHeaders` settings plumbing). Their
- *     bodies AND floating frames drop on save.
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -72,6 +68,39 @@ function blockSignatures(blocks: readonly Block[]): string[] {
  *  closed, so the whole block structure must survive. */
 function noteSignatures(doc: SobreeDocument): unknown {
   return JSON.parse(JSON.stringify(doc.footnotes ?? {}));
+}
+
+/**
+ * Opaque parts carried byte-for-byte (settings / webSettings / theme /
+ * docProps / customXml) plus per-section header/footer ref lists (type +
+ * partId — even refs included). A dropped or mutated part shows up as a
+ * length/hash mismatch here.
+ */
+function opaqueSignatures(doc: SobreeDocument): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [path, bytes] of Object.entries(doc.rawParts)) {
+    if (path.endsWith("/")) continue; // zip directory entries, not parts
+    if (
+      path === "word/settings.xml" ||
+      path === "word/webSettings.xml" ||
+      path === "word/theme/theme1.xml" ||
+      path.startsWith("docProps/") ||
+      path.startsWith("customXml/")
+    ) {
+      let hash = 0;
+      for (const b of bytes) hash = (hash * 31 + b) | 0;
+      out[path] = hash;
+    }
+  }
+  return out;
+}
+
+/** Header/footer ref lists per section — type + partId, even included. */
+function hfRefSignatures(doc: SobreeDocument): unknown {
+  return doc.sections.map((s) => ({
+    headers: s.headerRefs.map((r) => r.type).sort(),
+    footers: s.footerRefs.map((r) => r.type).sort(),
+  }));
 }
 
 /** Endnote bodies, deep equality — same bar as footnotes. */
@@ -128,19 +157,13 @@ function frameSignaturesOf(
 
 /**
  * Header/footer floating frames, per part, at the frame-signature bar.
- * Parts reachable ONLY through even-page refs are excluded — the even
- * scope cut above drops the whole part, frames included.
+ * Even-page parts are included — they round-trip since the opaque-parts
+ * slice removed the even scope cut.
  */
 function headerFrameSignatures(doc: SobreeDocument): Record<string, unknown[]> {
-  const emitted = new Set<string>();
-  for (const section of doc.sections) {
-    for (const ref of [...section.headerRefs, ...section.footerRefs]) {
-      if (ref.type !== "even") emitted.add(ref.partId);
-    }
-  }
   const out: Record<string, unknown[]> = {};
   for (const [partId, frames] of Object.entries(doc.headerFooterFrames ?? {})) {
-    if (frames.length === 0 || !emitted.has(partId)) continue;
+    if (frames.length === 0) continue;
     out[partId] = frameSignaturesOf(frames);
   }
   return out;
@@ -175,6 +198,8 @@ function expectedAfterExport(doc: SobreeDocument): {
   bodySignatures: string[];
   footnotes: unknown;
   endnotes: unknown;
+  opaqueParts: unknown;
+  hfRefs: unknown;
   comments: unknown;
   frames: unknown[];
   headerFrames: Record<string, unknown[]>;
@@ -190,6 +215,8 @@ function expectedAfterExport(doc: SobreeDocument): {
     bodySignatures: blockSignatures(body),
     footnotes: noteSignatures(doc),
     endnotes: endnoteSignatures(doc),
+    opaqueParts: opaqueSignatures(doc),
+    hfRefs: hfRefSignatures(doc),
     comments: commentSignatures(doc),
     frames: frameSignatures(doc),
     headerFrames: headerFrameSignatures(doc),
@@ -223,6 +250,13 @@ describe("export fixpoint — open → save preserves the document", () => {
       );
       expect(endnoteSignatures(d2), "endnote bodies (word/endnotes.xml round-trip)").toEqual(
         want.endnotes,
+      );
+      expect(
+        opaqueSignatures(d2),
+        "opaque parts (settings/theme/docProps/customXml bytes)",
+      ).toEqual(want.opaqueParts);
+      expect(hfRefSignatures(d2), "header/footer ref lists (even refs included)").toEqual(
+        want.hfRefs,
       );
       expect(
         commentSignatures(d2),

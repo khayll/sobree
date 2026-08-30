@@ -8,6 +8,7 @@ import { renderDocumentXml } from "./document";
 import { emitHeadersAndFooters } from "./headers";
 import { emitCommentsParts, emitEndnotesPart, emitFootnotesPart } from "./notes";
 import { renderNumberingXml } from "./numbering";
+import { emitOpaqueParts } from "./opaqueParts";
 import { renderStylesXml } from "./styles";
 import { type DocxParts, packageDocx } from "./zip";
 
@@ -68,6 +69,11 @@ export function exportDocx(doc: SobreeDocument): DocxExportResult {
   // the part / rel / content-type bookkeeping.
   mountFontTableArtifacts(doc, ctx);
 
+  // Opaque parts (settings / theme / docProps / customXml) — carried
+  // byte-for-byte from rawParts with their rels + content types. See
+  // opaqueParts.ts for what qualifies and why.
+  const rootRels = emitOpaqueParts(doc, ctx);
+
   // Safety net: emitters above stage every referenced part into
   // `ctx.parts` as they encounter it. This loop catches any live part
   // whose bytes live in `doc.rawParts` but never got staged through an
@@ -86,7 +92,7 @@ export function exportDocx(doc: SobreeDocument): DocxExportResult {
       ctx.contentTypeOverrides,
       Array.from(ctx.mediaExtensions),
     ),
-    "_rels/.rels": renderRootRelsXml(),
+    "_rels/.rels": renderRootRelsXml(rootRels),
     "word/_rels/document.xml.rels": renderDocumentRelsXml(ctx.relationships),
     "word/document.xml": documentXml,
     "word/styles.xml": renderStylesXml(doc.styles),

@@ -254,6 +254,23 @@ export async function importDocx(
   for (const [path, bytes] of Object.entries(unzipped.binary)) {
     rawParts[path] = bytes;
   }
+  // OPAQUE XML parts (settings / webSettings / theme / docProps /
+  // customXml) also ride rawParts, byte-encoded — the exporter re-emits
+  // them verbatim (`emitOpaqueParts`). Everything else in `unzipped.text`
+  // is MODELED and regenerated on export, so folding it in here would
+  // just be dead weight (and a temptation to splice).
+  const opaqueEncoder = new TextEncoder();
+  for (const [path, xml] of Object.entries(unzipped.text)) {
+    if (
+      path === "word/settings.xml" ||
+      path === "word/webSettings.xml" ||
+      path === "word/theme/theme1.xml" ||
+      path.startsWith("docProps/") ||
+      path.startsWith("customXml/")
+    ) {
+      rawParts[path] = opaqueEncoder.encode(xml);
+    }
+  }
 
   // Font declarations + embedded font binaries. The bytes are already
   // in `rawParts` from the unzip pass — `mountFontTableFromZip` just
