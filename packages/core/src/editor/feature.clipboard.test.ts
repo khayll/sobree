@@ -298,6 +298,56 @@ describe("clipboard — copy a block, paste it below", () => {
     editor.destroy();
   });
 
+  it("repeat paste alternates blocks — the caret lands AFTER the pasted fragment", () => {
+    // Reported (Field Almanac screenshot): copy a complete kicker line + the
+    // "Rea" start of the next heading, then paste repeatedly. The caret used
+    // to land at the tail block's START — BEFORE the merged fragment — so
+    // every repeat paste inserted ahead of the previous one: the standalone
+    // blocks stacked up in a row ("Field Almanac" ×10) while the fragments
+    // glued together behind the caret ("ReaReaRea…"). Word alternates:
+    // fragment / block / fragment / block…
+    const editor = editorWith();
+    const blocks = [...host.querySelectorAll<HTMLElement>("[data-block-id]")];
+    const tn0 = document.createTreeWalker(blocks[0]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const tn1 = document.createTreeWalker(blocks[1]!, NodeFilter.SHOW_TEXT).nextNode() as Text;
+    const range = document.createRange();
+    range.setStart(tn0, 0); // "First line." fully covered (the kicker)
+    range.setEnd(tn1, 3); // "Dup|licate me." — the fragment
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const clip = makeClipboard();
+    fire(host, "copy", clip);
+
+    // Caret at the start of "Duplicate me." (like clicking before "Reading
+    // the Sky"), then paste twice — the second paste uses the caret the
+    // FIRST paste left behind.
+    const caret = document.createRange();
+    caret.setStart(tn1, 0);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+    fire(host, "paste", clip);
+    fire(host, "paste", clip);
+
+    const texts = (editor.getDocument().body as Paragraph[]).map((p) =>
+      p.runs.map((r) => (r.kind === "text" ? r.text : "")).join(""),
+    );
+    // Alternation, not stacking: each paste lays down kicker + fragment IN
+    // ORDER at the caret ("First line.¶Dup" twice at |Duplicate me. →
+    // kicker, Dup / kicker / DupDuplicate me.). The broken caret gave
+    // kicker, kicker stacked with "DupDup…" glued behind them.
+    expect(texts).toEqual([
+      "First line.",
+      "First line.",
+      "Dup",
+      "First line.",
+      "DupDuplicate me.",
+      "Last line.",
+    ]);
+    editor.destroy();
+  });
+
   it("cut of a partial multi-block selection removes ONLY the selection", () => {
     // Same root as the copy bug, but destructive: cut used to delete the
     // WHOLE endpoint blocks, taking text outside the selection with it.

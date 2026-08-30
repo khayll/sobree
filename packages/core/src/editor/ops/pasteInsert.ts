@@ -131,10 +131,16 @@ export function pasteBlocksAtCaret(
   }
   let tailRuns = after;
   let mergedTail = false;
+  // Where the pasted content ENDS inside the tail block — the caret's landing.
+  // A merged trailing fragment occupies the tail's head, so "after the paste"
+  // is after those runs; a pure remainder tail starts at the paste boundary.
+  let tailCaretOffset = 0;
   if (list.length > 0 && mergeLast) {
-    tailRuns = mergeAdjacentTextRuns([...(list[list.length - 1] as Paragraph).runs, ...after]);
+    const fragment = (list[list.length - 1] as Paragraph).runs;
+    tailRuns = mergeAdjacentTextRuns([...fragment, ...after]);
     list = list.slice(0, -1);
     mergedTail = true;
+    tailCaretOffset = runsLength(fragment);
   }
 
   // Caret at the very START of the block, first pasted block standing alone:
@@ -169,7 +175,11 @@ export function pasteBlocksAtCaret(
     };
     const res = insertBlockAfter(ctx, afterRef, tail);
     const ref = res.ok ? res.affected[0] : undefined;
-    if (ref) query.placeCaret(ctx, ref.id, 0);
+    // AFTER the pasted content — past a merged fragment, not before it.
+    // Landing at the tail's start put the caret BEFORE the fragment, so a
+    // repeat paste inserted ahead of the previous one: standalone blocks
+    // stacked up while the fragments glued together behind the caret.
+    if (ref) query.placeCaret(ctx, ref.id, tailCaretOffset);
   } else {
     query.placeCaret(ctx, afterRef.id, blockEndOffset(ctx, afterRef.id));
   }
@@ -219,10 +229,15 @@ function pasteIntoCell(
   }
   let tailRuns = after;
   let mergedTail = false;
+  // Caret landing inside the tail: after a merged fragment, else at the
+  // paste boundary (tail start) — same rule as the body path.
+  let tailCaretOffset = 0;
   if (list.length > 0 && mergeLast) {
-    tailRuns = mergeAdjacentTextRuns([...(list[list.length - 1] as Paragraph).runs, ...after]);
+    const fragment = (list[list.length - 1] as Paragraph).runs;
+    tailRuns = mergeAdjacentTextRuns([...fragment, ...after]);
     list = list.slice(0, -1);
     mergedTail = true;
+    tailCaretOffset = runsLength(fragment);
   }
 
   const head: Paragraph = { ...target.paragraph, runs: headRuns };
@@ -246,15 +261,15 @@ function pasteIntoCell(
   if (!body) return false;
   if (!ctx.commit({ body }, [{ type: "bump", index: target.index }]).ok) return true;
 
-  // The body path lands the caret at the START of the tail when there is one,
-  // else at the END of the last block it emitted. Same rule, cell coordinates:
-  // either way that's the last emitted block, so only the offset differs.
+  // Caret AFTER the pasted content, in cell coordinates: past a merged
+  // fragment in the tail, at the tail's start for a pure remainder, else at
+  // the end of the last block pasted — the body path's rule.
   const cell = caret.cell;
   if (!cell) return true;
   const last = emitted[emitted.length - 1];
   query.placeCaretAt(ctx, {
     block: caret.block,
-    offset: hasTail || last?.kind !== "paragraph" ? 0 : runsLength(last.runs),
+    offset: hasTail ? tailCaretOffset : last?.kind === "paragraph" ? runsLength(last.runs) : 0,
     cell: { ...cell, blockIndex: cell.blockIndex + emitted.length - 1 },
   });
   return true;
