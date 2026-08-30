@@ -14,7 +14,7 @@
  * the styles baseline fallback) stands — today's behavior.
  */
 
-import type { Block, RunProperties, SobreeDocument } from "../../doc/types";
+import type { AnchoredFrame, Block, RunProperties, SobreeDocument } from "../../doc/types";
 import { walk, walkBlock } from "../../doc/walk";
 
 export function resolveThemeFontSlots(doc: SobreeDocument): void {
@@ -51,6 +51,21 @@ export function resolveThemeFontSlots(doc: SobreeDocument): void {
   for (const body of Object.values(doc.footnotes ?? {})) applyBlocks(body);
   for (const body of Object.values(doc.endnotes ?? {})) applyBlocks(body);
   for (const c of Object.values(doc.comments ?? {})) applyBlocks(c.body);
+
+  // Textbox bodies live OUTSIDE the block tree: anchored frames (body +
+  // header/footer overlays, groups recursively) and inline-frame group
+  // textboxes each carry their own Block[].
+  const applyFrames = (frames: readonly AnchoredFrame[] | undefined): void => {
+    for (const f of frames ?? []) {
+      if (f.content.kind === "textbox") applyBlocks(f.content.body);
+      else if (f.content.kind === "group") applyFrames(f.content.children);
+    }
+  };
+  applyFrames(doc.anchoredFrames);
+  for (const frames of Object.values(doc.headerFooterFrames ?? {})) applyFrames(frames);
+  for (const frame of doc.inlineFrames ?? []) {
+    for (const tb of frame.textboxes) applyBlocks(tb.body);
+  }
 
   for (const style of doc.styles) {
     apply(style.runDefaults);
