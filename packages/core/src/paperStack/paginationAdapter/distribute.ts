@@ -327,6 +327,14 @@ function cloneEmptyRow(source: HTMLElement): HTMLElement {
   for (const attr of Array.from(source.attributes)) {
     trClone.setAttribute(attr.name, attr.value);
   }
+  // `w:trHeight` renders as a CSS `height` minimum on the source row —
+  // a minimum for the WHOLE row. Copying it onto every per-page
+  // fragment re-applies the full minimum per fragment: snap-ed's
+  // newsletter scaffold row (226mm ≈ 855px minimum, content split
+  // across three pages) rendered 3 × 855px and doubled the page count.
+  // Fragments size by their content; the engine's boxes already carry
+  // the row's true measured height.
+  trClone.style.removeProperty("height");
   for (const cell of Array.from(source.children)) {
     if (cell.tagName !== "TD" && cell.tagName !== "TH") continue;
     const cellClone = document.createElement(cell.tagName.toLowerCase());
