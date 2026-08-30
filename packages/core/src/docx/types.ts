@@ -61,7 +61,7 @@ export interface ParagraphFormat {
   /** Font properties of the paragraph mark itself, from
    *  `<w:pPr><w:rPr>`. Used by the renderer to size the paragraph's
    *  line height when there are no inline runs to provide a font. */
-  markFormat?: { fontFamily?: string; fontSizePt?: number };
+  markFormat?: { fontFamily?: string; fontSizePt?: number; fontThemeSlot?: "major" | "minor" };
   /** Paragraph background colour (`<w:shd w:fill="…">`). */
   shading?: import("../doc/types").Shading;
   /** Paragraph borders (`<w:pBdr>` — top / bottom / left / right /

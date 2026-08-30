@@ -57,6 +57,13 @@ const CHAINS: Array<{ match: RegExp; chain: string }> = [
     chain: `'Bookman Old Style', Bookman, 'URW Bookman L', 'Times New Roman', serif`,
   },
   { match: /^cambria$/i, chain: `Cambria, 'Times New Roman', serif` },
+  // Theme faces newly resolving via the fontScheme (healthcare's Book
+  // Antiqua major, stats-fact-sheet's Roboto Black major).
+  { match: /^book antiqua$/i, chain: `'Book Antiqua', Palatino, 'Palatino Linotype', serif` },
+  {
+    match: /^roboto black$/i,
+    chain: `'Roboto Black', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif`,
+  },
   { match: /^times new roman$/i, chain: `'Times New Roman', Times, serif` },
   { match: /^georgia$/i, chain: `Georgia, 'Times New Roman', serif` },
   // Common sans-serif neighbours.

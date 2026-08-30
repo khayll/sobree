@@ -223,11 +223,18 @@ function readCommentId(el: Element): number | null {
  * height-affecting fields, so the font/size parsing lives in exactly
  * one place.
  */
-function readMarkRunFormat(rPr: Element): { fontFamily?: string; fontSizePt?: number } {
+function readMarkRunFormat(rPr: Element): {
+  fontFamily?: string;
+  fontSizePt?: number;
+  fontThemeSlot?: "major" | "minor";
+} {
   const props = readRunProperties(rPr);
-  const out: { fontFamily?: string; fontSizePt?: number } = {};
+  const out: { fontFamily?: string; fontSizePt?: number; fontThemeSlot?: "major" | "minor" } = {};
   if (props?.fontFamily) out.fontFamily = props.fontFamily;
   if (props?.fontSizePt !== undefined) out.fontSizePt = props.fontSizePt;
+  // Theme slot rides along so the post-pass resolves the ¶-mark font —
+  // it drives an EMPTY paragraph's line height (§17.3.1.29).
+  if (props?.fontThemeSlot) out.fontThemeSlot = props.fontThemeSlot;
   return out;
 }
 
@@ -415,7 +422,7 @@ function readParagraphFormat(pPr: Element): ParagraphFormat {
     // re-use readRunFormat semantics by inlining a minimal read
     // (just font / size — the only properties that affect height).
     const markFormat = readMarkRunFormat(pPr_rPr);
-    if (markFormat.fontFamily || markFormat.fontSizePt !== undefined) {
+    if (markFormat.fontFamily || markFormat.fontSizePt !== undefined || markFormat.fontThemeSlot) {
       format.markFormat = markFormat;
     }
     const insEl = wFirst(pPr_rPr, "ins");

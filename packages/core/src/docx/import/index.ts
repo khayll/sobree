@@ -13,6 +13,7 @@ import {
   type ThemePalette,
   computeThemeBlipLuminance,
   parseThemeFillStyles,
+  parseThemeFontScheme,
   parseThemeLineWidthsEmu,
   parseThemeXml,
 } from "../drawing";
@@ -32,6 +33,7 @@ import { convertParagraph } from "./paragraph";
 import { parseRels } from "./rels";
 import { parseSettingsXml } from "./settings";
 import { parseStylesXml } from "./styles";
+import { resolveThemeFontSlots } from "./themeFontResolve";
 import { unzipDocx } from "./unzip";
 
 /**
@@ -286,7 +288,8 @@ export async function importDocx(
   // imported doc's typography (Calibri / Cambria heading, etc.)
   // survives. Only fall back to Sobree's synthesised defaults when
   // the docx genuinely omits styles.xml or the parse fails.
-  const importedStyles = parseStylesXml(unzipped.text["word/styles.xml"], settings);
+  const themeFonts = parseThemeFontScheme(unzipped.text["word/theme/theme1.xml"]);
+  const importedStyles = parseStylesXml(unzipped.text["word/styles.xml"], settings, themeFonts);
   const footnotes = parseFootnotesXml(unzipped.text["word/footnotes.xml"], { rels });
   const endnotes = parseEndnotesXml(unzipped.text["word/endnotes.xml"], { rels });
   const comments = parseCommentsXml(
@@ -307,6 +310,7 @@ export async function importDocx(
     fonts,
     ...(Object.keys(footnotes).length > 0 ? { footnotes } : {}),
     ...(Object.keys(endnotes).length > 0 ? { endnotes } : {}),
+    ...(themeFonts ? { themeFonts } : {}),
     ...(Object.keys(comments).length > 0 ? { comments } : {}),
     // Surface document-wide layout settings (defaultTabStop, column-balance
     // policy) so the renderer can apply them instead of CSS fallbacks.
@@ -331,6 +335,11 @@ export async function importDocx(
   if (doc.body.length === 0) {
     doc.body.push({ kind: "paragraph", properties: {}, runs: [] });
   }
+
+  // Resolve `fontThemeSlot` references against the fontScheme — after
+  // the whole document (body, zones, notes, styles) is assembled, so
+  // one pass covers every run home.
+  resolveThemeFontSlots(doc);
 
   return { document: doc, warnings };
 }

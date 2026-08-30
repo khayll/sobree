@@ -194,6 +194,7 @@ export const Y_META_FIELDS = {
   // vanish on refresh, defaultTabStop would revert).
   footnotes: "footnotes",
   endnotes: "endnotes",
+  themeFonts: "themeFonts",
   comments: "comments",
   settings: "settings",
   styles: "styles",

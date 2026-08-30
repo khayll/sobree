@@ -101,6 +101,11 @@ export function projectYDoc(ydoc: Y.Doc): {
   }
   const footnotes = parseMeta<Record<number, Block[]>>(meta, Y_META_FIELDS.footnotes, {});
   const endnotes = parseMeta<Record<number, Block[]>>(meta, Y_META_FIELDS.endnotes, {});
+  const themeFonts = parseMeta<{ major?: string; minor?: string }>(
+    meta,
+    Y_META_FIELDS.themeFonts,
+    {},
+  );
   const comments = parseMeta<Record<number, Comment>>(meta, Y_META_FIELDS.comments, {});
   const settings = parseMeta<NonNullable<SobreeDocument["settings"]>>(
     meta,
@@ -132,6 +137,7 @@ export function projectYDoc(ydoc: Y.Doc): {
       ...(Object.keys(headerFooterFrames).length > 0 ? { headerFooterFrames } : {}),
       ...(Object.keys(footnotes).length > 0 ? { footnotes } : {}),
       ...(Object.keys(endnotes).length > 0 ? { endnotes } : {}),
+      ...(Object.keys(themeFonts).length > 0 ? { themeFonts } : {}),
       ...(Object.keys(comments).length > 0 ? { comments } : {}),
       // Attach settings when it carries ANY field (defaultTabStop,
       // noColumnBalance, pageBackgroundColor, …) — gating on one specific

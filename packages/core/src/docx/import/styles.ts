@@ -75,6 +75,9 @@ export function parseStylesXml(
     doNotUseHTMLParagraphAutoSpacing: false,
     displayBackgroundShape: false,
   },
+  /** Theme font scheme — the real source of the heading/body baseline
+   *  faces the hardcoded literals below stand in for. */
+  themeFonts?: import("../../doc/types/document").ThemeFonts,
 ): NamedStyle[] | null {
   if (!xml) return null;
   let doc: Document;
@@ -174,7 +177,7 @@ export function parseStylesXml(
   //    style is the document default for paragraphs (Normal, or the
   //    one tagged `<w:default w:val="1"/>` if styles.xml uses that).
   //    Properties already specified by the docx win.
-  ensureWordBaseline(out, doc, shouldApplyAutoSpacing(settings));
+  ensureWordBaseline(out, doc, shouldApplyAutoSpacing(settings), themeFonts);
 
   return out.length > 0 ? out : null;
 }
@@ -200,7 +203,12 @@ export function parseStylesXml(
  * way of marking "the default style for this type") OR, failing that,
  * the style id `Normal`.
  */
-function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacing: boolean): void {
+function ensureWordBaseline(
+  styles: NamedStyle[],
+  doc: Document,
+  applyAutoSpacing: boolean,
+  themeFonts?: import("../../doc/types/document").ThemeFonts,
+): void {
   // Find the explicit default-paragraph-style id from styles.xml
   // attribute markers.
   let defaultStyleId: string | undefined;
@@ -268,7 +276,7 @@ function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacin
   const inheritedFontSize = resolved.runDefaults.fontSizePt;
   target.runDefaults = {
     ...existingRuns,
-    ...(inheritedFontFamily === undefined ? { fontFamily: "Calibri" } : {}),
+    ...(inheritedFontFamily === undefined ? { fontFamily: themeFonts?.minor ?? "Calibri" } : {}),
     ...(inheritedFontSize === undefined ? { fontSizePt: OOXML_DEFAULT_FONT_SIZE_PT } : {}),
   };
 
@@ -309,16 +317,16 @@ function ensureWordBaseline(styles: NamedStyle[], doc: Document, applyAutoSpacin
         keepNext: true,
       };
     }
-    // Heading font baseline: Word's modern theme uses "Calibri Light"
-    // for headings (the "Major Latin" font slot in the theme). When the
-    // docx doesn't declare a font on the Heading style (typical — the
-    // theme provides it), inject Calibri Light so headings render with
-    // their distinct typographic voice. Other run-default fields the
-    // docx already set (color, fontSizePt) are preserved.
+    // Heading font baseline: the theme's MAJOR Latin face — the slot
+    // Word's built-in Heading styles reference. The literal is only the
+    // no-theme-part fallback (the Office-default theme's face). A
+    // heading style that carries its own rFonts (literal or theme slot)
+    // is preserved; slot-only styles get this face overwritten by the
+    // theme post-pass anyway (same value, by construction).
     const existing = heading.runDefaults ?? {};
     heading.runDefaults = {
       ...existing,
-      fontFamily: existing.fontFamily ?? "Calibri Light",
+      fontFamily: existing.fontFamily ?? themeFonts?.major ?? "Calibri Light",
     };
   }
 

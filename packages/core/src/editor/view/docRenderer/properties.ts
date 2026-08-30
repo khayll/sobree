@@ -89,12 +89,19 @@ export function applyParagraphProps(
     runDefaults = { ...cascadeRunDefaults, ...markRpr };
   } else {
     // Content paragraph: the mark supplies font/colour the cascade omits
-    // (kept), but its SIZE must not override the cascade — that is the
-    // property that widened the recipe legend. Cascade size wins when it
-    // has one; the mark's size only survives where the cascade is silent.
+    // (kept), but neither its SIZE nor its FONT may override the cascade
+    // — the mark styles only the ¶ glyph (§17.3.1.29). Size was fixed
+    // first (the widened recipe legend); the font restoration became
+    // load-bearing when theme-slot resolution started populating mark
+    // fonts everywhere (gatech's TOC entries flipped Times New Roman →
+    // Calibri from their pPr-rPr minorHAnsi mark). Cascade wins when it
+    // has a value; the mark's only survives where the cascade is silent.
     runDefaults = { ...cascadeRunDefaults, ...markRpr };
     if (cascadeRunDefaults.fontSizePt !== undefined) {
       runDefaults = { ...runDefaults, fontSizePt: cascadeRunDefaults.fontSizePt };
+    }
+    if (cascadeRunDefaults.fontFamily !== undefined) {
+      runDefaults = { ...runDefaults, fontFamily: cascadeRunDefaults.fontFamily };
     }
   }
 

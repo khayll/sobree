@@ -59,12 +59,22 @@ function runPropertiesToXml(props: RunProperties): string {
     parts.push(el("w:u", { "w:val": props.underline }));
   }
   if (props.color) parts.push(el("w:color", { "w:val": props.color.replace(/^#/, "") }));
-  if (props.fontFamily) {
+  if (props.fontFamily || props.fontThemeSlot) {
     parts.push(
       el("w:rFonts", {
-        "w:ascii": props.fontFamily,
-        "w:hAnsi": props.fontFamily,
-        "w:cs": props.fontFamily,
+        ...(props.fontFamily
+          ? {
+              "w:ascii": props.fontFamily,
+              "w:hAnsi": props.fontFamily,
+              "w:cs": props.fontFamily,
+            }
+          : {}),
+        ...(props.fontThemeSlot
+          ? {
+              "w:asciiTheme": `${props.fontThemeSlot}HAnsi`,
+              "w:hAnsiTheme": `${props.fontThemeSlot}HAnsi`,
+            }
+          : {}),
       }),
     );
   }

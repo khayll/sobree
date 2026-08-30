@@ -195,6 +195,15 @@ export interface RunProperties {
   /** `<w:rtl/>` — complex-script right-to-left run. Stored only when true. */
   rtl?: boolean;
   /**
+   * Theme font slot from `<w:rFonts w:asciiTheme>` — "major" (headings)
+   * or "minor" (body). Pure SYNTAX at read time; the import post-pass
+   * resolves it against `SobreeDocument.themeFonts` into `fontFamily`
+   * (theme supersedes any literal `w:ascii`, ECMA-376 §17.3.2.26). Kept
+   * after resolution so export can re-emit the theme linkage and Word
+   * retheming still works on the saved file.
+   */
+  fontThemeSlot?: "major" | "minor";
+  /**
    * `<w:szCs>` complex-script size in pt — stored ONLY when it differs
    * from `fontSizePt` (the exporter mirrors `fontSizePt` otherwise).
    * Round-trip only for now; the renderer sizes rtl runs from
