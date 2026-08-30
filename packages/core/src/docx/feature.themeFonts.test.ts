@@ -142,9 +142,7 @@ describe("theme font scheme", () => {
     const run = (doc.body[0] as Paragraph).runs[0] as TextRun;
     expect(run.properties.fontFamily).toBe("MS Gothic");
     expect(run.properties.fontThemeSlot).toBeUndefined();
-    const xml = new TextDecoder().decode(
-      unzipSync(exportDocx(doc).bytes)["word/document.xml"],
-    );
+    const xml = new TextDecoder().decode(unzipSync(exportDocx(doc).bytes)["word/document.xml"]);
     expect(xml).toContain('w:ascii="MS Gothic"');
     expect(xml.includes("majorHAnsi")).toBe(false);
   });
